@@ -666,7 +666,7 @@ class FakeNotifier(AccountNotificationSender):
     ) -> None:
         self.sent.append((discord_user_id, result))
 
-    async def send_tracking_embed(self, discord_channel_id: int, embed) -> None:
+    async def send_tracking_embed(self, discord_channel_id: int, embed, *, channel_login: str | None = None) -> None:
         self.tracking_embeds.append((discord_channel_id, embed))
 
 
@@ -1241,6 +1241,7 @@ async def test_show_auto_replies_lists_attached_replies() -> None:
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         reply_repository=reply_repository,
+        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
     )
 
     result = await dispatch_show_command(
@@ -1251,9 +1252,9 @@ async def test_show_auto_replies_lists_attached_replies() -> None:
     )
 
     assert result.title == "Configuration Overview"
-    assert "pattern_id=`1`" in result.message
-    assert "mode=`reply`" in result.message
-    assert "message=`Hi there`" in result.message
+    assert "- #1" in result.message
+    assert "Trigger: `hello`" in result.message
+    assert "Reply: `Hi there`" in result.message
 
 
 @pytest.mark.asyncio

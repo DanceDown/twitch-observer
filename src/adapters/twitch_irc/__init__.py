@@ -109,6 +109,8 @@ class AnonymousTwitchIRCAdapter:
         self._writer: asyncio.StreamWriter | None = None
         self._nick = self._build_anonymous_nick(config.twitch_irc_nick_prefix)
         self._joined_channels: set[str] = set()
+        self._pending_channels: set[str] = set()
+        self._connected_event = asyncio.Event()
 
     @property
     def nick(self) -> str:
@@ -134,8 +136,10 @@ class AnonymousTwitchIRCAdapter:
         await self._send_line("CAP REQ :twitch.tv/tags twitch.tv/commands")
         await self._send_line(f"NICK {self._nick}")
         await self._send_line(f"USER {self._nick} 8 * :{self._nick}")
-        if self._config.twitch_irc_channels:
-            await self.join_channels(self._config.twitch_irc_channels)
+        self._connected_event.set()
+        initial_channels = list(self._config.twitch_irc_channels) + sorted(self._pending_channels)
+        if initial_channels:
+            await self.join_channels(initial_channels)
         else:
             print("No Twitch IRC channels configured yet; connection is ready for later joins.")
 
@@ -148,6 +152,9 @@ class AnonymousTwitchIRCAdapter:
             await self._writer.wait_closed()
         self._reader = None
         self._writer = None
+        self._connected_event.clear()
+        self._joined_channels.clear()
+        self._pending_channels.clear()
 
     async def handle_line(self, raw_line: str) -> None:
         """Handle one raw IRC line.
@@ -178,6 +185,11 @@ class AnonymousTwitchIRCAdapter:
         normalized = channel_login.strip().lstrip("#").lower()
         if not normalized or normalized in self._joined_channels:
             return
+        if self._writer is None:
+            self._pending_channels.add(normalized)
+            logger.debug("Queued Twitch IRC join for #%s until the adapter is connected.", normalized)
+            return
+        self._pending_channels.discard(normalized)
         await self._send_line(f"JOIN #{normalized}")
         self._joined_channels.add(normalized)
         logger.debug("Joined Twitch IRC channel #%s", normalized)
@@ -190,11 +202,19 @@ class AnonymousTwitchIRCAdapter:
     async def leave_channel(self, channel_login: str) -> None:
         """Leave one Twitch channel after normalizing the login."""
         normalized = channel_login.strip().lstrip("#").lower()
-        if not normalized or normalized not in self._joined_channels:
+        if not normalized:
+            return
+        if normalized in self._pending_channels:
+            self._pending_channels.remove(normalized)
+        if normalized not in self._joined_channels:
             return
         await self._send_line(f"PART #{normalized}")
         self._joined_channels.remove(normalized)
         logger.debug("Left Twitch IRC channel #%s", normalized)
+
+    async def wait_until_connected(self) -> None:
+        """Wait until the IRC connection is established and handshake lines were sent."""
+        await self._connected_event.wait()
 
     async def _read_loop(self) -> None:
         """Continuously read raw lines from the IRC socket."""

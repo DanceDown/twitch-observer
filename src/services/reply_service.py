@@ -13,6 +13,7 @@ from src.database.connection import (
     PatternRepository,
     ReplyRecord,
     ReplyRepository,
+    TrackedUserRepository,
     ThreadRecord,
     ThreadRepository,
     TwitchAccountRepository,
@@ -28,7 +29,7 @@ from src.events.event_types import (
 )
 from src.services.authz import thread_has_permission
 from src.utils.pattern_matching import matches_pattern
-from src.utils.discord_embeds import build_auto_reply_embed
+from src.utils.discord_embeds import build_auto_reply_embed, escape_discord_preserving_links
 from src.utils.permissions import ObserverPermission
 
 logger = logging.getLogger(__name__)
@@ -82,7 +83,7 @@ class ReplyCommandService:
         if pattern is None:
             return DiscordCommandResult(
                 title="Pattern Not Found",
-                message="No ping or regex rule with that ID exists in this Discord context.",
+                message="No ping or regex rule with that ID exists.",
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -108,7 +109,7 @@ class ReplyCommandService:
                     title="Reply Already Exists",
                     message=(
                         "This pattern already has an attached auto-reply. "
-                        "Remove it first with `/reply remove` before creating a new one."
+                        "Remove it first before creating a new one."
                     ),
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
@@ -124,9 +125,9 @@ class ReplyCommandService:
             return DiscordCommandResult(
                 title="Auto-Reply Added",
                 message=(
-                    f"Added an auto-reply to pattern `{pattern.p_index}`.\n"
-                    f"Mode: `{'reply' if created.reply_as_reply else 'message'}`\n"
-                    f"Message: `{created.reply_message}`"
+                    f"Added an auto-reply to pattern #{pattern.p_index}.\n"
+                    f"Mode: {'Reply to the matched message' if created.reply_as_reply else 'Send a separate Twitch message'}\n"
+                    f"Message: {escape_discord_preserving_links(created.reply_message)}"
                 ),
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
@@ -252,6 +253,7 @@ class AutoReplyService:
     reply_repository: ReplyRepository
     account_repository: TwitchAccountRepository
     twitch_api: TwitchAPIClient
+    tracked_user_repository: TrackedUserRepository | None = None
     notifier: object | None = None
     handled_messages: int = field(default=0, init=False)
     sent_replies: int = field(default=0, init=False)
@@ -293,6 +295,8 @@ class AutoReplyService:
             if account is None or not account.access_token:
                 logger.debug("Skipping auto-replies for thread_id=%s because no account is linked.", thread.thread_id)
                 continue
+            author_user = await self._safe_get_user_by_login(event.author_login)
+            channel_user = await self._safe_get_user_by_id(event.broadcaster_id)
             match = await self._find_matching_reply_pattern(thread, event, live_status, account.twitch_user_id)
             if match is None:
                 logger.debug("No reply-enabled pattern matched for thread_id=%s.", thread.thread_id)
@@ -322,6 +326,9 @@ class AutoReplyService:
                     thread=thread,
                     event=event,
                     pattern=matching_pattern,
+                    author_icon_url=None if author_user is None else author_user.profile_image_url,
+                    channel_display_name=None if channel_user is None else channel_user.display_name,
+                    channel_login=None if channel_user is None else channel_user.login,
                     reply=ReplyRecord(
                         thread_id=matching_reply.thread_id,
                         p_index=matching_reply.p_index,
@@ -354,6 +361,9 @@ class AutoReplyService:
                             thread=thread,
                             event=event,
                             pattern=matching_pattern,
+                            author_icon_url=None if author_user is None else author_user.profile_image_url,
+                            channel_display_name=None if channel_user is None else channel_user.display_name,
+                            channel_login=None if channel_user is None else channel_user.login,
                             reply=ReplyRecord(
                                 thread_id=matching_reply.thread_id,
                                 p_index=matching_reply.p_index,
@@ -395,37 +405,69 @@ class AutoReplyService:
         linked_twitch_user_id: str,
     ) -> tuple[PatternRecord, ReplyRecord] | None:
         for pattern in self.pattern_repository.list_active_patterns_for_thread(thread.thread_id):
-            if not matches_pattern(pattern, event):
-                logger.debug("Pattern %s did not match incoming message for auto-reply evaluation.", pattern.p_index)
+            effective_pattern = self._expand_all_tracked_users(thread.thread_id, pattern)
+            if not matches_pattern(effective_pattern, event):
+                logger.debug("Pattern %s did not match incoming message for auto-reply evaluation.", effective_pattern.p_index)
                 continue
             if (
                 event.author_id == linked_twitch_user_id
-                and pattern.user_scope_mode != "only_selected"
+                and effective_pattern.user_scope_mode != "only_selected"
             ):
                 logger.debug(
                     "Skipping self-triggered auto-reply for pattern %s because user_scope_mode=%s is not self-explicit.",
-                    pattern.p_index,
-                    pattern.user_scope_mode,
+                    effective_pattern.p_index,
+                    effective_pattern.user_scope_mode,
                 )
                 continue
             current_live_status = live_status
-            if pattern.offline_state != "both":
+            if effective_pattern.offline_state != "both":
                 if current_live_status is None and event.broadcaster_id:
                     current_live_status = await self.twitch_api.is_user_live(event.broadcaster_id)
-                if not self._offline_state_allows(pattern, current_live_status):
+                if not self._offline_state_allows(effective_pattern, current_live_status):
                     logger.debug(
                         "Pattern %s matched text but was filtered by offline_state=%s live_status=%s during auto-reply evaluation.",
-                        pattern.p_index,
-                        pattern.offline_state,
+                        effective_pattern.p_index,
+                        effective_pattern.offline_state,
                         current_live_status,
                     )
                     continue
-            reply = self.reply_repository.get_by_pattern(thread_id=thread.thread_id, p_index=pattern.p_index)
+            reply = self.reply_repository.get_by_pattern(thread_id=thread.thread_id, p_index=effective_pattern.p_index)
             if reply is None or reply.disabled:
-                logger.debug("Pattern %s matched first but has no enabled auto-reply attached.", pattern.p_index)
+                logger.debug("Pattern %s matched first but has no enabled auto-reply attached.", effective_pattern.p_index)
                 return None
-            return pattern, reply
+            return effective_pattern, reply
         return None
+
+    def _expand_all_tracked_users(self, thread_id: int, pattern: PatternRecord) -> PatternRecord:
+        if pattern.user_scope_mode not in {"all_tracked", "all_tracked_except_selected"}:
+            return pattern
+        if self.tracked_user_repository is None:
+            tracked_user_ids: tuple[str, ...] = ()
+        else:
+            tracked_user_ids = tuple(user.twitch_user_id for user in self.tracked_user_repository.list_users_for_thread(thread_id))
+        if pattern.user_scope_mode == "all_tracked_except_selected":
+            tracked_user_ids = tuple(
+                user_id for user_id in tracked_user_ids if user_id not in set(pattern.user_scope_ids)
+            )
+        return PatternRecord(
+            thread_id=pattern.thread_id,
+            p_index=pattern.p_index,
+            regex=pattern.regex,
+            channel_scope_mode=pattern.channel_scope_mode,
+            channel_scope_ids=pattern.channel_scope_ids,
+            user_scope_mode="only_selected",
+            user_scope_ids=tracked_user_ids,
+            sub_state=pattern.sub_state,
+            offline_state=pattern.offline_state,
+            is_regex=pattern.is_regex,
+            case_sensitive=pattern.case_sensitive,
+            color=pattern.color,
+            disabled=pattern.disabled,
+            notify=pattern.notify,
+            priority=pattern.priority,
+            reply_message=pattern.reply_message,
+            reply_as_reply=pattern.reply_as_reply,
+        )
 
     async def _ensure_account_token(self, account):
         if account.expires_at is None:
@@ -473,6 +515,9 @@ class AutoReplyService:
         event: TwitchChatMessageEvent,
         pattern: PatternRecord,
         reply: ReplyRecord,
+        author_icon_url: str | None = None,
+        channel_display_name: str | None = None,
+        channel_login: str | None = None,
     ) -> None:
         sender = getattr(self.notifier, "send_tracking_embed", None)
         if sender is None:
@@ -480,7 +525,16 @@ class AutoReplyService:
         source_channel = self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, event.broadcaster_id or "")
         await sender(
             thread.discord_channel_id,
-            build_auto_reply_embed(event=event, pattern=pattern, thread=thread, reply=reply, channel=source_channel),
+            build_auto_reply_embed(
+                event=event,
+                pattern=pattern,
+                thread=thread,
+                reply=reply,
+                channel=source_channel,
+                author_icon_url=author_icon_url,
+                channel_display_name=channel_display_name,
+            ),
+            channel_login=channel_login,
         )
 
     @staticmethod
@@ -508,6 +562,20 @@ class AutoReplyService:
                 ephemeral=False,
             ),
         )
+
+    async def _safe_get_user_by_login(self, login: str):
+        try:
+            return await self.twitch_api.get_user_by_login(login)
+        except Exception:
+            return None
+
+    async def _safe_get_user_by_id(self, user_id: str | None):
+        if not user_id:
+            return None
+        try:
+            return await self.twitch_api.get_user_by_id(user_id)
+        except Exception:
+            return None
 
     @staticmethod
     def _offline_state_allows(pattern: PatternRecord, live_status: bool | None) -> bool:

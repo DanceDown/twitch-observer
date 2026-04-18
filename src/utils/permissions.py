@@ -45,6 +45,14 @@ def permission_from_value(value: str) -> ObserverPermission:
     raise ValueError(f"Unsupported permission `{value}`.")
 
 
+def permissions_mask_from_values(values: tuple[str, ...]) -> int:
+    """Resolve multiple stable permission values into one bitmask."""
+    mask = 0
+    for value in values:
+        mask |= int(permission_from_value(value))
+    return mask
+
+
 def explicit_permission_labels(mask: int) -> tuple[str, ...]:
     """Return the explicitly stored permission names for one bitmask."""
     resolved = []

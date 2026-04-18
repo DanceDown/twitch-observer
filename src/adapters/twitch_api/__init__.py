@@ -37,6 +37,7 @@ class TwitchUser:
     user_id: str
     login: str
     display_name: str
+    profile_image_url: str | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -135,6 +136,7 @@ class TwitchAPIClient:
             user_id=user["id"],
             login=user["login"],
             display_name=user["display_name"],
+            profile_image_url=user.get("profile_image_url"),
         )
 
     async def get_user_by_id(self, user_id: str) -> TwitchUser:
@@ -170,6 +172,7 @@ class TwitchAPIClient:
             user_id=user["id"],
             login=user["login"],
             display_name=user["display_name"],
+            profile_image_url=user.get("profile_image_url"),
         )
 
     async def is_user_live(self, user_id: str) -> bool:

@@ -13,6 +13,7 @@ class EventType(StrEnum):
 
     DISCORD_THREAD_REQUESTED = "discord.thread.requested"
     DISCORD_CHANNEL_REQUESTED = "discord.channel.requested"
+    DISCORD_USER_REQUESTED = "discord.user.requested"
     DISCORD_PATTERN_REQUESTED = "discord.pattern.requested"
     DISCORD_PATTERN_EDIT_REQUESTED = "discord.pattern.edit.requested"
     DISCORD_ACCOUNT_REQUESTED = "discord.account.requested"
@@ -82,6 +83,17 @@ class DiscordChannelRequestedEvent:
     result_future: Future[DiscordCommandResult]
     color: str | None = None
     clear_color: bool = False
+
+
+@dataclass(slots=True, frozen=True)
+class DiscordUserRequestedEvent:
+    """Normalized command event for adding or removing tracked Twitch users."""
+
+    discord_channel_id: int
+    requester_id: int
+    action: str
+    twitch_user_login: str
+    result_future: Future[DiscordCommandResult]
 
 
 @dataclass(slots=True, frozen=True)
@@ -158,7 +170,7 @@ class DiscordPermissionRequestedEvent:
     requester_id: int
     action: str
     target_user_id: int
-    permission: str | None
+    permissions: tuple[str, ...] | None
     result_future: Future[DiscordCommandResult]
 
 

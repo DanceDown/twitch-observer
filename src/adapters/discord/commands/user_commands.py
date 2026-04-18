@@ -1,32 +1,32 @@
 from __future__ import annotations
 
-"""Slash-command registration for auto-reply management."""
+"""Slash-command registration for tracked Twitch users."""
 
 import discord
 
 from src.events.event_bus import EventBus
 
 from ..helpers import command_unavailable_result, send_initial_result
-from ..ui.reply_ui import ReplyMenuView
 from ..ui.shared import start_form
+from ..ui.user_ui import UserMenuView
 from ..ui_data import DiscordUIDataProvider
 
 
-def register_reply_commands(
+def register_user_commands(
     tree: discord.app_commands.CommandTree,
     event_bus: EventBus,
     ui_data_provider: DiscordUIDataProvider,
 ) -> None:
-    """Register the single-word `/reply` command."""
+    """Register the single-word `/user` command."""
 
-    @tree.command(name="reply", description="Add, remove, disable/enable automatic replies to pings.")
-    async def reply(interaction: discord.Interaction) -> None:
+    @tree.command(name="user", description="Add or remove tracked Twitch users.")
+    async def user(interaction: discord.Interaction) -> None:
         if interaction.channel_id is None:
             await send_initial_result(interaction, command_unavailable_result())
             return
         await start_form(
             interaction,
-            view=ReplyMenuView(
+            view=UserMenuView(
                 owner_id=interaction.user.id,
                 event_bus=event_bus,
                 data_provider=ui_data_provider,

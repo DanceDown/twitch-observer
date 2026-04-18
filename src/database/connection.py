@@ -3,6 +3,7 @@ from __future__ import annotations
 """Database access layer for PostgreSQL-backed persistence."""
 
 from dataclasses import dataclass
+from datetime import datetime
 
 import psycopg
 from psycopg.types.json import Jsonb
@@ -66,6 +67,14 @@ class ChannelRecord:
 
 
 @dataclass(slots=True, frozen=True)
+class TrackedUserRecord:
+    """Persisted tracked Twitch user for one thread."""
+
+    thread_id: int
+    twitch_user_id: str
+
+
+@dataclass(slots=True, frozen=True)
 class PatternRecord:
     """Persisted match rule for one thread."""
 
@@ -108,10 +117,22 @@ class UserPermissionRecord:
     permissions: int
 
 
+@dataclass(slots=True, frozen=True)
+class RecentMessageRecord:
+    """Compact stored Twitch message used for status text and lightweight displays."""
+
+    username: str
+    content: str
+    timestamp: datetime
+
+
 class MessageRepository:
     """Persistence interface for normalized Twitch chat messages."""
 
     def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:  # pragma: no cover - interface
+        raise NotImplementedError
+
+    def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:  # pragma: no cover - interface
         raise NotImplementedError
 
 
@@ -268,6 +289,28 @@ class ChannelRepository:
         raise NotImplementedError
 
     def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:  # pragma: no cover
+        raise NotImplementedError
+
+    def list_all_twitch_channel_ids(self) -> list[str]:  # pragma: no cover
+        raise NotImplementedError
+
+
+class TrackedUserRepository:
+    """Persistence interface for per-thread tracked Twitch users."""
+
+    def get_by_thread_and_twitch_user(self, thread_id: int, twitch_user_id: str) -> TrackedUserRecord | None:  # pragma: no cover
+        raise NotImplementedError
+
+    def add_user(self, thread_id: int, twitch_user_id: str) -> None:  # pragma: no cover
+        raise NotImplementedError
+
+    def remove_user(self, thread_id: int, twitch_user_id: str) -> None:  # pragma: no cover
+        raise NotImplementedError
+
+    def list_users_for_thread(self, thread_id: int) -> list[TrackedUserRecord]:  # pragma: no cover
+        raise NotImplementedError
+
+    def count_pattern_scope_references(self, *, thread_id: int, twitch_user_id: str) -> int:  # pragma: no cover
         raise NotImplementedError
 
 
@@ -468,6 +511,51 @@ class PostgresDatabase:
                 DROP COLUMN IF EXISTS use_twitch_colors
                 """
             )
+            cursor.execute(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_type t
+                        JOIN pg_enum e ON e.enumtypid = t.oid
+                        WHERE t.typname = 'user_scope_mode_enum' AND e.enumlabel = 'all_tracked'
+                    ) THEN
+                        ALTER TYPE USER_SCOPE_MODE_ENUM ADD VALUE 'all_tracked';
+                    END IF;
+                END $$;
+                """
+            )
+            cursor.execute(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_type t
+                        JOIN pg_enum e ON e.enumtypid = t.oid
+                        WHERE t.typname = 'user_scope_mode_enum' AND e.enumlabel = 'all_tracked_except_selected'
+                    ) THEN
+                        ALTER TYPE USER_SCOPE_MODE_ENUM ADD VALUE 'all_tracked_except_selected';
+                    END IF;
+                END $$;
+                """
+            )
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS tracked_user (
+                    thread_id INTEGER NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,
+                    twitch_user_id TEXT NOT NULL,
+                    PRIMARY KEY (thread_id, twitch_user_id)
+                )
+                """
+            )
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_tracked_user_twitch_user_id
+                ON tracked_user(twitch_user_id)
+                """
+            )
 
 
 @dataclass(slots=True)
@@ -506,6 +594,31 @@ class PostgresMessageRepository(MessageRepository):
                     event.reply_parent_message_id,
                 ),
             )
+
+    def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
+        """Load recent Twitch messages for presence updates or lightweight recency-based features."""
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT username, content, timestamp
+                FROM message
+                WHERE timestamp >= %s
+                ORDER BY timestamp DESC
+                LIMIT %s
+                """,
+                (since, limit),
+            )
+            rows = cursor.fetchall()
+        return [
+            RecentMessageRecord(
+                username=str(row[0]),
+                content=str(row[1]),
+                timestamp=row[2],
+            )
+            for row in rows
+        ]
 
     @staticmethod
     def _build_fallback_message_id(event: TwitchChatMessageEvent) -> str:
@@ -1242,6 +1355,101 @@ class PostgresChannelRepository(ChannelRepository):
             )
             rows = cursor.fetchall()
         return [ChannelRecord(thread_id=row[0], twitch_channel_id=row[1], color=row[2]) for row in rows]
+
+    def list_all_twitch_channel_ids(self) -> list[str]:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT DISTINCT twitch_channel_id
+                FROM channel
+                ORDER BY twitch_channel_id
+                """
+            )
+            rows = cursor.fetchall()
+        return [str(row[0]) for row in rows]
+
+
+@dataclass(slots=True)
+class PostgresTrackedUserRepository(TrackedUserRepository):
+    """Store and retrieve per-thread tracked Twitch users."""
+
+    database: PostgresDatabase
+
+    def get_by_thread_and_twitch_user(self, thread_id: int, twitch_user_id: str) -> TrackedUserRecord | None:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT thread_id, twitch_user_id
+                FROM tracked_user
+                WHERE thread_id = %s AND twitch_user_id = %s
+                """,
+                (thread_id, twitch_user_id),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return TrackedUserRecord(thread_id=row[0], twitch_user_id=row[1])
+
+    def add_user(self, thread_id: int, twitch_user_id: str) -> None:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO tracked_user (thread_id, twitch_user_id)
+                VALUES (%s, %s)
+                ON CONFLICT (thread_id, twitch_user_id) DO NOTHING
+                """,
+                (thread_id, twitch_user_id),
+            )
+
+    def remove_user(self, thread_id: int, twitch_user_id: str) -> None:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                DELETE FROM tracked_user
+                WHERE thread_id = %s AND twitch_user_id = %s
+                """,
+                (thread_id, twitch_user_id),
+            )
+
+    def list_users_for_thread(self, thread_id: int) -> list[TrackedUserRecord]:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT thread_id, twitch_user_id
+                FROM tracked_user
+                WHERE thread_id = %s
+                ORDER BY twitch_user_id
+                """,
+                (thread_id,),
+            )
+            rows = cursor.fetchall()
+        return [TrackedUserRecord(thread_id=row[0], twitch_user_id=row[1]) for row in rows]
+
+    def count_pattern_scope_references(self, *, thread_id: int, twitch_user_id: str) -> int:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT COUNT(*)
+                FROM pattern_user_scope
+                WHERE thread_id = %s AND twitch_user_id = %s
+                """,
+                (thread_id, twitch_user_id),
+            )
+            row = cursor.fetchone()
+        assert row is not None
+        return int(row[0])
 
 
 @dataclass(slots=True)

@@ -66,4 +66,8 @@ def _matches_user_scope(pattern: PatternRecord, event: TwitchChatMessageEvent) -
         return author_id in pattern.user_scope_ids
     if pattern.user_scope_mode == "all_except_selected":
         return author_id not in pattern.user_scope_ids
+    if pattern.user_scope_mode == "all_tracked":
+        return author_id in pattern.user_scope_ids
+    if pattern.user_scope_mode == "all_tracked_except_selected":
+        return author_id in pattern.user_scope_ids
     return False

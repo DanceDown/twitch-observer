@@ -7,19 +7,46 @@ from contextlib import suppress
 import discord
 
 from src.config import AppConfig
+from src.database.connection import ChannelRepository, PatternRepository, ReplyRepository, ThreadRepository
+from src.database.connection import TrackedUserRepository
 from src.events.event_bus import EventBus
 from src.events.event_types import DiscordCommandResult
+from src.services.discord_presence_service import DiscordPresenceStatusSender
 from src.services.pattern_service import TrackingNotificationSender
+from src.adapters.twitch_api import TwitchAPIClient
 
 from .client import ObserverDiscordClient
+from .ui_data import DiscordUIDataProvider
 
 
-class DiscordAdapter(TrackingNotificationSender):
+class DiscordAdapter(TrackingNotificationSender, DiscordPresenceStatusSender):
     """Wrapper managing the Discord client lifecycle."""
 
-    def __init__(self, config: AppConfig, event_bus: EventBus) -> None:
+    def __init__(
+        self,
+        config: AppConfig,
+        event_bus: EventBus,
+        *,
+        thread_repository: ThreadRepository,
+        channel_repository: ChannelRepository,
+        tracked_user_repository: TrackedUserRepository,
+        pattern_repository: PatternRepository,
+        reply_repository: ReplyRepository,
+        twitch_api: TwitchAPIClient,
+    ) -> None:
         self._config = config
-        self._client = ObserverDiscordClient(config=config, event_bus=event_bus)
+        self._client = ObserverDiscordClient(
+            config=config,
+            event_bus=event_bus,
+            ui_data_provider=DiscordUIDataProvider(
+                thread_repository=thread_repository,
+                channel_repository=channel_repository,
+                tracked_user_repository=tracked_user_repository,
+                pattern_repository=pattern_repository,
+                reply_repository=reply_repository,
+                twitch_api=twitch_api,
+            ),
+        )
 
     async def start(self) -> None:
         """Connect the Discord bot if a token is configured."""
@@ -33,12 +60,18 @@ class DiscordAdapter(TrackingNotificationSender):
         if not self._client.is_closed():
             await self._client.close()
 
-    async def send_tracking_embed(self, discord_channel_id: int, embed: discord.Embed) -> None:
+    async def send_tracking_embed(
+        self,
+        discord_channel_id: int,
+        embed: discord.Embed,
+        *,
+        channel_login: str | None = None,
+    ) -> None:
         """Send a tracking embed through the Discord client."""
         if not self._config.discord_bot_token or not self._client.is_ready():
             return
         with suppress(discord.HTTPException):
-            await self._client.send_tracking_embed(discord_channel_id, embed)
+            await self._client.send_tracking_embed(discord_channel_id, embed, channel_login=channel_login)
 
     async def send_account_result(
         self,
@@ -55,3 +88,10 @@ class DiscordAdapter(TrackingNotificationSender):
                 return
         with suppress(discord.HTTPException, discord.Forbidden):
             await self._client.send_user_result(discord_user_id, result)
+
+    async def set_status_text(self, text: str) -> None:
+        """Update the bot's visible global Discord custom status."""
+        if not self._config.discord_bot_token or not self._client.is_ready():
+            return
+        with suppress(discord.HTTPException):
+            await self._client.set_status_text(text)

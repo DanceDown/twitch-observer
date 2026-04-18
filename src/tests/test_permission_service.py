@@ -257,7 +257,7 @@ async def test_permission_grant_allows_non_owner_to_add_patterns() -> None:
         requester_id=200,
         action="grant",
         target_user_id=201,
-        permission="manage_patterns",
+        permissions=("manage_patterns",),
     )
     add_result = await dispatch_pattern_command(
         bus,
@@ -278,7 +278,7 @@ async def test_permission_grant_allows_non_owner_to_add_patterns() -> None:
         disabled=False,
     )
 
-    assert grant_result.title == "Permission Granted"
+    assert grant_result.title == "Permissions Granted"
     assert add_result.title == "Ping Added"
     assert len(pattern_repository.patterns) == 1
 
@@ -322,6 +322,7 @@ async def test_permission_view_allows_non_owner_to_use_show() -> None:
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         reply_repository=InMemoryReplyRepository(),
+        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
         permission_repository=permission_repository,
     )
 
@@ -331,7 +332,7 @@ async def test_permission_view_allows_non_owner_to_use_show() -> None:
         requester_id=200,
         action="grant",
         target_user_id=201,
-        permission="view",
+        permissions=("view",),
     )
     result = await dispatch_show_command(
         bus,
@@ -341,6 +342,7 @@ async def test_permission_view_allows_non_owner_to_use_show() -> None:
     )
 
     assert result.title == "Configuration Overview"
-    assert "owner=`200`" in result.message
-    assert "user=`201`, permissions=`view`" in result.message
-    assert "text=`hello`" in result.message
+    assert "<@200>" in result.message
+    assert "<@201>" in result.message
+    assert "View configuration" in result.message
+    assert "hello" in result.message

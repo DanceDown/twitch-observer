@@ -7,7 +7,7 @@
 CREATE TYPE SUB_STATE_ENUM AS ENUM ('all', 'non_subs', 'subs');
 CREATE TYPE OFFLINE_STATE_ENUM AS ENUM ('both', 'offline', 'online');
 CREATE TYPE CHANNEL_SCOPE_MODE_ENUM AS ENUM ('all_tracked', 'only_selected', 'all_except_selected');
-CREATE TYPE USER_SCOPE_MODE_ENUM AS ENUM ('all_users', 'only_selected', 'all_except_selected');
+CREATE TYPE USER_SCOPE_MODE_ENUM AS ENUM ('all_users', 'all_tracked', 'only_selected', 'all_except_selected', 'all_tracked_except_selected');
 
 ----------------------------
 -- Twitch accounts
@@ -82,6 +82,15 @@ CREATE TABLE channel (
 CREATE INDEX idx_channel_twitch_channel_id
     ON channel(twitch_channel_id);
 
+CREATE TABLE tracked_user (
+    thread_id         INTEGER NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,
+    twitch_user_id    TEXT NOT NULL,
+    PRIMARY KEY (thread_id, twitch_user_id)
+);
+
+CREATE INDEX idx_tracked_user_twitch_user_id
+    ON tracked_user(twitch_user_id);
+
 ----------------------------
 -- Pattern rules
 ----------------------------
@@ -136,7 +145,11 @@ CREATE TABLE pattern_user_scope (
     CONSTRAINT fk_pattern_user_scope_pattern
         FOREIGN KEY (thread_id, p_index)
         REFERENCES pattern(thread_id, p_index)
-        ON DELETE CASCADE
+        ON DELETE CASCADE,
+    CONSTRAINT fk_pattern_user_scope_tracked_user
+        FOREIGN KEY (thread_id, twitch_user_id)
+        REFERENCES tracked_user(thread_id, twitch_user_id)
+        ON DELETE RESTRICT
 );
 
 CREATE INDEX idx_pattern_user_scope_user

@@ -20,6 +20,7 @@ from src.database.connection import (
     PatternRepository,
     ReplyRecord,
     ReplyRepository,
+    TrackedUserRepository,
     ThreadRecord,
     ThreadRepository,
     UserPermissionRepository,
@@ -35,7 +36,7 @@ from src.events.event_types import (
     TwitchChatMessageEvent,
 )
 from src.services.authz import thread_has_permission
-from src.utils.discord_embeds import build_tracking_embed
+from src.utils.discord_embeds import build_tracking_embed, escape_discord_preserving_links, escape_discord_text
 from src.utils.permissions import ObserverPermission, explicit_permission_labels
 from src.utils.pattern_matching import matches_pattern
 
@@ -45,7 +46,13 @@ logger = logging.getLogger(__name__)
 class TrackingNotificationSender:
     """Interface used by the tracking service to emit Discord embeds."""
 
-    async def send_tracking_embed(self, discord_channel_id: int, embed: discord.Embed) -> None:  # pragma: no cover
+    async def send_tracking_embed(
+        self,
+        discord_channel_id: int,
+        embed: discord.Embed,
+        *,
+        channel_login: str | None = None,
+    ) -> None:  # pragma: no cover
         raise NotImplementedError
 
 
@@ -58,6 +65,7 @@ class PatternCommandService:
     channel_repository: ChannelRepository
     pattern_repository: PatternRepository
     twitch_api: TwitchAPIClient
+    tracked_user_repository: TrackedUserRepository | None = None
     permission_repository: UserPermissionRepository | None = None
 
     def __post_init__(self) -> None:
@@ -142,13 +150,13 @@ class PatternCommandService:
     async def _handle_action(self, event: DiscordPatternRequestedEvent) -> DiscordCommandResult:
         if event.action in {"add", "remove"}:
             required_permission = ObserverPermission.MANAGE_PATTERNS
-            denial_message = "You do not have permission to add or remove ping and regex rules in this Discord channel."
+            denial_message = "You do not have permission to add or remove ping and regex rules."
         elif event.action in {"disable", "enable"}:
             required_permission = ObserverPermission.TOGGLE_PATTERNS
-            denial_message = "You do not have permission to enable or disable ping and regex rules in this Discord channel."
+            denial_message = "You do not have permission to enable or disable ping and regex rules."
         else:
             required_permission = ObserverPermission.MANAGE_PATTERNS
-            denial_message = "You do not have permission to change ping and regex rules in this Discord channel."
+            denial_message = "You do not have permission to change ping and regex rules."
 
         thread = self._ensure_pattern_permission(
             event.discord_channel_id,
@@ -206,7 +214,7 @@ class PatternCommandService:
         if not text:
             raise ValueError("Please provide a ping or regex pattern.")
         if event.is_regex is None:
-            raise ValueError("Please specify whether this rule should be treated as a regex.")
+            raise ValueError("Please specify whether this pattern should be treated as a regex.")
         if event.color is not None and not re.fullmatch(r"#[0-9A-Fa-f]{6}", event.color.strip()):
             raise ValueError("Color must use the format `#RRGGBB`.")
         if event.is_regex:
@@ -229,7 +237,7 @@ class PatternCommandService:
         if existing is not None:
             return DiscordCommandResult(
                 title="Already Exists",
-                message=f"This {'regex' if event.is_regex else 'ping'} already exists with ID `{existing.p_index}`.",
+                message=f"This {'regex' if event.is_regex else 'ping'} already exists with ID #{existing.p_index}.",
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
             )
@@ -298,7 +306,12 @@ class PatternCommandService:
         mode_name = "Regex" if pattern.is_regex else "Ping"
         return DiscordCommandResult(
             title=f"{mode_name} Removed",
-            message=f"Removed {'regex' if pattern.is_regex else 'ping'} with ID `{pattern.p_index}`: `{pattern.regex}`.",
+            message="\n".join(
+                [
+                    f"Removed {'regex' if pattern.is_regex else 'ping'} #{pattern.p_index}.",
+                    escape_discord_text(pattern.regex),
+                ]
+            ),
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
         )
@@ -332,7 +345,12 @@ class PatternCommandService:
         mode_name = "Regex" if pattern.is_regex else "Ping"
         return DiscordCommandResult(
             title=f"{mode_name} Disabled",
-            message=f"Disabled {'regex' if pattern.is_regex else 'ping'} with ID `{updated.p_index}`: `{updated.regex}`.",
+            message="\n".join(
+                [
+                    f"Disabled {'regex' if pattern.is_regex else 'ping'} #{updated.p_index}.",
+                    escape_discord_text(updated.regex),
+                ]
+            ),
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
         )
@@ -366,7 +384,12 @@ class PatternCommandService:
         mode_name = "Regex" if pattern.is_regex else "Ping"
         return DiscordCommandResult(
             title=f"{mode_name} Enabled",
-            message=f"Enabled {'regex' if pattern.is_regex else 'ping'} with ID `{updated.p_index}`: `{updated.regex}`.",
+            message="\n".join(
+                [
+                    f"Enabled {'regex' if pattern.is_regex else 'ping'} #{updated.p_index}.",
+                    escape_discord_text(updated.regex),
+                ]
+            ),
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
         )
@@ -376,7 +399,7 @@ class PatternCommandService:
             event.discord_channel_id,
             event.requester_id,
             required_permission=ObserverPermission.MANAGE_PATTERNS,
-            denial_message="You do not have permission to edit ping and regex rules in this Discord channel.",
+            denial_message="You do not have permission to edit ping and regex rules.",
         )
         if isinstance(thread, DiscordCommandResult):
             return thread
@@ -453,13 +476,17 @@ class PatternCommandService:
             priority=new_priority,
         )
         assert updated is not None
+        old_channel_logins = await self._resolve_channel_logins_from_ids(pattern.channel_scope_ids)
+        old_user_logins = await self._resolve_user_logins_from_ids(pattern.user_scope_ids)
         return DiscordCommandResult(
             title="Pattern Updated",
-            message=self._format_pattern_summary(
-                action="Updated",
-                pattern=updated,
-                channel_logins=tuple(channel.login for channel in scoped_channels),
-                user_logins=tuple(user.login for user in scoped_users),
+            message=self._format_pattern_changes(
+                before=pattern,
+                after=updated,
+                old_channel_logins=old_channel_logins,
+                new_channel_logins=tuple(channel.login for channel in scoped_channels),
+                old_user_logins=old_user_logins,
+                new_user_logins=tuple(user.login for user in scoped_users),
             ),
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
@@ -491,18 +518,34 @@ class PatternCommandService:
                 )
             scoped_channels.append(channel_user)
 
-        if event.user_scope_mode not in {"all_users", "only_selected", "all_except_selected"}:
+        if event.user_scope_mode not in {
+            "all_users",
+            "all_tracked",
+            "only_selected",
+            "all_except_selected",
+            "all_tracked_except_selected",
+        }:
             raise ValueError("Unsupported user scope.")
 
-        if event.user_scope_mode == "all_users" and event.twitch_user_logins:
-            raise ValueError("Do not provide selected users when the scope is `all_users`.")
+        if event.user_scope_mode in {"all_users", "all_tracked"} and event.twitch_user_logins:
+            logger.debug("Ignoring explicitly provided Twitch users because user_scope_mode=all_users.")
+            event_user_logins: tuple[str, ...] = ()
+        else:
+            event_user_logins = event.twitch_user_logins
 
-        if event.user_scope_mode in {"only_selected", "all_except_selected"} and not event.twitch_user_logins:
+        if event.user_scope_mode in {"only_selected", "all_except_selected", "all_tracked_except_selected"} and not event_user_logins:
             raise ValueError("Please provide at least one Twitch user for this user scope.")
 
         scoped_users = []
-        for user_login in event.twitch_user_logins:
-            scoped_users.append(await self.twitch_api.get_user_by_login(user_login))
+        for user_login in event_user_logins:
+            resolved_user = await self.twitch_api.get_user_by_login(user_login)
+            existing_user = None if self.tracked_user_repository is None else self.tracked_user_repository.get_by_thread_and_twitch_user(thread.thread_id, resolved_user.user_id)
+            if self.tracked_user_repository is not None and existing_user is None:
+                raise ValueError(
+                    f"Twitch user `{resolved_user.login}` is not tracked in this Discord context. "
+                    "Add it first with `/user`."
+                )
+            scoped_users.append(resolved_user)
         return scoped_channels, scoped_users
 
     async def _resolve_pattern_edit_filters(
@@ -585,17 +628,145 @@ class PatternCommandService:
         channel_logins: tuple[str, ...],
         user_logins: tuple[str, ...],
     ) -> str:
-        parts = [f"{action} pattern with ID `{pattern.p_index}`: `{pattern.regex}`."]
-        parts.append(f"Channel scope: `{pattern.channel_scope_mode}`.")
-        if channel_logins:
-            parts.append(f"Scoped channels: `{', '.join(channel_logins)}`.")
-        parts.append(f"User scope: `{pattern.user_scope_mode}`.")
-        if user_logins:
-            parts.append(f"Scoped users: `{', '.join(user_logins)}`.")
-        parts.append(f"Sub-state: `{pattern.sub_state}`.")
-        parts.append(f"Offline-state: `{pattern.offline_state}`.")
-        parts.append(f"Priority: `{pattern.priority}`.")
-        return " ".join(parts)
+        parts = [
+            f"{action} {'regex' if pattern.is_regex else 'ping'} #{pattern.p_index}.",
+            escape_discord_preserving_links(pattern.regex),
+        ]
+        channel_scope = PatternCommandService._scope_text(
+            mode=pattern.channel_scope_mode,
+            selected=channel_logins,
+            all_label="Every tracked channel",
+            only_label="Only in",
+            except_label="Every tracked channel except",
+            tracked_except_label="Every tracked channel except",
+        )
+        user_scope = PatternCommandService._scope_text(
+            mode=pattern.user_scope_mode,
+            selected=user_logins,
+            all_label="All tracked Twitch users",
+            only_label="Only from",
+            except_label="Everyone except",
+            tracked_except_label="All tracked Twitch users except",
+        )
+        if channel_scope:
+            parts.append(channel_scope)
+        if user_scope:
+            parts.append(user_scope)
+        if pattern.sub_state != "all":
+            parts.append("Subscribers only" if pattern.sub_state == "subs" else "Non-subscribers only")
+        if pattern.offline_state != "both":
+            parts.append("Only while live" if pattern.offline_state == "online" else "Only while offline")
+        if pattern.case_sensitive:
+            parts.append("Uppercase and lowercase must match exactly")
+        if pattern.color:
+            parts.append(f"Custom color: {pattern.color}")
+        parts.append(f"Priority: {pattern.priority}")
+        return "\n".join(parts)
+
+    @staticmethod
+    def _format_pattern_changes(
+        *,
+        before: PatternRecord,
+        after: PatternRecord,
+        old_channel_logins: tuple[str, ...],
+        new_channel_logins: tuple[str, ...],
+        old_user_logins: tuple[str, ...],
+        new_user_logins: tuple[str, ...],
+    ) -> str:
+        changes = [f"Updated {'regex' if after.is_regex else 'ping'} #{after.p_index}."]
+        if before.regex != after.regex:
+            changes.append(
+                "Text:\nFrom "
+                + escape_discord_preserving_links(before.regex)
+                + "\nTo "
+                + escape_discord_preserving_links(after.regex)
+            )
+        if before.is_regex != after.is_regex:
+            changes.append(f"Mode:\nFrom {'Regex' if before.is_regex else 'Normal ping'}\nTo {'Regex' if after.is_regex else 'Normal ping'}")
+
+        old_channel_scope = PatternCommandService._scope_text(
+            mode=before.channel_scope_mode,
+            selected=old_channel_logins,
+            all_label="Every tracked channel",
+            only_label="Only in",
+            except_label="Every tracked channel except",
+            tracked_except_label="Every tracked channel except",
+        )
+        new_channel_scope = PatternCommandService._scope_text(
+            mode=after.channel_scope_mode,
+            selected=new_channel_logins,
+            all_label="Every tracked channel",
+            only_label="Only in",
+            except_label="Every tracked channel except",
+            tracked_except_label="Every tracked channel except",
+        )
+        if old_channel_scope != new_channel_scope:
+            changes.append(f"Where:\nFrom {old_channel_scope or 'Every tracked channel'}\nTo {new_channel_scope or 'Every tracked channel'}")
+
+        old_user_scope = PatternCommandService._scope_text(
+            mode=before.user_scope_mode,
+            selected=old_user_logins,
+            all_label="All tracked Twitch users",
+            only_label="Only from",
+            except_label="Everyone except",
+            tracked_except_label="All tracked Twitch users except",
+        )
+        new_user_scope = PatternCommandService._scope_text(
+            mode=after.user_scope_mode,
+            selected=new_user_logins,
+            all_label="All tracked Twitch users",
+            only_label="Only from",
+            except_label="Everyone except",
+            tracked_except_label="All tracked Twitch users except",
+        )
+        if old_user_scope != new_user_scope:
+            changes.append(f"Who:\nFrom {old_user_scope or 'Everyone'}\nTo {new_user_scope or 'Everyone'}")
+        if before.sub_state != after.sub_state:
+            changes.append(
+                "Subscribers:\nFrom "
+                + ("Everyone" if before.sub_state == "all" else "Subscribers only" if before.sub_state == "subs" else "Non-subscribers only")
+                + "\nTo "
+                + ("Everyone" if after.sub_state == "all" else "Subscribers only" if after.sub_state == "subs" else "Non-subscribers only")
+            )
+        if before.offline_state != after.offline_state:
+            changes.append(
+                "Stream state:\nFrom "
+                + ("Online and offline" if before.offline_state == "both" else "Only while live" if before.offline_state == "online" else "Only while offline")
+                + "\nTo "
+                + ("Online and offline" if after.offline_state == "both" else "Only while live" if after.offline_state == "online" else "Only while offline")
+            )
+        if before.case_sensitive != after.case_sensitive:
+            changes.append(
+                "Uppercase and lowercase:\nFrom "
+                + ("must match exactly" if before.case_sensitive else "do not need to match exactly")
+                + "\nTo "
+                + ("must match exactly" if after.case_sensitive else "do not need to match exactly")
+            )
+        if before.color != after.color:
+            changes.append(f"Color:\nFrom {before.color or 'Inherited automatically'}\nTo {after.color or 'Inherited automatically'}")
+        if before.priority != after.priority:
+            changes.append(f"Priority:\nFrom {before.priority}\nTo {after.priority}")
+        return "\n".join(changes)
+
+    @staticmethod
+    def _scope_text(
+        *,
+        mode: str,
+        selected: tuple[str, ...],
+        all_label: str,
+        only_label: str,
+        except_label: str,
+        tracked_except_label: str,
+    ) -> str | None:
+        if mode in {"all_tracked", "all_users"}:
+            return None if mode == "all_users" else all_label
+        if mode == "only_selected":
+            return f"{only_label} {', '.join(selected)}"
+        if mode == "all_except_selected":
+            return f"{except_label} {', '.join(selected)}"
+        if mode == "all_tracked_except_selected":
+            return f"{tracked_except_label} {', '.join(selected)}"
+        return all_label
 
     @staticmethod
     def _default_priority_for(
@@ -618,6 +789,8 @@ class PatternCommandService:
             priority += 4 if user_scope_ids else 0
         elif user_scope_mode == "all_except_selected":
             priority += 2
+        elif user_scope_mode == "all_tracked_except_selected":
+            priority += 3
 
         if sub_state != "all":
             priority += 1
@@ -635,6 +808,8 @@ class ShowCommandService:
     channel_repository: ChannelRepository
     pattern_repository: PatternRepository
     reply_repository: ReplyRepository
+    twitch_api: TwitchAPIClient
+    tracked_user_repository: TrackedUserRepository | None = None
     permission_repository: UserPermissionRepository | None = None
 
     def __post_init__(self) -> None:
@@ -660,7 +835,7 @@ class ShowCommandService:
             ):
                 result = DiscordCommandResult(
                     title="Permission Denied",
-                    message="You do not have permission to view this Discord channel configuration.",
+                    message="You do not have permission to view the settings.",
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 )
@@ -670,11 +845,13 @@ class ShowCommandService:
             lines = []
             sections = self._normalize_sections(event.sections)
             if "channels" in sections:
-                lines.append(self._render_channels_section(thread.thread_id))
+                lines.append(await self._render_channels_section(thread.thread_id))
             if "pings" in sections:
-                lines.append(self._render_patterns_section(thread.thread_id, title="Pings"))
+                lines.append(await self._render_patterns_section(thread.thread_id, title="Pings"))
             if "auto_replies" in sections:
-                lines.append(self._render_auto_replies_section(thread.thread_id))
+                lines.append(await self._render_auto_replies_section(thread.thread_id))
+            if "users" in sections:
+                lines.append(await self._render_users_section(thread.thread_id))
             if "permissions" in sections:
                 lines.append(self._render_permissions_section(thread))
             result = DiscordCommandResult(
@@ -693,91 +870,166 @@ class ShowCommandService:
         if not raw_sections:
             return ("channels",)
 
-        allowed = {"channels", "pings", "auto_replies", "permissions"}
+        allowed = {"channels", "pings", "auto_replies", "users", "permissions"}
         normalized = tuple(section for section in raw_sections if section in allowed)
         if normalized:
             return normalized
         return ("channels",)
 
-    def _render_channels_section(self, thread_id: int) -> str:
+    async def _render_channels_section(self, thread_id: int) -> str:
         """Render the tracked Twitch channels for one Discord configuration root."""
         channels = self.channel_repository.list_channels_for_thread(thread_id)
         if not channels:
-            return "**Channels**\n`None`"
-        rows = [f"- twitch_channel_id=`{channel.twitch_channel_id}`" for channel in channels]
-        return "**Channels**\n" + "\n".join(rows)
+            return "**Tracked Channels**\nNo Twitch channels are connected yet."
 
-    def _render_patterns_section(self, thread_id: int, *, title: str) -> str:
+        rows: list[str] = []
+        for channel in channels:
+            twitch_user = await self.twitch_api.get_user_by_id(channel.twitch_channel_id)
+            line = f"- [{escape_discord_text(twitch_user.display_name)}](https://www.twitch.tv/{twitch_user.login})"
+            if channel.color:
+                line += f"\n  Custom color: {channel.color}"
+            rows.append(line)
+        return "**Tracked Channels**\n" + "\n".join(rows)
+
+    async def _render_patterns_section(self, thread_id: int, *, title: str) -> str:
         """Render all stored ping and regex rules with stable IDs for removals."""
         patterns = self.pattern_repository.list_patterns_for_thread(thread_id, is_regex=None)
         if not patterns:
-            return f"**{title}**\n`None`"
-        rows = [self._format_pattern_row(pattern) for pattern in patterns]
+            return f"**{title}**\nNo pings are saved yet."
+        rows = [await self._format_pattern_row(pattern) for pattern in patterns]
         return f"**{title}**\n" + "\n".join(rows)
 
-    def _render_auto_replies_section(self, thread_id: int) -> str:
+    async def _render_auto_replies_section(self, thread_id: int) -> str:
         """Render all patterns that currently have an attached reply."""
         replies = self.reply_repository.list_replies_for_thread(thread_id, include_disabled=True)
         if not replies:
-            return "**Auto-Replies**\n`None`"
+            return "**Auto-Replies**\nNo automatic replies are attached yet."
         rows: list[str] = []
         for reply in replies:
             pattern = self.pattern_repository.get_pattern_by_id(thread_id=thread_id, p_index=reply.p_index)
             if pattern is None:
                 continue
-            rows.append(self._format_auto_reply_row(pattern, reply))
+            rows.append(await self._format_auto_reply_row(pattern, reply))
         if not rows:
-            return "**Auto-Replies**\n`None`"
+            return "**Auto-Replies**\nNo automatic replies are attached yet."
         return "**Auto-Replies**\n" + "\n".join(rows)
 
+    async def _render_users_section(self, thread_id: int) -> str:
+        """Render the tracked Twitch users for one Discord configuration root."""
+        if self.tracked_user_repository is None:
+            return "**Tracked Users**\nNo Twitch users are connected yet."
+        tracked_users = self.tracked_user_repository.list_users_for_thread(thread_id)
+        if not tracked_users:
+            return "**Tracked Users**\nNo Twitch users are connected yet."
+        rows: list[str] = []
+        for tracked_user in tracked_users:
+            twitch_user = await self.twitch_api.get_user_by_id(tracked_user.twitch_user_id)
+            rows.append(f"- [{escape_discord_text(twitch_user.display_name)}](https://www.twitch.tv/{twitch_user.login})")
+        return "**Tracked Users**\n" + "\n".join(rows)
+
     def _render_permissions_section(self, thread: ThreadRecord) -> str:
-        rows = [f"- owner=`{thread.owner_id}` (all permissions)"]
+        rows = [f"- <@{thread.owner_id}>\n  Full access"]
         if self.permission_repository is None:
             return "**Permissions**\n" + "\n".join(rows)
         grants = self.permission_repository.list_for_thread(thread_id=thread.thread_id)
         for grant in grants:
             labels = explicit_permission_labels(grant.permissions)
-            rendered = ", ".join(f"`{label}`" for label in labels) if labels else "`none`"
-            rows.append(f"- user=`{grant.discord_user_id}`, permissions={rendered}")
+            rendered = "\n".join(f"  - {self._permission_label(label)}" for label in labels) if labels else "  - No extra permissions"
+            rows.append(f"- <@{grant.discord_user_id}>\n{rendered}")
         return "**Permissions**\n" + "\n".join(rows)
 
-    @staticmethod
-    def _format_pattern_row(pattern: PatternRecord) -> str:
+    async def _format_pattern_row(self, pattern: PatternRecord) -> str:
         """Render one compact row containing all identifying pattern fields."""
-        extras = [
-            f"id=`{pattern.p_index}`",
-            f"priority=`{pattern.priority}`",
-            f"type=`{'regex' if pattern.is_regex else 'ping'}`",
-            f"text=`{pattern.regex}`",
+        parts = [
+            f"- {'Regex' if pattern.is_regex else 'Ping'} #{pattern.p_index}",
+            f"  {self._format_inline_code(pattern.regex)}",
         ]
-        extras.append(f"scope=`{pattern.channel_scope_mode}`")
-        if pattern.channel_scope_ids:
-            extras.append(f"channels=`{','.join(pattern.channel_scope_ids)}`")
-        extras.append(f"user_scope=`{pattern.user_scope_mode}`")
-        if pattern.user_scope_ids:
-            extras.append(f"users=`{','.join(pattern.user_scope_ids)}`")
-        extras.append(f"sub=`{pattern.sub_state}`")
-        extras.append(f"offline=`{pattern.offline_state}`")
-        if pattern.color:
-            extras.append(f"color=`{pattern.color}`")
+        details = await self._describe_pattern_details(pattern)
+        parts.extend(f"  {detail}" for detail in details)
+        return "\n".join(parts)
+
+    async def _format_auto_reply_row(self, pattern: PatternRecord, reply: ReplyRecord) -> str:
+        """Render one compact row for an attached auto-reply."""
+        details = [f"- #{pattern.p_index}"]
+        trigger = self._format_show_code_unescaped(pattern.regex)
+        response = self._format_show_code_unescaped(reply.reply_message)
+        details.append(f"  Trigger: {trigger}")
+        details.append(f"  Reply: {response}")
+        return "\n".join(details)
+
+    async def _describe_pattern_details(self, pattern: PatternRecord) -> list[str]:
+        details: list[str] = []
+        if pattern.channel_scope_mode != "all_tracked":
+            channel_names = await self._resolve_twitch_links(pattern.channel_scope_ids)
+            if pattern.channel_scope_mode == "only_selected":
+                details.append(f"Only in {', '.join(channel_names)}")
+            elif pattern.channel_scope_mode == "all_except_selected":
+                details.append(f"Every tracked channel except {', '.join(channel_names)}")
+        if pattern.user_scope_mode != "all_users":
+            user_names = await self._resolve_twitch_names(pattern.user_scope_ids)
+            if pattern.user_scope_mode == "only_selected":
+                details.append(f"Only from {', '.join(user_names)}")
+            elif pattern.user_scope_mode == "all_except_selected":
+                details.append(f"Everyone except {', '.join(user_names)}")
+            elif pattern.user_scope_mode == "all_tracked":
+                details.append("Only from tracked Twitch users")
+            elif pattern.user_scope_mode == "all_tracked_except_selected":
+                details.append(f"Only from tracked Twitch users except {', '.join(user_names)}")
+        if pattern.sub_state != "all":
+            details.append("Subscribers only" if pattern.sub_state == "subs" else "Non-subscribers only")
+        if pattern.offline_state != "both":
+            details.append("Only while live" if pattern.offline_state == "online" else "Only while offline")
         if pattern.case_sensitive:
-            extras.append("case=`true`")
+            details.append("Uppercase and lowercase must match exactly")
+        if pattern.color:
+            details.append(f"Custom color: {pattern.color}")
+        details.append(f"Priority {pattern.priority}")
         if pattern.disabled:
-            extras.append("disabled=`true`")
-        return "- " + ", ".join(extras)
+            details.append("Disabled")
+        return details
+
+    async def _resolve_twitch_links(self, twitch_ids: tuple[str, ...]) -> tuple[str, ...]:
+        resolved: list[str] = []
+        for twitch_id in twitch_ids:
+            user = await self.twitch_api.get_user_by_id(twitch_id)
+            resolved.append(f"[{escape_discord_text(user.display_name)}](https://www.twitch.tv/{user.login})")
+        return tuple(resolved)
+
+    async def _resolve_twitch_names(self, twitch_ids: tuple[str, ...]) -> tuple[str, ...]:
+        resolved: list[str] = []
+        for twitch_id in twitch_ids:
+            user = await self.twitch_api.get_user_by_id(twitch_id)
+            resolved.append(f"[{escape_discord_text(user.display_name)}](https://www.twitch.tv/{user.login})")
+        return tuple(resolved)
 
     @staticmethod
-    def _format_auto_reply_row(pattern: PatternRecord, reply: ReplyRecord) -> str:
-        """Render one compact row for an attached auto-reply."""
-        mode = "reply" if reply.reply_as_reply else "message"
-        return (
-            f"- pattern_id=`{pattern.p_index}`, "
-            f"type=`{'regex' if pattern.is_regex else 'ping'}`, "
-            f"mode=`{mode}`, "
-            f"disabled=`{'true' if reply.disabled else 'false'}`, "
-            f"match=`{pattern.regex}`, "
-            f"message=`{reply.reply_message}`"
-        )
+    def _permission_label(label: str) -> str:
+        return {
+            "view": "View configuration",
+            "manage_channels": "Add and remove channels",
+            "toggle_patterns": "Enable and disable pings",
+            "manage_patterns": "Create, edit and remove pings",
+            "toggle_replies": "Enable and disable auto-replies",
+            "manage_replies": "Create and remove auto-replies",
+            "send_twitch_messages": "Send Twitch messages",
+            "control_observer": "Turn the observer on or off",
+            "leave_context": "Disconnect this Discord channel",
+            "manage_permissions": "Manage permissions",
+            "admin": "Administrator",
+        }.get(label, label.replace("_", " ").capitalize())
+
+    @staticmethod
+    def _format_inline_code(text: str) -> str:
+        escaped = escape_discord_text(text)
+        if "`" in text:
+            return escaped
+        return f"`{escaped}`"
+
+    @staticmethod
+    def _format_show_code_unescaped(text: str) -> str:
+        if "`" in text:
+            return text
+        return f"`{text}`"
 
 
 @dataclass(slots=True)
@@ -790,6 +1042,7 @@ class PatternTrackingService:
     pattern_repository: PatternRepository
     twitch_api: TwitchAPIClient
     notifier: TrackingNotificationSender
+    tracked_user_repository: TrackedUserRepository | None = None
     reply_repository: ReplyRepository | None = None
 
     def __post_init__(self) -> None:
@@ -827,42 +1080,53 @@ class PatternTrackingService:
             patterns = self.pattern_repository.list_active_patterns_for_thread(thread.thread_id)
             logger.debug("Thread %s has %d active pattern(s).", thread.thread_id, len(patterns))
             source_channel = self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, event.broadcaster_id)
+            author_user = await self._safe_get_user_by_login(event.author_login)
+            channel_user = await self._safe_get_user_by_id(event.broadcaster_id)
             for pattern in patterns:
-                if not matches_pattern(pattern, event):
+                effective_pattern = self._expand_all_tracked_users(thread.thread_id, pattern)
+                if not matches_pattern(effective_pattern, event):
                     logger.debug(
                         "Pattern %s did not match message. regex=%r channel_filter=%s user_filter=%s sub=%s offline=%s is_regex=%s",
-                        pattern.p_index,
-                        pattern.regex,
-                        pattern.channel_scope_ids,
-                        pattern.user_scope_ids,
-                        pattern.sub_state,
-                        pattern.offline_state,
-                        pattern.is_regex,
+                        effective_pattern.p_index,
+                        effective_pattern.regex,
+                        effective_pattern.channel_scope_ids,
+                        effective_pattern.user_scope_ids,
+                        effective_pattern.sub_state,
+                        effective_pattern.offline_state,
+                        effective_pattern.is_regex,
                     )
                     continue
-                if pattern.offline_state != "both" and live_status is None:
+                if effective_pattern.offline_state != "both" and live_status is None:
                     live_status = await self.twitch_api.is_user_live(event.broadcaster_id)
-                if not self._offline_state_allows(pattern, live_status):
+                if not self._offline_state_allows(effective_pattern, live_status):
                     logger.debug(
                         "Pattern %s matched text but was filtered by offline_state=%s live_status=%s",
-                        pattern.p_index,
-                        pattern.offline_state,
+                        effective_pattern.p_index,
+                        effective_pattern.offline_state,
                         live_status,
                     )
                     continue
 
-                if self._has_enabled_reply(thread.thread_id, pattern.p_index):
+                if self._has_enabled_reply(thread.thread_id, effective_pattern.p_index):
                     logger.debug(
                         "Pattern %s matched for thread_id=%s but notification is delegated to auto-reply handling.",
-                        pattern.p_index,
+                        effective_pattern.p_index,
                         thread.thread_id,
                     )
                     break
 
-                logger.debug("Pattern %s matched. Sending tracking embed to discord_channel_id=%s", pattern.p_index, thread.discord_channel_id)
+                logger.debug("Pattern %s matched. Sending tracking embed to discord_channel_id=%s", effective_pattern.p_index, thread.discord_channel_id)
                 await self.notifier.send_tracking_embed(
                     thread.discord_channel_id,
-                    build_tracking_embed(event=event, pattern=pattern, thread=thread, channel=source_channel),
+                    build_tracking_embed(
+                        event=event,
+                        pattern=effective_pattern,
+                        thread=thread,
+                        channel=source_channel,
+                        author_icon_url=None if author_user is None else author_user.profile_image_url,
+                        channel_display_name=None if channel_user is None else channel_user.display_name,
+                    ),
+                    channel_login=None if channel_user is None else channel_user.login,
                 )
                 break
 
@@ -881,3 +1145,46 @@ class PatternTrackingService:
             return False
         reply = self.reply_repository.get_by_pattern(thread_id=thread_id, p_index=pattern_id)
         return reply is not None and not reply.disabled
+
+    def _expand_all_tracked_users(self, thread_id: int, pattern: PatternRecord) -> PatternRecord:
+        if pattern.user_scope_mode not in {"all_tracked", "all_tracked_except_selected"}:
+            return pattern
+        if self.tracked_user_repository is None:
+            tracked_user_ids: tuple[str, ...] = ()
+        else:
+            tracked_user_ids = tuple(user.twitch_user_id for user in self.tracked_user_repository.list_users_for_thread(thread_id))
+        if pattern.user_scope_mode == "all_tracked_except_selected":
+            tracked_user_ids = tuple(
+                user_id for user_id in tracked_user_ids if user_id not in set(pattern.user_scope_ids)
+            )
+        return PatternRecord(
+            thread_id=pattern.thread_id,
+            p_index=pattern.p_index,
+            regex=pattern.regex,
+            channel_scope_mode=pattern.channel_scope_mode,
+            channel_scope_ids=pattern.channel_scope_ids,
+            user_scope_mode="only_selected",
+            user_scope_ids=tracked_user_ids,
+            sub_state=pattern.sub_state,
+            offline_state=pattern.offline_state,
+            is_regex=pattern.is_regex,
+            case_sensitive=pattern.case_sensitive,
+            color=pattern.color,
+            disabled=pattern.disabled,
+            notify=pattern.notify,
+            priority=pattern.priority,
+            reply_message=pattern.reply_message,
+            reply_as_reply=pattern.reply_as_reply,
+        )
+
+    async def _safe_get_user_by_login(self, login: str):
+        try:
+            return await self.twitch_api.get_user_by_login(login)
+        except Exception:
+            return None
+
+    async def _safe_get_user_by_id(self, user_id: str):
+        try:
+            return await self.twitch_api.get_user_by_id(user_id)
+        except Exception:
+            return None

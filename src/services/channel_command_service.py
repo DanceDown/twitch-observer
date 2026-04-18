@@ -105,7 +105,7 @@ class ChannelCommandService:
         ):
             return DiscordCommandResult(
                 title="Permission Denied",
-                message="You do not have permission to change tracked Twitch channels in this Discord channel.",
+                message="You do not have permission to change tracked Twitch channels.",
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -118,7 +118,7 @@ class ChannelCommandService:
                     title="Already Added",
                     message=(
                         f"Twitch channel `{twitch_user.display_name}` (`{twitch_user.login}`) "
-                        "is already tracked in this Discord channel."
+                        "is already tracked."
                     ),
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
@@ -135,8 +135,7 @@ class ChannelCommandService:
             return DiscordCommandResult(
                 title="Channel Added",
                 message=(
-                    f"Added Twitch channel `{twitch_user.display_name}` (`{twitch_user.login}`) "
-                    "to this Discord channel."
+                    f"Added Twitch channel `{twitch_user.display_name}` (`{twitch_user.login}`)"
                 ),
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
@@ -148,7 +147,7 @@ class ChannelCommandService:
                     title="Not Found",
                     message=(
                         f"Twitch channel `{twitch_user.display_name}` (`{twitch_user.login}`) "
-                        "is not currently tracked in this Discord channel."
+                        "is not currently tracked."
                     ),
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
@@ -172,7 +171,7 @@ class ChannelCommandService:
             if event.color is None or not re.fullmatch(r"#[0-9A-Fa-f]{6}", event.color.strip()):
                 return DiscordCommandResult(
                     title="Validation Error",
-                    message="Color must use the format `#RRGGBB` or set `clear:true`.",
+                    message="Color must use the format `#RRGGBB` or be empty.",
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 )
@@ -205,7 +204,7 @@ class ChannelCommandService:
                 title="Not Found",
                 message=(
                     f"Twitch channel `{twitch_user.display_name}` (`{twitch_user.login}`) "
-                    "is not currently tracked in this Discord channel."
+                    "is not currently tracked."
                 ),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
@@ -219,7 +218,7 @@ class ChannelCommandService:
                 title="Channel In Use",
                 message=(
                     f"Twitch channel `{twitch_user.display_name}` (`{twitch_user.login}`) "
-                    "is still referenced by one or more ping/regex rules."
+                    "is still referenced by one or more pings."
                 ),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
@@ -237,8 +236,7 @@ class ChannelCommandService:
         return DiscordCommandResult(
             title="Channel Removed",
             message=(
-                f"Removed Twitch channel `{twitch_user.display_name}` (`{twitch_user.login}`) "
-                "from this Discord channel."
+                f"Removed Twitch channel `{twitch_user.display_name}` (`{twitch_user.login}`)"
             ),
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 """Centralized Discord embed styling helpers."""
 
+import re
+
 import discord
 
 from src.database.connection import ChannelRecord, PatternRecord, ReplyRecord, ThreadRecord
@@ -31,19 +33,25 @@ def build_tracking_embed(
     thread: ThreadRecord,
     channel: ChannelRecord | None,
     reply: ReplyRecord | None = None,
+    author_icon_url: str | None = None,
+    channel_display_name: str | None = None,
 ) -> discord.Embed:
     """Render one matched Twitch message as a Discord embed."""
     embed = discord.Embed(
-        title=event.author_display_name or event.author_login,
-        description=event.content,
+        title="",
+        description=escape_discord_preserving_links(event.content),
         color=resolve_tracking_color(event=event, pattern=pattern, channel=channel, thread=thread),
     )
-    embed.add_field(name="Channel", value=f"`{event.channel_login}`", inline=True)
-    embed.add_field(name="Match", value=f"`{pattern.regex}`", inline=True)
-    embed.add_field(name="Mode", value="Regex" if pattern.is_regex else "Ping", inline=True)
+    embed.set_author(
+        name=escape_discord_text(event.author_display_name or event.author_login),
+        url=f"https://www.twitch.tv/{event.author_login}",
+        icon_url=author_icon_url,
+    )
+    embed.set_footer(
+        text=f"Channel: {escape_discord_text(channel_display_name or event.channel_login)}",
+    )
     if reply is not None:
-        embed.add_field(name="Auto Reply", value=f"`{reply.reply_message}`", inline=False)
-        embed.add_field(name="Reply Mode", value="Reply" if reply.reply_as_reply else "Message", inline=True)
+        embed.add_field(name="Reply", value=escape_discord_preserving_links(reply.reply_message), inline=False)
     return embed
 
 
@@ -54,11 +62,26 @@ def build_auto_reply_embed(
     thread: ThreadRecord,
     reply: ReplyRecord,
     channel: ChannelRecord | None = None,
+    author_icon_url: str | None = None,
+    channel_display_name: str | None = None,
 ) -> discord.Embed:
     """Render one matched Twitch message that also triggered an auto-reply."""
-    embed = build_tracking_embed(event=event, pattern=pattern, thread=thread, channel=channel, reply=reply)
-    embed.add_field(name="Status", value="Auto-replied", inline=True)
-    return embed
+    return build_tracking_embed(
+        event=event,
+        pattern=pattern,
+        thread=thread,
+        channel=channel,
+        reply=reply,
+        author_icon_url=author_icon_url,
+        channel_display_name=channel_display_name,
+    )
+
+
+def build_tracking_view(*, channel_login: str) -> discord.ui.View:
+    """Build a compact URL-button view linking to the Twitch channel."""
+    view = discord.ui.View(timeout=None)
+    view.add_item(discord.ui.Button(label="Open Channel", style=discord.ButtonStyle.link, url=f"https://www.twitch.tv/{channel_login}"))
+    return view
 
 
 def resolve_tracking_color(
@@ -83,3 +106,24 @@ def resolve_tracking_color(
 def _parse_hex_color(value: str) -> int:
     normalized = value.strip().lstrip("#")
     return int(normalized, 16)
+
+
+_URL_PATTERN = re.compile(r"https?://[^\s]+")
+
+
+def escape_discord_text(text: str) -> str:
+    """Escape Discord markdown and mentions for display-only text fragments."""
+    return discord.utils.escape_mentions(discord.utils.escape_markdown(text))
+
+
+def escape_discord_preserving_links(text: str) -> str:
+    """Escape Discord formatting while keeping raw URLs clickable."""
+    rendered = []
+    last_end = 0
+    for match in _URL_PATTERN.finditer(text):
+        start, end = match.span()
+        rendered.append(escape_discord_text(text[last_end:start]))
+        rendered.append(match.group(0))
+        last_end = end
+    rendered.append(escape_discord_text(text[last_end:]))
+    return "".join(rendered)

@@ -18,6 +18,8 @@ from src.database.connection import (
     PatternRepository,
     ReplyRecord,
     ReplyRepository,
+    TrackedUserRecord,
+    TrackedUserRepository,
     ThreadRecord,
     ThreadRepository,
 )
@@ -359,6 +361,31 @@ class InMemoryReplyRepository(ReplyRepository):
 
 
 @dataclass
+class InMemoryTrackedUserRepository(TrackedUserRepository):
+    tracked_users: dict[tuple[int, str], TrackedUserRecord] = field(default_factory=dict)
+
+    def get_by_thread_and_twitch_user(self, thread_id: int, twitch_user_id: str) -> TrackedUserRecord | None:
+        return self.tracked_users.get((thread_id, twitch_user_id))
+
+    def add_user(self, *, thread_id: int, twitch_user_id: str) -> TrackedUserRecord:
+        record = TrackedUserRecord(thread_id=thread_id, twitch_user_id=twitch_user_id)
+        self.tracked_users[(thread_id, twitch_user_id)] = record
+        return record
+
+    def remove_user(self, *, thread_id: int, twitch_user_id: str) -> None:
+        self.tracked_users.pop((thread_id, twitch_user_id), None)
+
+    def list_users_for_thread(self, thread_id: int) -> list[TrackedUserRecord]:
+        return sorted(
+            [record for record in self.tracked_users.values() if record.thread_id == thread_id],
+            key=lambda record: record.twitch_user_id,
+        )
+
+    def count_pattern_scope_references(self, *, thread_id: int, twitch_user_id: str) -> int:
+        return 0
+
+
+@dataclass
 class FakeTwitchAPI:
     users_by_login: dict[str, TwitchUser] = field(default_factory=dict)
     live_by_user_id: dict[str, bool] = field(default_factory=dict)
@@ -385,7 +412,7 @@ class FakeTwitchAPI:
 class FakeNotifier(TrackingNotificationSender):
     sent: list[tuple[int, object]] = field(default_factory=list)
 
-    async def send_tracking_embed(self, discord_channel_id: int, embed) -> None:
+    async def send_tracking_embed(self, discord_channel_id: int, embed, *, channel_login: str | None = None) -> None:
         self.sent.append((discord_channel_id, embed))
 
 
@@ -993,12 +1020,18 @@ async def test_show_command_lists_channels_and_all_pattern_types_together() -> N
         disabled=False,
         priority=0,
     )
+    twitch_api = FakeTwitchAPI(
+        users_by_login={
+            "example": TwitchUser(user_id="42", login="example", display_name="Example"),
+        }
+    )
     ShowCommandService(
         event_bus=event_bus,
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         reply_repository=InMemoryReplyRepository(),
+        twitch_api=twitch_api,  # type: ignore[arg-type]
     )
 
     result = await dispatch_show_command(
@@ -1010,14 +1043,45 @@ async def test_show_command_lists_channels_and_all_pattern_types_together() -> N
 
     assert result.title == "Configuration Overview"
     assert result.ephemeral is True
-    assert "twitch_channel_id=`42`" in result.message
-    assert "id=`1`" in result.message
-    assert "type=`ping`" in result.message
-    assert "text=`hello`" in result.message
-    assert "scope=`only_selected`" in result.message
-    assert "user_scope=`all_users`" in result.message
-    assert "type=`regex`" in result.message
-    assert "text=`^hello$`" in result.message
+    assert "[Example](https://www.twitch.tv/example)" in result.message
+    assert "Ping #1" in result.message
+    assert "hello" in result.message
+    assert "Only in [Example](https://www.twitch.tv/example)" in result.message
+    assert "Regex #2" in result.message
+    assert "^hello$" in result.message
+
+
+@pytest.mark.asyncio
+async def test_show_command_lists_tracked_users_with_links() -> None:
+    event_bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    tracked_user_repository = InMemoryTrackedUserRepository()
+    tracked_user_repository.add_user(thread_id=thread.thread_id, twitch_user_id="7")
+    ShowCommandService(
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        channel_repository=InMemoryChannelRepository(),
+        pattern_repository=InMemoryPatternRepository(),
+        reply_repository=InMemoryReplyRepository(),
+        twitch_api=FakeTwitchAPI(
+            users_by_login={
+                "alice": TwitchUser(user_id="7", login="alice", display_name="Alice"),
+            }
+        ),  # type: ignore[arg-type]
+        tracked_user_repository=tracked_user_repository,
+    )
+
+    result = await dispatch_show_command(
+        event_bus,
+        discord_channel_id=100,
+        requester_id=200,
+        sections=("users",),
+    )
+
+    assert result.title == "Configuration Overview"
+    assert "**Tracked Users**" in result.message
+    assert "[Alice](https://www.twitch.tv/alice)" in result.message
 
 
 @pytest.mark.asyncio
@@ -1070,7 +1134,7 @@ async def test_tracking_service_sends_embed_for_matching_ping_with_pattern_color
     assert len(notifier.sent) == 1
     _, embed = notifier.sent[0]
     assert embed.color.value == 0x123456
-    assert embed.title == "Alice"
+    assert embed.title == ""
 
 
 @pytest.mark.asyncio
@@ -1137,7 +1201,7 @@ async def test_tracking_service_uses_highest_priority_match_and_stops_after_firs
     assert len(notifier.sent) == 1
     _, embed = notifier.sent[0]
     assert embed.color.value == 0x222222
-    assert embed.fields[1].value == "`hello there`"
+    assert "hello there" in embed.description
 
 
 @pytest.mark.asyncio
@@ -1235,6 +1299,12 @@ async def test_show_command_lists_patterns_in_priority_order() -> None:
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         reply_repository=InMemoryReplyRepository(),
+        twitch_api=FakeTwitchAPI(
+            users_by_login={
+                "example": TwitchUser(user_id="42", login="example", display_name="Example"),
+                "alice": TwitchUser(user_id="7", login="alice", display_name="Alice"),
+            }
+        ),  # type: ignore[arg-type]
     )
 
     result = await dispatch_show_command(
@@ -1245,7 +1315,7 @@ async def test_show_command_lists_patterns_in_priority_order() -> None:
     )
 
     assert result.title == "Configuration Overview"
-    assert result.message.index("text=`specific`") < result.message.index("text=`general`")
+    assert result.message.index("specific") < result.message.index("general")
 
 
 @pytest.mark.asyncio
@@ -1296,6 +1366,60 @@ async def test_tracking_service_respects_all_except_selected_user_scope() -> Non
     )
 
     assert notifier.sent == []
+
+
+@pytest.mark.asyncio
+async def test_tracking_service_respects_all_tracked_except_selected_user_scope() -> None:
+    event_bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread = thread_repository.create(owner_id=200, discord_channel_id=1000)
+    channel_repository = InMemoryChannelRepository()
+    channel_repository.add_channel(thread.thread_id, "42")
+    tracked_user_repository = InMemoryTrackedUserRepository()
+    tracked_user_repository.add_user(thread_id=thread.thread_id, twitch_user_id="7")
+    tracked_user_repository.add_user(thread_id=thread.thread_id, twitch_user_id="8")
+    pattern_repository = InMemoryPatternRepository()
+    pattern_repository.add_pattern(
+        thread_id=thread.thread_id,
+        regex="hello",
+        channel_scope_mode="all_tracked",
+        channel_scope_ids=(),
+        user_scope_mode="all_tracked_except_selected",
+        user_scope_ids=("7",),
+        sub_state="all",
+        offline_state="both",
+        is_regex=False,
+        case_sensitive=False,
+        color="#123456",
+        disabled=False,
+        priority=0,
+    )
+    notifier = FakeNotifier()
+    service = PatternTrackingService(
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        tracked_user_repository=tracked_user_repository,
+        pattern_repository=pattern_repository,
+        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        notifier=notifier,
+    )
+
+    await service.handle_chat_message(
+        TwitchChatMessageEvent(
+            channel_login="example",
+            author_login="bob",
+            author_display_name="Bob",
+            author_id="8",
+            broadcaster_id="42",
+            color="#ffffff",
+            content="hello there",
+            sent_at=datetime.now(timezone.utc),
+            raw_tags={"badges": ""},
+        )
+    )
+
+    assert len(notifier.sent) == 1
 
 
 @pytest.mark.asyncio

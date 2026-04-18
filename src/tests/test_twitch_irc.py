@@ -98,6 +98,25 @@ async def test_anonymous_adapter_can_join_channels_later() -> None:
 
 
 @pytest.mark.asyncio
+async def test_anonymous_adapter_queues_channel_joins_until_connected() -> None:
+    bus = EventBus()
+    config = AppConfig()
+    adapter = AnonymousTwitchIRCAdapter(config=config, event_bus=bus)
+    sent_lines = []
+
+    async def fake_send_line(line: str) -> None:
+        sent_lines.append(line)
+
+    await adapter.join_channel("Example")
+    adapter._writer = SimpleNamespace()  # type: ignore[assignment]
+    adapter._send_line = fake_send_line  # type: ignore[method-assign]
+
+    await adapter.join_channels(["example", "second"])
+
+    assert sent_lines == ["JOIN #example", "JOIN #second"]
+
+
+@pytest.mark.asyncio
 async def test_anonymous_adapter_sends_pass_during_handshake(monkeypatch: pytest.MonkeyPatch) -> None:
     bus = EventBus()
     config = AppConfig()

@@ -2,22 +2,98 @@ from __future__ import annotations
 
 """Shared Discord adapter helpers for command handlers and modals."""
 
+from contextlib import suppress
+
 import discord
 
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 from src.utils.discord_embeds import build_result_embed
 
 
+def _build_public_actor_embed(result: DiscordCommandResult, actor_mention: str) -> discord.Embed:
+    """Render one public result embed that names the Discord user who triggered it."""
+    embed = build_result_embed(result)
+    embed.description = f"{actor_mention} {result.message}"
+    return embed
+
+
 async def send_initial_result(interaction: discord.Interaction, result: DiscordCommandResult) -> None:
     """Send the standardized embed response for a completed interaction."""
-    embed = build_result_embed(result)
-    if interaction.response.is_done():
-        try:
-            await interaction.edit_original_response(embed=embed)
-        except discord.HTTPException:
-            await interaction.followup.send(embed=embed, ephemeral=result.ephemeral)
+    if result.ephemeral:
+        embed = build_result_embed(result)
+        if interaction.response.is_done():
+            try:
+                await interaction.edit_original_response(embed=embed)
+            except discord.HTTPException:
+                pass
+            return
+        await interaction.response.send_message(embed=embed, ephemeral=True)
         return
-    await interaction.response.send_message(embed=embed, ephemeral=result.ephemeral)
+
+    public_embed = _build_public_actor_embed(result, interaction.user.mention)
+    if interaction.response.is_done():
+        if interaction.channel is not None:
+            await interaction.channel.send(embed=public_embed)
+        with suppress(discord.HTTPException):
+            await interaction.delete_original_response()
+        return
+
+    await interaction.response.defer(ephemeral=True)
+    if interaction.channel is not None:
+        await interaction.channel.send(embed=public_embed)
+    with suppress(discord.HTTPException):
+        await interaction.delete_original_response()
+
+
+async def complete_bound_result(
+    interaction: discord.Interaction,
+    *,
+    bound_message: discord.InteractionMessage | None,
+    result: DiscordCommandResult,
+) -> None:
+    """Finish one interactive form flow using its bound root message when available."""
+    embed = build_result_embed(result)
+    if bound_message is None:
+        if interaction.response.is_done():
+            if result.ephemeral:
+                try:
+                    await interaction.edit_original_response(embed=embed)
+                except discord.HTTPException:
+                    pass
+            elif interaction.channel is not None:
+                await interaction.channel.send(embed=_build_public_actor_embed(result, interaction.user.mention))
+        else:
+            if result.ephemeral:
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+            else:
+                await interaction.response.defer(ephemeral=True)
+                if interaction.channel is not None:
+                    await interaction.channel.send(embed=_build_public_actor_embed(result, interaction.user.mention))
+                with suppress(discord.HTTPException):
+                    await interaction.delete_original_response()
+        return
+
+    if result.ephemeral:
+        if interaction.response.is_done():
+            await bound_message.edit(embed=embed, view=None)
+        else:
+            await interaction.response.defer(ephemeral=True)
+            await bound_message.edit(embed=embed, view=None)
+        return
+
+    with suppress(discord.HTTPException):
+        await bound_message.edit(view=None)
+    if interaction.response.is_done():
+        if interaction.channel is not None:
+            await interaction.channel.send(embed=_build_public_actor_embed(result, interaction.user.mention))
+    else:
+        await interaction.response.defer(ephemeral=True)
+        if interaction.channel is not None:
+            await interaction.channel.send(embed=_build_public_actor_embed(result, interaction.user.mention))
+    with suppress(discord.HTTPException):
+        await interaction.delete_original_response()
+    with suppress(discord.HTTPException):
+        await bound_message.delete()
 
 
 def command_unavailable_result() -> DiscordCommandResult:

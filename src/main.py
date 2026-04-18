@@ -17,6 +17,7 @@ from src.database.connection import (
     PostgresMessageRepository,
     PostgresPatternRepository,
     PostgresReplyRepository,
+    PostgresTrackedUserRepository,
     PostgresThreadRepository,
     PostgresTwitchAccountRepository,
     PostgresTwitchDeviceFlowRepository,
@@ -25,11 +26,14 @@ from src.database.connection import (
 from src.events.event_bus import EventBus
 from src.services.account_service import AccountCommandService, DeviceFlowPollingService
 from src.services.channel_command_service import ChannelCommandService
+from src.services.discord_presence_service import DiscordPresenceService
+from src.services.irc_bootstrap_service import IRCBootstrapService
 from src.services.message_ingest_service import MessageIngestService
 from src.services.pattern_service import PatternCommandService, PatternTrackingService, ShowCommandService
 from src.services.permission_service import PermissionCommandService
 from src.services.reply_service import AutoReplyService, ReplyCommandService
 from src.services.thread_lifecycle_service import ThreadLifecycleService
+from src.services.user_command_service import UserCommandService
 from src.services.write_service import TwitchWriteCommandService
 
 
@@ -45,6 +49,7 @@ async def _run() -> None:
     message_repository = PostgresMessageRepository(database)
     thread_repository = PostgresThreadRepository(database)
     channel_repository = PostgresChannelRepository(database)
+    tracked_user_repository = PostgresTrackedUserRepository(database)
     pattern_repository = PostgresPatternRepository(database)
     reply_repository = PostgresReplyRepository(database)
     permission_repository = PostgresUserPermissionRepository(database)
@@ -82,7 +87,23 @@ async def _run() -> None:
         irc_manager=irc_adapter,
         permission_repository=permission_repository,
     )
-    discord_adapter = DiscordAdapter(config=config, event_bus=event_bus)
+    UserCommandService(
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        tracked_user_repository=tracked_user_repository,
+        twitch_api=twitch_api,
+        permission_repository=permission_repository,
+    )
+    discord_adapter = DiscordAdapter(
+        config=config,
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        tracked_user_repository=tracked_user_repository,
+        pattern_repository=pattern_repository,
+        reply_repository=reply_repository,
+        twitch_api=twitch_api,
+    )
     device_flow_poller = DeviceFlowPollingService(
         device_flow_repository=device_flow_repository,
         account_repository=account_repository,
@@ -90,10 +111,20 @@ async def _run() -> None:
         twitch_api=twitch_api,
         notifier=discord_adapter,
     )
+    presence_service = DiscordPresenceService(
+        message_repository=message_repository,
+        notifier=discord_adapter,
+    )
+    irc_bootstrap_service = IRCBootstrapService(
+        channel_repository=channel_repository,
+        twitch_api=twitch_api,
+        irc_manager=irc_adapter,
+    )
     PatternCommandService(
         event_bus=event_bus,
         thread_repository=thread_repository,
         channel_repository=channel_repository,
+        tracked_user_repository=tracked_user_repository,
         pattern_repository=pattern_repository,
         twitch_api=twitch_api,
         permission_repository=permission_repository,
@@ -117,12 +148,15 @@ async def _run() -> None:
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         reply_repository=reply_repository,
+        tracked_user_repository=tracked_user_repository,
+        twitch_api=twitch_api,
         permission_repository=permission_repository,
     )
     PatternTrackingService(
         event_bus=event_bus,
         thread_repository=thread_repository,
         channel_repository=channel_repository,
+        tracked_user_repository=tracked_user_repository,
         pattern_repository=pattern_repository,
         twitch_api=twitch_api,
         notifier=discord_adapter,
@@ -132,6 +166,7 @@ async def _run() -> None:
         event_bus=event_bus,
         thread_repository=thread_repository,
         channel_repository=channel_repository,
+        tracked_user_repository=tracked_user_repository,
         pattern_repository=pattern_repository,
         reply_repository=reply_repository,
         account_repository=account_repository,
@@ -159,7 +194,9 @@ async def _run() -> None:
 
     irc_task = asyncio.create_task(irc_adapter.start(), name="twitch-irc-adapter")
     discord_task = asyncio.create_task(discord_adapter.start(), name="discord-adapter")
+    await irc_bootstrap_service.sync_persisted_channels()
     await device_flow_poller.start()
+    await presence_service.start()
 
     try:
         await stop_event.wait()
@@ -171,6 +208,7 @@ async def _run() -> None:
         with suppress(asyncio.CancelledError):
             await discord_task
         await device_flow_poller.stop()
+        await presence_service.stop()
         await twitch_api.close()
         await discord_adapter.stop()
         await irc_adapter.stop()

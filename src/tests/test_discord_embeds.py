@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import discord
+
 from src.database.connection import ChannelRecord, PatternRecord, ReplyRecord, ThreadRecord
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle, TwitchChatMessageEvent
-from src.utils.discord_embeds import EMBED_COLORS, build_auto_reply_embed, build_result_embed, build_tracking_embed
+from src.utils.discord_embeds import EMBED_COLORS, build_auto_reply_embed, build_result_embed, build_tracking_embed, build_tracking_view
 
 
 def _build_event(*, color: str | None) -> TwitchChatMessageEvent:
@@ -136,8 +138,42 @@ def test_auto_reply_embed_mentions_sent_reply_message() -> None:
         ),
     )
 
-    assert embed.title == "Alice"
+    assert embed.title == ""
     field_names = [field.name for field in embed.fields]
-    assert "Auto Reply" in field_names
-    assert "Status" in field_names
+    assert "Reply" in field_names
     assert embed.color.value == 0x123456
+
+
+def test_tracking_embed_escapes_markdown_but_keeps_links_clickable() -> None:
+    event = TwitchChatMessageEvent(
+        channel_login="example",
+        author_login="alice",
+        author_display_name="Alice",
+        author_id="7",
+        broadcaster_id="42",
+        message_id="msg-1",
+        content="Look at **this** https://example.com/_test_ and @everyone",
+        color=None,
+        sent_at=datetime.now(timezone.utc),
+        raw_tags={"badges": ""},
+    )
+
+    embed = build_tracking_embed(
+        event=event,
+        pattern=_build_pattern(color=None),
+        channel=ChannelRecord(thread_id=1, twitch_channel_id="42", color=None),
+        thread=_build_thread(color=None),
+    )
+
+    assert "\\*\\*this\\*\\*" in embed.description
+    assert "https://example.com/_test_" in embed.description
+    assert "@everyone" not in embed.description
+
+
+def test_tracking_view_links_to_twitch_channel() -> None:
+    view = build_tracking_view(channel_login="example")
+
+    assert len(view.children) == 1
+    button = view.children[0]
+    assert isinstance(button, discord.ui.Button)
+    assert button.url == "https://www.twitch.tv/example"

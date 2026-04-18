@@ -465,7 +465,7 @@ async def test_write_send_respects_granted_permission_for_non_owner() -> None:
         requester_id=200,
         action="grant",
         target_user_id=201,
-        permission="send_twitch_messages",
+        permissions=("send_twitch_messages",),
     )
     result = await dispatch_write_command(
         bus,
@@ -512,7 +512,7 @@ async def test_write_send_reports_missing_owner_account_even_for_permitted_helpe
         requester_id=200,
         action="grant",
         target_user_id=201,
-        permission="send_twitch_messages",
+        permissions=("send_twitch_messages",),
     )
     result = await dispatch_write_command(
         bus,

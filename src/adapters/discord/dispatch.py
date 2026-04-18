@@ -9,6 +9,7 @@ from src.events.event_types import (
     DiscordAccountRequestedEvent,
     DiscordChannelRequestedEvent,
     DiscordCommandResult,
+    DiscordUserRequestedEvent,
     DiscordPatternEditRequestedEvent,
     DiscordPatternRequestedEvent,
     DiscordPermissionRequestedEvent,
@@ -42,6 +43,30 @@ async def dispatch_channel_command(
             twitch_channel_login=twitch_channel_login,
             color=color,
             clear_color=clear_color,
+            result_future=result_future,
+        ),
+    )
+    return await result_future
+
+
+async def dispatch_user_command(
+    event_bus: EventBus,
+    *,
+    discord_channel_id: int,
+    requester_id: int,
+    action: str,
+    twitch_user_login: str,
+) -> DiscordCommandResult:
+    """Publish a tracked-user add/remove request and await the service result."""
+    loop = asyncio.get_running_loop()
+    result_future: asyncio.Future[DiscordCommandResult] = loop.create_future()
+    await event_bus.publish(
+        EventType.DISCORD_USER_REQUESTED,
+        DiscordUserRequestedEvent(
+            discord_channel_id=discord_channel_id,
+            requester_id=requester_id,
+            action=action,
+            twitch_user_login=twitch_user_login,
             result_future=result_future,
         ),
     )
@@ -245,7 +270,7 @@ async def dispatch_permission_command(
     requester_id: int,
     action: str,
     target_user_id: int,
-    permission: str | None,
+    permissions: tuple[str, ...] | None,
 ) -> DiscordCommandResult:
     """Publish a permission-management request and await the service result."""
     loop = asyncio.get_running_loop()
@@ -257,7 +282,7 @@ async def dispatch_permission_command(
             requester_id=requester_id,
             action=action,
             target_user_id=target_user_id,
-            permission=permission,
+            permissions=permissions,
             result_future=result_future,
         ),
     )
