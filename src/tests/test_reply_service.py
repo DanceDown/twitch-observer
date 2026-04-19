@@ -9,11 +9,14 @@ from src.adapters.discord import dispatch_account_command, dispatch_reply_comman
 from src.adapters.twitch_api import (
     TwitchDeviceCodeStart,
     TwitchDevicePollResult,
+    TwitchUser,
     TwitchUserTokenBundle,
     TwitchValidatedToken,
 )
 from src.database.connection import (
     ChannelRecord,
+    ChannelEventReplyRecord,
+    ChannelEventReplyRepository,
     ChannelRepository,
     PatternRecord,
     PatternRepository,
@@ -27,10 +30,16 @@ from src.database.connection import (
     TwitchDeviceFlowRepository,
 )
 from src.events.event_bus import EventBus
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle, TwitchChatMessageEvent
+from src.events.event_types import (
+    DiscordCommandResult,
+    DiscordResultStyle,
+    EventType,
+    TwitchChannelLiveStateChangedEvent,
+    TwitchChatMessageEvent,
+)
 from src.services.account_service import AccountCommandService, AccountNotificationSender, DeviceFlowPollingService
 from src.services.pattern_service import ShowCommandService
-from src.services.reply_service import AutoReplyService, ReplyCommandService
+from src.services.reply_service import AutoReplyService, ChannelEventAutoReplyService, ReplyCommandService
 
 
 @dataclass
@@ -134,9 +143,30 @@ class InMemoryChannelRepository(ChannelRepository):
         existing = self.channels_by_thread.get(key)
         if existing is None:
             return None
-        updated = ChannelRecord(thread_id=existing.thread_id, twitch_channel_id=existing.twitch_channel_id, color=color)
+        updated = ChannelRecord(
+            thread_id=existing.thread_id,
+            twitch_channel_id=existing.twitch_channel_id,
+            color=color,
+            is_live=existing.is_live,
+            last_live_status_at=existing.last_live_status_at,
+        )
         self.channels_by_thread[key] = updated
         return updated
+
+    def set_live_state_for_twitch_channel(self, *, twitch_channel_id: str, is_live: bool, changed_at: str | None) -> int:
+        updated_rows = 0
+        for key, existing in list(self.channels_by_thread.items()):
+            if existing.twitch_channel_id != twitch_channel_id:
+                continue
+            self.channels_by_thread[key] = ChannelRecord(
+                thread_id=existing.thread_id,
+                twitch_channel_id=existing.twitch_channel_id,
+                color=existing.color,
+                is_live=is_live,
+                last_live_status_at=changed_at,
+            )
+            updated_rows += 1
+        return updated_rows
 
     def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
         return sum(1 for record in self.channels_by_thread.values() if record.twitch_channel_id == twitch_channel_id)
@@ -356,6 +386,79 @@ class InMemoryReplyRepository(ReplyRepository):
                 )
                 count += 1
         return count
+
+
+@dataclass
+class InMemoryChannelEventReplyRepository(ChannelEventReplyRepository):
+    replies: dict[tuple[int, str, str], ChannelEventReplyRecord] = field(default_factory=dict)
+
+    def get_by_channel_event(self, *, thread_id: int, twitch_channel_id: str, event_state: str) -> ChannelEventReplyRecord | None:
+        return self.replies.get((thread_id, twitch_channel_id, event_state))
+
+    def upsert_reply(
+        self,
+        *,
+        thread_id: int,
+        twitch_channel_id: str,
+        event_state: str,
+        reply_message: str,
+    ) -> ChannelEventReplyRecord:
+        record = ChannelEventReplyRecord(
+            thread_id=thread_id,
+            twitch_channel_id=twitch_channel_id,
+            event_state=event_state,
+            reply_message=reply_message,
+            disabled=False,
+        )
+        self.replies[(thread_id, twitch_channel_id, event_state)] = record
+        return record
+
+    def remove_reply(self, *, thread_id: int, twitch_channel_id: str, event_state: str) -> ChannelEventReplyRecord | None:
+        return self.replies.pop((thread_id, twitch_channel_id, event_state), None)
+
+    def set_reply_disabled(
+        self,
+        *,
+        thread_id: int,
+        twitch_channel_id: str,
+        event_state: str,
+        disabled: bool,
+    ) -> ChannelEventReplyRecord | None:
+        key = (thread_id, twitch_channel_id, event_state)
+        existing = self.replies.get(key)
+        if existing is None:
+            return None
+        updated = ChannelEventReplyRecord(
+            thread_id=existing.thread_id,
+            twitch_channel_id=existing.twitch_channel_id,
+            event_state=existing.event_state,
+            reply_message=existing.reply_message,
+            disabled=disabled,
+        )
+        self.replies[key] = updated
+        return updated
+
+    def list_replies_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[ChannelEventReplyRecord]:
+        rows = [reply for reply in self.replies.values() if reply.thread_id == thread_id]
+        if not include_disabled:
+            rows = [reply for reply in rows if not reply.disabled]
+        return sorted(rows, key=lambda reply: (reply.event_state, reply.twitch_channel_id))
+
+    def list_replies_for_channel_event(
+        self,
+        *,
+        twitch_channel_id: str,
+        event_state: str,
+        include_disabled: bool = False,
+    ) -> list[ChannelEventReplyRecord]:
+        rows = [
+            reply
+            for reply in self.replies.values()
+            if reply.twitch_channel_id == twitch_channel_id and reply.event_state == event_state
+        ]
+        if not include_disabled:
+            rows = [reply for reply in rows if not reply.disabled]
+        return sorted(rows, key=lambda reply: reply.thread_id)
 
 
 @dataclass
@@ -600,6 +703,7 @@ class FakeTwitchAPI:
     validated_token: TwitchValidatedToken | None = None
     sent_messages: list[dict[str, str | None]] = field(default_factory=list)
     live_by_user_id: dict[str, bool] = field(default_factory=dict)
+    users_by_id: dict[str, TwitchUser] = field(default_factory=dict)
     poll_requests: list[tuple[str, tuple[str, ...]]] = field(default_factory=list)
     refreshed_tokens: list[str] = field(default_factory=list)
 
@@ -648,6 +752,9 @@ class FakeTwitchAPI:
             }
         )
         return "sent-1"
+
+    async def get_user_by_id(self, user_id: str) -> TwitchUser:
+        return self.users_by_id[user_id]
 
     async def is_user_live(self, user_id: str) -> bool:
         return self.live_by_user_id.get(user_id, False)
@@ -1252,9 +1359,9 @@ async def test_show_auto_replies_lists_attached_replies() -> None:
     )
 
     assert result.title == "Configuration Overview"
-    assert "- #1" in result.message
-    assert "Trigger: `hello`" in result.message
-    assert "Reply: `Hi there`" in result.message
+    assert "- `1`" in result.message
+    assert "Trigger: ``hello``" in result.message
+    assert "Reply: ``Hi there``" in result.message
 
 
 @pytest.mark.asyncio
@@ -1647,3 +1754,132 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
 
     assert service.sent_replies == 0
     assert twitch_api.sent_messages == []
+
+
+@pytest.mark.asyncio
+async def test_auto_reply_service_uses_persisted_channel_live_state_without_live_api_calls() -> None:
+    bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    channel_repository = InMemoryChannelRepository()
+    channel_repository.add_channel(thread.thread_id, "42")
+    channel_repository.set_live_state_for_twitch_channel(twitch_channel_id="42", is_live=True, changed_at="now")
+    pattern_repository = InMemoryPatternRepository(
+        patterns=[
+            PatternRecord(
+                thread_id=thread.thread_id,
+                p_index=1,
+                regex="hello",
+                channel_scope_mode="all_tracked",
+                channel_scope_ids=(),
+                user_scope_mode="all_users",
+                user_scope_ids=(),
+                sub_state="all",
+                offline_state="online",
+                is_regex=False,
+                case_sensitive=False,
+                color=None,
+                disabled=False,
+                notify=True,
+                priority=0,
+            )
+        ]
+    )
+    reply_repository = InMemoryReplyRepository()
+    reply_repository.add_reply(thread_id=thread.thread_id, p_index=1, reply_message="Hi there", reply_as_reply=False)
+    account_repository = InMemoryAccountRepository()
+    account = account_repository.create_account(
+        discord_user_id=200,
+        twitch_user_id="77",
+        twitch_login="dancedown",
+        client_id="client-123",
+        access_token="oauth:test-token",
+        refresh_token=None,
+        expires_at=None,
+        scope=("user:write:chat",),
+        token_type="bearer",
+    )
+    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    twitch_api = FakeTwitchAPI()
+    service = AutoReplyService(
+        event_bus=bus,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        pattern_repository=pattern_repository,
+        reply_repository=reply_repository,
+        account_repository=account_repository,
+        twitch_api=twitch_api,  # type: ignore[arg-type]
+        notifier=FakeNotifier(),
+    )
+
+    await service.handle_chat_message(
+        TwitchChatMessageEvent(
+            channel_login="example",
+            author_login="alice",
+            author_display_name="Alice",
+            author_id="7",
+            broadcaster_id="42",
+            message_id="msg-1",
+            content="hello there",
+            sent_at=datetime.now(timezone.utc),
+            raw_tags={"badges": ""},
+        )
+    )
+
+    assert service.sent_replies == 1
+    assert twitch_api.sent_messages[0]["message"] == "Hi there"
+
+
+@pytest.mark.asyncio
+async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_live() -> None:
+    bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    channel_repository = InMemoryChannelRepository()
+    channel_repository.add_channel(thread.thread_id, "42")
+    channel_event_reply_repository = InMemoryChannelEventReplyRepository()
+    channel_event_reply_repository.upsert_reply(
+        thread_id=thread.thread_id,
+        twitch_channel_id="42",
+        event_state="online",
+        reply_message="YIPPIE {CHANNEL} is {STATE}",
+    )
+    account_repository = InMemoryAccountRepository()
+    account = account_repository.create_account(
+        discord_user_id=200,
+        twitch_user_id="77",
+        twitch_login="dancedown",
+        client_id="client-123",
+        access_token="oauth:test-token",
+        refresh_token=None,
+        expires_at=None,
+        scope=("user:write:chat",),
+        token_type="bearer",
+    )
+    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    twitch_api = FakeTwitchAPI(
+        users_by_id={
+            "42": TwitchUser(user_id="42", login="example", display_name="ExampleChannel"),
+        }
+    )
+    ChannelEventAutoReplyService(
+        event_bus=bus,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        channel_event_reply_repository=channel_event_reply_repository,
+        account_repository=account_repository,
+        twitch_api=twitch_api,  # type: ignore[arg-type]
+    )
+
+    await bus.publish(
+        EventType.TWITCH_CHANNEL_LIVE_STATE_CHANGED,
+        TwitchChannelLiveStateChangedEvent(
+            twitch_channel_id="42",
+            twitch_channel_login="example",
+            is_live=True,
+        ),
+    )
+
+    assert len(twitch_api.sent_messages) == 1
+    assert twitch_api.sent_messages[0]["broadcaster_id"] == "42"
+    assert twitch_api.sent_messages[0]["message"] == "YIPPIE ExampleChannel is online"

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from src.adapters.twitch_api import TwitchAPIClient, TwitchUser
 from src.database.connection import (
     ChannelRepository,
+    ChannelEventReplyRecord,
+    ChannelEventReplyRepository,
     PatternRecord,
     PatternRepository,
     ReplyRecord,
@@ -45,6 +47,14 @@ class ReplyPresentation:
 
 
 @dataclass(slots=True, frozen=True)
+class ChannelEventReplyPresentation:
+    """Channel live/offline auto-reply enriched for Discord UI display."""
+
+    reply: ChannelEventReplyRecord
+    channel: TrackedChannelPresentation
+
+
+@dataclass(slots=True, frozen=True)
 class TrackedUserPresentation:
     """Tracked Twitch user metadata enriched for Discord UI rendering."""
 
@@ -63,6 +73,7 @@ class DiscordUIDataProvider:
     pattern_repository: PatternRepository
     reply_repository: ReplyRepository
     twitch_api: TwitchAPIClient
+    channel_event_reply_repository: ChannelEventReplyRepository | None = None
 
     def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
         """Return the stored Discord-context root if it exists."""
@@ -137,6 +148,21 @@ class DiscordUIDataProvider:
             if pattern is None:
                 continue
             presentations.append(ReplyPresentation(reply=reply, pattern=pattern))
+        return presentations
+
+    async def list_channel_event_replies(self, discord_channel_id: int) -> list[ChannelEventReplyPresentation]:
+        """Resolve all live/offline event replies for one Discord context."""
+        thread = self.get_thread(discord_channel_id)
+        if thread is None or self.channel_event_reply_repository is None:
+            return []
+
+        channel_map = {item.user_id: item for item in await self.list_tracked_channels(discord_channel_id)}
+        presentations: list[ChannelEventReplyPresentation] = []
+        for reply in self.channel_event_reply_repository.list_replies_for_thread(thread.thread_id, include_disabled=True):
+            channel = channel_map.get(reply.twitch_channel_id)
+            if channel is None:
+                continue
+            presentations.append(ChannelEventReplyPresentation(reply=reply, channel=channel))
         return presentations
 
     async def get_pattern(self, discord_channel_id: int, pattern_id: int) -> PatternPresentation | None:

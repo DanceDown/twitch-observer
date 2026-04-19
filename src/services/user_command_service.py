@@ -88,7 +88,8 @@ class UserCommandService:
                 ephemeral=True,
             )
 
-        twitch_user = await self.twitch_api.get_user_by_login(event.twitch_user_login)
+        refresh_lookup = getattr(self.twitch_api, "refresh_user_by_login", self.twitch_api.get_user_by_login)
+        twitch_user = await refresh_lookup(event.twitch_user_login)
         existing = self.tracked_user_repository.get_by_thread_and_twitch_user(thread.thread_id, twitch_user.user_id)
 
         if event.action == "add":

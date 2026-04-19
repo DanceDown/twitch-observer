@@ -78,6 +78,8 @@ Current concrete example:
 - pings are matched as whole-word searches
 - regexes use Python regular expressions
 - `case_sensitive` affects both pings and regexes
+- detailed runtime notes for Twitch user caching and API usage live in
+  [docs/twitch_user_caching_flow.md](docs/twitch_user_caching_flow.md)
 - pattern priority decides which matching rule wins first
 - patterns can be edited after creation
 - per-user permissions can delegate configuration access inside one Discord context

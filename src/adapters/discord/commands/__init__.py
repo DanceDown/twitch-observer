@@ -1,5 +1,6 @@
 from .account_commands import register_account_commands
 from .channel_commands import register_channel_commands
+from .live_state_commands import register_live_state_commands
 from .permission_commands import register_permission_commands
 from .pattern_commands import register_pattern_commands
 from .reply_commands import register_reply_commands
@@ -11,6 +12,7 @@ from .write_commands import register_write_commands
 __all__ = [
     "register_account_commands",
     "register_channel_commands",
+    "register_live_state_commands",
     "register_permission_commands",
     "register_pattern_commands",
     "register_reply_commands",

@@ -13,6 +13,7 @@ include:
 - the Discord bot and slash commands
 - the anonymous Twitch IRC connection used for read-only chat intake
 - the Twitch Helix API used for validation, account linking, and auto-replies
+- manual tracked-channel live/offline updates entering through Discord commands
 
 ### Database
 
@@ -68,9 +69,10 @@ The application follows this flow:
 1. `twitch_irc` receives a Twitch IRC `PRIVMSG`
 2. it creates a `TwitchChatMessageEvent`
 3. `MessageIngestService` stores the message
-4. `PatternTrackingService` evaluates the message against active patterns
-5. if a pattern matches, one Discord embed is sent
-6. `AutoReplyService` evaluates the same message and may send one Twitch reply
+4. `TwitchUserDirectoryIngestService` refreshes cached login and display-name data from IRC metadata
+5. `PatternTrackingService` evaluates the message against active patterns
+6. if a pattern matches, one Discord embed is sent
+7. `AutoReplyService` evaluates the same message and may send one Twitch reply
 
 ### Discord configuration command
 
@@ -81,6 +83,14 @@ The application follows this flow:
 4. the corresponding service validates ownership and input
 5. repositories persist the new state
 6. the Discord adapter renders the returned `DiscordCommandResult` as an embed
+
+### Live/offline state change
+
+1. `/live` or `/offline` is executed in Discord
+2. the Discord adapter normalizes it into a request event
+3. `ChannelLiveStateCommandService` validates the request and publishes `TwitchChannelLiveStateChangedEvent`
+4. `ChannelLiveStatePersistenceService` updates persisted tracked-channel state
+5. `ChannelEventAutoReplyService` may send Twitch messages for configured online/offline triggers
 
 ## Important Architectural Choices
 
@@ -121,6 +131,9 @@ That means:
 - future convenience commands
 
 all build on the same underlying pattern semantics.
+
+Live/offline channel-event replies are intentionally separate because they are
+triggered by channel state changes rather than by one concrete chat message.
 
 ### Explicit Discord context lifecycle
 

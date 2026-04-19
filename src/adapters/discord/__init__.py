@@ -4,6 +4,7 @@ from .adapter import DiscordAdapter
 from .dispatch import (
     dispatch_account_command,
     dispatch_channel_command,
+    dispatch_channel_live_state_command,
     dispatch_user_command,
     dispatch_permission_command,
     dispatch_pattern_edit_command,
@@ -18,6 +19,7 @@ __all__ = [
     "DiscordAdapter",
     "dispatch_account_command",
     "dispatch_channel_command",
+    "dispatch_channel_live_state_command",
     "dispatch_user_command",
     "dispatch_permission_command",
     "dispatch_pattern_edit_command",

@@ -7,7 +7,13 @@ from contextlib import suppress
 import discord
 
 from src.config import AppConfig
-from src.database.connection import ChannelRepository, PatternRepository, ReplyRepository, ThreadRepository
+from src.database.connection import (
+    ChannelEventReplyRepository,
+    ChannelRepository,
+    PatternRepository,
+    ReplyRepository,
+    ThreadRepository,
+)
 from src.database.connection import TrackedUserRepository
 from src.events.event_bus import EventBus
 from src.events.event_types import DiscordCommandResult
@@ -32,6 +38,7 @@ class DiscordAdapter(TrackingNotificationSender, DiscordPresenceStatusSender):
         tracked_user_repository: TrackedUserRepository,
         pattern_repository: PatternRepository,
         reply_repository: ReplyRepository,
+        channel_event_reply_repository: ChannelEventReplyRepository,
         twitch_api: TwitchAPIClient,
     ) -> None:
         self._config = config
@@ -44,6 +51,7 @@ class DiscordAdapter(TrackingNotificationSender, DiscordPresenceStatusSender):
                 tracked_user_repository=tracked_user_repository,
                 pattern_repository=pattern_repository,
                 reply_repository=reply_repository,
+                channel_event_reply_repository=channel_event_reply_repository,
                 twitch_api=twitch_api,
             ),
         )

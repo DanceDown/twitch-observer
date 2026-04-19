@@ -58,4 +58,3 @@ class IRCBootstrapService:
                 )
                 continue
             await self.irc_manager.join_channel(user.login)
-

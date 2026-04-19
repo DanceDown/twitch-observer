@@ -18,10 +18,12 @@ class EventType(StrEnum):
     DISCORD_PATTERN_EDIT_REQUESTED = "discord.pattern.edit.requested"
     DISCORD_ACCOUNT_REQUESTED = "discord.account.requested"
     DISCORD_REPLY_REQUESTED = "discord.reply.requested"
+    DISCORD_CHANNEL_LIVE_STATE_REQUESTED = "discord.channel_live_state.requested"
     DISCORD_PERMISSION_REQUESTED = "discord.permission.requested"
     DISCORD_WRITE_REQUESTED = "discord.write.requested"
     DISCORD_SHOW_REQUESTED = "discord.show.requested"
     TWITCH_CHAT_MESSAGE = "twitch.chat.message"
+    TWITCH_CHANNEL_LIVE_STATE_CHANGED = "twitch.channel_live_state.changed"
 
 
 class DiscordResultStyle(StrEnum):
@@ -160,6 +162,9 @@ class DiscordReplyRequestedEvent:
     message: str | None
     reply_as_reply: bool
     result_future: Future[DiscordCommandResult]
+    target_type: str = "pattern"
+    twitch_channel_id: str | None = None
+    channel_event_state: str | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -187,6 +192,17 @@ class DiscordWriteRequestedEvent:
 
 
 @dataclass(slots=True, frozen=True)
+class DiscordChannelLiveStateRequestedEvent:
+    """Normalized command event for manually setting one tracked channel live/offline."""
+
+    discord_channel_id: int
+    requester_id: int
+    twitch_channel_id: str
+    is_live: bool
+    result_future: Future[DiscordCommandResult]
+
+
+@dataclass(slots=True, frozen=True)
 class DiscordShowRequestedEvent:
     """Normalized slash command event for showing stored configuration sections."""
 
@@ -194,3 +210,13 @@ class DiscordShowRequestedEvent:
     requester_id: int
     sections: tuple[str, ...]
     result_future: Future[DiscordCommandResult]
+
+
+@dataclass(slots=True, frozen=True)
+class TwitchChannelLiveStateChangedEvent:
+    """Domain event emitted when a tracked Twitch channel changes live status."""
+
+    twitch_channel_id: str
+    is_live: bool
+    twitch_channel_login: str | None = None
+    changed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))

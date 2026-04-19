@@ -295,7 +295,10 @@ class TwitchAPIClient:
         if message == "authorization_pending":
             return TwitchDevicePollResult(status="pending")
         if message == "slow_down":
-            return TwitchDevicePollResult(status="slow_down", interval=5)
+            return TwitchDevicePollResult(
+                status="slow_down",
+                interval=self._config.twitch_device_flow_slowdown_step_seconds,
+            )
         if message in {"access_denied", "invalid device code", "expired_token"}:
             return TwitchDevicePollResult(status="failed", error_message=message)
         raise TwitchDeviceFlowError(message)
@@ -420,7 +423,9 @@ class TwitchAPIClient:
 
         self._app_access_token = payload["access_token"]
         expires_in = int(payload.get("expires_in", 0))
-        self._app_access_token_expires_at = now + timedelta(seconds=max(0, expires_in - 60))
+        self._app_access_token_expires_at = now + timedelta(
+            seconds=max(0, expires_in - self._config.twitch_app_access_token_refresh_skew_seconds)
+        )
         return self._app_access_token
 
 

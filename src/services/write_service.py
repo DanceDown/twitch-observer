@@ -31,6 +31,7 @@ class TwitchWriteCommandService:
     account_repository: TwitchAccountRepository
     twitch_api: TwitchAPIClient
     permission_repository: UserPermissionRepository | None = None
+    token_refresh_skew_seconds: int = 30
 
     def __post_init__(self) -> None:
         self.event_bus.subscribe(EventType.DISCORD_WRITE_REQUESTED, self.handle_request)
@@ -92,7 +93,8 @@ class TwitchWriteCommandService:
         if len(message) > 500:
             raise ValueError("Twitch chat messages are limited to 500 characters.")
 
-        twitch_channel = await self.twitch_api.get_user_by_login(event.twitch_channel_login)
+        refresh_lookup = getattr(self.twitch_api, "refresh_user_by_login", self.twitch_api.get_user_by_login)
+        twitch_channel = await refresh_lookup(event.twitch_channel_login)
         tracked_channel = self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_channel.user_id)
         if tracked_channel is None:
             return DiscordCommandResult(
@@ -179,7 +181,7 @@ class TwitchWriteCommandService:
             expires_at = datetime.fromisoformat(account.expires_at)
         except ValueError:
             return account
-        if expires_at > datetime.now(timezone.utc) + timedelta(seconds=30):
+        if expires_at > datetime.now(timezone.utc) + timedelta(seconds=self.token_refresh_skew_seconds):
             return account
         refreshed = await self._try_refresh_account(account)
         return refreshed or account

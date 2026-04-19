@@ -113,9 +113,30 @@ class InMemoryChannelRepository(ChannelRepository):
         existing = self.channels_by_thread.get(key)
         if existing is None:
             return None
-        updated = ChannelRecord(thread_id=existing.thread_id, twitch_channel_id=existing.twitch_channel_id, color=color)
+        updated = ChannelRecord(
+            thread_id=existing.thread_id,
+            twitch_channel_id=existing.twitch_channel_id,
+            color=color,
+            is_live=existing.is_live,
+            last_live_status_at=existing.last_live_status_at,
+        )
         self.channels_by_thread[key] = updated
         return updated
+
+    def set_live_state_for_twitch_channel(self, *, twitch_channel_id: str, is_live: bool, changed_at: str | None) -> int:
+        updated_rows = 0
+        for key, existing in list(self.channels_by_thread.items()):
+            if existing.twitch_channel_id != twitch_channel_id:
+                continue
+            self.channels_by_thread[key] = ChannelRecord(
+                thread_id=existing.thread_id,
+                twitch_channel_id=existing.twitch_channel_id,
+                color=existing.color,
+                is_live=is_live,
+                last_live_status_at=changed_at,
+            )
+            updated_rows += 1
+        return updated_rows
 
     def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
         return sum(1 for record in self.channels_by_thread.values() if record.twitch_channel_id == twitch_channel_id)
@@ -390,6 +411,7 @@ class FakeTwitchAPI:
     users_by_login: dict[str, TwitchUser] = field(default_factory=dict)
     live_by_user_id: dict[str, bool] = field(default_factory=dict)
     error: Exception | None = None
+    live_requests: list[str] = field(default_factory=list)
 
     async def get_user_by_login(self, login: str) -> TwitchUser:
         if self.error is not None:
@@ -405,6 +427,7 @@ class FakeTwitchAPI:
         raise KeyError(user_id)
 
     async def is_user_live(self, user_id: str) -> bool:
+        self.live_requests.append(user_id)
         return self.live_by_user_id.get(user_id, False)
 
 
@@ -1044,11 +1067,11 @@ async def test_show_command_lists_channels_and_all_pattern_types_together() -> N
     assert result.title == "Configuration Overview"
     assert result.ephemeral is True
     assert "[Example](https://www.twitch.tv/example)" in result.message
-    assert "Ping #1" in result.message
-    assert "hello" in result.message
+    assert "- Ping `1`" in result.message
+    assert "Text: `hello`" in result.message
     assert "Only in [Example](https://www.twitch.tv/example)" in result.message
-    assert "Regex #2" in result.message
-    assert "^hello$" in result.message
+    assert "- Regex `2`" in result.message
+    assert "Text: `^hello$`" in result.message
 
 
 @pytest.mark.asyncio
@@ -1470,3 +1493,55 @@ async def test_tracking_service_skips_disabled_thread() -> None:
     )
 
     assert notifier.sent == []
+
+
+@pytest.mark.asyncio
+async def test_tracking_service_uses_persisted_channel_live_state_without_twitch_live_lookup() -> None:
+    event_bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread = thread_repository.create(owner_id=200, discord_channel_id=1000)
+    channel_repository = InMemoryChannelRepository()
+    channel_repository.add_channel(thread.thread_id, "42")
+    channel_repository.set_live_state_for_twitch_channel(twitch_channel_id="42", is_live=True, changed_at="now")
+    pattern_repository = InMemoryPatternRepository()
+    pattern_repository.add_pattern(
+        thread_id=thread.thread_id,
+        regex="hello",
+        channel_scope_mode="all_tracked",
+        channel_scope_ids=(),
+        user_scope_mode="all_users",
+        user_scope_ids=(),
+        sub_state="all",
+        offline_state="online",
+        is_regex=False,
+        case_sensitive=False,
+        color=None,
+        disabled=False,
+        priority=0,
+    )
+    twitch_api = FakeTwitchAPI()
+    notifier = FakeNotifier()
+    service = PatternTrackingService(
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        pattern_repository=pattern_repository,
+        twitch_api=twitch_api,  # type: ignore[arg-type]
+        notifier=notifier,
+    )
+
+    await service.handle_chat_message(
+        TwitchChatMessageEvent(
+            channel_login="example",
+            author_login="alice",
+            author_display_name="Alice",
+            author_id="7",
+            broadcaster_id="42",
+            content="hello there",
+            sent_at=datetime.now(timezone.utc),
+            raw_tags={"badges": ""},
+        )
+    )
+
+    assert len(notifier.sent) == 1
+    assert twitch_api.live_requests == []

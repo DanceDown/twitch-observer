@@ -348,7 +348,7 @@ class DeviceFlowPollingService:
                 if result.status == "slow_down":
                     self.device_flow_repository.update_interval(
                         discord_channel_id=pending.discord_channel_id or 0,
-                        interval_seconds=pending.interval_seconds + int(result.interval or 5),
+                        interval_seconds=pending.interval_seconds + int(result.interval or 0),
                     )
                     continue
                 if result.status == "failed":

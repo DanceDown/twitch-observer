@@ -13,6 +13,7 @@ from src.utils.discord_embeds import build_result_embed, build_tracking_view
 from .commands import (
     register_account_commands,
     register_channel_commands,
+    register_live_state_commands,
     register_permission_commands,
     register_pattern_commands,
     register_reply_commands,
@@ -44,6 +45,7 @@ class ObserverDiscordClient(discord.Client):
         """Register slash commands and sync them globally."""
         register_thread_commands(self.tree, self._event_bus)
         register_channel_commands(self.tree, self._event_bus, self._ui_data_provider)
+        register_live_state_commands(self.tree, self._event_bus, self._ui_data_provider)
         register_user_commands(self.tree, self._event_bus, self._ui_data_provider)
         register_pattern_commands(self.tree, self._event_bus, self._ui_data_provider)
         register_permission_commands(self.tree, self._event_bus)

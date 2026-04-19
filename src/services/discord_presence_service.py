@@ -25,6 +25,7 @@ class DiscordPresenceService:
     notifier: DiscordPresenceStatusSender
     poll_interval_seconds: float = 60.0
     lookback_minutes: int = 5
+    message_limit: int = 50
     max_status_length: int = 120
     _task: asyncio.Task[None] | None = field(default=None, init=False)
     _stop_event: asyncio.Event = field(default_factory=asyncio.Event, init=False)
@@ -48,7 +49,7 @@ class DiscordPresenceService:
     async def poll_once(self) -> None:
         """Choose one recent message and publish it as Discord custom status."""
         since = datetime.now(timezone.utc) - timedelta(minutes=self.lookback_minutes)
-        messages = self.message_repository.list_recent_messages(since=since, limit=50)
+        messages = self.message_repository.list_recent_messages(since=since, limit=self.message_limit)
         if not messages:
             return
         selected = random.choice(messages)

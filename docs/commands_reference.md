@@ -215,6 +215,32 @@ Parameters:
 - `clear`
   - set to `true` to remove the stored channel color
 
+### `/live`
+
+Purpose:
+
+- manually mark one tracked Twitch channel as live
+
+Behavior:
+
+- opens a modal
+- lets you choose one tracked channel from the current Discord context
+- persists the live state through the event bus and the channel-state service
+- may trigger configured channel-event auto-replies
+
+### `/offline`
+
+Purpose:
+
+- manually mark one tracked Twitch channel as offline
+
+Behavior:
+
+- opens a modal
+- lets you choose one tracked channel from the current Discord context
+- persists the offline state through the event bus and the channel-state service
+- may trigger configured channel-event auto-replies
+
 ## Pattern Commands
 
 ### `/ping add`
@@ -394,35 +420,25 @@ Behavior:
 
 ## Reply Commands
 
-### `/reply add`
+### `/reply`
 
 Purpose:
 
-- attach one auto-reply to one existing pattern
-
-Syntax:
-
-```text
-/reply add pattern_id:3 message:Hallo! mode:reply
-```
-
-Parameters:
-
-- `pattern_id`
-  - stable rule ID from `/show section:pings`
-- `message`
-  - the Twitch chat message to send when that rule matches
-- `mode`
-  - `message`
-  - `reply`
-  - default: `message`
+- manage auto-replies through one interactive form
 
 Behavior:
 
-- each pattern can have at most one reply
-- replies inherit the same scope and match conditions as the pattern
+- opens a form with `Add`, `Remove`, `Disable`, and `Enable`
+- `Add` lets you attach a reply to:
+  - one existing ping or regex rule
+  - one tracked channel becoming `online`
+  - one tracked channel becoming `offline`
+- pattern-based replies may either send a normal Twitch message or reply directly to the matched Twitch chat message
+- channel-event replies always send a normal Twitch message
+- one pattern can have at most one attached pattern reply
+- one tracked channel can have at most one configured reply per live-state event
 
-Supported placeholders:
+Pattern placeholders:
 
 - `{NAME}`
   - matched message author display name or login
@@ -431,41 +447,12 @@ Supported placeholders:
 - `{MESSAGE}`
   - original matched message text
 
-### `/reply remove`
+Channel-event placeholders:
 
-Purpose:
-
-- remove the reply attached to one pattern
-
-Syntax:
-
-```text
-/reply remove pattern_id:3
-```
-
-### `/reply disable`
-
-Purpose:
-
-- disable an existing reply without deleting it
-
-Syntax:
-
-```text
-/reply disable pattern_id:3
-```
-
-### `/reply enable`
-
-Purpose:
-
-- re-enable a previously disabled reply
-
-Syntax:
-
-```text
-/reply enable pattern_id:3
-```
+- `{CHANNEL}`
+  - tracked channel display name used for the event
+- `{STATE}`
+  - either `online` or `offline`
 
 ## Account Commands
 
@@ -625,6 +612,7 @@ Syntax:
 /show section:channels
 /show section:pings
 /show section:auto_replies
+/show section:users
 /show section:permissions
 ```
 
@@ -635,10 +623,15 @@ Parameters:
     - `channels`
     - `pings`
     - `auto_replies`
+    - `users`
     - `permissions`
 
 Behavior:
 
 - `pings` includes both normal pings and regex-mode rules
+- `auto_replies` includes both pattern-bound replies and live/offline channel-event replies
 - rules are shown in descending priority order
 - IDs shown here are the IDs used by `/ping ...` and `/reply ...`
+- when one section exceeds Discord's embed size limit, `/show` splits it across
+  multiple pages and adds `Previous` and `Next` buttons plus a `Page x/y`
+  footer

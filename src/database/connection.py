@@ -3,7 +3,7 @@ from __future__ import annotations
 """Database access layer for PostgreSQL-backed persistence."""
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 import psycopg
 from psycopg.types.json import Jsonb
@@ -58,12 +58,26 @@ class TwitchDeviceFlowRecord:
 
 
 @dataclass(slots=True, frozen=True)
+class TwitchUserCacheRecord:
+    """Persisted Twitch user metadata used to avoid repeated Helix lookups."""
+
+    twitch_user_id: str
+    twitch_login: str
+    display_name: str
+    profile_image_url: str | None
+    updated_at: str
+    last_api_refresh_at: str | None
+
+
+@dataclass(slots=True, frozen=True)
 class ChannelRecord:
     """Persisted Twitch channel subscription for one thread."""
 
     thread_id: int
     twitch_channel_id: str
     color: str | None
+    is_live: bool | None = None
+    last_live_status_at: str | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -105,6 +119,17 @@ class ReplyRecord:
     p_index: int
     reply_message: str
     reply_as_reply: bool
+    disabled: bool
+
+
+@dataclass(slots=True, frozen=True)
+class ChannelEventReplyRecord:
+    """Persisted auto-reply triggered by a tracked channel going live or offline."""
+
+    thread_id: int
+    twitch_channel_id: str
+    event_state: str
+    reply_message: str
     disabled: bool
 
 
@@ -267,6 +292,35 @@ class TwitchDeviceFlowRepository:
         raise NotImplementedError
 
 
+class TwitchUserCacheRepository:
+    """Persistence interface for Twitch user metadata cached by ID and login."""
+
+    def get_by_user_id(self, twitch_user_id: str) -> TwitchUserCacheRecord | None:  # pragma: no cover
+        raise NotImplementedError
+
+    def get_by_login(self, twitch_login: str) -> TwitchUserCacheRecord | None:  # pragma: no cover
+        raise NotImplementedError
+
+    def upsert_from_api(
+        self,
+        *,
+        twitch_user_id: str,
+        twitch_login: str,
+        display_name: str,
+        profile_image_url: str | None,
+    ) -> TwitchUserCacheRecord:  # pragma: no cover
+        raise NotImplementedError
+
+    def observe_from_chat(
+        self,
+        *,
+        twitch_user_id: str,
+        twitch_login: str,
+        display_name: str | None,
+    ) -> TwitchUserCacheRecord:  # pragma: no cover
+        raise NotImplementedError
+
+
 class ChannelRepository:
     """Persistence interface for per-thread Twitch channel subscriptions."""
 
@@ -280,6 +334,15 @@ class ChannelRepository:
         raise NotImplementedError
 
     def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:  # pragma: no cover
+        raise NotImplementedError
+
+    def set_live_state_for_twitch_channel(
+        self,
+        *,
+        twitch_channel_id: str,
+        is_live: bool,
+        changed_at: str | None,
+    ) -> int:  # pragma: no cover
         raise NotImplementedError
 
     def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:  # pragma: no cover
@@ -435,6 +498,65 @@ class ReplyRepository:
         raise NotImplementedError
 
 
+class ChannelEventReplyRepository:
+    """Persistence interface for live/offline-triggered auto-replies."""
+
+    def get_by_channel_event(
+        self,
+        *,
+        thread_id: int,
+        twitch_channel_id: str,
+        event_state: str,
+    ) -> ChannelEventReplyRecord | None:  # pragma: no cover
+        raise NotImplementedError
+
+    def upsert_reply(
+        self,
+        *,
+        thread_id: int,
+        twitch_channel_id: str,
+        event_state: str,
+        reply_message: str,
+    ) -> ChannelEventReplyRecord:  # pragma: no cover
+        raise NotImplementedError
+
+    def remove_reply(
+        self,
+        *,
+        thread_id: int,
+        twitch_channel_id: str,
+        event_state: str,
+    ) -> ChannelEventReplyRecord | None:  # pragma: no cover
+        raise NotImplementedError
+
+    def set_reply_disabled(
+        self,
+        *,
+        thread_id: int,
+        twitch_channel_id: str,
+        event_state: str,
+        disabled: bool,
+    ) -> ChannelEventReplyRecord | None:  # pragma: no cover
+        raise NotImplementedError
+
+    def list_replies_for_thread(
+        self,
+        thread_id: int,
+        *,
+        include_disabled: bool = True,
+    ) -> list[ChannelEventReplyRecord]:  # pragma: no cover
+        raise NotImplementedError
+
+    def list_replies_for_channel_event(
+        self,
+        *,
+        twitch_channel_id: str,
+        event_state: str,
+        include_disabled: bool = False,
+    ) -> list[ChannelEventReplyRecord]:  # pragma: no cover
+        raise NotImplementedError
+
+
 class UserPermissionRepository:
     """Persistence interface for additional per-thread Discord permissions."""
 
@@ -554,6 +676,60 @@ class PostgresDatabase:
                 """
                 CREATE INDEX IF NOT EXISTS idx_tracked_user_twitch_user_id
                 ON tracked_user(twitch_user_id)
+                """
+            )
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS twitch_user_cache (
+                    twitch_user_id TEXT PRIMARY KEY,
+                    twitch_login TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    profile_image_url TEXT,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    last_api_refresh_at TIMESTAMPTZ
+                )
+                """
+            )
+            cursor.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_twitch_user_cache_login
+                ON twitch_user_cache(twitch_login)
+                """
+            )
+            cursor.execute(
+                """
+                ALTER TABLE channel
+                ADD COLUMN IF NOT EXISTS is_live BOOLEAN
+                """
+            )
+            cursor.execute(
+                """
+                ALTER TABLE channel
+                ADD COLUMN IF NOT EXISTS last_live_status_at TIMESTAMPTZ
+                """
+            )
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS channel_event_reply (
+                    thread_id INTEGER NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,
+                    twitch_channel_id TEXT NOT NULL,
+                    event_state OFFLINE_STATE_ENUM NOT NULL,
+                    reply_message TEXT NOT NULL,
+                    disabled BOOLEAN NOT NULL DEFAULT FALSE,
+                    PRIMARY KEY (thread_id, twitch_channel_id, event_state),
+                    CONSTRAINT fk_channel_event_reply_channel
+                        FOREIGN KEY (thread_id, twitch_channel_id)
+                        REFERENCES channel(thread_id, twitch_channel_id)
+                        ON DELETE CASCADE,
+                    CONSTRAINT chk_channel_event_reply_state
+                        CHECK (event_state IN ('offline', 'online'))
+                )
+                """
+            )
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_channel_event_reply_lookup
+                ON channel_event_reply(twitch_channel_id, event_state, disabled)
                 """
             )
 
@@ -1244,6 +1420,172 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
 
 
 @dataclass(slots=True)
+class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
+    """Store and retrieve cached Twitch user metadata."""
+
+    database: PostgresDatabase
+
+    def get_by_user_id(self, twitch_user_id: str) -> TwitchUserCacheRecord | None:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT twitch_user_id, twitch_login, display_name, profile_image_url, updated_at, last_api_refresh_at
+                FROM twitch_user_cache
+                WHERE twitch_user_id = %s
+                """,
+                (twitch_user_id,),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return self._build_record(row)
+
+    def get_by_login(self, twitch_login: str) -> TwitchUserCacheRecord | None:
+        normalized_login = twitch_login.strip().lower()
+        if not normalized_login:
+            return None
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT twitch_user_id, twitch_login, display_name, profile_image_url, updated_at, last_api_refresh_at
+                FROM twitch_user_cache
+                WHERE twitch_login = %s
+                """,
+                (normalized_login,),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return self._build_record(row)
+
+    def upsert_from_api(
+        self,
+        *,
+        twitch_user_id: str,
+        twitch_login: str,
+        display_name: str,
+        profile_image_url: str | None,
+    ) -> TwitchUserCacheRecord:
+        normalized_login = twitch_login.strip().lower()
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                DELETE FROM twitch_user_cache
+                WHERE twitch_login = %s AND twitch_user_id <> %s
+                """,
+                (normalized_login, twitch_user_id),
+            )
+            cursor.execute(
+                """
+                INSERT INTO twitch_user_cache (
+                    twitch_user_id,
+                    twitch_login,
+                    display_name,
+                    profile_image_url,
+                    updated_at,
+                    last_api_refresh_at
+                )
+                VALUES (%s, %s, %s, %s, NOW(), NOW())
+                ON CONFLICT (twitch_user_id)
+                DO UPDATE SET
+                    twitch_login = EXCLUDED.twitch_login,
+                    display_name = EXCLUDED.display_name,
+                    profile_image_url = EXCLUDED.profile_image_url,
+                    updated_at = CASE
+                        WHEN twitch_user_cache.twitch_login IS DISTINCT FROM EXCLUDED.twitch_login
+                          OR twitch_user_cache.display_name IS DISTINCT FROM EXCLUDED.display_name
+                          OR twitch_user_cache.profile_image_url IS DISTINCT FROM EXCLUDED.profile_image_url
+                        THEN NOW()
+                        ELSE twitch_user_cache.updated_at
+                    END,
+                    last_api_refresh_at = NOW()
+                RETURNING twitch_user_id, twitch_login, display_name, profile_image_url, updated_at, last_api_refresh_at
+                """,
+                (
+                    twitch_user_id,
+                    normalized_login,
+                    display_name,
+                    profile_image_url,
+                ),
+            )
+            row = cursor.fetchone()
+        assert row is not None
+        return self._build_record(row)
+
+    def observe_from_chat(
+        self,
+        *,
+        twitch_user_id: str,
+        twitch_login: str,
+        display_name: str | None,
+    ) -> TwitchUserCacheRecord:
+        normalized_login = twitch_login.strip().lower()
+        normalized_display_name = (display_name or "").strip() or None
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                DELETE FROM twitch_user_cache
+                WHERE twitch_login = %s AND twitch_user_id <> %s
+                """,
+                (normalized_login, twitch_user_id),
+            )
+            cursor.execute(
+                """
+                INSERT INTO twitch_user_cache (
+                    twitch_user_id,
+                    twitch_login,
+                    display_name,
+                    profile_image_url,
+                    updated_at,
+                    last_api_refresh_at
+                )
+                VALUES (%s, %s, %s, NULL, NOW(), NULL)
+                ON CONFLICT (twitch_user_id)
+                DO UPDATE SET
+                    twitch_login = EXCLUDED.twitch_login,
+                    display_name = COALESCE(%s, twitch_user_cache.display_name, EXCLUDED.display_name),
+                    updated_at = CASE
+                        WHEN twitch_user_cache.twitch_login IS DISTINCT FROM EXCLUDED.twitch_login
+                          OR (%s IS NOT NULL AND twitch_user_cache.display_name IS DISTINCT FROM %s)
+                        THEN NOW()
+                        ELSE twitch_user_cache.updated_at
+                    END
+                RETURNING twitch_user_id, twitch_login, display_name, profile_image_url, updated_at, last_api_refresh_at
+                """,
+                (
+                    twitch_user_id,
+                    normalized_login,
+                    normalized_display_name or normalized_login,
+                    normalized_display_name,
+                    normalized_display_name,
+                    normalized_display_name,
+                ),
+            )
+            row = cursor.fetchone()
+        assert row is not None
+        return self._build_record(row)
+
+    @staticmethod
+    def _build_record(row: tuple) -> TwitchUserCacheRecord:
+        return TwitchUserCacheRecord(
+            twitch_user_id=str(row[0]),
+            twitch_login=row[1],
+            display_name=row[2],
+            profile_image_url=row[3],
+            updated_at=row[4].isoformat(),
+            last_api_refresh_at=row[5].isoformat() if row[5] is not None else None,
+        )
+
+
+@dataclass(slots=True)
 class PostgresChannelRepository(ChannelRepository):
     """Store and retrieve per-thread Twitch channel subscriptions."""
 
@@ -1255,7 +1597,7 @@ class PostgresChannelRepository(ChannelRepository):
         with self.database.connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT thread_id, twitch_channel_id, color
+                SELECT thread_id, twitch_channel_id, color, is_live, last_live_status_at
                 FROM channel
                 WHERE thread_id = %s AND twitch_channel_id = %s
                 """,
@@ -1264,7 +1606,13 @@ class PostgresChannelRepository(ChannelRepository):
             row = cursor.fetchone()
         if row is None:
             return None
-        return ChannelRecord(thread_id=row[0], twitch_channel_id=row[1], color=row[2])
+        return ChannelRecord(
+            thread_id=row[0],
+            twitch_channel_id=row[1],
+            color=row[2],
+            is_live=row[3],
+            last_live_status_at=row[4].isoformat() if row[4] is not None else None,
+        )
 
     def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
         self.database.connect()
@@ -1300,14 +1648,46 @@ class PostgresChannelRepository(ChannelRepository):
                 UPDATE channel
                 SET color = %s
                 WHERE thread_id = %s AND twitch_channel_id = %s
-                RETURNING thread_id, twitch_channel_id, color
+                RETURNING thread_id, twitch_channel_id, color, is_live, last_live_status_at
                 """,
                 (color, thread_id, twitch_channel_id),
             )
             row = cursor.fetchone()
         if row is None:
             return None
-        return ChannelRecord(thread_id=row[0], twitch_channel_id=row[1], color=row[2])
+        return ChannelRecord(
+            thread_id=row[0],
+            twitch_channel_id=row[1],
+            color=row[2],
+            is_live=row[3],
+            last_live_status_at=row[4].isoformat() if row[4] is not None else None,
+        )
+
+    def set_live_state_for_twitch_channel(
+        self,
+        *,
+        twitch_channel_id: str,
+        is_live: bool,
+        changed_at: str | None,
+    ) -> int:
+        effective_changed_at = (
+            datetime.fromisoformat(changed_at)
+            if changed_at is not None
+            else datetime.now(timezone.utc)
+        )
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE channel
+                SET is_live = %s,
+                    last_live_status_at = %s
+                WHERE twitch_channel_id = %s
+                """,
+                (is_live, effective_changed_at, twitch_channel_id),
+            )
+            return cursor.rowcount
 
     def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
         self.database.connect()
@@ -1346,7 +1726,7 @@ class PostgresChannelRepository(ChannelRepository):
         with self.database.connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT thread_id, twitch_channel_id, color
+                SELECT thread_id, twitch_channel_id, color, is_live, last_live_status_at
                 FROM channel
                 WHERE thread_id = %s
                 ORDER BY twitch_channel_id
@@ -1354,7 +1734,16 @@ class PostgresChannelRepository(ChannelRepository):
                 (thread_id,),
             )
             rows = cursor.fetchall()
-        return [ChannelRecord(thread_id=row[0], twitch_channel_id=row[1], color=row[2]) for row in rows]
+        return [
+            ChannelRecord(
+                thread_id=row[0],
+                twitch_channel_id=row[1],
+                color=row[2],
+                is_live=row[3],
+                last_live_status_at=row[4].isoformat() if row[4] is not None else None,
+            )
+            for row in rows
+        ]
 
     def list_all_twitch_channel_ids(self) -> list[str]:
         self.database.connect()
@@ -2021,6 +2410,186 @@ class PostgresReplyRepository(ReplyRepository):
             reply_message=row[2],
             reply_as_reply=row[3],
             disabled=row[4],
+        )
+
+
+@dataclass(slots=True)
+class PostgresChannelEventReplyRepository(ChannelEventReplyRepository):
+    """Store and retrieve auto-replies triggered by live/offline channel events."""
+
+    database: PostgresDatabase
+
+    def get_by_channel_event(
+        self,
+        *,
+        thread_id: int,
+        twitch_channel_id: str,
+        event_state: str,
+    ) -> ChannelEventReplyRecord | None:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT thread_id, twitch_channel_id, event_state, reply_message, disabled
+                FROM channel_event_reply
+                WHERE thread_id = %s AND twitch_channel_id = %s AND event_state = %s
+                """,
+                (thread_id, twitch_channel_id, event_state),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return self._build_record(row)
+
+    def upsert_reply(
+        self,
+        *,
+        thread_id: int,
+        twitch_channel_id: str,
+        event_state: str,
+        reply_message: str,
+    ) -> ChannelEventReplyRecord:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO channel_event_reply (thread_id, twitch_channel_id, event_state, reply_message, disabled)
+                VALUES (%s, %s, %s, %s, FALSE)
+                ON CONFLICT (thread_id, twitch_channel_id, event_state)
+                DO UPDATE SET
+                    reply_message = EXCLUDED.reply_message,
+                    disabled = FALSE
+                RETURNING thread_id, twitch_channel_id, event_state, reply_message, disabled
+                """,
+                (thread_id, twitch_channel_id, event_state, reply_message),
+            )
+            row = cursor.fetchone()
+        assert row is not None
+        return self._build_record(row)
+
+    def remove_reply(
+        self,
+        *,
+        thread_id: int,
+        twitch_channel_id: str,
+        event_state: str,
+    ) -> ChannelEventReplyRecord | None:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                DELETE FROM channel_event_reply
+                WHERE thread_id = %s AND twitch_channel_id = %s AND event_state = %s
+                RETURNING thread_id, twitch_channel_id, event_state, reply_message, disabled
+                """,
+                (thread_id, twitch_channel_id, event_state),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return self._build_record(row)
+
+    def set_reply_disabled(
+        self,
+        *,
+        thread_id: int,
+        twitch_channel_id: str,
+        event_state: str,
+        disabled: bool,
+    ) -> ChannelEventReplyRecord | None:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE channel_event_reply
+                SET disabled = %s
+                WHERE thread_id = %s AND twitch_channel_id = %s AND event_state = %s
+                RETURNING thread_id, twitch_channel_id, event_state, reply_message, disabled
+                """,
+                (disabled, thread_id, twitch_channel_id, event_state),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return self._build_record(row)
+
+    def list_replies_for_thread(
+        self,
+        thread_id: int,
+        *,
+        include_disabled: bool = True,
+    ) -> list[ChannelEventReplyRecord]:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            if include_disabled:
+                cursor.execute(
+                    """
+                    SELECT thread_id, twitch_channel_id, event_state, reply_message, disabled
+                    FROM channel_event_reply
+                    WHERE thread_id = %s
+                    ORDER BY event_state, twitch_channel_id
+                    """,
+                    (thread_id,),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT thread_id, twitch_channel_id, event_state, reply_message, disabled
+                    FROM channel_event_reply
+                    WHERE thread_id = %s AND disabled = FALSE
+                    ORDER BY event_state, twitch_channel_id
+                    """,
+                    (thread_id,),
+                )
+            rows = cursor.fetchall()
+        return [self._build_record(row) for row in rows]
+
+    def list_replies_for_channel_event(
+        self,
+        *,
+        twitch_channel_id: str,
+        event_state: str,
+        include_disabled: bool = False,
+    ) -> list[ChannelEventReplyRecord]:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            if include_disabled:
+                cursor.execute(
+                    """
+                    SELECT thread_id, twitch_channel_id, event_state, reply_message, disabled
+                    FROM channel_event_reply
+                    WHERE twitch_channel_id = %s AND event_state = %s
+                    ORDER BY thread_id
+                    """,
+                    (twitch_channel_id, event_state),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT thread_id, twitch_channel_id, event_state, reply_message, disabled
+                    FROM channel_event_reply
+                    WHERE twitch_channel_id = %s AND event_state = %s AND disabled = FALSE
+                    ORDER BY thread_id
+                    """,
+                    (twitch_channel_id, event_state),
+                )
+            rows = cursor.fetchall()
+        return [self._build_record(row) for row in rows]
+
+    @staticmethod
+    def _build_record(row: tuple) -> ChannelEventReplyRecord:
+        return ChannelEventReplyRecord(
+            thread_id=int(row[0]),
+            twitch_channel_id=str(row[1]),
+            event_state=row[2],
+            reply_message=row[3],
+            disabled=bool(row[4]),
         )
 
 

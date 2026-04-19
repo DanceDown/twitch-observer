@@ -15,13 +15,16 @@ The model centers around five main concepts:
    - one match rule for tracking and reply logic
 4. `reply`
    - one optional auto-reply attached to one pattern
-5. `message`
+5. `channel_event_reply`
+   - one optional auto-reply attached to a tracked channel going live or offline
+6. `message`
    - one observed Twitch message
 
 Additionally, Twitch login state is stored in:
 
 - `twitch_account`
 - `twitch_device_flow`
+- `twitch_user_cache`
 
 ## Important modeling decisions
 
@@ -125,11 +128,15 @@ Key fields:
 - `thread_id`
 - `twitch_channel_id`
 - `color`
+- `is_live`
+- `last_live_status_at`
 
 Notes:
 
 - `color` is a channel-level embed override
 - removing a channel is restricted if a pattern scope still references it
+- `is_live` stores the currently persisted live/offline state used by pattern matching
+- `last_live_status_at` stores when that state was last updated
 
 ## `pattern`
 
@@ -197,6 +204,44 @@ Notes:
 - one pattern can have at most one reply
 - a reply is preserved even if the linked Twitch account expires
 - a disabled reply stays stored and can later be enabled again
+
+## `channel_event_reply`
+
+Stores one optional auto-reply attached to a tracked channel going `online` or `offline`.
+
+Key fields:
+
+- `thread_id`
+- `twitch_channel_id`
+- `event_state`
+- `reply_message`
+- `disabled`
+
+Notes:
+
+- one tracked channel can have at most one reply per event state
+- event replies are triggered by persisted channel live-state changes
+- event replies are independent from pattern matching
+- disabling an event reply preserves the configuration
+
+## `twitch_user_cache`
+
+Stores persistent Twitch user identity data to avoid repeated Helix lookups.
+
+Key fields:
+
+- `twitch_user_id`
+- `twitch_login`
+- `display_name`
+- `profile_image_url`
+- `updated_at`
+- `last_api_refresh_at`
+
+Notes:
+
+- this table is updated from IRC metadata on every incoming message
+- `profile_image_url` is filled only by Helix lookups
+- `last_api_refresh_at` controls when a cached user is considered stale enough for refresh
 
 ## `user_permissions`
 

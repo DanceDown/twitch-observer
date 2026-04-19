@@ -9,6 +9,8 @@ import logging
 from src.adapters.twitch_api import TwitchAPIClient, TwitchAPIError, TwitchAuthenticationError
 from src.database.connection import (
     ChannelRepository,
+    ChannelEventReplyRecord,
+    ChannelEventReplyRepository,
     PatternRecord,
     PatternRepository,
     ReplyRecord,
@@ -21,10 +23,12 @@ from src.database.connection import (
 )
 from src.events.event_bus import EventBus
 from src.events.event_types import (
+    DiscordChannelLiveStateRequestedEvent,
     DiscordCommandResult,
     DiscordReplyRequestedEvent,
     DiscordResultStyle,
     EventType,
+    TwitchChannelLiveStateChangedEvent,
     TwitchChatMessageEvent,
 )
 from src.services.authz import thread_has_permission
@@ -44,6 +48,9 @@ class ReplyCommandService:
     pattern_repository: PatternRepository
     reply_repository: ReplyRepository
     account_repository: TwitchAccountRepository
+    channel_repository: ChannelRepository | None = None
+    twitch_api: TwitchAPIClient | None = None
+    channel_event_reply_repository: ChannelEventReplyRepository | None = None
     permission_repository: UserPermissionRepository | None = None
 
     def __post_init__(self) -> None:
@@ -51,7 +58,7 @@ class ReplyCommandService:
 
     async def handle_request(self, event: DiscordReplyRequestedEvent) -> None:
         try:
-            result = self._handle_action(event)
+            result = await self._handle_action(event)
         except ValueError as error:
             result = DiscordCommandResult(
                 title="Validation Error",
@@ -62,7 +69,7 @@ class ReplyCommandService:
         if not event.result_future.done():
             event.result_future.set_result(result)
 
-    def _handle_action(self, event: DiscordReplyRequestedEvent) -> DiscordCommandResult:
+    async def _handle_action(self, event: DiscordReplyRequestedEvent) -> DiscordCommandResult:
         if event.action in {"add", "remove"}:
             required_permission = ObserverPermission.MANAGE_REPLIES
             denial_message = "You do not have permission to add or remove auto-replies in this Discord channel."
@@ -78,6 +85,9 @@ class ReplyCommandService:
         )
         if isinstance(thread, DiscordCommandResult):
             return thread
+
+        if event.target_type == "channel_event":
+            return await self._handle_channel_event_action(thread, event)
 
         pattern = self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, p_index=event.pattern_id)
         if pattern is None:
@@ -211,6 +221,136 @@ class ReplyCommandService:
 
         raise ValueError("Unsupported reply action. Use add, remove, disable or enable.")
 
+    async def _handle_channel_event_action(
+        self,
+        thread: ThreadRecord,
+        event: DiscordReplyRequestedEvent,
+    ) -> DiscordCommandResult:
+        if self.channel_event_reply_repository is None or self.channel_repository is None:
+            raise ValueError("Channel-event auto-replies are not available in this runtime.")
+        if event.twitch_channel_id is None or event.channel_event_state not in {"online", "offline"}:
+            raise ValueError("Please choose a tracked channel and whether the trigger should be online or offline.")
+
+        tracked_channel = self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, event.twitch_channel_id)
+        if tracked_channel is None:
+            return DiscordCommandResult(
+                title="Channel Not Tracked",
+                message="That tracked Twitch channel is not available in this Discord channel.",
+                style=DiscordResultStyle.ERROR,
+                ephemeral=True,
+            )
+
+        channel_name = event.twitch_channel_id
+        if self.twitch_api is not None:
+            try:
+                twitch_channel = await self.twitch_api.get_user_by_id(event.twitch_channel_id)
+                channel_name = twitch_channel.display_name
+            except Exception:
+                pass
+
+        if event.action == "add":
+            linked_account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
+            if linked_account is None:
+                return DiscordCommandResult(
+                    title="No Linked Account",
+                    message="This Discord channel must link a Twitch account first with `/account link` before auto-replies can be enabled.",
+                    style=DiscordResultStyle.ERROR,
+                    ephemeral=True,
+                )
+            message = (event.message or "").strip()
+            if not message:
+                raise ValueError("Please provide the reply message.")
+            if len(message) > 500:
+                raise ValueError("Twitch chat messages are limited to 500 characters.")
+            created = self.channel_event_reply_repository.upsert_reply(
+                thread_id=thread.thread_id,
+                twitch_channel_id=event.twitch_channel_id,
+                event_state=event.channel_event_state,
+                reply_message=message,
+            )
+            return DiscordCommandResult(
+                title="Auto-Reply Added",
+                message=(
+                    f"Added an auto-reply for `{channel_name}` when it goes {event.channel_event_state}.\n"
+                    f"Message: {escape_discord_preserving_links(created.reply_message)}"
+                ),
+                style=DiscordResultStyle.SUCCESS,
+                ephemeral=False,
+            )
+
+        existing_reply = self.channel_event_reply_repository.get_by_channel_event(
+            thread_id=thread.thread_id,
+            twitch_channel_id=event.twitch_channel_id,
+            event_state=event.channel_event_state,
+        )
+        if existing_reply is None:
+            return DiscordCommandResult(
+                title="No Auto-Reply Configured",
+                message="This live/offline trigger does not have an auto-reply.",
+                style=DiscordResultStyle.INFO,
+                ephemeral=True,
+            )
+
+        if event.action == "remove":
+            removed = self.channel_event_reply_repository.remove_reply(
+                thread_id=thread.thread_id,
+                twitch_channel_id=event.twitch_channel_id,
+                event_state=event.channel_event_state,
+            )
+            assert removed is not None
+            return DiscordCommandResult(
+                title="Auto-Reply Removed",
+                message=f"Removed the {event.channel_event_state} auto-reply for `{channel_name}`.",
+                style=DiscordResultStyle.SUCCESS,
+                ephemeral=False,
+            )
+
+        if event.action == "disable":
+            if existing_reply.disabled:
+                return DiscordCommandResult(
+                    title="Already Disabled",
+                    message="This auto-reply is already disabled.",
+                    style=DiscordResultStyle.INFO,
+                    ephemeral=True,
+                )
+            disabled_reply = self.channel_event_reply_repository.set_reply_disabled(
+                thread_id=thread.thread_id,
+                twitch_channel_id=event.twitch_channel_id,
+                event_state=event.channel_event_state,
+                disabled=True,
+            )
+            assert disabled_reply is not None
+            return DiscordCommandResult(
+                title="Auto-Reply Disabled",
+                message=f"Disabled the {event.channel_event_state} auto-reply for `{channel_name}`.",
+                style=DiscordResultStyle.SUCCESS,
+                ephemeral=False,
+            )
+
+        if event.action == "enable":
+            if not existing_reply.disabled:
+                return DiscordCommandResult(
+                    title="Already Enabled",
+                    message="This auto-reply is already enabled.",
+                    style=DiscordResultStyle.INFO,
+                    ephemeral=True,
+                )
+            enabled_reply = self.channel_event_reply_repository.set_reply_disabled(
+                thread_id=thread.thread_id,
+                twitch_channel_id=event.twitch_channel_id,
+                event_state=event.channel_event_state,
+                disabled=False,
+            )
+            assert enabled_reply is not None
+            return DiscordCommandResult(
+                title="Auto-Reply Enabled",
+                message=f"Enabled the {event.channel_event_state} auto-reply for `{channel_name}`.",
+                style=DiscordResultStyle.SUCCESS,
+                ephemeral=False,
+            )
+
+        raise ValueError("Unsupported reply action. Use add, remove, disable or enable.")
+
     def _ensure_thread_permission(
         self,
         discord_channel_id: int,
@@ -255,6 +395,7 @@ class AutoReplyService:
     twitch_api: TwitchAPIClient
     tracked_user_repository: TrackedUserRepository | None = None
     notifier: object | None = None
+    token_refresh_skew_seconds: int = 30
     handled_messages: int = field(default=0, init=False)
     sent_replies: int = field(default=0, init=False)
 
@@ -281,7 +422,6 @@ class AutoReplyService:
             logger.debug("No configured threads for broadcaster_id=%s when evaluating auto-replies.", event.broadcaster_id)
             return
 
-        live_status: bool | None = None
         for thread_id in thread_ids:
             thread = self.thread_repository.get_by_thread_id(thread_id)
             if thread is None:
@@ -297,6 +437,8 @@ class AutoReplyService:
                 continue
             author_user = await self._safe_get_user_by_login(event.author_login)
             channel_user = await self._safe_get_user_by_id(event.broadcaster_id)
+            source_channel = self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, event.broadcaster_id)
+            live_status = None if source_channel is None else source_channel.is_live
             match = await self._find_matching_reply_pattern(thread, event, live_status, account.twitch_user_id)
             if match is None:
                 logger.debug("No reply-enabled pattern matched for thread_id=%s.", thread.thread_id)
@@ -421,8 +563,6 @@ class AutoReplyService:
                 continue
             current_live_status = live_status
             if effective_pattern.offline_state != "both":
-                if current_live_status is None and event.broadcaster_id:
-                    current_live_status = await self.twitch_api.is_user_live(event.broadcaster_id)
                 if not self._offline_state_allows(effective_pattern, current_live_status):
                     logger.debug(
                         "Pattern %s matched text but was filtered by offline_state=%s live_status=%s during auto-reply evaluation.",
@@ -476,7 +616,7 @@ class AutoReplyService:
             expires_at = datetime.fromisoformat(account.expires_at)
         except ValueError:
             return account
-        if expires_at > datetime.now(timezone.utc) + timedelta(seconds=30):
+        if expires_at > datetime.now(timezone.utc) + timedelta(seconds=self.token_refresh_skew_seconds):
             return account
         refreshed = await self._try_refresh_account(account)
         return refreshed or account
@@ -565,7 +705,13 @@ class AutoReplyService:
 
     async def _safe_get_user_by_login(self, login: str):
         try:
-            return await self.twitch_api.get_user_by_login(login)
+            get_user = getattr(self.twitch_api, "get_user_by_login", None)
+            if get_user is not None:
+                return await get_user(login)
+            cached_lookup = getattr(self.twitch_api, "get_cached_user_by_login", None)
+            if cached_lookup is not None:
+                return cached_lookup(login)
+            return None
         except Exception:
             return None
 
@@ -573,7 +719,13 @@ class AutoReplyService:
         if not user_id:
             return None
         try:
-            return await self.twitch_api.get_user_by_id(user_id)
+            get_user = getattr(self.twitch_api, "get_user_by_id", None)
+            if get_user is not None:
+                return await get_user(user_id)
+            cached_lookup = getattr(self.twitch_api, "get_cached_user_by_id", None)
+            if cached_lookup is not None:
+                return cached_lookup(user_id)
+            return None
         except Exception:
             return None
 
@@ -586,3 +738,128 @@ class AutoReplyService:
         if pattern.offline_state == "offline":
             return not live_status
         return False
+
+
+@dataclass(slots=True)
+class ChannelEventAutoReplyService:
+    """Send Twitch messages when a tracked channel goes live or offline."""
+
+    event_bus: EventBus
+    thread_repository: ThreadRepository
+    channel_repository: ChannelRepository
+    channel_event_reply_repository: ChannelEventReplyRepository
+    account_repository: TwitchAccountRepository
+    twitch_api: TwitchAPIClient
+    notifier: object | None = None
+    token_refresh_skew_seconds: int = 30
+
+    def __post_init__(self) -> None:
+        self.event_bus.subscribe(EventType.TWITCH_CHANNEL_LIVE_STATE_CHANGED, self.handle_channel_live_state_changed)
+
+    async def handle_channel_live_state_changed(self, event: TwitchChannelLiveStateChangedEvent) -> None:
+        event_state = "online" if event.is_live else "offline"
+        replies = self.channel_event_reply_repository.list_replies_for_channel_event(
+            twitch_channel_id=event.twitch_channel_id,
+            event_state=event_state,
+            include_disabled=False,
+        )
+        if not replies:
+            return
+
+        channel_user = await self._safe_get_user_by_id(event.twitch_channel_id)
+        channel_login = event.twitch_channel_login or (None if channel_user is None else channel_user.login)
+        channel_name = (
+            event.twitch_channel_login
+            if channel_user is None
+            else channel_user.display_name
+        ) or event.twitch_channel_id
+        for reply in replies:
+            thread = self.thread_repository.get_by_thread_id(reply.thread_id)
+            if thread is None or not thread.enabled:
+                continue
+            account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
+            if account is None or not account.access_token:
+                continue
+            account = await self._ensure_account_token(account)
+            rendered_message = self._render_channel_event_reply(reply.reply_message, channel_name=channel_name, state=event_state)
+            try:
+                await self.twitch_api.send_chat_message(
+                    access_token=account.access_token,
+                    client_id=account.client_id,
+                    sender_id=account.twitch_user_id,
+                    broadcaster_id=event.twitch_channel_id,
+                    message=rendered_message,
+                )
+            except TwitchAuthenticationError:
+                refreshed = await self._try_refresh_account(account, thread)
+                if refreshed is None:
+                    continue
+                await self.twitch_api.send_chat_message(
+                    access_token=refreshed.access_token,
+                    client_id=refreshed.client_id,
+                    sender_id=refreshed.twitch_user_id,
+                    broadcaster_id=event.twitch_channel_id,
+                    message=rendered_message,
+                )
+            except TwitchAPIError as error:
+                logger.warning(
+                    "Failed to send channel-event auto-reply thread_id=%s twitch_channel_id=%s state=%s: %s",
+                    reply.thread_id,
+                    event.twitch_channel_id,
+                    event_state,
+                    error,
+                )
+
+    async def _ensure_account_token(self, account):
+        if account.expires_at is None:
+            return account
+        try:
+            expires_at = datetime.fromisoformat(account.expires_at)
+        except ValueError:
+            return account
+        if expires_at > datetime.now(timezone.utc) + timedelta(seconds=self.token_refresh_skew_seconds):
+            return account
+        refreshed = await self._try_refresh_account(account, None)
+        return refreshed or account
+
+    async def _try_refresh_account(self, account, thread: ThreadRecord | None):
+        if not account.refresh_token:
+            return None
+        try:
+            refreshed = await self.twitch_api.refresh_user_access_token(account.refresh_token)
+            validated = await self.twitch_api.validate_user_access_token(refreshed.access_token)
+        except TwitchAPIError as error:
+            logger.warning("Failed to refresh Twitch account for account_id=%s: %s", account.account_id, error)
+            return None
+
+        expires_at = (datetime.now(timezone.utc) + timedelta(seconds=refreshed.expires_in)).isoformat()
+        stored = self.account_repository.update_account(
+            account_id=account.account_id,
+            twitch_user_id=validated.user_id,
+            twitch_login=validated.login,
+            client_id=validated.client_id,
+            access_token=refreshed.access_token,
+            refresh_token=refreshed.refresh_token,
+            expires_at=expires_at,
+            scope=refreshed.scope,
+            token_type=refreshed.token_type,
+        )
+        if stored is None and thread is not None and thread.account_id is not None:
+            self.account_repository.remove_by_account_id(thread.account_id)
+            self.thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
+        return stored
+
+    async def _safe_get_user_by_id(self, user_id: str):
+        try:
+            get_user = getattr(self.twitch_api, "get_user_by_id", None)
+            if get_user is not None:
+                return await get_user(user_id)
+        except Exception:
+            return None
+        return None
+
+    @staticmethod
+    def _render_channel_event_reply(template: str, *, channel_name: str, state: str) -> str:
+        rendered = template.replace("{CHANNEL}", channel_name)
+        rendered = rendered.replace("{STATE}", state)
+        return rendered

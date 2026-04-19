@@ -11,6 +11,16 @@ def _split_csv(value: str) -> list[str]:
     return [item.strip().lower() for item in value.split(",") if item.strip()]
 
 
+def _get_int(name: str, default: str) -> int:
+    """Read one integer environment variable with a centralized fallback."""
+    return int(os.getenv(name, default))
+
+
+def _get_float(name: str, default: str) -> float:
+    """Read one float environment variable with a centralized fallback."""
+    return float(os.getenv(name, default))
+
+
 @dataclass(slots=True)
 class AppConfig:
     """Central runtime configuration for adapters, database and services."""
@@ -39,6 +49,39 @@ class AppConfig:
         default_factory=lambda: _split_csv(os.getenv("TWITCH_IRC_CHANNELS", ""))
     )
     twitch_irc_nick_prefix: str = field(default_factory=lambda: os.getenv("TWITCH_IRC_NICK_PREFIX", "justinfan"))
+    twitch_user_cache_memory_size: int = field(
+        default_factory=lambda: _get_int("TWITCH_USER_CACHE_MEMORY_SIZE", "2048")
+    )
+    twitch_user_cache_api_refresh_seconds: int = field(
+        default_factory=lambda: _get_int("TWITCH_USER_CACHE_API_REFRESH_SECONDS", "43200")
+    )
+    twitch_account_token_refresh_skew_seconds: int = field(
+        default_factory=lambda: _get_int("TWITCH_ACCOUNT_TOKEN_REFRESH_SKEW_SECONDS", "30")
+    )
+    twitch_app_access_token_refresh_skew_seconds: int = field(
+        default_factory=lambda: _get_int("TWITCH_APP_ACCESS_TOKEN_REFRESH_SKEW_SECONDS", "60")
+    )
+    twitch_device_flow_poll_interval_seconds: float = field(
+        default_factory=lambda: _get_float("TWITCH_DEVICE_FLOW_POLL_INTERVAL_SECONDS", "2")
+    )
+    twitch_device_flow_slowdown_step_seconds: int = field(
+        default_factory=lambda: _get_int("TWITCH_DEVICE_FLOW_SLOWDOWN_STEP_SECONDS", "5")
+    )
+    discord_presence_poll_interval_seconds: float = field(
+        default_factory=lambda: _get_float("DISCORD_PRESENCE_POLL_INTERVAL_SECONDS", "60")
+    )
+    discord_presence_lookback_minutes: int = field(
+        default_factory=lambda: _get_int("DISCORD_PRESENCE_LOOKBACK_MINUTES", "5")
+    )
+    discord_presence_message_limit: int = field(
+        default_factory=lambda: _get_int("DISCORD_PRESENCE_MESSAGE_LIMIT", "50")
+    )
+    discord_presence_max_status_length: int = field(
+        default_factory=lambda: _get_int("DISCORD_PRESENCE_MAX_STATUS_LENGTH", "120")
+    )
+    irc_bootstrap_connect_timeout_seconds: float = field(
+        default_factory=lambda: _get_float("IRC_BOOTSTRAP_CONNECT_TIMEOUT_SECONDS", "15")
+    )
     log_level: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
 
     @property

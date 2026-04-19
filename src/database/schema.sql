@@ -32,6 +32,18 @@ CREATE INDEX idx_twitch_account_discord_user_id
 CREATE INDEX idx_twitch_account_twitch_user_id
     ON twitch_account(twitch_user_id);
 
+CREATE TABLE twitch_user_cache (
+    twitch_user_id       TEXT PRIMARY KEY,
+    twitch_login         TEXT        NOT NULL,
+    display_name         TEXT        NOT NULL,
+    profile_image_url    TEXT,
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_api_refresh_at  TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX idx_twitch_user_cache_login
+    ON twitch_user_cache(twitch_login);
+
 CREATE TABLE twitch_device_flow (
     discord_channel_id BIGINT PRIMARY KEY,
     discord_user_id    BIGINT NOT NULL,
@@ -75,6 +87,8 @@ CREATE TABLE channel (
     thread_id           INTEGER NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,
     twitch_channel_id   TEXT NOT NULL,
     color               TEXT,
+    is_live             BOOLEAN,
+    last_live_status_at TIMESTAMPTZ,
     PRIMARY KEY (thread_id, twitch_channel_id),
     CONSTRAINT chk_channel_color_format CHECK (color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$')
 );
@@ -173,6 +187,24 @@ CREATE TABLE reply (
 
 CREATE INDEX idx_reply_thread_disabled
     ON reply(thread_id, disabled);
+
+CREATE TABLE channel_event_reply (
+    thread_id           INTEGER NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,
+    twitch_channel_id   TEXT NOT NULL,
+    event_state         OFFLINE_STATE_ENUM NOT NULL,
+    reply_message       TEXT NOT NULL,
+    disabled            BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (thread_id, twitch_channel_id, event_state),
+    CONSTRAINT fk_channel_event_reply_channel
+        FOREIGN KEY (thread_id, twitch_channel_id)
+        REFERENCES channel(thread_id, twitch_channel_id)
+        ON DELETE CASCADE,
+    CONSTRAINT chk_channel_event_reply_state
+        CHECK (event_state IN ('offline', 'online'))
+);
+
+CREATE INDEX idx_channel_event_reply_lookup
+    ON channel_event_reply(twitch_channel_id, event_state, disabled);
 
 ----------------------------
 -- User permissions

@@ -8,6 +8,7 @@ from src.events.event_bus import EventBus
 from src.events.event_types import (
     DiscordAccountRequestedEvent,
     DiscordChannelRequestedEvent,
+    DiscordChannelLiveStateRequestedEvent,
     DiscordCommandResult,
     DiscordUserRequestedEvent,
     DiscordPatternEditRequestedEvent,
@@ -43,6 +44,30 @@ async def dispatch_channel_command(
             twitch_channel_login=twitch_channel_login,
             color=color,
             clear_color=clear_color,
+            result_future=result_future,
+        ),
+    )
+    return await result_future
+
+
+async def dispatch_channel_live_state_command(
+    event_bus: EventBus,
+    *,
+    discord_channel_id: int,
+    requester_id: int,
+    twitch_channel_id: str,
+    is_live: bool,
+) -> DiscordCommandResult:
+    """Publish one manual live/offline channel-state change and await the result."""
+    loop = asyncio.get_running_loop()
+    result_future: asyncio.Future[DiscordCommandResult] = loop.create_future()
+    await event_bus.publish(
+        EventType.DISCORD_CHANNEL_LIVE_STATE_REQUESTED,
+        DiscordChannelLiveStateRequestedEvent(
+            discord_channel_id=discord_channel_id,
+            requester_id=requester_id,
+            twitch_channel_id=twitch_channel_id,
+            is_live=is_live,
             result_future=result_future,
         ),
     )
@@ -244,6 +269,9 @@ async def dispatch_reply_command(
     pattern_id: int,
     message: str | None,
     reply_as_reply: bool,
+    target_type: str = "pattern",
+    twitch_channel_id: str | None = None,
+    channel_event_state: str | None = None,
 ) -> DiscordCommandResult:
     """Publish a reply add/remove/disable/enable request and await the result."""
     loop = asyncio.get_running_loop()
@@ -258,6 +286,9 @@ async def dispatch_reply_command(
             message=message,
             reply_as_reply=reply_as_reply,
             result_future=result_future,
+            target_type=target_type,
+            twitch_channel_id=twitch_channel_id,
+            channel_event_state=channel_event_state,
         ),
     )
     return await result_future

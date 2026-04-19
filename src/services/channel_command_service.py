@@ -110,7 +110,8 @@ class ChannelCommandService:
                 ephemeral=True,
             )
 
-        twitch_user = await self.twitch_api.get_user_by_login(event.twitch_channel_login)
+        refresh_lookup = getattr(self.twitch_api, "refresh_user_by_login", self.twitch_api.get_user_by_login)
+        twitch_user = await refresh_lookup(event.twitch_channel_login)
         existing = self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_user.user_id)
         if event.action == "add":
             if existing is not None:
