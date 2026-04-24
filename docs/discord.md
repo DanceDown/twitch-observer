@@ -62,44 +62,11 @@ Example:
 
 ## Current commands
 
-The full current command surface, with all parameters and examples, is
-documented in [commands_reference.md](commands_reference.md).
+The full command surface, with parameters and examples, is documented in
+[commands_reference.md](commands_reference.md).
 
-The short version is:
-
-- lifecycle:
-  - `/join`
-  - `/leave`
-  - `/on`
-  - `/off`
-  - `/color`
-- tracked Twitch channels:
-  - `/channel add`
-  - `/channel remove`
-  - `/channel color`
-- tracking rules:
-  - `/ping add`
-  - `/ping remove`
-  - `/ping disable`
-  - `/ping enable`
-  - `/ping edit`
-- linked Twitch account:
-  - `/account link`
-  - `/account unlink`
-  - `/account show`
-- auto-replies:
-  - `/reply add`
-  - `/reply remove`
-  - `/reply disable`
-  - `/reply enable`
-- manual Twitch sending:
-  - `/write`
-- permission delegation:
-  - `/permission grant`
-  - `/permission revoke`
-  - `/permission clear`
-- inspection:
-  - `/show`
+This document intentionally does not duplicate that reference. It focuses on
+Discord platform requirements and adapter behavior.
 
 ## Internal event flow
 
@@ -117,6 +84,7 @@ Examples:
 
 - `/join`, `/leave`, `/on`, `/off` -> `discord.thread.requested`
 - `/channel add` or `/channel remove` -> `discord.channel.requested`
+- `/live` or `/offline` -> `discord.channel_event.requested`
 - `/ping add`, `/ping remove`, `/ping enable`, `/ping disable` -> `discord.pattern.requested`
 - `/ping edit` -> `discord.pattern.edit.requested`
 - `/account link`, `/account unlink`, `/account show` -> `discord.account.requested`

@@ -286,8 +286,8 @@ class DeviceFlowPollingService:
     account_repository: TwitchAccountRepository
     thread_repository: ThreadRepository
     twitch_api: TwitchAPIClient
+    poll_interval_seconds: float
     notifier: AccountNotificationSender | None = None
-    poll_interval_seconds: float = 2.0
     _task: asyncio.Task[None] | None = field(default=None, init=False)
     _stop_event: asyncio.Event = field(default_factory=asyncio.Event, init=False)
 

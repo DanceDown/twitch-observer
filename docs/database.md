@@ -1,271 +1,172 @@
-# Database Concept
+# Database
 
-This document describes the current persisted domain model of the Twitch
-Observer.
+This document describes the persisted data model at a high level. For exact SQL,
+see [src/database/schema.sql](../src/database/schema.sql).
 
-## Core idea
+## Design goals
 
-The model centers around five main concepts:
+- keep Discord-context configuration isolated per channel, thread, or DM
+- persist enough runtime state to avoid expensive Twitch API calls
+- separate message-driven rules from source-driven event actions
 
-1. `thread`
-   - one Discord channel, thread, or DM configuration root
-2. `channel`
-   - one tracked Twitch channel inside that Discord context
-3. `pattern`
-   - one match rule for tracking and reply logic
-4. `reply`
-   - one optional auto-reply attached to one pattern
-5. `channel_event_reply`
-   - one optional auto-reply attached to a tracked channel going live or offline
-6. `message`
-   - one observed Twitch message
+## Core ownership model
 
-Additionally, Twitch login state is stored in:
+### `thread`
 
-- `twitch_account`
-- `twitch_device_flow`
-- `twitch_user_cache`
+`thread` is the configuration root for one Discord context.
 
-## Important modeling decisions
+It stores:
 
-### No separate stalk or block tables
+- `discord_channel_id`
+- `owner_id`
+- optional linked Twitch `account_id`
+- enabled flag
+- default embed color
 
-There are intentionally no dedicated `stalked_user`, `blocked_user`,
-`blocked_ping`, or `blocked_regex` tables.
+Most other tables hang off `thread_id`.
 
-Those cases are represented through the scope system of `pattern`:
+## Twitch identity and auth
 
-- channel scope
-- user scope
-- sub-state
-- offline-state
-- regex or ping mode
+### `twitch_account`
 
-This keeps the model smaller and avoids historical workaround tables.
+Stores linked Twitch accounts used for writing to Twitch.
 
-### Replies are separate from patterns
-
-A reply is attached to one pattern, but it lives in its own table.
-
-That allows:
-
-- keeping replies even if a linked account temporarily expires
-- disabling replies without deleting them
-- evolving reply-specific features without bloating `pattern`
-
-### Pattern priority decides match order
-
-Patterns are evaluated in descending priority order.
-
-Once one pattern matches, later patterns are not considered for that message in
-the tracking flow. Auto-replies follow the same priority order.
-
-## Entities
-
-## `twitch_account`
-
-Stores one linked Twitch account record that may be attached to exactly one
-Discord context through `thread.account_id`.
-
-That means the same Discord user may have multiple stored Twitch account links
-across different Discord contexts.
-
-Key fields:
+Important fields:
 
 - `discord_user_id`
 - `twitch_user_id`
 - `twitch_login`
-- `client_id`
-- `access_token`
-- `refresh_token`
-- `expires_at`
-- `scope`
-- `token_type`
+- access and refresh tokens
+- token expiry and scopes
 
-## `twitch_device_flow`
+This table is not used for background live monitoring.
 
-Stores one pending or failed Twitch Device Code Flow per Discord context.
+### `twitch_device_flow`
 
-Key fields:
+Stores pending Twitch Device Code Flow sessions while a Discord user is linking
+an account.
 
-- `discord_user_id`
-- `discord_channel_id`
-- `device_code`
-- `user_code`
-- `verification_uri`
-- `interval_seconds`
-- `expires_at`
-- `scope`
-- `status`
-- `last_error`
+### `twitch_user_cache`
 
-## `thread`
+Persistent cache of Twitch user metadata.
 
-Represents one Discord-side configuration root.
-
-Key fields:
-
-- `thread_id`
-- `owner_id`
-- `discord_channel_id`
-- `account_id`
-- `enabled`
-- `color`
-
-Notes:
-
-- one Discord channel ID maps to exactly one configuration root
-- `account_id` links the context to the exact Twitch account used for
-  auto-replies and manual Twitch writes
-- `enabled = false` pauses tracking and auto-replies without deleting config
-
-## `channel`
-
-Stores which Twitch channels are tracked in one Discord context.
-
-Key fields:
-
-- `thread_id`
-- `twitch_channel_id`
-- `color`
-- `is_live`
-- `last_live_status_at`
-
-Notes:
-
-- `color` is a channel-level embed override
-- removing a channel is restricted if a pattern scope still references it
-- `is_live` stores the currently persisted live/offline state used by pattern matching
-- `last_live_status_at` stores when that state was last updated
-
-## `pattern`
-
-Stores one match rule.
-
-Key fields:
-
-- `thread_id`
-- `p_index`
-- `regex`
-- `channel_scope_mode`
-- `user_scope_mode`
-- `sub_state`
-- `offline_state`
-- `is_regex`
-- `case_sensitive`
-- `color`
-- `disabled`
-- `notify`
-- `priority`
-
-Notes:
-
-- pings are stored in the same table as regexes
-- a ping is matched as a whole-word search
-- `case_sensitive` applies to both ping and regex matching
-- `priority` is user-adjustable
-
-## `pattern_channel_scope`
-
-Stores explicit Twitch channel selections or exclusions for a pattern.
-
-Used when `channel_scope_mode` is:
-
-- `only_selected`
-- `all_except_selected`
-
-If the mode is `all_tracked`, no rows are required.
-
-## `pattern_user_scope`
-
-Stores explicit Twitch user selections or exclusions for a pattern.
-
-Used when `user_scope_mode` is:
-
-- `only_selected`
-- `all_except_selected`
-
-If the mode is `all_users`, no rows are required.
-
-## `reply`
-
-Stores one optional auto-reply attached to one pattern.
-
-Key fields:
-
-- `thread_id`
-- `p_index`
-- `reply_message`
-- `reply_as_reply`
-- `disabled`
-
-Notes:
-
-- one pattern can have at most one reply
-- a reply is preserved even if the linked Twitch account expires
-- a disabled reply stays stored and can later be enabled again
-
-## `channel_event_reply`
-
-Stores one optional auto-reply attached to a tracked channel going `online` or `offline`.
-
-Key fields:
-
-- `thread_id`
-- `twitch_channel_id`
-- `event_state`
-- `reply_message`
-- `disabled`
-
-Notes:
-
-- one tracked channel can have at most one reply per event state
-- event replies are triggered by persisted channel live-state changes
-- event replies are independent from pattern matching
-- disabling an event reply preserves the configuration
-
-## `twitch_user_cache`
-
-Stores persistent Twitch user identity data to avoid repeated Helix lookups.
-
-Key fields:
+Important fields:
 
 - `twitch_user_id`
 - `twitch_login`
 - `display_name`
 - `profile_image_url`
-- `updated_at`
 - `last_api_refresh_at`
 
-Notes:
+This cache is warmed from IRC metadata when possible and refreshed from Helix
+only when needed.
 
-- this table is updated from IRC metadata on every incoming message
-- `profile_image_url` is filled only by Helix lookups
-- `last_api_refresh_at` controls when a cached user is considered stale enough for refresh
+## Tracking scope
 
-## `user_permissions`
+### `channel`
 
-Stores explicitly granted extra permissions for non-owner Discord users inside
-one thread.
+Stores tracked Twitch channels per Discord context.
 
-Key fields:
+Important fields:
 
-- `discord_user_id`
 - `thread_id`
-- `permissions`
+- `twitch_channel_id`
+- optional color override
+- `is_live`
+- `last_live_status_at`
 
-Notes:
+One tracked channel means:
 
-- the owner is not stored here because the owner always has full access
-- permissions are stored as a bitmask
-- implication rules such as `manage_patterns -> toggle_patterns` are handled in
-  application code
+- the IRC adapter should read that chat when needed
+- patterns may scope to that channel
+- the live monitor should include it in batched `Get Streams` polling
 
-## `message`
+### `tracked_user`
+
+Stores Twitch users that may be referenced by pattern user scopes.
+
+## Message-driven behavior
+
+### `pattern`
+
+Stores the matching rules for Twitch chat messages.
+
+Important fields:
+
+- `regex`
+- `is_regex`
+- `case_sensitive`
+- `channel_scope_mode`
+- `user_scope_mode`
+- `sub_state`
+- `offline_state`
+- `priority`
+- `disabled`
+- `notify`
+
+### `pattern_channel_scope`
+
+Selected channel scope rows for patterns that do not apply to all tracked
+channels.
+
+### `pattern_user_scope`
+
+Selected user scope rows for patterns that do not apply to all users or all
+tracked users.
+
+### `reply`
+
+Stores the optional Twitch auto-reply attached to one pattern.
+
+Important fields:
+
+- `reply_message`
+- `reply_as_reply`
+- `disabled`
+
+There is at most one pattern reply per pattern.
+
+## Source-driven event behavior
+
+### `adapter_event`
+
+Stores a configured external trigger inside one Discord context.
+
+Current use:
+
+- Twitch channel `stream.online`
+- Twitch channel `stream.offline`
+
+The shape is intentionally generic:
+
+- `adapter_key`
+- `subject_type`
+- `subject_id`
+- `event_key`
+- `disabled`
+
+### `adapter_event_action`
+
+Stores follow-up actions for one configured `adapter_event`.
+
+Current action types:
+
+- Discord notification
+- Twitch send-message auto-reply
+
+This is the event-driven counterpart to `reply`.
+
+## Permissions and message history
+
+### `user_permissions`
+
+Stores explicit per-user permission overrides inside one Discord context.
+
+### `message`
 
 Stores observed Twitch chat messages.
 
-Key fields:
+Important fields:
 
 - `message_id`
 - `twitch_channel_id`
@@ -276,19 +177,12 @@ Key fields:
 - `is_reply_to`
 - `is_bot`
 
-Current status:
+This supports Discord notifications, replies, presence summaries, and future
+inspection/debug flows.
 
-- messages are persisted
-- higher-level history features are not implemented yet
+## Relationship summary
 
-## Color inheritance
-
-Discord embed color resolution currently follows this priority:
-
-1. `pattern.color`
-2. `channel.color`
-3. `thread.color`
-4. Twitch author color from IRC tags
-5. gray fallback
-
-This is a presentation rule only.
+- one `thread` has many tracked `channel`, `tracked_user`, `pattern`, `adapter_event`, and `user_permissions` rows
+- one `pattern` may have many channel and user scope rows, and at most one `reply`
+- one `adapter_event` may have multiple actions keyed by `action_type`
+- one `thread` may optionally link one `twitch_account`

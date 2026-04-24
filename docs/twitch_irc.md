@@ -6,8 +6,14 @@ the read-only chat adapter.
 ## Why IRC exists here
 
 The project wants to read public Twitch chat as anonymously as possible.
-For that goal, anonymous Twitch IRC is a better fit than EventSub, because
-EventSub requires authenticated access.
+For that goal, anonymous Twitch IRC is a better fit than EventSub chat intake,
+because EventSub chat subscriptions require authenticated access.
+
+Important:
+
+- IRC is still the chat-message intake path
+- live/offline state is tracked separately through batched Helix `Get Streams`
+  polling with the application's Twitch client credentials
 
 The application architecture still keeps this in an adapter so that the read
 path can be replaced or extended later.

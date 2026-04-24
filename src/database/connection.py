@@ -10,573 +10,35 @@ from psycopg.types.json import Jsonb
 
 from src.config import AppConfig
 from src.events.event_types import TwitchChatMessageEvent
-
-
-@dataclass(slots=True, frozen=True)
-class ThreadRecord:
-    """Persisted Discord channel configuration root."""
-
-    thread_id: int
-    owner_id: int
-    discord_channel_id: int
-    enabled: bool
-    color: str | None
-    account_id: int | None = None
-
-
-@dataclass(slots=True, frozen=True)
-class TwitchAccountRecord:
-    """Persisted Twitch user token linked to one Discord user."""
-
-    account_id: int
-    discord_user_id: int
-    twitch_user_id: str
-    twitch_login: str
-    client_id: str
-    access_token: str | None
-    refresh_token: str | None
-    expires_at: str | None
-    scope: tuple[str, ...]
-    token_type: str | None
-
-
-@dataclass(slots=True, frozen=True)
-class TwitchDeviceFlowRecord:
-    """Persisted pending Twitch Device Code login for one Discord user."""
-
-    discord_user_id: int
-    discord_channel_id: int | None
-    device_code: str
-    user_code: str
-    verification_uri: str
-    interval_seconds: int
-    expires_at: str
-    scope: tuple[str, ...]
-    status: str
-    last_error: str | None
-    last_polled_at: str | None
-
-
-@dataclass(slots=True, frozen=True)
-class TwitchUserCacheRecord:
-    """Persisted Twitch user metadata used to avoid repeated Helix lookups."""
-
-    twitch_user_id: str
-    twitch_login: str
-    display_name: str
-    profile_image_url: str | None
-    updated_at: str
-    last_api_refresh_at: str | None
-
-
-@dataclass(slots=True, frozen=True)
-class ChannelRecord:
-    """Persisted Twitch channel subscription for one thread."""
-
-    thread_id: int
-    twitch_channel_id: str
-    color: str | None
-    is_live: bool | None = None
-    last_live_status_at: str | None = None
-
-
-@dataclass(slots=True, frozen=True)
-class TrackedUserRecord:
-    """Persisted tracked Twitch user for one thread."""
-
-    thread_id: int
-    twitch_user_id: str
-
-
-@dataclass(slots=True, frozen=True)
-class PatternRecord:
-    """Persisted match rule for one thread."""
-
-    thread_id: int
-    p_index: int
-    regex: str
-    channel_scope_mode: str
-    channel_scope_ids: tuple[str, ...]
-    user_scope_mode: str
-    user_scope_ids: tuple[str, ...]
-    sub_state: str
-    offline_state: str
-    is_regex: bool
-    case_sensitive: bool
-    color: str | None
-    disabled: bool
-    notify: bool
-    priority: int
-    reply_message: str | None = None
-    reply_as_reply: bool = False
-
-
-@dataclass(slots=True, frozen=True)
-class ReplyRecord:
-    """Persisted auto-reply attached to one pattern."""
-
-    thread_id: int
-    p_index: int
-    reply_message: str
-    reply_as_reply: bool
-    disabled: bool
-
-
-@dataclass(slots=True, frozen=True)
-class ChannelEventReplyRecord:
-    """Persisted auto-reply triggered by a tracked channel going live or offline."""
-
-    thread_id: int
-    twitch_channel_id: str
-    event_state: str
-    reply_message: str
-    disabled: bool
-
-
-@dataclass(slots=True, frozen=True)
-class UserPermissionRecord:
-    """Persisted additional permission grants for one Discord user in one thread."""
-
-    discord_user_id: int
-    thread_id: int
-    permissions: int
-
-
-@dataclass(slots=True, frozen=True)
-class RecentMessageRecord:
-    """Compact stored Twitch message used for status text and lightweight displays."""
-
-    username: str
-    content: str
-    timestamp: datetime
-
-
-class MessageRepository:
-    """Persistence interface for normalized Twitch chat messages."""
-
-    def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:  # pragma: no cover - interface
-        raise NotImplementedError
-
-    def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:  # pragma: no cover - interface
-        raise NotImplementedError
-
-
-class ThreadRepository:
-    """Persistence interface for Discord thread/channel configuration roots."""
-
-    def get_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def get_by_thread_id(self, thread_id: int) -> ThreadRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def create(self, owner_id: int, discord_channel_id: int) -> ThreadRecord:  # pragma: no cover
-        raise NotImplementedError
-
-    def delete_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def set_enabled(self, *, discord_channel_id: int, enabled: bool) -> ThreadRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def set_color(self, *, discord_channel_id: int, color: str | None) -> ThreadRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def set_account_id(self, *, discord_channel_id: int, account_id: int | None) -> ThreadRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def list_by_owner_id(self, owner_id: int) -> list[ThreadRecord]:  # pragma: no cover
-        raise NotImplementedError
-
-
-class TwitchAccountRepository:
-    """Persistence interface for linked Twitch accounts."""
-
-    def get_by_account_id(self, account_id: int) -> TwitchAccountRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def create_account(
-        self,
-        *,
-        discord_user_id: int,
-        twitch_user_id: str,
-        twitch_login: str,
-        client_id: str,
-        access_token: str,
-        refresh_token: str | None,
-        expires_at: str | None,
-        scope: tuple[str, ...],
-        token_type: str | None,
-    ) -> TwitchAccountRecord:  # pragma: no cover
-        raise NotImplementedError
-
-    def update_account(
-        self,
-        *,
-        account_id: int,
-        twitch_user_id: str,
-        twitch_login: str,
-        client_id: str,
-        access_token: str,
-        refresh_token: str | None,
-        expires_at: str | None,
-        scope: tuple[str, ...],
-        token_type: str | None,
-    ) -> TwitchAccountRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def remove_by_account_id(self, account_id: int) -> bool:  # pragma: no cover
-        raise NotImplementedError
-
-    def get_by_discord_user_id(self, discord_user_id: int) -> TwitchAccountRecord | None:  # pragma: no cover - compatibility
-        raise NotImplementedError
-
-    def upsert_account(
-        self,
-        *,
-        discord_user_id: int,
-        twitch_user_id: str,
-        twitch_login: str,
-        client_id: str,
-        access_token: str,
-        refresh_token: str | None,
-        expires_at: str | None,
-        scope: tuple[str, ...],
-        token_type: str | None,
-    ) -> TwitchAccountRecord:  # pragma: no cover - compatibility
-        raise NotImplementedError
-
-    def remove_by_discord_user_id(self, discord_user_id: int) -> bool:  # pragma: no cover - compatibility
-        raise NotImplementedError
-
-
-class TwitchDeviceFlowRepository:
-    """Persistence interface for pending Twitch Device Code logins."""
-
-    def get_by_discord_channel_id(self, discord_channel_id: int) -> TwitchDeviceFlowRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def upsert_pending_flow(
-        self,
-        *,
-        discord_user_id: int,
-        discord_channel_id: int,
-        device_code: str,
-        user_code: str,
-        verification_uri: str,
-        interval_seconds: int,
-        expires_at: str,
-        scope: tuple[str, ...],
-    ) -> TwitchDeviceFlowRecord:  # pragma: no cover
-        raise NotImplementedError
-
-    def list_pending_flows(self) -> list[TwitchDeviceFlowRecord]:  # pragma: no cover
-        raise NotImplementedError
-
-    def mark_failed(self, *, discord_channel_id: int, last_error: str) -> TwitchDeviceFlowRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def touch_polled(self, *, discord_channel_id: int) -> None:  # pragma: no cover
-        raise NotImplementedError
-
-    def update_interval(self, *, discord_channel_id: int, interval_seconds: int) -> None:  # pragma: no cover
-        raise NotImplementedError
-
-    def remove_by_discord_channel_id(self, discord_channel_id: int) -> bool:  # pragma: no cover
-        raise NotImplementedError
-
-    def get_by_discord_user_id(self, discord_user_id: int) -> TwitchDeviceFlowRecord | None:  # pragma: no cover - compatibility
-        raise NotImplementedError
-
-    def remove_by_discord_user_id(self, discord_user_id: int) -> bool:  # pragma: no cover - compatibility
-        raise NotImplementedError
-
-
-class TwitchUserCacheRepository:
-    """Persistence interface for Twitch user metadata cached by ID and login."""
-
-    def get_by_user_id(self, twitch_user_id: str) -> TwitchUserCacheRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def get_by_login(self, twitch_login: str) -> TwitchUserCacheRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def upsert_from_api(
-        self,
-        *,
-        twitch_user_id: str,
-        twitch_login: str,
-        display_name: str,
-        profile_image_url: str | None,
-    ) -> TwitchUserCacheRecord:  # pragma: no cover
-        raise NotImplementedError
-
-    def observe_from_chat(
-        self,
-        *,
-        twitch_user_id: str,
-        twitch_login: str,
-        display_name: str | None,
-    ) -> TwitchUserCacheRecord:  # pragma: no cover
-        raise NotImplementedError
-
-
-class ChannelRepository:
-    """Persistence interface for per-thread Twitch channel subscriptions."""
-
-    def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:  # pragma: no cover
-        raise NotImplementedError
-
-    def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:  # pragma: no cover
-        raise NotImplementedError
-
-    def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def set_live_state_for_twitch_channel(
-        self,
-        *,
-        twitch_channel_id: str,
-        is_live: bool,
-        changed_at: str | None,
-    ) -> int:  # pragma: no cover
-        raise NotImplementedError
-
-    def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:  # pragma: no cover
-        raise NotImplementedError
-
-    def list_thread_ids_by_twitch_channel_id(self, twitch_channel_id: str) -> list[int]:  # pragma: no cover
-        raise NotImplementedError
-
-    def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:  # pragma: no cover
-        raise NotImplementedError
-
-    def list_all_twitch_channel_ids(self) -> list[str]:  # pragma: no cover
-        raise NotImplementedError
-
-
-class TrackedUserRepository:
-    """Persistence interface for per-thread tracked Twitch users."""
-
-    def get_by_thread_and_twitch_user(self, thread_id: int, twitch_user_id: str) -> TrackedUserRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def add_user(self, thread_id: int, twitch_user_id: str) -> None:  # pragma: no cover
-        raise NotImplementedError
-
-    def remove_user(self, thread_id: int, twitch_user_id: str) -> None:  # pragma: no cover
-        raise NotImplementedError
-
-    def list_users_for_thread(self, thread_id: int) -> list[TrackedUserRecord]:  # pragma: no cover
-        raise NotImplementedError
-
-    def count_pattern_scope_references(self, *, thread_id: int, twitch_user_id: str) -> int:  # pragma: no cover
-        raise NotImplementedError
-
-
-class PatternRepository:
-    """Persistence interface for per-thread ping/regex definitions."""
-
-    def find_exact_pattern(
-        self,
-        *,
-        thread_id: int,
-        regex: str,
-        channel_scope_mode: str,
-        channel_scope_ids: tuple[str, ...],
-        user_scope_mode: str,
-        user_scope_ids: tuple[str, ...],
-        sub_state: str,
-        offline_state: str,
-        is_regex: bool,
-        case_sensitive: bool,
-    ) -> PatternRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def add_pattern(
-        self,
-        *,
-        thread_id: int,
-        regex: str,
-        channel_scope_mode: str,
-        channel_scope_ids: tuple[str, ...],
-        user_scope_mode: str,
-        user_scope_ids: tuple[str, ...],
-        sub_state: str,
-        offline_state: str,
-        is_regex: bool,
-        case_sensitive: bool,
-        color: str | None,
-        disabled: bool,
-        priority: int,
-    ) -> PatternRecord:  # pragma: no cover
-        raise NotImplementedError
-
-    def remove_pattern(self, *, thread_id: int, p_index: int) -> None:  # pragma: no cover
-        raise NotImplementedError
-
-    def set_pattern_disabled(self, *, thread_id: int, p_index: int, disabled: bool) -> PatternRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def set_pattern_priority(self, *, thread_id: int, p_index: int, priority: int) -> PatternRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def update_pattern(
-        self,
-        *,
-        thread_id: int,
-        p_index: int,
-        regex: str,
-        channel_scope_mode: str,
-        channel_scope_ids: tuple[str, ...],
-        user_scope_mode: str,
-        user_scope_ids: tuple[str, ...],
-        sub_state: str,
-        offline_state: str,
-        is_regex: bool,
-        case_sensitive: bool,
-        color: str | None,
-        priority: int,
-    ) -> PatternRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def list_active_patterns_for_thread(self, thread_id: int) -> list[PatternRecord]:  # pragma: no cover
-        raise NotImplementedError
-
-    def get_pattern_by_id(
-        self,
-        *,
-        thread_id: int,
-        p_index: int,
-    ) -> PatternRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def list_patterns_for_thread(
-        self,
-        thread_id: int,
-        *,
-        is_regex: bool | None = None,
-    ) -> list[PatternRecord]:  # pragma: no cover
-        raise NotImplementedError
-
-    def count_channel_scope_references(self, *, thread_id: int, twitch_channel_id: str) -> int:  # pragma: no cover
-        raise NotImplementedError
-
-
-class ReplyRepository:
-    """Persistence interface for auto-replies attached to patterns."""
-
-    def get_by_pattern(self, *, thread_id: int, p_index: int) -> ReplyRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def add_reply(
-        self,
-        *,
-        thread_id: int,
-        p_index: int,
-        reply_message: str,
-        reply_as_reply: bool,
-    ) -> ReplyRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def remove_reply(self, *, thread_id: int, p_index: int) -> ReplyRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def set_reply_disabled(self, *, thread_id: int, p_index: int, disabled: bool) -> ReplyRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def list_replies_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[ReplyRecord]:  # pragma: no cover
-        raise NotImplementedError
-
-    def disable_replies_for_thread(self, thread_id: int) -> int:  # pragma: no cover
-        raise NotImplementedError
-
-    def enable_replies_for_thread(self, thread_id: int) -> int:  # pragma: no cover
-        raise NotImplementedError
-
-
-class ChannelEventReplyRepository:
-    """Persistence interface for live/offline-triggered auto-replies."""
-
-    def get_by_channel_event(
-        self,
-        *,
-        thread_id: int,
-        twitch_channel_id: str,
-        event_state: str,
-    ) -> ChannelEventReplyRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def upsert_reply(
-        self,
-        *,
-        thread_id: int,
-        twitch_channel_id: str,
-        event_state: str,
-        reply_message: str,
-    ) -> ChannelEventReplyRecord:  # pragma: no cover
-        raise NotImplementedError
-
-    def remove_reply(
-        self,
-        *,
-        thread_id: int,
-        twitch_channel_id: str,
-        event_state: str,
-    ) -> ChannelEventReplyRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def set_reply_disabled(
-        self,
-        *,
-        thread_id: int,
-        twitch_channel_id: str,
-        event_state: str,
-        disabled: bool,
-    ) -> ChannelEventReplyRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def list_replies_for_thread(
-        self,
-        thread_id: int,
-        *,
-        include_disabled: bool = True,
-    ) -> list[ChannelEventReplyRecord]:  # pragma: no cover
-        raise NotImplementedError
-
-    def list_replies_for_channel_event(
-        self,
-        *,
-        twitch_channel_id: str,
-        event_state: str,
-        include_disabled: bool = False,
-    ) -> list[ChannelEventReplyRecord]:  # pragma: no cover
-        raise NotImplementedError
-
-
-class UserPermissionRepository:
-    """Persistence interface for additional per-thread Discord permissions."""
-
-    def get_by_user_and_thread(self, *, discord_user_id: int, thread_id: int) -> UserPermissionRecord | None:  # pragma: no cover
-        raise NotImplementedError
-
-    def upsert_permissions(
-        self,
-        *,
-        discord_user_id: int,
-        thread_id: int,
-        permissions: int,
-    ) -> UserPermissionRecord:  # pragma: no cover
-        raise NotImplementedError
-
-    def remove_by_user_and_thread(self, *, discord_user_id: int, thread_id: int) -> bool:  # pragma: no cover
-        raise NotImplementedError
-
-    def list_for_thread(self, *, thread_id: int) -> list[UserPermissionRecord]:  # pragma: no cover
-        raise NotImplementedError
+from .records import (
+    AdapterEventActionRecord,
+    AdapterEventRecord,
+    ChannelRecord,
+    PatternRecord,
+    RecentMessageRecord,
+    ReplyRecord,
+    ThreadRecord,
+    TrackedChannelStateRecord,
+    TrackedUserRecord,
+    TwitchAccountRecord,
+    TwitchDeviceFlowRecord,
+    TwitchUserCacheRecord,
+    UserPermissionRecord,
+)
+from .repositories import (
+    AdapterEventActionRepository,
+    AdapterEventRepository,
+    ChannelRepository,
+    MessageRepository,
+    PatternRepository,
+    ReplyRepository,
+    ThreadRepository,
+    TrackedUserRepository,
+    TwitchAccountRepository,
+    TwitchDeviceFlowRepository,
+    TwitchUserCacheRepository,
+    UserPermissionRepository,
+)
 
 
 @dataclass(slots=True)
@@ -710,26 +172,77 @@ class PostgresDatabase:
             )
             cursor.execute(
                 """
-                CREATE TABLE IF NOT EXISTS channel_event_reply (
+                CREATE TABLE IF NOT EXISTS adapter_event (
+                    event_id SERIAL PRIMARY KEY,
                     thread_id INTEGER NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,
-                    twitch_channel_id TEXT NOT NULL,
-                    event_state OFFLINE_STATE_ENUM NOT NULL,
-                    reply_message TEXT NOT NULL,
+                    adapter_key TEXT NOT NULL,
+                    subject_type TEXT NOT NULL,
+                    subject_id TEXT NOT NULL,
+                    event_key TEXT NOT NULL,
                     disabled BOOLEAN NOT NULL DEFAULT FALSE,
-                    PRIMARY KEY (thread_id, twitch_channel_id, event_state),
-                    CONSTRAINT fk_channel_event_reply_channel
-                        FOREIGN KEY (thread_id, twitch_channel_id)
-                        REFERENCES channel(thread_id, twitch_channel_id)
-                        ON DELETE CASCADE,
-                    CONSTRAINT chk_channel_event_reply_state
-                        CHECK (event_state IN ('offline', 'online'))
+                    CONSTRAINT uniq_adapter_event
+                        UNIQUE (thread_id, adapter_key, subject_type, subject_id, event_key)
                 )
                 """
             )
             cursor.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_channel_event_reply_lookup
-                ON channel_event_reply(twitch_channel_id, event_state, disabled)
+                CREATE INDEX IF NOT EXISTS idx_adapter_event_lookup
+                ON adapter_event(adapter_key, subject_type, subject_id, event_key, disabled)
+                """
+            )
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS adapter_event_action (
+                    event_id INTEGER NOT NULL REFERENCES adapter_event(event_id) ON DELETE CASCADE,
+                    action_type TEXT NOT NULL,
+                    message_template TEXT,
+                    reply_as_reply BOOLEAN NOT NULL DEFAULT FALSE,
+                    disabled BOOLEAN NOT NULL DEFAULT FALSE,
+                    PRIMARY KEY (event_id, action_type)
+                )
+                """
+            )
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_adapter_event_action_lookup
+                ON adapter_event_action(action_type, disabled)
+                """
+            )
+            cursor.execute(
+                """
+                DO $$
+                BEGIN
+                    IF to_regclass('public.channel_event_reply') IS NOT NULL THEN
+                        INSERT INTO adapter_event (thread_id, adapter_key, subject_type, subject_id, event_key, disabled)
+                        SELECT cer.thread_id,
+                               'twitch',
+                               'channel',
+                               cer.twitch_channel_id,
+                               CASE cer.event_state WHEN 'online' THEN 'stream.online' ELSE 'stream.offline' END,
+                               FALSE
+                        FROM channel_event_reply cer
+                        ON CONFLICT (thread_id, adapter_key, subject_type, subject_id, event_key) DO NOTHING;
+
+                        INSERT INTO adapter_event_action (event_id, action_type, message_template, reply_as_reply, disabled)
+                        SELECT ae.event_id,
+                               'twitch_send_message',
+                               cer.reply_message,
+                               FALSE,
+                               cer.disabled
+                        FROM channel_event_reply cer
+                        JOIN adapter_event ae
+                          ON ae.thread_id = cer.thread_id
+                         AND ae.adapter_key = 'twitch'
+                         AND ae.subject_type = 'channel'
+                         AND ae.subject_id = cer.twitch_channel_id
+                         AND ae.event_key = CASE cer.event_state WHEN 'online' THEN 'stream.online' ELSE 'stream.offline' END
+                        ON CONFLICT (event_id, action_type)
+                        DO UPDATE SET
+                            message_template = EXCLUDED.message_template,
+                            disabled = EXCLUDED.disabled;
+                    END IF;
+                END $$;
                 """
             )
 
@@ -1201,6 +714,21 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
         if existing is None:
             return False
         return self.remove_by_account_id(existing.account_id)
+
+    def list_accounts(self) -> list[TwitchAccountRecord]:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT account_id, discord_user_id, twitch_user_id, twitch_login, client_id,
+                       access_token, refresh_token, expires_at, scope, token_type
+                FROM twitch_account
+                ORDER BY updated_at DESC NULLS LAST, account_id DESC
+                """
+            )
+            rows = cursor.fetchall()
+        return [self._build_account_record(row) for row in rows]
 
     @staticmethod
     def _build_account_record(row: tuple) -> TwitchAccountRecord:
@@ -1758,6 +1286,30 @@ class PostgresChannelRepository(ChannelRepository):
             )
             rows = cursor.fetchall()
         return [str(row[0]) for row in rows]
+
+    def list_distinct_channel_states(self) -> list[TrackedChannelStateRecord]:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT twitch_channel_id,
+                       BOOL_OR(is_live) FILTER (WHERE is_live IS NOT NULL),
+                       MAX(last_live_status_at)
+                FROM channel
+                GROUP BY twitch_channel_id
+                ORDER BY twitch_channel_id
+                """
+            )
+            rows = cursor.fetchall()
+        return [
+            TrackedChannelStateRecord(
+                twitch_channel_id=str(row[0]),
+                is_live=row[1],
+                last_live_status_at=row[2].isoformat() if row[2] is not None else None,
+            )
+            for row in rows
+        ]
 
 
 @dataclass(slots=True)
@@ -2413,182 +1965,322 @@ class PostgresReplyRepository(ReplyRepository):
         )
 
 
-@dataclass(slots=True)
-class PostgresChannelEventReplyRepository(ChannelEventReplyRepository):
-    """Store and retrieve auto-replies triggered by live/offline channel events."""
+class PostgresAdapterEventRepository(AdapterEventRepository):
+    """Store and retrieve external adapter event triggers."""
 
     database: PostgresDatabase
 
-    def get_by_channel_event(
+    def upsert_event(
         self,
         *,
         thread_id: int,
-        twitch_channel_id: str,
-        event_state: str,
-    ) -> ChannelEventReplyRecord | None:
+        adapter_key: str,
+        subject_type: str,
+        subject_id: str,
+        event_key: str,
+    ) -> AdapterEventRecord:
         self.database.connect()
         assert self.database.connection is not None
         with self.database.connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT thread_id, twitch_channel_id, event_state, reply_message, disabled
-                FROM channel_event_reply
-                WHERE thread_id = %s AND twitch_channel_id = %s AND event_state = %s
+                INSERT INTO adapter_event (thread_id, adapter_key, subject_type, subject_id, event_key, disabled)
+                VALUES (%s, %s, %s, %s, %s, FALSE)
+                ON CONFLICT (thread_id, adapter_key, subject_type, subject_id, event_key)
+                DO UPDATE SET disabled = FALSE
+                RETURNING event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
                 """,
-                (thread_id, twitch_channel_id, event_state),
-            )
-            row = cursor.fetchone()
-        if row is None:
-            return None
-        return self._build_record(row)
-
-    def upsert_reply(
-        self,
-        *,
-        thread_id: int,
-        twitch_channel_id: str,
-        event_state: str,
-        reply_message: str,
-    ) -> ChannelEventReplyRecord:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO channel_event_reply (thread_id, twitch_channel_id, event_state, reply_message, disabled)
-                VALUES (%s, %s, %s, %s, FALSE)
-                ON CONFLICT (thread_id, twitch_channel_id, event_state)
-                DO UPDATE SET
-                    reply_message = EXCLUDED.reply_message,
-                    disabled = FALSE
-                RETURNING thread_id, twitch_channel_id, event_state, reply_message, disabled
-                """,
-                (thread_id, twitch_channel_id, event_state, reply_message),
+                (thread_id, adapter_key, subject_type, subject_id, event_key),
             )
             row = cursor.fetchone()
         assert row is not None
         return self._build_record(row)
 
-    def remove_reply(
+    def get_event(
         self,
         *,
         thread_id: int,
-        twitch_channel_id: str,
-        event_state: str,
-    ) -> ChannelEventReplyRecord | None:
+        adapter_key: str,
+        subject_type: str,
+        subject_id: str,
+        event_key: str,
+    ) -> AdapterEventRecord | None:
         self.database.connect()
         assert self.database.connection is not None
         with self.database.connection.cursor() as cursor:
             cursor.execute(
                 """
-                DELETE FROM channel_event_reply
-                WHERE thread_id = %s AND twitch_channel_id = %s AND event_state = %s
-                RETURNING thread_id, twitch_channel_id, event_state, reply_message, disabled
+                SELECT event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
+                FROM adapter_event
+                WHERE thread_id = %s
+                  AND adapter_key = %s
+                  AND subject_type = %s
+                  AND subject_id = %s
+                  AND event_key = %s
                 """,
-                (thread_id, twitch_channel_id, event_state),
+                (thread_id, adapter_key, subject_type, subject_id, event_key),
             )
             row = cursor.fetchone()
         if row is None:
             return None
         return self._build_record(row)
 
-    def set_reply_disabled(
-        self,
-        *,
-        thread_id: int,
-        twitch_channel_id: str,
-        event_state: str,
-        disabled: bool,
-    ) -> ChannelEventReplyRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
-            cursor.execute(
-                """
-                UPDATE channel_event_reply
-                SET disabled = %s
-                WHERE thread_id = %s AND twitch_channel_id = %s AND event_state = %s
-                RETURNING thread_id, twitch_channel_id, event_state, reply_message, disabled
-                """,
-                (disabled, thread_id, twitch_channel_id, event_state),
-            )
-            row = cursor.fetchone()
-        if row is None:
-            return None
-        return self._build_record(row)
-
-    def list_replies_for_thread(
-        self,
-        thread_id: int,
-        *,
-        include_disabled: bool = True,
-    ) -> list[ChannelEventReplyRecord]:
+    def list_events_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[AdapterEventRecord]:
         self.database.connect()
         assert self.database.connection is not None
         with self.database.connection.cursor() as cursor:
             if include_disabled:
                 cursor.execute(
                     """
-                    SELECT thread_id, twitch_channel_id, event_state, reply_message, disabled
-                    FROM channel_event_reply
+                    SELECT event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
+                    FROM adapter_event
                     WHERE thread_id = %s
-                    ORDER BY event_state, twitch_channel_id
+                    ORDER BY adapter_key, event_key, subject_id
                     """,
                     (thread_id,),
                 )
             else:
                 cursor.execute(
                     """
-                    SELECT thread_id, twitch_channel_id, event_state, reply_message, disabled
-                    FROM channel_event_reply
+                    SELECT event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
+                    FROM adapter_event
                     WHERE thread_id = %s AND disabled = FALSE
-                    ORDER BY event_state, twitch_channel_id
+                    ORDER BY adapter_key, event_key, subject_id
                     """,
                     (thread_id,),
                 )
             rows = cursor.fetchall()
         return [self._build_record(row) for row in rows]
 
-    def list_replies_for_channel_event(
+    def list_matching_events(
         self,
         *,
-        twitch_channel_id: str,
-        event_state: str,
+        adapter_key: str,
+        subject_type: str,
+        subject_id: str,
+        event_key: str,
         include_disabled: bool = False,
-    ) -> list[ChannelEventReplyRecord]:
+    ) -> list[AdapterEventRecord]:
         self.database.connect()
         assert self.database.connection is not None
         with self.database.connection.cursor() as cursor:
             if include_disabled:
                 cursor.execute(
                     """
-                    SELECT thread_id, twitch_channel_id, event_state, reply_message, disabled
-                    FROM channel_event_reply
-                    WHERE twitch_channel_id = %s AND event_state = %s
-                    ORDER BY thread_id
+                    SELECT event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
+                    FROM adapter_event
+                    WHERE adapter_key = %s
+                      AND subject_type = %s
+                      AND subject_id = %s
+                      AND event_key = %s
+                    ORDER BY thread_id, event_id
                     """,
-                    (twitch_channel_id, event_state),
+                    (adapter_key, subject_type, subject_id, event_key),
                 )
             else:
                 cursor.execute(
                     """
-                    SELECT thread_id, twitch_channel_id, event_state, reply_message, disabled
-                    FROM channel_event_reply
-                    WHERE twitch_channel_id = %s AND event_state = %s AND disabled = FALSE
-                    ORDER BY thread_id
+                    SELECT event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
+                    FROM adapter_event
+                    WHERE adapter_key = %s
+                      AND subject_type = %s
+                      AND subject_id = %s
+                      AND event_key = %s
+                      AND disabled = FALSE
+                    ORDER BY thread_id, event_id
                     """,
-                    (twitch_channel_id, event_state),
+                    (adapter_key, subject_type, subject_id, event_key),
                 )
             rows = cursor.fetchall()
         return [self._build_record(row) for row in rows]
 
     @staticmethod
-    def _build_record(row: tuple) -> ChannelEventReplyRecord:
-        return ChannelEventReplyRecord(
-            thread_id=int(row[0]),
-            twitch_channel_id=str(row[1]),
-            event_state=row[2],
-            reply_message=row[3],
+    def _build_record(row: tuple) -> AdapterEventRecord:
+        return AdapterEventRecord(
+            event_id=int(row[0]),
+            thread_id=int(row[1]),
+            adapter_key=str(row[2]),
+            subject_type=str(row[3]),
+            subject_id=str(row[4]),
+            event_key=str(row[5]),
+            disabled=bool(row[6]),
+        )
+
+
+@dataclass(slots=True)
+class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
+    """Store and retrieve follow-up actions for external adapter events."""
+
+    database: PostgresDatabase
+
+    def upsert_action(
+        self,
+        *,
+        event_id: int,
+        action_type: str,
+        message_template: str | None,
+        reply_as_reply: bool,
+    ) -> AdapterEventActionRecord:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO adapter_event_action (event_id, action_type, message_template, reply_as_reply, disabled)
+                VALUES (%s, %s, %s, %s, FALSE)
+                ON CONFLICT (event_id, action_type)
+                DO UPDATE SET
+                    message_template = EXCLUDED.message_template,
+                    reply_as_reply = EXCLUDED.reply_as_reply,
+                    disabled = FALSE
+                RETURNING event_id, action_type, message_template, reply_as_reply, disabled
+                """,
+                (event_id, action_type, message_template, reply_as_reply),
+            )
+            row = cursor.fetchone()
+        assert row is not None
+        return self._build_record(row)
+
+    def get_action(self, *, event_id: int, action_type: str) -> AdapterEventActionRecord | None:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT event_id, action_type, message_template, reply_as_reply, disabled
+                FROM adapter_event_action
+                WHERE event_id = %s AND action_type = %s
+                """,
+                (event_id, action_type),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return self._build_record(row)
+
+    def remove_action(self, *, event_id: int, action_type: str) -> AdapterEventActionRecord | None:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                DELETE FROM adapter_event_action
+                WHERE event_id = %s AND action_type = %s
+                RETURNING event_id, action_type, message_template, reply_as_reply, disabled
+                """,
+                (event_id, action_type),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return self._build_record(row)
+
+    def set_action_disabled(
+        self,
+        *,
+        event_id: int,
+        action_type: str,
+        disabled: bool,
+    ) -> AdapterEventActionRecord | None:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE adapter_event_action
+                SET disabled = %s
+                WHERE event_id = %s AND action_type = %s
+                RETURNING event_id, action_type, message_template, reply_as_reply, disabled
+                """,
+                (disabled, event_id, action_type),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return self._build_record(row)
+
+    def list_actions_for_event(
+        self,
+        event_id: int,
+        *,
+        include_disabled: bool = True,
+    ) -> list[AdapterEventActionRecord]:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            if include_disabled:
+                cursor.execute(
+                    """
+                    SELECT event_id, action_type, message_template, reply_as_reply, disabled
+                    FROM adapter_event_action
+                    WHERE event_id = %s
+                    ORDER BY action_type
+                    """,
+                    (event_id,),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT event_id, action_type, message_template, reply_as_reply, disabled
+                    FROM adapter_event_action
+                    WHERE event_id = %s AND disabled = FALSE
+                    ORDER BY action_type
+                    """,
+                    (event_id,),
+                )
+            rows = cursor.fetchall()
+        return [self._build_record(row) for row in rows]
+
+    def list_actions_for_thread(
+        self,
+        thread_id: int,
+        *,
+        include_disabled: bool = True,
+    ) -> list[tuple[AdapterEventRecord, AdapterEventActionRecord]]:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            if include_disabled:
+                cursor.execute(
+                    """
+                    SELECT ae.event_id, ae.thread_id, ae.adapter_key, ae.subject_type, ae.subject_id, ae.event_key, ae.disabled,
+                           aea.event_id, aea.action_type, aea.message_template, aea.reply_as_reply, aea.disabled
+                    FROM adapter_event ae
+                    JOIN adapter_event_action aea ON aea.event_id = ae.event_id
+                    WHERE ae.thread_id = %s
+                    ORDER BY ae.adapter_key, ae.event_key, ae.subject_id, aea.action_type
+                    """,
+                    (thread_id,),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT ae.event_id, ae.thread_id, ae.adapter_key, ae.subject_type, ae.subject_id, ae.event_key, ae.disabled,
+                           aea.event_id, aea.action_type, aea.message_template, aea.reply_as_reply, aea.disabled
+                    FROM adapter_event ae
+                    JOIN adapter_event_action aea ON aea.event_id = ae.event_id
+                    WHERE ae.thread_id = %s
+                      AND ae.disabled = FALSE
+                      AND aea.disabled = FALSE
+                    ORDER BY ae.adapter_key, ae.event_key, ae.subject_id, aea.action_type
+                    """,
+                    (thread_id,),
+                )
+            rows = cursor.fetchall()
+        results: list[tuple[AdapterEventRecord, AdapterEventActionRecord]] = []
+        for row in rows:
+            event_record = PostgresAdapterEventRepository._build_record(row[:7])
+            action_record = self._build_record(row[7:])
+            results.append((event_record, action_record))
+        return results
+
+    @staticmethod
+    def _build_record(row: tuple) -> AdapterEventActionRecord:
+        return AdapterEventActionRecord(
+            event_id=int(row[0]),
+            action_type=str(row[1]),
+            message_template=None if row[2] is None else str(row[2]),
+            reply_as_reply=bool(row[3]),
             disabled=bool(row[4]),
         )
 

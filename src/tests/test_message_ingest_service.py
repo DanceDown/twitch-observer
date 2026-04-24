@@ -59,7 +59,14 @@ def test_presence_service_uses_recent_message_as_status() -> None:
     repository = InMemoryMessageRepository()
     MessageIngestService(event_bus=bus, message_repository=repository)
     notifier = FakePresenceNotifier()
-    service = DiscordPresenceService(message_repository=repository, notifier=notifier)
+    service = DiscordPresenceService(
+        message_repository=repository,
+        notifier=notifier,
+        poll_interval_seconds=60,
+        lookback_minutes=5,
+        message_limit=50,
+        max_status_length=120,
+    )
 
     event = TwitchChatMessageEvent(channel_login="channel", author_login="bob", author_display_name="Bob", content="A tracked message")
     import asyncio
@@ -75,7 +82,14 @@ def test_presence_service_uses_recent_message_as_status() -> None:
 def test_presence_service_keeps_current_status_when_no_recent_message_exists() -> None:
     repository = InMemoryMessageRepository()
     notifier = FakePresenceNotifier(statuses=["old status"])
-    service = DiscordPresenceService(message_repository=repository, notifier=notifier)
+    service = DiscordPresenceService(
+        message_repository=repository,
+        notifier=notifier,
+        poll_interval_seconds=60,
+        lookback_minutes=5,
+        message_limit=50,
+        max_status_length=120,
+    )
 
     import asyncio
 

@@ -219,27 +219,30 @@ Parameters:
 
 Purpose:
 
-- manually mark one tracked Twitch channel as live
+- notify the current Discord context when one tracked Twitch channel goes live
 
 Behavior:
 
 - opens a modal
 - lets you choose one tracked channel from the current Discord context
-- persists the live state through the event bus and the channel-state service
-- may trigger configured channel-event auto-replies
+- stores a Twitch `stream.online` event trigger plus a Discord notification action
+- does not control whether the channel is monitored
+- tracked channels are monitored globally through app-token Helix polling
+  whether or not this command was used
 
 ### `/offline`
 
 Purpose:
 
-- manually mark one tracked Twitch channel as offline
+- notify the current Discord context when one tracked Twitch channel goes offline
 
 Behavior:
 
 - opens a modal
 - lets you choose one tracked channel from the current Discord context
-- persists the offline state through the event bus and the channel-state service
-- may trigger configured channel-event auto-replies
+- stores a Twitch `stream.offline` event trigger plus a Discord notification
+  action
+- does not control whether the channel is monitored
 
 ## Pattern Commands
 
@@ -428,15 +431,16 @@ Purpose:
 
 Behavior:
 
-- opens a form with `Add`, `Remove`, `Disable`, and `Enable`
-- `Add` lets you attach a reply to:
-  - one existing ping or regex rule
-  - one tracked channel becoming `online`
-  - one tracked channel becoming `offline`
+- opens a form with separate `Add Pattern` and `Add Event` actions plus
+  `Remove`, `Disable`, and `Enable`
+- `Add Pattern` attaches a reply to one existing ping or regex rule
+- `Add Event` attaches a reply to one already configured `/live` or `/offline`
+  event trigger
 - pattern-based replies may either send a normal Twitch message or reply directly to the matched Twitch chat message
-- channel-event replies always send a normal Twitch message
+- external-event replies always send a normal Twitch message
 - one pattern can have at most one attached pattern reply
-- one tracked channel can have at most one configured reply per live-state event
+- one configured external event trigger can have at most one Twitch message
+  follow-up action
 
 Pattern placeholders:
 
@@ -629,7 +633,8 @@ Parameters:
 Behavior:
 
 - `pings` includes both normal pings and regex-mode rules
-- `auto_replies` includes both pattern-bound replies and live/offline channel-event replies
+- `channels` also shows configured live/offline notification states for tracked channels
+- `auto_replies` includes both pattern-bound replies and event-triggered Twitch message actions
 - rules are shown in descending priority order
 - IDs shown here are the IDs used by `/ping ...` and `/reply ...`
 - when one section exceeds Discord's embed size limit, `/show` splits it across

@@ -3,7 +3,6 @@ from __future__ import annotations
 """Business logic for manually sending Twitch chat messages from Discord."""
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
 import logging
 
 from src.adapters.twitch_api import TwitchAPIClient, TwitchAPIError, TwitchAuthenticationError
@@ -16,6 +15,7 @@ from src.events.event_types import (
     EventType,
 )
 from src.services.authz import thread_has_permission
+from src.services.twitch_runtime import ensure_fresh_linked_account, refresh_linked_account
 from src.utils.permissions import ObserverPermission
 
 logger = logging.getLogger(__name__)
@@ -30,8 +30,8 @@ class TwitchWriteCommandService:
     channel_repository: ChannelRepository
     account_repository: TwitchAccountRepository
     twitch_api: TwitchAPIClient
+    token_refresh_skew_seconds: int
     permission_repository: UserPermissionRepository | None = None
-    token_refresh_skew_seconds: int = 30
 
     def __post_init__(self) -> None:
         self.event_bus.subscribe(EventType.DISCORD_WRITE_REQUESTED, self.handle_request)
@@ -119,7 +119,14 @@ class TwitchWriteCommandService:
                 ephemeral=True,
             )
 
-        account = await self._ensure_account_token(account)
+        account = await ensure_fresh_linked_account(
+            account=account,
+            account_repository=self.account_repository,
+            twitch_api=self.twitch_api,
+            token_refresh_skew_seconds=self.token_refresh_skew_seconds,
+            thread_repository=self.thread_repository,
+            thread=thread,
+        ) or account
         try:
             await self.twitch_api.send_chat_message(
                 access_token=account.access_token,
@@ -130,7 +137,13 @@ class TwitchWriteCommandService:
                 reply_parent_message_id=event.reply_parent_message_id,
             )
         except TwitchAuthenticationError:
-            refreshed = await self._try_refresh_account(account)
+            refreshed = await refresh_linked_account(
+                account=account,
+                account_repository=self.account_repository,
+                twitch_api=self.twitch_api,
+                thread_repository=self.thread_repository,
+                thread=thread,
+            )
             if refreshed is None:
                 if thread.account_id is not None:
                     self.account_repository.remove_by_account_id(thread.account_id)
@@ -173,41 +186,3 @@ class TwitchWriteCommandService:
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
         )
-
-    async def _ensure_account_token(self, account):
-        if account.expires_at is None:
-            return account
-        try:
-            expires_at = datetime.fromisoformat(account.expires_at)
-        except ValueError:
-            return account
-        if expires_at > datetime.now(timezone.utc) + timedelta(seconds=self.token_refresh_skew_seconds):
-            return account
-        refreshed = await self._try_refresh_account(account)
-        return refreshed or account
-
-    async def _try_refresh_account(self, account):
-        if not account.refresh_token:
-            return None
-        try:
-            refreshed = await self.twitch_api.refresh_user_access_token(account.refresh_token)
-            validated = await self.twitch_api.validate_user_access_token(refreshed.access_token)
-        except TwitchAPIError as error:
-            logger.warning("Failed to refresh Twitch account for account_id=%s: %s", account.account_id, error)
-            return None
-
-        expires_at = (datetime.now(timezone.utc) + timedelta(seconds=refreshed.expires_in)).isoformat()
-        stored = self.account_repository.update_account(
-            account_id=account.account_id,
-            twitch_user_id=validated.user_id,
-            twitch_login=validated.login,
-            client_id=validated.client_id,
-            access_token=refreshed.access_token,
-            refresh_token=refreshed.refresh_token,
-            expires_at=expires_at,
-            scope=refreshed.scope,
-            token_type=refreshed.token_type,
-        )
-        if stored is None:
-            return None
-        return stored

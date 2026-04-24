@@ -13,9 +13,10 @@ from src.adapters.twitch_irc import AnonymousTwitchIRCAdapter
 from src.config import AppConfig
 from src.database.connection import (
     PostgresChannelRepository,
-    PostgresChannelEventReplyRepository,
     PostgresDatabase,
     PostgresMessageRepository,
+    PostgresAdapterEventActionRepository,
+    PostgresAdapterEventRepository,
     PostgresPatternRepository,
     PostgresReplyRepository,
     PostgresTrackedUserRepository,
@@ -28,7 +29,11 @@ from src.database.connection import (
 from src.events.event_bus import EventBus
 from src.services.account_service import AccountCommandService, DeviceFlowPollingService
 from src.services.channel_command_service import ChannelCommandService
-from src.services.channel_live_state_service import ChannelLiveStateCommandService, ChannelLiveStatePersistenceService
+from src.services.channel_live_state_service import (
+    ChannelEventCommandService,
+    ChannelEventNotificationService,
+    ChannelLiveStatePersistenceService,
+)
 from src.services.discord_presence_service import DiscordPresenceService
 from src.services.irc_bootstrap_service import IRCBootstrapService
 from src.services.message_ingest_service import MessageIngestService
@@ -36,6 +41,7 @@ from src.services.pattern_service import PatternCommandService, PatternTrackingS
 from src.services.permission_service import PermissionCommandService
 from src.services.reply_service import AutoReplyService, ChannelEventAutoReplyService, ReplyCommandService
 from src.services.thread_lifecycle_service import ThreadLifecycleService
+from src.services.twitch_live_monitor_service import TwitchLiveMonitorService
 from src.services.twitch_user_directory_service import TwitchUserDirectoryIngestService, TwitchUserDirectoryService
 from src.services.user_command_service import UserCommandService
 from src.services.write_service import TwitchWriteCommandService
@@ -56,7 +62,8 @@ async def _run() -> None:
     tracked_user_repository = PostgresTrackedUserRepository(database)
     pattern_repository = PostgresPatternRepository(database)
     reply_repository = PostgresReplyRepository(database)
-    channel_event_reply_repository = PostgresChannelEventReplyRepository(database)
+    adapter_event_repository = PostgresAdapterEventRepository(database)
+    adapter_event_action_repository = PostgresAdapterEventActionRepository(database)
     permission_repository = PostgresUserPermissionRepository(database)
     account_repository = PostgresTwitchAccountRepository(database)
     device_flow_repository = PostgresTwitchDeviceFlowRepository(database)
@@ -99,11 +106,12 @@ async def _run() -> None:
         irc_manager=irc_adapter,
         permission_repository=permission_repository,
     )
-    ChannelLiveStateCommandService(
+    ChannelEventCommandService(
         event_bus=event_bus,
         thread_repository=thread_repository,
         channel_repository=channel_repository,
-        twitch_api=twitch_api,
+        adapter_event_repository=adapter_event_repository,
+        adapter_event_action_repository=adapter_event_action_repository,
         permission_repository=permission_repository,
     )
     ChannelLiveStatePersistenceService(
@@ -125,7 +133,8 @@ async def _run() -> None:
         tracked_user_repository=tracked_user_repository,
         pattern_repository=pattern_repository,
         reply_repository=reply_repository,
-        channel_event_reply_repository=channel_event_reply_repository,
+        adapter_event_repository=adapter_event_repository,
+        adapter_event_action_repository=adapter_event_action_repository,
         twitch_api=twitch_api,
     )
     device_flow_poller = DeviceFlowPollingService(
@@ -172,7 +181,8 @@ async def _run() -> None:
         reply_repository=reply_repository,
         account_repository=account_repository,
         twitch_api=twitch_api,
-        channel_event_reply_repository=channel_event_reply_repository,
+        adapter_event_repository=adapter_event_repository,
+        adapter_event_action_repository=adapter_event_action_repository,
         permission_repository=permission_repository,
     )
     ShowCommandService(
@@ -182,7 +192,8 @@ async def _run() -> None:
         pattern_repository=pattern_repository,
         reply_repository=reply_repository,
         tracked_user_repository=tracked_user_repository,
-        channel_event_reply_repository=channel_event_reply_repository,
+        adapter_event_repository=adapter_event_repository,
+        adapter_event_action_repository=adapter_event_action_repository,
         twitch_api=twitch_api,
         permission_repository=permission_repository,
     )
@@ -212,11 +223,19 @@ async def _run() -> None:
         event_bus=event_bus,
         thread_repository=thread_repository,
         channel_repository=channel_repository,
-        channel_event_reply_repository=channel_event_reply_repository,
+        adapter_event_repository=adapter_event_repository,
+        adapter_event_action_repository=adapter_event_action_repository,
         account_repository=account_repository,
         twitch_api=twitch_api,
         notifier=discord_adapter,
         token_refresh_skew_seconds=config.twitch_account_token_refresh_skew_seconds,
+    )
+    ChannelEventNotificationService(
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        adapter_event_repository=adapter_event_repository,
+        adapter_event_action_repository=adapter_event_action_repository,
+        notifier=discord_adapter,
     )
     TwitchWriteCommandService(
         event_bus=event_bus,
@@ -239,6 +258,15 @@ async def _run() -> None:
             loop.add_signal_handler(signum, _request_stop)
 
     irc_task = asyncio.create_task(irc_adapter.start(), name="twitch-irc-adapter")
+    live_monitor_service = TwitchLiveMonitorService(
+        event_bus=event_bus,
+        channel_repository=channel_repository,
+        twitch_api=twitch_api,
+        poll_interval_seconds=config.twitch_live_monitor_poll_interval_seconds,
+        batch_size=config.twitch_live_monitor_batch_size,
+        refresh_on_startup=config.twitch_live_monitor_refresh_on_startup,
+    )
+    await live_monitor_service.start()
     discord_task = asyncio.create_task(discord_adapter.start(), name="discord-adapter")
     await irc_bootstrap_service.sync_persisted_channels()
     await device_flow_poller.start()
@@ -253,6 +281,7 @@ async def _run() -> None:
             await irc_task
         with suppress(asyncio.CancelledError):
             await discord_task
+        await live_monitor_service.stop()
         await device_flow_poller.stop()
         await presence_service.stop()
         await twitch_api.close()

@@ -129,7 +129,12 @@ async def test_directory_uses_persistent_cache_before_hitting_helix() -> None:
             ),
         },
     )
-    directory = TwitchUserDirectoryService(twitch_api=twitch_api, repository=repository)
+    directory = TwitchUserDirectoryService(
+        twitch_api=twitch_api,
+        repository=repository,
+        memory_cache_size=2048,
+        api_refresh_interval_seconds=43200,
+    )
 
     first = await directory.get_user_by_login("example")
     second = await directory.get_user_by_login("example")
@@ -147,7 +152,12 @@ async def test_directory_ingests_chat_metadata_without_any_helix_lookup() -> Non
     event_bus = EventBus()
     repository = InMemoryTwitchUserCacheRepository()
     twitch_api = FakeTwitchAPI()
-    directory = TwitchUserDirectoryService(twitch_api=twitch_api, repository=repository)
+    directory = TwitchUserDirectoryService(
+        twitch_api=twitch_api,
+        repository=repository,
+        memory_cache_size=2048,
+        api_refresh_interval_seconds=43200,
+    )
     TwitchUserDirectoryIngestService(event_bus=event_bus, directory=directory)
 
     await event_bus.publish(
@@ -190,7 +200,12 @@ async def test_directory_can_force_a_fresh_login_lookup_when_requested() -> None
             "newname": TwitchUser(user_id="42", login="newname", display_name="New Name"),
         }
     )
-    directory = TwitchUserDirectoryService(twitch_api=twitch_api, repository=repository)
+    directory = TwitchUserDirectoryService(
+        twitch_api=twitch_api,
+        repository=repository,
+        memory_cache_size=2048,
+        api_refresh_interval_seconds=43200,
+    )
 
     refreshed = await directory.refresh_user_by_login("newname")
     cached = await directory.get_user_by_id("42")
@@ -210,7 +225,12 @@ async def test_directory_uses_lru_memory_cache_before_repository() -> None:
             "gamma": TwitchUser(user_id="3", login="gamma", display_name="Gamma", profile_image_url="c"),
         }
     )
-    directory = TwitchUserDirectoryService(twitch_api=twitch_api, repository=repository, memory_cache_size=2)
+    directory = TwitchUserDirectoryService(
+        twitch_api=twitch_api,
+        repository=repository,
+        memory_cache_size=2,
+        api_refresh_interval_seconds=43200,
+    )
 
     await directory.get_user_by_login("alpha")
     await directory.get_user_by_login("beta")
@@ -226,7 +246,12 @@ async def test_directory_uses_lru_memory_cache_before_repository() -> None:
 async def test_directory_cache_only_lookup_does_not_fall_back_to_helix() -> None:
     repository = InMemoryTwitchUserCacheRepository()
     twitch_api = FakeTwitchAPI()
-    directory = TwitchUserDirectoryService(twitch_api=twitch_api, repository=repository)
+    directory = TwitchUserDirectoryService(
+        twitch_api=twitch_api,
+        repository=repository,
+        memory_cache_size=2048,
+        api_refresh_interval_seconds=43200,
+    )
 
     cached = directory.get_cached_user_by_login("unknown")
 
@@ -258,7 +283,12 @@ async def test_directory_refreshes_missing_profile_image_from_api() -> None:
             )
         }
     )
-    directory = TwitchUserDirectoryService(twitch_api=twitch_api, repository=repository)
+    directory = TwitchUserDirectoryService(
+        twitch_api=twitch_api,
+        repository=repository,
+        memory_cache_size=2048,
+        api_refresh_interval_seconds=43200,
+    )
 
     user = await directory.get_user_by_id("42")
 
@@ -294,6 +324,7 @@ async def test_directory_refreshes_stale_api_cache_based_on_configured_interval(
     directory = TwitchUserDirectoryService(
         twitch_api=twitch_api,
         repository=repository,
+        memory_cache_size=2048,
         api_refresh_interval_seconds=60,
     )
 

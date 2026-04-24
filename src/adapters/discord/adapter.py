@@ -8,7 +8,8 @@ import discord
 
 from src.config import AppConfig
 from src.database.connection import (
-    ChannelEventReplyRepository,
+    AdapterEventActionRepository,
+    AdapterEventRepository,
     ChannelRepository,
     PatternRepository,
     ReplyRepository,
@@ -38,7 +39,8 @@ class DiscordAdapter(TrackingNotificationSender, DiscordPresenceStatusSender):
         tracked_user_repository: TrackedUserRepository,
         pattern_repository: PatternRepository,
         reply_repository: ReplyRepository,
-        channel_event_reply_repository: ChannelEventReplyRepository,
+        adapter_event_repository: AdapterEventRepository,
+        adapter_event_action_repository: AdapterEventActionRepository,
         twitch_api: TwitchAPIClient,
     ) -> None:
         self._config = config
@@ -51,7 +53,8 @@ class DiscordAdapter(TrackingNotificationSender, DiscordPresenceStatusSender):
                 tracked_user_repository=tracked_user_repository,
                 pattern_repository=pattern_repository,
                 reply_repository=reply_repository,
-                channel_event_reply_repository=channel_event_reply_repository,
+                adapter_event_repository=adapter_event_repository,
+                adapter_event_action_repository=adapter_event_action_repository,
                 twitch_api=twitch_api,
             ),
         )
@@ -96,6 +99,13 @@ class DiscordAdapter(TrackingNotificationSender, DiscordPresenceStatusSender):
                 return
         with suppress(discord.HTTPException, discord.Forbidden):
             await self._client.send_user_result(discord_user_id, result)
+
+    async def send_channel_result(self, discord_channel_id: int, result: DiscordCommandResult) -> None:
+        """Send a result embed to one Discord channel when possible."""
+        if not self._config.discord_bot_token or not self._client.is_ready():
+            return
+        with suppress(discord.HTTPException, discord.Forbidden):
+            await self._client.send_channel_result(discord_channel_id, result)
 
     async def set_status_text(self, text: str) -> None:
         """Update the bot's visible global Discord custom status."""

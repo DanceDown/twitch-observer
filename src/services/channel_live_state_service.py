@@ -1,51 +1,76 @@
 from __future__ import annotations
 
-"""Manual and adapter-driven tracked-channel live state handling."""
+"""Tracked Twitch channel events, persistence and Discord notifications."""
 
 from dataclasses import dataclass
 import logging
 
-from src.adapters.twitch_api import TwitchAPIClient, TwitchAPIError
-from src.database.connection import ChannelRepository, ThreadRecord, ThreadRepository, UserPermissionRepository
+from src.database.connection import (
+    AdapterEventActionRepository,
+    AdapterEventRepository,
+    ChannelRepository,
+    ThreadRecord,
+    ThreadRepository,
+    UserPermissionRepository,
+)
 from src.events.event_bus import EventBus
 from src.events.event_types import (
-    DiscordChannelLiveStateRequestedEvent,
+    DiscordChannelEventRequestedEvent,
     DiscordCommandResult,
     DiscordResultStyle,
     EventType,
     TwitchChannelLiveStateChangedEvent,
 )
 from src.services.authz import thread_has_permission
+from src.services.twitch_runtime import (
+    CHANNEL_SUBJECT_TYPE,
+    DISCORD_NOTIFY_ACTION,
+    STREAM_OFFLINE_EVENT_KEY,
+    STREAM_ONLINE_EVENT_KEY,
+    TWITCH_ADAPTER_KEY,
+)
 from src.utils.permissions import ObserverPermission
 
 logger = logging.getLogger(__name__)
 
 
+class ChannelEventNotificationSender:
+    """Interface used to emit Discord-side channel event notifications."""
+
+    async def send_channel_result(
+        self,
+        discord_channel_id: int,
+        result: DiscordCommandResult,
+    ) -> None:  # pragma: no cover - interface
+        raise NotImplementedError
+
+
 @dataclass(slots=True)
-class ChannelLiveStateCommandService:
-    """Handle `/live` and `/offline` requests from Discord."""
+class ChannelEventCommandService:
+    """Handle `/live` and `/offline` as notification-trigger configuration."""
 
     event_bus: EventBus
     thread_repository: ThreadRepository
     channel_repository: ChannelRepository
-    twitch_api: TwitchAPIClient
+    adapter_event_repository: AdapterEventRepository
+    adapter_event_action_repository: AdapterEventActionRepository
     permission_repository: UserPermissionRepository | None = None
 
     def __post_init__(self) -> None:
-        self.event_bus.subscribe(EventType.DISCORD_CHANNEL_LIVE_STATE_REQUESTED, self.handle_request)
+        self.event_bus.subscribe(EventType.DISCORD_CHANNEL_EVENT_REQUESTED, self.handle_request)
 
-    async def handle_request(self, event: DiscordChannelLiveStateRequestedEvent) -> None:
+    async def handle_request(self, event: DiscordChannelEventRequestedEvent) -> None:
         try:
-            result = await self._handle_change(event)
-        except TwitchAPIError as error:
+            result = await self._handle_action(event)
+        except ValueError as error:
             result = DiscordCommandResult(
-                title="Twitch API Error",
+                title="Validation Error",
                 message=str(error),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
         except Exception as error:
-            logger.exception("Unexpected error while handling live-state command.")
+            logger.exception("Unexpected error while handling channel event command.")
             result = DiscordCommandResult(
                 title="Unexpected Error",
                 message=str(error),
@@ -55,7 +80,7 @@ class ChannelLiveStateCommandService:
         if not event.result_future.done():
             event.result_future.set_result(result)
 
-    async def _handle_change(self, event: DiscordChannelLiveStateRequestedEvent) -> DiscordCommandResult:
+    async def _handle_action(self, event: DiscordChannelEventRequestedEvent) -> DiscordCommandResult:
         thread = self._ensure_permission(event)
         if isinstance(thread, DiscordCommandResult):
             return thread
@@ -68,28 +93,53 @@ class ChannelLiveStateCommandService:
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
+        if event.event_key not in {STREAM_ONLINE_EVENT_KEY, STREAM_OFFLINE_EVENT_KEY}:
+            raise ValueError("Unsupported tracked channel event.")
 
-        twitch_channel = await self.twitch_api.get_user_by_id(event.twitch_channel_id)
-        change_event = TwitchChannelLiveStateChangedEvent(
-            twitch_channel_id=event.twitch_channel_id,
-            twitch_channel_login=twitch_channel.login,
-            is_live=event.is_live,
+        adapter_event = self.adapter_event_repository.upsert_event(
+            thread_id=thread.thread_id,
+            adapter_key=TWITCH_ADAPTER_KEY,
+            subject_type=CHANNEL_SUBJECT_TYPE,
+            subject_id=event.twitch_channel_id,
+            event_key=event.event_key,
         )
-        await self.event_bus.publish(EventType.TWITCH_CHANNEL_LIVE_STATE_CHANGED, change_event)
-        state_label = "live" if event.is_live else "offline"
+        existing_action = self.adapter_event_action_repository.get_action(
+            event_id=adapter_event.event_id,
+            action_type=DISCORD_NOTIFY_ACTION,
+        )
+        action = self.adapter_event_action_repository.upsert_action(
+            event_id=adapter_event.event_id,
+            action_type=DISCORD_NOTIFY_ACTION,
+            message_template=None,
+            reply_as_reply=False,
+        )
+        action_label = "live" if event.event_key == STREAM_ONLINE_EVENT_KEY else "offline"
+        if existing_action is None:
+            title = "Notification Added"
+            message = f"This Discord channel will now be notified when the tracked Twitch channel goes {action_label}."
+        elif existing_action.disabled:
+            title = "Notification Enabled"
+            message = f"The {action_label} notification was re-enabled for this tracked Twitch channel."
+        else:
+            title = "Already Configured"
+            message = f"A {action_label} notification is already configured for this tracked Twitch channel."
+        logger.debug(
+            "Configured tracked channel event thread_id=%s event_id=%s action=%s event_key=%s",
+            thread.thread_id,
+            adapter_event.event_id,
+            action.action_type,
+            adapter_event.event_key,
+        )
         return DiscordCommandResult(
-            title=f"Channel Marked {state_label.capitalize()}",
-            message=(
-                f"Marked `{twitch_channel.display_name}` (`{twitch_channel.login}`) as {state_label}. "
-                "Stored live-state rules and event-based auto-replies will use this persisted value."
-            ),
-            style=DiscordResultStyle.SUCCESS,
-            ephemeral=False,
+            title=title,
+            message=message,
+            style=DiscordResultStyle.SUCCESS if title != "Already Configured" else DiscordResultStyle.INFO,
+            ephemeral=title == "Already Configured",
         )
 
     def _ensure_permission(
         self,
-        event: DiscordChannelLiveStateRequestedEvent,
+        event: DiscordChannelEventRequestedEvent,
     ) -> ThreadRecord | DiscordCommandResult:
         thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
         if thread is None:
@@ -107,7 +157,7 @@ class ChannelLiveStateCommandService:
         ):
             return DiscordCommandResult(
                 title="Permission Denied",
-                message="You do not have permission to update tracked channel live states.",
+                message="You do not have permission to configure tracked channel notifications.",
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -116,7 +166,7 @@ class ChannelLiveStateCommandService:
 
 @dataclass(slots=True)
 class ChannelLiveStatePersistenceService:
-    """Persist live/offline channel state changes received from any adapter."""
+    """Persist live/offline channel state changes received from adapters."""
 
     event_bus: EventBus
     channel_repository: ChannelRepository
@@ -136,3 +186,53 @@ class ChannelLiveStatePersistenceService:
             event.is_live,
             updated_rows,
         )
+
+
+@dataclass(slots=True)
+class ChannelEventNotificationService:
+    """Emit Discord notifications for configured tracked channel events."""
+
+    event_bus: EventBus
+    thread_repository: ThreadRepository
+    adapter_event_repository: AdapterEventRepository
+    adapter_event_action_repository: AdapterEventActionRepository
+    notifier: ChannelEventNotificationSender | None = None
+
+    def __post_init__(self) -> None:
+        self.event_bus.subscribe(EventType.TWITCH_CHANNEL_LIVE_STATE_CHANGED, self.handle_change)
+
+    async def handle_change(self, event: TwitchChannelLiveStateChangedEvent) -> None:
+        if self.notifier is None:
+            return
+        event_key = STREAM_ONLINE_EVENT_KEY if event.is_live else STREAM_OFFLINE_EVENT_KEY
+        configured_events = self.adapter_event_repository.list_matching_events(
+            adapter_key=TWITCH_ADAPTER_KEY,
+            subject_type=CHANNEL_SUBJECT_TYPE,
+            subject_id=event.twitch_channel_id,
+            event_key=event_key,
+            include_disabled=False,
+        )
+        if not configured_events:
+            return
+
+        channel_name = event.twitch_channel_login or event.twitch_channel_id
+        state_text = "live" if event.is_live else "offline"
+        for configured_event in configured_events:
+            thread = self.thread_repository.get_by_thread_id(configured_event.thread_id)
+            if thread is None or not thread.enabled:
+                continue
+            notify_action = self.adapter_event_action_repository.get_action(
+                event_id=configured_event.event_id,
+                action_type=DISCORD_NOTIFY_ACTION,
+            )
+            if notify_action is None or notify_action.disabled:
+                continue
+            await self.notifier.send_channel_result(
+                thread.discord_channel_id,
+                DiscordCommandResult(
+                    title=f"Channel Went {'Live' if event.is_live else 'Offline'}",
+                    message=f"`{channel_name}` is now {state_text}.",
+                    style=DiscordResultStyle.INFO,
+                    ephemeral=False,
+                ),
+            )

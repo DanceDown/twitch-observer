@@ -29,7 +29,7 @@ class IRCBootstrapService:
     channel_repository: ChannelRepository
     twitch_api: TwitchAPIClient
     irc_manager: IRCBootstrapManager
-    connect_timeout_seconds: float = 15.0
+    connect_timeout_seconds: float
 
     async def sync_persisted_channels(self) -> None:
         """Load all stored channels from the DB and join them on IRC."""

@@ -37,9 +37,10 @@ def test_build_show_pages_splits_oversized_single_item_when_needed() -> None:
 
 
 def test_show_pagination_view_sets_footer_and_button_states() -> None:
+    detail = "x" * 2100
     result = DiscordCommandResult(
         title="Configuration Overview",
-        message="**Pings**\n- one\n  detail\n- two\n  detail\n- three\n  detail",
+        message=f"**Pings**\n- one\n  {detail}\n- two\n  {detail}\n- three\n  {detail}",
         style=DiscordResultStyle.INFO,
         ephemeral=True,
     )
@@ -51,6 +52,6 @@ def test_show_pagination_view_sets_footer_and_button_states() -> None:
     previous_button = _find_button(view, "Previous")
     next_button = _find_button(view, "Next")
 
-    assert embed.footer.text == "Page 1/2"
+    assert embed.footer.text == "Page 1/3"
     assert previous_button.disabled is True
     assert next_button.disabled is False

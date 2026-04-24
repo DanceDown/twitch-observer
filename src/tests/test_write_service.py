@@ -359,6 +359,7 @@ async def test_write_send_posts_plain_twitch_message() -> None:
         channel_repository=channel_repository,
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
+        token_refresh_skew_seconds=30,
         permission_repository=InMemoryPermissionRepository(),
     )
 
@@ -405,6 +406,7 @@ async def test_write_send_can_reply_to_specific_twitch_message() -> None:
         channel_repository=channel_repository,
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
+        token_refresh_skew_seconds=30,
         permission_repository=InMemoryPermissionRepository(),
     )
 
@@ -456,6 +458,7 @@ async def test_write_send_respects_granted_permission_for_non_owner() -> None:
         channel_repository=channel_repository,
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
+        token_refresh_skew_seconds=30,
         permission_repository=permission_repository,
     )
 
@@ -503,6 +506,7 @@ async def test_write_send_reports_missing_owner_account_even_for_permitted_helpe
         channel_repository=channel_repository,
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
+        token_refresh_skew_seconds=30,
         permission_repository=permission_repository,
     )
 

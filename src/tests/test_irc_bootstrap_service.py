@@ -86,6 +86,7 @@ async def test_bootstrap_service_joins_all_distinct_persisted_channels() -> None
         channel_repository=repository,
         twitch_api=twitch_api,
         irc_manager=irc_manager,
+        connect_timeout_seconds=15,
     )
 
     await service.sync_persisted_channels()
@@ -107,6 +108,7 @@ async def test_bootstrap_service_skips_channels_that_cannot_be_resolved() -> Non
         channel_repository=repository,
         twitch_api=twitch_api,
         irc_manager=irc_manager,
+        connect_timeout_seconds=15,
     )
 
     await service.sync_persisted_channels()

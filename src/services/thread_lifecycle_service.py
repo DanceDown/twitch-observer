@@ -14,6 +14,7 @@ from src.events.event_types import (
     DiscordResultStyle,
     DiscordThreadRequestedEvent,
     EventType,
+    TwitchTrackedChannelsChangedEvent,
 )
 from src.services.channel_command_service import IRCChannelManager
 from src.services.authz import thread_has_permission
@@ -159,6 +160,10 @@ class ThreadLifecycleService:
             event.discord_channel_id,
             event.requester_id,
             removed_channel_ids,
+        )
+        await self.event_bus.publish(
+            EventType.TWITCH_TRACKED_CHANNELS_CHANGED,
+            TwitchTrackedChannelsChangedEvent(reason="thread_left"),
         )
         return DiscordCommandResult(
             title="Observer Left",

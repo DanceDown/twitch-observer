@@ -8,7 +8,7 @@ from src.events.event_bus import EventBus
 from src.events.event_types import (
     DiscordAccountRequestedEvent,
     DiscordChannelRequestedEvent,
-    DiscordChannelLiveStateRequestedEvent,
+    DiscordChannelEventRequestedEvent,
     DiscordCommandResult,
     DiscordUserRequestedEvent,
     DiscordPatternEditRequestedEvent,
@@ -50,24 +50,24 @@ async def dispatch_channel_command(
     return await result_future
 
 
-async def dispatch_channel_live_state_command(
+async def dispatch_channel_event_command(
     event_bus: EventBus,
     *,
     discord_channel_id: int,
     requester_id: int,
     twitch_channel_id: str,
-    is_live: bool,
+    event_key: str,
 ) -> DiscordCommandResult:
-    """Publish one manual live/offline channel-state change and await the result."""
+    """Publish one tracked channel-event configuration request and await the result."""
     loop = asyncio.get_running_loop()
     result_future: asyncio.Future[DiscordCommandResult] = loop.create_future()
     await event_bus.publish(
-        EventType.DISCORD_CHANNEL_LIVE_STATE_REQUESTED,
-        DiscordChannelLiveStateRequestedEvent(
+        EventType.DISCORD_CHANNEL_EVENT_REQUESTED,
+        DiscordChannelEventRequestedEvent(
             discord_channel_id=discord_channel_id,
             requester_id=requester_id,
             twitch_channel_id=twitch_channel_id,
-            is_live=is_live,
+            event_key=event_key,
             result_future=result_future,
         ),
     )
@@ -270,8 +270,7 @@ async def dispatch_reply_command(
     message: str | None,
     reply_as_reply: bool,
     target_type: str = "pattern",
-    twitch_channel_id: str | None = None,
-    channel_event_state: str | None = None,
+    adapter_event_id: int | None = None,
 ) -> DiscordCommandResult:
     """Publish a reply add/remove/disable/enable request and await the result."""
     loop = asyncio.get_running_loop()
@@ -287,8 +286,7 @@ async def dispatch_reply_command(
             reply_as_reply=reply_as_reply,
             result_future=result_future,
             target_type=target_type,
-            twitch_channel_id=twitch_channel_id,
-            channel_event_state=channel_event_state,
+            adapter_event_id=adapter_event_id,
         ),
     )
     return await result_future

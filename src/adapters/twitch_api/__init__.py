@@ -175,15 +175,20 @@ class TwitchAPIClient:
             profile_image_url=user.get("profile_image_url"),
         )
 
-    async def is_user_live(self, user_id: str) -> bool:
-        """Return whether a broadcaster is currently live on Twitch."""
+    async def get_live_user_ids(self, user_ids: list[str]) -> set[str]:
+        """Return the subset of broadcaster IDs that are currently live."""
+        normalized_ids = [user_id.strip() for user_id in user_ids if user_id.strip()]
+        if not normalized_ids:
+            return set()
+
         await self.start()
         token = await self._get_app_access_token()
         assert self._session is not None
 
+        params: list[tuple[str, str]] = [("user_id", user_id) for user_id in normalized_ids]
         async with self._session.get(
             f"{self._config.twitch_api_base_url}/streams",
-            params={"user_id": user_id},
+            params=params,
             headers={
                 "Client-Id": self._config.twitch_client_id,
                 "Authorization": f"Bearer {token}",
@@ -195,7 +200,7 @@ class TwitchAPIClient:
             message = payload.get("message", "Twitch API request failed.")
             raise TwitchAPIError(message)
 
-        return bool(payload.get("data"))
+        return {str(item["user_id"]) for item in payload.get("data", [])}
 
     async def validate_user_access_token(self, access_token: str) -> TwitchValidatedToken:
         """Validate a user token and return the identity/scopes Twitch reports."""

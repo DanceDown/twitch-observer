@@ -188,23 +188,42 @@ CREATE TABLE reply (
 CREATE INDEX idx_reply_thread_disabled
     ON reply(thread_id, disabled);
 
-CREATE TABLE channel_event_reply (
-    thread_id           INTEGER NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,
-    twitch_channel_id   TEXT NOT NULL,
-    event_state         OFFLINE_STATE_ENUM NOT NULL,
-    reply_message       TEXT NOT NULL,
-    disabled            BOOLEAN NOT NULL DEFAULT FALSE,
-    PRIMARY KEY (thread_id, twitch_channel_id, event_state),
-    CONSTRAINT fk_channel_event_reply_channel
-        FOREIGN KEY (thread_id, twitch_channel_id)
-        REFERENCES channel(thread_id, twitch_channel_id)
-        ON DELETE CASCADE,
-    CONSTRAINT chk_channel_event_reply_state
-        CHECK (event_state IN ('offline', 'online'))
+CREATE TABLE adapter_event (
+    event_id         SERIAL PRIMARY KEY,
+    thread_id        INTEGER NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,
+    adapter_key      TEXT NOT NULL,
+    subject_type     TEXT NOT NULL,
+    subject_id       TEXT NOT NULL,
+    event_key        TEXT NOT NULL,
+    disabled         BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT uniq_adapter_event
+        UNIQUE (thread_id, adapter_key, subject_type, subject_id, event_key),
+    CONSTRAINT chk_adapter_event_adapter_key
+        CHECK (adapter_key <> ''),
+    CONSTRAINT chk_adapter_event_subject_type
+        CHECK (subject_type <> ''),
+    CONSTRAINT chk_adapter_event_subject_id
+        CHECK (subject_id <> ''),
+    CONSTRAINT chk_adapter_event_event_key
+        CHECK (event_key <> '')
 );
 
-CREATE INDEX idx_channel_event_reply_lookup
-    ON channel_event_reply(twitch_channel_id, event_state, disabled);
+CREATE INDEX idx_adapter_event_lookup
+    ON adapter_event(adapter_key, subject_type, subject_id, event_key, disabled);
+
+CREATE TABLE adapter_event_action (
+    event_id            INTEGER NOT NULL REFERENCES adapter_event(event_id) ON DELETE CASCADE,
+    action_type         TEXT NOT NULL,
+    message_template    TEXT,
+    reply_as_reply      BOOLEAN NOT NULL DEFAULT FALSE,
+    disabled            BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (event_id, action_type),
+    CONSTRAINT chk_adapter_event_action_type
+        CHECK (action_type <> '')
+);
+
+CREATE INDEX idx_adapter_event_action_lookup
+    ON adapter_event_action(action_type, disabled);
 
 ----------------------------
 -- User permissions

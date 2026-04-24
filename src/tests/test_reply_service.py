@@ -14,9 +14,11 @@ from src.adapters.twitch_api import (
     TwitchValidatedToken,
 )
 from src.database.connection import (
+    AdapterEventActionRecord,
+    AdapterEventActionRepository,
+    AdapterEventRecord,
+    AdapterEventRepository,
     ChannelRecord,
-    ChannelEventReplyRecord,
-    ChannelEventReplyRepository,
     ChannelRepository,
     PatternRecord,
     PatternRepository,
@@ -176,6 +178,9 @@ class InMemoryChannelRepository(ChannelRepository):
 
     def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
         return [record for record in self.channels_by_thread.values() if record.thread_id == thread_id]
+
+    def list_all_twitch_channel_ids(self) -> list[str]:
+        return sorted({record.twitch_channel_id for record in self.channels_by_thread.values()})
 
 
 @dataclass
@@ -389,76 +394,168 @@ class InMemoryReplyRepository(ReplyRepository):
 
 
 @dataclass
-class InMemoryChannelEventReplyRepository(ChannelEventReplyRepository):
-    replies: dict[tuple[int, str, str], ChannelEventReplyRecord] = field(default_factory=dict)
+class InMemoryAdapterEventRepository(AdapterEventRepository):
+    events_by_id: dict[int, AdapterEventRecord] = field(default_factory=dict)
+    next_event_id: int = 1
 
-    def get_by_channel_event(self, *, thread_id: int, twitch_channel_id: str, event_state: str) -> ChannelEventReplyRecord | None:
-        return self.replies.get((thread_id, twitch_channel_id, event_state))
-
-    def upsert_reply(
+    def upsert_event(
         self,
         *,
         thread_id: int,
-        twitch_channel_id: str,
-        event_state: str,
-        reply_message: str,
-    ) -> ChannelEventReplyRecord:
-        record = ChannelEventReplyRecord(
+        adapter_key: str,
+        subject_type: str,
+        subject_id: str,
+        event_key: str,
+    ) -> AdapterEventRecord:
+        existing = self.get_event(
             thread_id=thread_id,
-            twitch_channel_id=twitch_channel_id,
-            event_state=event_state,
-            reply_message=reply_message,
+            adapter_key=adapter_key,
+            subject_type=subject_type,
+            subject_id=subject_id,
+            event_key=event_key,
+        )
+        if existing is not None:
+            updated = AdapterEventRecord(
+                event_id=existing.event_id,
+                thread_id=existing.thread_id,
+                adapter_key=existing.adapter_key,
+                subject_type=existing.subject_type,
+                subject_id=existing.subject_id,
+                event_key=existing.event_key,
+                disabled=False,
+            )
+            self.events_by_id[existing.event_id] = updated
+            return updated
+        record = AdapterEventRecord(
+            event_id=self.next_event_id,
+            thread_id=thread_id,
+            adapter_key=adapter_key,
+            subject_type=subject_type,
+            subject_id=subject_id,
+            event_key=event_key,
             disabled=False,
         )
-        self.replies[(thread_id, twitch_channel_id, event_state)] = record
+        self.next_event_id += 1
+        self.events_by_id[record.event_id] = record
         return record
 
-    def remove_reply(self, *, thread_id: int, twitch_channel_id: str, event_state: str) -> ChannelEventReplyRecord | None:
-        return self.replies.pop((thread_id, twitch_channel_id, event_state), None)
-
-    def set_reply_disabled(
+    def get_event(
         self,
         *,
         thread_id: int,
-        twitch_channel_id: str,
-        event_state: str,
-        disabled: bool,
-    ) -> ChannelEventReplyRecord | None:
-        key = (thread_id, twitch_channel_id, event_state)
-        existing = self.replies.get(key)
-        if existing is None:
-            return None
-        updated = ChannelEventReplyRecord(
-            thread_id=existing.thread_id,
-            twitch_channel_id=existing.twitch_channel_id,
-            event_state=existing.event_state,
-            reply_message=existing.reply_message,
-            disabled=disabled,
-        )
-        self.replies[key] = updated
-        return updated
+        adapter_key: str,
+        subject_type: str,
+        subject_id: str,
+        event_key: str,
+    ) -> AdapterEventRecord | None:
+        for event in self.events_by_id.values():
+            if (
+                event.thread_id == thread_id
+                and event.adapter_key == adapter_key
+                and event.subject_type == subject_type
+                and event.subject_id == subject_id
+                and event.event_key == event_key
+            ):
+                return event
+        return None
 
-    def list_replies_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[ChannelEventReplyRecord]:
-        rows = [reply for reply in self.replies.values() if reply.thread_id == thread_id]
+    def list_events_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[AdapterEventRecord]:
+        rows = [event for event in self.events_by_id.values() if event.thread_id == thread_id]
         if not include_disabled:
-            rows = [reply for reply in rows if not reply.disabled]
-        return sorted(rows, key=lambda reply: (reply.event_state, reply.twitch_channel_id))
+            rows = [event for event in rows if not event.disabled]
+        return sorted(rows, key=lambda event: (event.event_key, event.subject_id))
 
-    def list_replies_for_channel_event(
+    def list_matching_events(
         self,
         *,
-        twitch_channel_id: str,
-        event_state: str,
+        adapter_key: str,
+        subject_type: str,
+        subject_id: str,
+        event_key: str,
         include_disabled: bool = False,
-    ) -> list[ChannelEventReplyRecord]:
+    ) -> list[AdapterEventRecord]:
         rows = [
-            reply
-            for reply in self.replies.values()
-            if reply.twitch_channel_id == twitch_channel_id and reply.event_state == event_state
+            event
+            for event in self.events_by_id.values()
+            if event.adapter_key == adapter_key
+            and event.subject_type == subject_type
+            and event.subject_id == subject_id
+            and event.event_key == event_key
         ]
         if not include_disabled:
-            rows = [reply for reply in rows if not reply.disabled]
-        return sorted(rows, key=lambda reply: reply.thread_id)
+            rows = [event for event in rows if not event.disabled]
+        return sorted(rows, key=lambda event: event.thread_id)
+
+
+@dataclass
+class InMemoryAdapterEventActionRepository(AdapterEventActionRepository):
+    actions: dict[tuple[int, str], AdapterEventActionRecord] = field(default_factory=dict)
+    event_repository: InMemoryAdapterEventRepository | None = None
+
+    def upsert_action(
+        self,
+        *,
+        event_id: int,
+        action_type: str,
+        message_template: str | None,
+        reply_as_reply: bool,
+    ) -> AdapterEventActionRecord:
+        record = AdapterEventActionRecord(
+            event_id=event_id,
+            action_type=action_type,
+            message_template=message_template,
+            reply_as_reply=reply_as_reply,
+            disabled=False,
+        )
+        self.actions[(event_id, action_type)] = record
+        return record
+
+    def get_action(self, *, event_id: int, action_type: str) -> AdapterEventActionRecord | None:
+        return self.actions.get((event_id, action_type))
+
+    def remove_action(self, *, event_id: int, action_type: str) -> AdapterEventActionRecord | None:
+        return self.actions.pop((event_id, action_type), None)
+
+    def set_action_disabled(
+        self,
+        *,
+        event_id: int,
+        action_type: str,
+        disabled: bool,
+    ) -> AdapterEventActionRecord | None:
+        key = (event_id, action_type)
+        existing = self.actions.get(key)
+        if existing is None:
+            return None
+        updated = AdapterEventActionRecord(
+            event_id=existing.event_id,
+            action_type=existing.action_type,
+            message_template=existing.message_template,
+            reply_as_reply=existing.reply_as_reply,
+            disabled=disabled,
+        )
+        self.actions[key] = updated
+        return updated
+
+    def list_actions_for_event(self, event_id: int, *, include_disabled: bool = True) -> list[AdapterEventActionRecord]:
+        rows = [action for action in self.actions.values() if action.event_id == event_id]
+        if not include_disabled:
+            rows = [action for action in rows if not action.disabled]
+        return sorted(rows, key=lambda action: action.action_type)
+
+    def list_actions_for_thread(
+        self,
+        thread_id: int,
+        *,
+        include_disabled: bool = True,
+    ) -> list[tuple[AdapterEventRecord, AdapterEventActionRecord]]:
+        if self.event_repository is None:
+            return []
+        results: list[tuple[AdapterEventRecord, AdapterEventActionRecord]] = []
+        for event in self.event_repository.list_events_for_thread(thread_id, include_disabled=include_disabled):
+            for action in self.list_actions_for_event(event.event_id, include_disabled=include_disabled):
+                results.append((event, action))
+        return results
 
 
 @dataclass
@@ -584,6 +681,9 @@ class InMemoryAccountRepository(TwitchAccountRepository):
         if existing is None:
             return False
         return self.remove_by_account_id(existing.account_id)
+
+    def list_accounts(self) -> list[TwitchAccountRecord]:
+        return sorted(self.accounts_by_account_id.values(), key=lambda account: account.account_id, reverse=True)
 
 
 @dataclass
@@ -890,6 +990,7 @@ async def test_device_flow_poller_links_account_after_successful_authorization()
         account_repository=account_repository,
         thread_repository=thread_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
+        poll_interval_seconds=2,
         notifier=notifier,
     )
 
@@ -930,6 +1031,7 @@ async def test_device_flow_poller_marks_failed_authorizations() -> None:
         account_repository=account_repository,
         thread_repository=thread_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
+        poll_interval_seconds=2,
         notifier=notifier,
     )
 
@@ -1422,6 +1524,7 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
         reply_repository=reply_repository,
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
+        token_refresh_skew_seconds=30,
         notifier=notifier,
     )
 
@@ -1498,6 +1601,7 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
         reply_repository=reply_repository,
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
+        token_refresh_skew_seconds=30,
         notifier=FakeNotifier(),
     )
 
@@ -1571,6 +1675,7 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
         reply_repository=reply_repository,
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
+        token_refresh_skew_seconds=30,
         notifier=FakeNotifier(),
     )
 
@@ -1645,6 +1750,7 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
         reply_repository=reply_repository,
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
+        token_refresh_skew_seconds=30,
         notifier=FakeNotifier(),
     )
 
@@ -1735,6 +1841,7 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
         reply_repository=reply_repository,
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
+        token_refresh_skew_seconds=30,
         notifier=FakeNotifier(),
     )
 
@@ -1809,6 +1916,7 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
         reply_repository=reply_repository,
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
+        token_refresh_skew_seconds=30,
         notifier=FakeNotifier(),
     )
 
@@ -1837,12 +1945,20 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     channel_repository.add_channel(thread.thread_id, "42")
-    channel_event_reply_repository = InMemoryChannelEventReplyRepository()
-    channel_event_reply_repository.upsert_reply(
+    adapter_event_repository = InMemoryAdapterEventRepository()
+    adapter_event_action_repository = InMemoryAdapterEventActionRepository(event_repository=adapter_event_repository)
+    adapter_event = adapter_event_repository.upsert_event(
         thread_id=thread.thread_id,
-        twitch_channel_id="42",
-        event_state="online",
-        reply_message="YIPPIE {CHANNEL} is {STATE}",
+        adapter_key="twitch",
+        subject_type="channel",
+        subject_id="42",
+        event_key="stream.online",
+    )
+    adapter_event_action_repository.upsert_action(
+        event_id=adapter_event.event_id,
+        action_type="twitch_send_message",
+        message_template="YIPPIE {CHANNEL} is {STATE}",
+        reply_as_reply=False,
     )
     account_repository = InMemoryAccountRepository()
     account = account_repository.create_account(
@@ -1866,9 +1982,11 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
         event_bus=bus,
         thread_repository=thread_repository,
         channel_repository=channel_repository,
-        channel_event_reply_repository=channel_event_reply_repository,
+        adapter_event_repository=adapter_event_repository,
+        adapter_event_action_repository=adapter_event_action_repository,
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
+        token_refresh_skew_seconds=30,
     )
 
     await bus.publish(

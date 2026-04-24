@@ -1,145 +1,149 @@
-## Contents
+# Architecture
 
-This document explains the current architectural direction of the Twitch
-Observer and how the major parts fit together.
+This is the main runtime reference for the Twitch Observer.
 
-## Internal Structure
+## Layers
 
-### Adapters
+- Adapters
+  - translate external systems into internal events
+  - render results back to Discord or Twitch
+- Services
+  - own business logic
+  - react to events
+  - coordinate repositories and side effects
+- Repositories
+  - persist configuration, cache, and runtime state in PostgreSQL
+- Event bus
+  - keeps adapters and services decoupled
 
-Adapters are bindings to external systems. In the current implementation these
-include:
+## Main inputs
 
-- the Discord bot and slash commands
-- the anonymous Twitch IRC connection used for read-only chat intake
-- the Twitch Helix API used for validation, account linking, and auto-replies
-- manual tracked-channel live/offline updates entering through Discord commands
+- Discord
+  - slash commands, modals, and buttons
+- Twitch IRC
+  - public chat intake
+- Twitch Helix
+  - validation, metadata, live-state polling, and chat writes
 
-### Database
+## Core runtime flows
 
-The database layer opens the PostgreSQL connection and exposes repository-style
-access to persisted data.
+### Chat message flow
 
-### Events
+1. `AnonymousTwitchIRCAdapter` receives a Twitch `PRIVMSG`.
+2. It publishes `TwitchChatMessageEvent`.
+3. `MessageIngestService` stores the message.
+4. `TwitchUserDirectoryIngestService` updates `twitch_user_cache` from IRC metadata.
+5. `PatternTrackingService` evaluates message-driven patterns.
+6. `AutoReplyService` evaluates pattern-bound Twitch auto-replies.
 
-The central event bus lives here. Adapters publish normalized events, and
-services subscribe to the events they care about.
+### Live-state flow
 
-### Services
+1. `TwitchLiveMonitorService` periodically polls Helix `Get Streams` for all tracked channels.
+2. It compares the result with persisted `channel.is_live`.
+3. First-seen state is stored silently.
+4. Actual transitions publish `TwitchChannelLiveStateChangedEvent`.
+5. `ChannelLiveStatePersistenceService` persists the new state.
+6. `ChannelEventNotificationService` sends Discord notifications for configured `/live` or `/offline` triggers.
+7. `ChannelEventAutoReplyService` sends Twitch messages for configured live/offline event actions.
 
-Services implement business logic. They react to events, validate data, call
-repositories, and optionally trigger secondary side effects.
+### Command flow
 
-### Tests
+1. A Discord command is dispatched from the Discord adapter.
+2. The adapter publishes one typed command event.
+3. The matching service validates permissions and inputs.
+4. The service updates repositories and returns a `DiscordCommandResult`.
+5. The Discord adapter renders the result.
 
-Unit tests focus on service behavior, event flows, and helper utilities.
+## Key design decisions
 
-### Utils
+### Tracked channels are infrastructure
 
-Shared helper functions that do not belong to one specific service.
+A row in `channel` means:
 
-### Main
+- read this Twitch chat on IRC
+- poll this channel for live/offline state
+- allow patterns to scope to it
 
-`main.py` wires everything together:
+It does not mean:
 
-- configuration
-- database
-- repositories
-- event bus
-- services
-- Discord adapter
-- Twitch adapters
+- notify on live/offline automatically
 
-## Current Data Flow
+Notifications and event-driven follow-up actions are configured separately through
+`adapter_event` and `adapter_event_action`.
 
-The application follows this flow:
+### Live monitoring is app-owned, not user-owned
 
-1. an adapter receives external input
-2. the adapter normalizes it into an internal event
-3. the event bus dispatches the event
-4. one or more services react
-5. services read or write PostgreSQL data
-6. services may emit a user-facing side effect, such as a Discord embed or a
-   Twitch reply
+Background live/offline monitoring must not depend on whichever user happened to
+link a Twitch account in one Discord context.
 
-## Current Concrete Flows
+The app therefore uses Helix `Get Streams` with the Twitch application
+credentials for live-state polling.
 
-### Twitch message intake
+That keeps ownership correct:
 
-1. `twitch_irc` receives a Twitch IRC `PRIVMSG`
-2. it creates a `TwitchChatMessageEvent`
-3. `MessageIngestService` stores the message
-4. `TwitchUserDirectoryIngestService` refreshes cached login and display-name data from IRC metadata
-5. `PatternTrackingService` evaluates the message against active patterns
-6. if a pattern matches, one Discord embed is sent
-7. `AutoReplyService` evaluates the same message and may send one Twitch reply
+- linked user accounts are only used for Twitch writes
+- live/offline monitoring works even when no user account is linked
 
-### Discord configuration command
+### Patterns and external events stay separate
 
-1. a Discord slash command is executed
-2. the Discord adapter normalizes it into an event such as
-   `DiscordPatternRequestedEvent`
-3. the event bus dispatches the event
-4. the corresponding service validates ownership and input
-5. repositories persist the new state
-6. the Discord adapter renders the returned `DiscordCommandResult` as an embed
+- `pattern` + `reply` are for message-driven behavior
+- `adapter_event` + `adapter_event_action` are for source-driven behavior
 
-### Live/offline state change
+This avoids forcing live/offline events into the pattern model.
 
-1. `/live` or `/offline` is executed in Discord
-2. the Discord adapter normalizes it into a request event
-3. `ChannelLiveStateCommandService` validates the request and publishes `TwitchChannelLiveStateChangedEvent`
-4. `ChannelLiveStatePersistenceService` updates persisted tracked-channel state
-5. `ChannelEventAutoReplyService` may send Twitch messages for configured online/offline triggers
+## Caching model
 
-## Important Architectural Choices
+### Twitch users
 
-### Anonymous Twitch IRC for reading
+`TwitchUserDirectoryService` is the central Twitch user lookup layer.
 
-The current read path uses anonymous Twitch IRC instead of EventSub.
+It uses:
 
-Reason:
+- PostgreSQL cache in `twitch_user_cache`
+- a small in-memory LRU
+- Helix fallback only when needed
 
-- the project explicitly prefers anonymous read access for public chat intake
-- EventSub requires authenticated access for chat events
-- anonymous IRC is therefore the better fit for this specific product goal
+IRC metadata updates login and display-name information without a Helix call.
+Profile images still require Helix.
 
-### Separate adapters, events, and services
+### Live state
 
-Adapters should stay thin.
+`channel.is_live` is the single persisted live/offline source of truth for:
 
-They should:
+- pattern `offline_state` filtering
+- `/show`
+- live/offline notifications
+- event-driven Twitch auto-replies
 
-- talk to external systems
-- normalize input
-- publish events
-- render returned results
+The message hot path never calls `Get Streams`.
 
-They should not contain business rules.
+## Current Twitch auth model
 
-Business rules belong in services.
+- App credentials
+  - user lookup validation
+  - live-state polling
+- Linked user credentials
+  - `/write`
+  - pattern auto-replies
+  - live/offline event auto-replies
 
-### Shared match logic
+## Implementation notes
 
-Patterns are the single source of truth for deciding whether a Twitch message
-matches.
-
-That means:
-
-- tracking notifications
-- auto-replies
-- future convenience commands
-
-all build on the same underlying pattern semantics.
-
-Live/offline channel-event replies are intentionally separate because they are
-triggered by channel state changes rather than by one concrete chat message.
-
-### Explicit Discord context lifecycle
-
-A Discord channel or thread is not created implicitly anymore.
-
-It must be explicitly joined through `/join` and can be fully removed through
-`/leave`.
-
-That keeps configuration predictable and avoids hidden database side effects.
+- `src/main.py`
+  - dependency wiring and lifecycle
+- `src/database/records.py`
+  - shared persistence dataclasses
+- `src/database/repositories.py`
+  - repository interfaces used by services and tests
+- `src/database/connection.py`
+  - PostgreSQL schema bootstrapping and repository implementations
+- `src/services/patterns/`
+  - split pattern command, show, and tracking services
+- `src/services/replies/`
+  - split reply command, pattern auto-reply, and channel-event auto-reply services
+- `src/services/twitch_runtime.py`
+  - shared Twitch runtime helpers and constants
+- `src/services/twitch_live_monitor_service.py`
+  - app-token-based live-state polling
+- `src/services/twitch_user_directory_service.py`
+  - persistent Twitch user cache

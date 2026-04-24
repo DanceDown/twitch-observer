@@ -21,6 +21,11 @@ def _get_float(name: str, default: str) -> float:
     return float(os.getenv(name, default))
 
 
+def _get_bool(name: str, default: str) -> bool:
+    """Read one boolean environment variable with a centralized fallback."""
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass(slots=True)
 class AppConfig:
     """Central runtime configuration for adapters, database and services."""
@@ -54,6 +59,15 @@ class AppConfig:
     )
     twitch_user_cache_api_refresh_seconds: int = field(
         default_factory=lambda: _get_int("TWITCH_USER_CACHE_API_REFRESH_SECONDS", "43200")
+    )
+    twitch_live_monitor_poll_interval_seconds: float = field(
+        default_factory=lambda: _get_float("TWITCH_LIVE_MONITOR_POLL_INTERVAL_SECONDS", "30")
+    )
+    twitch_live_monitor_batch_size: int = field(
+        default_factory=lambda: _get_int("TWITCH_LIVE_MONITOR_BATCH_SIZE", "100")
+    )
+    twitch_live_monitor_refresh_on_startup: bool = field(
+        default_factory=lambda: _get_bool("TWITCH_LIVE_MONITOR_REFRESH_ON_STARTUP", "true")
     )
     twitch_account_token_refresh_skew_seconds: int = field(
         default_factory=lambda: _get_int("TWITCH_ACCOUNT_TOKEN_REFRESH_SKEW_SECONDS", "30")

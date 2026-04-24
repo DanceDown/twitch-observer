@@ -19,6 +19,7 @@ from src.events.event_types import (
     DiscordCommandResult,
     DiscordResultStyle,
     EventType,
+    TwitchTrackedChannelsChangedEvent,
 )
 from src.services.authz import thread_has_permission
 from src.utils.permissions import ObserverPermission
@@ -133,6 +134,10 @@ class ChannelCommandService:
             )
             if self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id) == 1:
                 await self.irc_manager.join_channel(twitch_user.login)
+            await self.event_bus.publish(
+                EventType.TWITCH_TRACKED_CHANNELS_CHANGED,
+                TwitchTrackedChannelsChangedEvent(reason="channel_added"),
+            )
             return DiscordCommandResult(
                 title="Channel Added",
                 message=(
@@ -234,6 +239,10 @@ class ChannelCommandService:
         )
         if self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id) == 0:
             await self.irc_manager.leave_channel(twitch_user.login)
+        await self.event_bus.publish(
+            EventType.TWITCH_TRACKED_CHANNELS_CHANGED,
+            TwitchTrackedChannelsChangedEvent(reason="channel_removed"),
+        )
         return DiscordCommandResult(
             title="Channel Removed",
             message=(

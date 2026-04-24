@@ -23,10 +23,10 @@ class DiscordPresenceService:
 
     message_repository: MessageRepository
     notifier: DiscordPresenceStatusSender
-    poll_interval_seconds: float = 60.0
-    lookback_minutes: int = 5
-    message_limit: int = 50
-    max_status_length: int = 120
+    poll_interval_seconds: float
+    lookback_minutes: int
+    message_limit: int
+    max_status_length: int
     _task: asyncio.Task[None] | None = field(default=None, init=False)
     _stop_event: asyncio.Event = field(default_factory=asyncio.Event, init=False)
 

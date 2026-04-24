@@ -8,48 +8,47 @@ from src.events.event_bus import EventBus
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 
 from ..dispatch import dispatch_reply_command
-from ..helpers import complete_bound_result, normalize_optional_text, send_initial_result
+from ..helpers import complete_bound_result, normalize_optional_text
 from ..ui_data import (
-    ChannelEventReplyPresentation,
+    AdapterEventActionPresentation,
+    AdapterEventPresentation,
     DiscordUIDataProvider,
     PatternPresentation,
     ReplyPresentation,
-    TrackedChannelPresentation,
 )
 from .shared import BaseFormView, build_form_embed
 
 
 def _pattern_label(pattern: PatternPresentation) -> str:
-    """Build a compact human-readable label for one pattern option."""
     return (pattern.pattern.regex or "Untitled ping")[:100]
 
 
 def _reply_label(reply: ReplyPresentation) -> str:
-    """Build a compact human-readable label for one reply option."""
     return reply.reply.reply_message[:100]
 
 
-def _channel_event_label(channel: TrackedChannelPresentation, event_state: str) -> str:
-    state_label = "Online" if event_state == "online" else "Offline"
-    return f"{channel.display_name} {state_label}"[:100]
+def _event_state_label(event_key: str) -> str:
+    return "Live" if event_key == "stream.online" else "Offline"
+
+
+def _adapter_event_label(event: AdapterEventPresentation) -> str:
+    return f"{event.channel.display_name} {_event_state_label(event.event.event_key)}"[:100]
 
 
 def _encode_pattern_target(pattern_id: int) -> str:
     return f"pattern:{pattern_id}"
 
 
-def _encode_channel_event_target(channel_id: str, event_state: str) -> str:
-    return f"channel_event:{channel_id}:{event_state}"
+def _encode_adapter_event_target(event_id: int) -> str:
+    return f"adapter_event:{event_id}"
 
 
-def _decode_target(value: str) -> tuple[str, int | None, str | None, str | None]:
-    if value.startswith("pattern:"):
-        return "pattern", int(value.split(":", 1)[1]), None, None
-    _, twitch_channel_id, event_state = value.split(":", 2)
-    return "channel_event", None, twitch_channel_id, event_state
+def _decode_target(value: str) -> tuple[str, int]:
+    target_type, raw_id = value.split(":", 1)
+    return target_type, int(raw_id)
 
 
-class ReplyAddModal(discord.ui.Modal, title="Add Auto-Reply"):
+class PatternReplyAddModal(discord.ui.Modal, title="Add Pattern Auto-Reply"):
     """Attach one reply to one existing pattern using a modal."""
 
     message = discord.ui.TextInput(
@@ -67,7 +66,6 @@ class ReplyAddModal(discord.ui.Modal, title="Add Auto-Reply"):
         discord_channel_id: int,
         requester_id: int,
         patterns: list[PatternPresentation],
-        tracked_channels: list[TrackedChannelPresentation],
         bound_message: discord.InteractionMessage | None = None,
     ) -> None:
         super().__init__(timeout=300)
@@ -76,35 +74,17 @@ class ReplyAddModal(discord.ui.Modal, title="Add Auto-Reply"):
         self._requester_id = requester_id
         self._bound_message = bound_message
         self.pattern = discord.ui.Label(
-            text="Trigger",
-            description="Choose either a ping/regex pattern or a tracked channel live/offline event.",
+            text="Pattern",
+            description="Choose the ping or regex rule that should send an automatic Twitch message.",
             component=discord.ui.Select(
-                options=(
-                    [
-                        discord.SelectOption(
-                            label=_pattern_label(pattern),
-                            value=_encode_pattern_target(pattern.pattern.p_index),
-                            description=f"ID {pattern.pattern.p_index} - {'Regex' if pattern.pattern.is_regex else 'Ping'}",
-                        )
-                        for pattern in patterns
-                    ]
-                    + [
-                        discord.SelectOption(
-                            label=_channel_event_label(channel, "online"),
-                            value=_encode_channel_event_target(channel.user_id, "online"),
-                            description=f"{channel.login[:80]} - when the channel goes live",
-                        )
-                        for channel in tracked_channels
-                    ]
-                    + [
-                        discord.SelectOption(
-                            label=_channel_event_label(channel, "offline"),
-                            value=_encode_channel_event_target(channel.user_id, "offline"),
-                            description=f"{channel.login[:80]} - when the channel goes offline",
-                        )
-                        for channel in tracked_channels
-                    ]
-                )[:25],
+                options=[
+                    discord.SelectOption(
+                        label=_pattern_label(pattern),
+                        value=_encode_pattern_target(pattern.pattern.p_index),
+                        description=f"ID {pattern.pattern.p_index} - {'Regex' if pattern.pattern.is_regex else 'Ping'}",
+                    )
+                    for pattern in patterns[:25]
+                ],
                 min_values=1,
                 max_values=1,
             ),
@@ -122,25 +102,81 @@ class ReplyAddModal(discord.ui.Modal, title="Add Auto-Reply"):
         self.add_item(self.mode)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        """Create one auto-reply attached to the chosen pattern."""
-        target_type, pattern_id, twitch_channel_id, channel_event_state = _decode_target(self.pattern.component.values[0])
+        _, pattern_id = _decode_target(self.pattern.component.values[0])
         result = await dispatch_reply_command(
             self._event_bus,
             discord_channel_id=self._discord_channel_id,
             requester_id=self._requester_id,
             action="add",
-            pattern_id=0 if pattern_id is None else pattern_id,
+            pattern_id=pattern_id,
             message=normalize_optional_text(self.message.value),
             reply_as_reply=self.mode.component.value == "reply",
-            target_type=target_type,
-            twitch_channel_id=twitch_channel_id,
-            channel_event_state=channel_event_state,
+            target_type="pattern",
+        )
+        await complete_bound_result(interaction, bound_message=self._bound_message, result=result)
+
+
+class EventReplyAddModal(discord.ui.Modal, title="Add Event Auto-Reply"):
+    """Attach one auto-reply to one configured external event trigger."""
+
+    message = discord.ui.TextInput(
+        label="What should it say?",
+        style=discord.TextStyle.paragraph,
+        placeholder="YIPPIE {CHANNEL} is now {STATE}!",
+        required=True,
+        max_length=500,
+    )
+
+    def __init__(
+        self,
+        *,
+        event_bus: EventBus,
+        discord_channel_id: int,
+        requester_id: int,
+        adapter_events: list[AdapterEventPresentation],
+        bound_message: discord.InteractionMessage | None = None,
+    ) -> None:
+        super().__init__(timeout=300)
+        self._event_bus = event_bus
+        self._discord_channel_id = discord_channel_id
+        self._requester_id = requester_id
+        self._bound_message = bound_message
+        self.adapter_event = discord.ui.Label(
+            text="Event Trigger",
+            description="Choose the configured live or offline event that should send a Twitch message.",
+            component=discord.ui.Select(
+                options=[
+                    discord.SelectOption(
+                        label=_adapter_event_label(event),
+                        value=_encode_adapter_event_target(event.event.event_id),
+                        description=f"{event.channel.login[:80]} - {_event_state_label(event.event.event_key).lower()} notification",
+                    )
+                    for event in adapter_events[:25]
+                ],
+                min_values=1,
+                max_values=1,
+            ),
+        )
+        self.add_item(self.adapter_event)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        _, adapter_event_id = _decode_target(self.adapter_event.component.values[0])
+        result = await dispatch_reply_command(
+            self._event_bus,
+            discord_channel_id=self._discord_channel_id,
+            requester_id=self._requester_id,
+            action="add",
+            pattern_id=0,
+            message=normalize_optional_text(self.message.value),
+            reply_as_reply=False,
+            target_type="adapter_event",
+            adapter_event_id=adapter_event_id,
         )
         await complete_bound_result(interaction, bound_message=self._bound_message, result=result)
 
 
 class ReplyActionModal(discord.ui.Modal):
-    """Enable, disable, or remove one existing reply via a modal."""
+    """Enable, disable, or remove one existing reply action via a modal."""
 
     def __init__(
         self,
@@ -150,7 +186,7 @@ class ReplyActionModal(discord.ui.Modal):
         discord_channel_id: int,
         requester_id: int,
         action: str,
-        replies: list[ReplyPresentation | ChannelEventReplyPresentation],
+        replies: list[ReplyPresentation | AdapterEventActionPresentation],
         bound_message: discord.InteractionMessage | None = None,
     ) -> None:
         super().__init__(title=title, timeout=300)
@@ -171,12 +207,12 @@ class ReplyActionModal(discord.ui.Modal):
                     )
                     if isinstance(reply, ReplyPresentation)
                     else discord.SelectOption(
-                        label=reply.reply.reply_message[:100],
-                        value=_encode_channel_event_target(reply.reply.twitch_channel_id, reply.reply.event_state),
-                        description=f"Linked to: {_channel_event_label(reply.channel, reply.reply.event_state)}",
+                        label=(reply.action.message_template or "Untitled event action")[:100],
+                        value=_encode_adapter_event_target(reply.event.event.event_id),
+                        description=f"Linked to: {_adapter_event_label(reply.event)}",
                     )
-                    for reply in replies
-                ][:25],
+                    for reply in replies[:25]
+                ],
                 min_values=1,
                 max_values=1,
             ),
@@ -184,25 +220,23 @@ class ReplyActionModal(discord.ui.Modal):
         self.add_item(self.reply)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        """Dispatch the selected reply action."""
-        target_type, pattern_id, twitch_channel_id, channel_event_state = _decode_target(self.reply.component.values[0])
+        target_type, identifier = _decode_target(self.reply.component.values[0])
         result = await dispatch_reply_command(
             self._event_bus,
             discord_channel_id=self._discord_channel_id,
             requester_id=self._requester_id,
             action=self._action,
-            pattern_id=0 if pattern_id is None else pattern_id,
+            pattern_id=identifier if target_type == "pattern" else 0,
             message=None,
             reply_as_reply=False,
             target_type=target_type,
-            twitch_channel_id=twitch_channel_id,
-            channel_event_state=channel_event_state,
+            adapter_event_id=None if target_type == "pattern" else identifier,
         )
         await complete_bound_result(interaction, bound_message=self._bound_message, result=result)
 
 
 class ReplyMenuView(BaseFormView):
-    """Root `/reply` flow with one button per action."""
+    """Root `/reply` flow with separate buttons for pattern and event actions."""
 
     def __init__(
         self,
@@ -220,31 +254,53 @@ class ReplyMenuView(BaseFormView):
     def render_embed(self) -> discord.Embed:
         return build_form_embed(
             "Auto-Replies",
-            "Attach an automatic message to a ping or to a tracked channel going live/offline, then manage those replies here.",
+            "Attach automatic Twitch messages either to a ping/regex pattern or to a configured live/offline event trigger.",
         )
 
-    @discord.ui.button(label="Add", style=discord.ButtonStyle.primary)
-    async def add(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+    @discord.ui.button(label="Add Pattern", style=discord.ButtonStyle.primary)
+    async def add_pattern(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         patterns = await self._data_provider.list_patterns(self._discord_channel_id)
-        tracked_channels = await self._data_provider.list_tracked_channels(self._discord_channel_id)
-        if not patterns and not tracked_channels:
+        if not patterns:
             await self.finish_with_interaction(
                 interaction,
                 DiscordCommandResult(
-                    title="Nothing Available Yet",
-                    message="Create a ping or track a channel first before attaching an auto-reply.",
+                    title="No Patterns Available",
+                    message="Create a ping or regex rule first before attaching a pattern auto-reply.",
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 ),
             )
             return
         await interaction.response.send_modal(
-            ReplyAddModal(
+            PatternReplyAddModal(
                 event_bus=self._event_bus,
                 discord_channel_id=self._discord_channel_id,
                 requester_id=interaction.user.id,
                 patterns=patterns,
-                tracked_channels=tracked_channels,
+                bound_message=self.bound_message,
+            )
+        )
+
+    @discord.ui.button(label="Add Event", style=discord.ButtonStyle.primary)
+    async def add_event(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        adapter_events = await self._data_provider.list_adapter_events(self._discord_channel_id)
+        if not adapter_events:
+            await self.finish_with_interaction(
+                interaction,
+                DiscordCommandResult(
+                    title="No Event Triggers Available",
+                    message="Configure `/live` or `/offline` first before attaching an event auto-reply.",
+                    style=DiscordResultStyle.ERROR,
+                    ephemeral=True,
+                ),
+            )
+            return
+        await interaction.response.send_modal(
+            EventReplyAddModal(
+                event_bus=self._event_bus,
+                discord_channel_id=self._discord_channel_id,
+                requester_id=interaction.user.id,
+                adapter_events=adapter_events,
                 bound_message=self.bound_message,
             )
         )
@@ -263,7 +319,7 @@ class ReplyMenuView(BaseFormView):
 
     async def _open_action_modal(self, interaction: discord.Interaction, action: str) -> None:
         replies = list(await self._data_provider.list_replies(self._discord_channel_id))
-        replies.extend(await self._data_provider.list_channel_event_replies(self._discord_channel_id))
+        replies.extend(await self._data_provider.list_adapter_event_actions(self._discord_channel_id))
         if not replies:
             await self.finish_with_interaction(
                 interaction,

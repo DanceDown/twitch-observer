@@ -34,8 +34,8 @@ class TwitchUserDirectoryService:
 
     twitch_api: TwitchAPIClient
     repository: TwitchUserCacheRepository
-    memory_cache_size: int = 2048
-    api_refresh_interval_seconds: int = 43200
+    memory_cache_size: int
+    api_refresh_interval_seconds: int
     _users_by_id: OrderedDict[str, TwitchUserCacheRecord] = field(default_factory=OrderedDict, init=False)
     _user_ids_by_login: dict[str, str] = field(default_factory=dict, init=False)
 
@@ -139,9 +139,6 @@ class TwitchUserDirectoryService:
             )
             self._remember_record(record)
 
-    async def is_user_live(self, user_id: str) -> bool:
-        return await self.twitch_api.is_user_live(user_id)
-
     async def validate_user_access_token(self, access_token: str) -> TwitchValidatedToken:
         return await self.twitch_api.validate_user_access_token(access_token)
 
@@ -210,17 +207,6 @@ class TwitchUserDirectoryService:
             return None
         self._users_by_id.move_to_end(user_id)
         return user
-
-    def _remember_user(self, user: TwitchUser) -> None:
-        synthetic_record = TwitchUserCacheRecord(
-            twitch_user_id=user.user_id,
-            twitch_login=user.login,
-            display_name=user.display_name,
-            profile_image_url=user.profile_image_url,
-            updated_at=datetime.now(timezone.utc).isoformat(),
-            last_api_refresh_at=datetime.now(timezone.utc).isoformat() if user.profile_image_url else None,
-        )
-        self._remember_record(synthetic_record)
 
     def _remember_record(self, record: TwitchUserCacheRecord) -> None:
         previous = self._users_by_id.get(record.twitch_user_id)

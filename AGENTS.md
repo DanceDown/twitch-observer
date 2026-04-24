@@ -8,7 +8,8 @@
 - `src/adapters/twitch_irc` contains Twitch chat intake and IRC event parsing.
 - `src/adapters/twitch_api` contains Helix-facing API clients.
 - `src/services` contains application logic and orchestration.
-- `src/database` contains schema and PostgreSQL repositories.
+- `src/services/patterns` and `src/services/replies` split the larger runtime services by responsibility.
+- `src/database/records.py` contains record dataclasses, `src/database/repositories.py` contains interfaces, and `src/database/connection.py` contains PostgreSQL implementations.
 - `docs/architecture.md` is the main architecture reference and should stay aligned with actual code flow.
 
 ## Architecture Rules
@@ -30,15 +31,20 @@
 ## Live State and Auto-Replies
 
 - Tracked channel live/offline state is persisted on `channel.is_live` rather than fetched per message.
-- Manual `/live` and `/offline` commands should publish events and let services persist and react to them.
-- Pattern replies and channel live/offline event replies are separate concepts; avoid forcing channel-event replies into pattern storage.
-- Keep channel-event side effects event-driven so a future non-Discord live-state adapter can publish the same domain event.
+- Tracked channels are monitored globally through `TwitchLiveMonitorService` with app-token Helix `Get Streams` polling.
+- `/live` and `/offline` only configure follow-up behavior for tracked channel events inside one Discord context.
+- External source-driven triggers should use the `adapter_event` plus `adapter_event_action` model.
+- Linked Twitch accounts must only be used for Twitch writes and write-adjacent token validation.
+- Pattern replies and external event actions are separate concepts; avoid forcing external event actions into pattern storage.
+- External event auto-replies never support `reply_as_reply` because they do not originate from a source chat message.
+- Keep live/offline side effects event-driven so future Twitch, Discord, or other adapters can publish into the same flow.
 
 ## Docs
 
 - Project documentation should be written in English.
 - Keep docs focused on actual runtime behavior, tradeoffs, and operational guidance.
-- When behavior changes materially, update the closest existing document instead of creating overlapping docs unless a dedicated flow document is clearly useful.
+- Avoid overlapping documentation; prefer one canonical document per topic.
+- `docs/architecture.md` is the main runtime overview, `docs/database.md` is the schema guide, and `docs/commands_reference.md` is the user-facing command surface.
 
 ## Testing
 

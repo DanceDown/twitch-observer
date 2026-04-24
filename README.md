@@ -4,30 +4,34 @@ This project connects Discord channels, threads, or DMs with Twitch chat.
 
 Users configure the observer through Discord slash commands. The application
 stores configuration in PostgreSQL, reads Twitch chat through anonymous Twitch
-IRC, forwards matching messages to Discord, and can optionally send Twitch
-auto-replies through a linked Twitch account.
+IRC, polls Twitch live state through the Helix API, forwards matching messages
+to Discord, and can optionally send Twitch auto-replies through a linked Twitch
+account.
 
 ## Current v1 scope
 
 - track multiple Twitch channels per Discord context
 - add ping and regex rules through Discord commands
 - forward matching Twitch messages to Discord embeds
-- attach one optional auto-reply to a pattern
+- attach Twitch auto-replies to patterns or configured live/offline events
+- notify Discord when tracked channels go live or offline
 - link a Twitch account through the Twitch Device Code Flow
 - keep separate configuration per Discord channel, thread, or DM
 
 ## Runtime overview
 
-The runtime has three main parts:
+The runtime has four main parts:
 
 1. PostgreSQL
-   - stores configuration and observed messages
+   - stores configuration, observed messages, cached Twitch user metadata, and persisted channel live state
 2. Python application server
    - hosts the Discord bot
    - connects to anonymous Twitch IRC for read-only chat intake
-   - calls the Twitch Helix API for validation and sending replies
+   - calls the Twitch Helix API for validation, metadata lookup, live-state polling, and sending replies
 3. Discord users
    - configure the observer through slash commands
+4. Twitch application credentials
+   - back app-token Helix access for validation and background live monitoring
 
 ## Startup
 
@@ -55,35 +59,17 @@ At minimum the application currently needs:
 3. fill `.env`
 4. start the app through `src/main.py` or Docker Compose
 
-## Architecture summary
-
-The code follows this flow:
-
-1. adapters receive input from Discord, Twitch IRC, or Twitch API
-2. adapters normalize input into internal events
-3. the event bus dispatches those events
-4. services execute business logic
-5. repositories persist or load data from PostgreSQL
-
-Current concrete example:
-
-1. the Twitch IRC adapter receives a `PRIVMSG`
-2. it emits a `TwitchChatMessageEvent`
-3. `MessageIngestService` stores the message
-4. `PatternTrackingService` checks pings and regexes
-5. `AutoReplyService` optionally sends one Twitch reply
-
 ## Current feature notes
 
 - pings are matched as whole-word searches
 - regexes use Python regular expressions
-- `case_sensitive` affects both pings and regexes
-- detailed runtime notes for Twitch user caching and API usage live in
-  [docs/twitch_user_caching_flow.md](docs/twitch_user_caching_flow.md)
+- `case_sensitive` affects both modes
 - pattern priority decides which matching rule wins first
 - patterns can be edited after creation
 - per-user permissions can delegate configuration access inside one Discord context
 - linked users can manually send Twitch messages and replies from Discord
+- tracked channels are live-monitored globally through app-token Helix polling
+- `/live` and `/offline` configure notifications, not the monitoring itself
 - color inheritance for Discord embeds is:
   - pattern color
   - source channel color
@@ -102,6 +88,7 @@ Current concrete example:
 - [docs/architecture.md](docs/architecture.md)
 - [docs/database.md](docs/database.md)
 - [docs/commands_reference.md](docs/commands_reference.md)
+- [docs/events.md](docs/events.md)
 - [docs/discord.md](docs/discord.md)
 - [docs/discord_interaction_flows.md](docs/discord_interaction_flows.md)
 - [docs/twitch_irc.md](docs/twitch_irc.md)
