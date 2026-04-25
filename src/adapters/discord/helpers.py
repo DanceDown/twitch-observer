@@ -7,6 +7,7 @@ from contextlib import suppress
 import discord
 
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.localization import Localizer
 from src.utils.discord_embeds import build_result_embed
 
 
@@ -98,9 +99,9 @@ async def complete_bound_result(
 
 def command_unavailable_result() -> DiscordCommandResult:
     """Build the shared error result used outside channel or DM contexts."""
-    return DiscordCommandResult(
-        title="Command Unavailable",
-        message="This command can only be used inside a Discord channel or DM.",
+    return Localizer.from_directory().result(
+        "results.command_unavailable",
+        language="english",
         style=DiscordResultStyle.ERROR,
         ephemeral=True,
     )

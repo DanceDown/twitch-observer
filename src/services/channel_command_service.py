@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Business logic for Discord channel-management commands."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
 import re
 
@@ -21,6 +21,7 @@ from src.events.event_types import (
     EventType,
     TwitchTrackedChannelsChangedEvent,
 )
+from src.localization import Localizer
 from src.services.authz import thread_has_permission
 from src.utils.permissions import ObserverPermission
 
@@ -47,6 +48,7 @@ class ChannelCommandService:
     pattern_repository: PatternRepository
     twitch_api: TwitchAPIClient
     irc_manager: IRCChannelManager
+    localizer: Localizer = field(default_factory=Localizer.from_directory)
     permission_repository: UserPermissionRepository | None = None
 
     def __post_init__(self) -> None:
@@ -57,26 +59,32 @@ class ChannelCommandService:
         try:
             result = await self._handle_action(event)
         except (TwitchAPIConfigurationError, TwitchChannelNotFoundError) as error:
-            result = DiscordCommandResult(
-                title="Validation Error",
-                message=str(error),
+            thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+            result = self.localizer.thread_result(
+                "results.validation_error",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                DETAIL=str(error),
             )
         except TwitchAPIError as error:
-            result = DiscordCommandResult(
-                title="Twitch API Error",
-                message=str(error),
+            thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+            result = self.localizer.thread_result(
+                "results.twitch_api_error",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                DETAIL=str(error),
             )
         except Exception as error:
             logger.exception("Unexpected error while handling channel command.")
-            result = DiscordCommandResult(
-                title="Unexpected Error",
-                message=str(error),
+            thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+            result = self.localizer.thread_result(
+                "results.unexpected_error",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                DETAIL=str(error),
             )
 
         if not event.result_future.done():
@@ -92,9 +100,9 @@ class ChannelCommandService:
         )
         thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
         if thread is None:
-            return DiscordCommandResult(
-                title="Not Joined",
-                message="This Discord channel is not connected yet. Use `/join` first.",
+            return self.localizer.result(
+                "results.not_joined",
+                language=self.localizer.default_language,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -104,9 +112,9 @@ class ChannelCommandService:
             permission_repository=self.permission_repository,
             required_permission=ObserverPermission.MANAGE_CHANNELS,
         ):
-            return DiscordCommandResult(
-                title="Permission Denied",
-                message="You do not have permission to change tracked Twitch channels.",
+            return self.localizer.thread_result(
+                "results.channel.permission_denied",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -116,14 +124,13 @@ class ChannelCommandService:
         existing = self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_user.user_id)
         if event.action == "add":
             if existing is not None:
-                return DiscordCommandResult(
-                    title="Already Added",
-                    message=(
-                        f"Twitch channel `{twitch_user.display_name}` (`{twitch_user.login}`) "
-                        "is already tracked."
-                    ),
+                return self.localizer.thread_result(
+                    "results.channel.already_added",
+                    thread=thread,
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
+                    DISPLAY_NAME=twitch_user.display_name,
+                    LOGIN=twitch_user.login,
                 )
             self.channel_repository.add_channel(thread.thread_id, twitch_user.user_id)
             logger.debug(
@@ -138,25 +145,24 @@ class ChannelCommandService:
                 EventType.TWITCH_TRACKED_CHANNELS_CHANGED,
                 TwitchTrackedChannelsChangedEvent(reason="channel_added"),
             )
-            return DiscordCommandResult(
-                title="Channel Added",
-                message=(
-                    f"Added Twitch channel `{twitch_user.display_name}` (`{twitch_user.login}`)"
-                ),
+            return self.localizer.thread_result(
+                "results.channel.added",
+                thread=thread,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
+                DISPLAY_NAME=twitch_user.display_name,
+                LOGIN=twitch_user.login,
             )
 
         if event.action == "color":
             if existing is None:
-                return DiscordCommandResult(
-                    title="Not Found",
-                    message=(
-                        f"Twitch channel `{twitch_user.display_name}` (`{twitch_user.login}`) "
-                        "is not currently tracked."
-                    ),
+                return self.localizer.thread_result(
+                    "results.channel.not_found",
+                    thread=thread,
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
+                    DISPLAY_NAME=twitch_user.display_name,
+                    LOGIN=twitch_user.login,
                 )
             if event.clear_color:
                 updated = self.channel_repository.set_color(
@@ -165,21 +171,21 @@ class ChannelCommandService:
                     color=None,
                 )
                 assert updated is not None
-                return DiscordCommandResult(
-                    title="Channel Color Cleared",
-                    message=(
-                        f"Cleared the custom color for Twitch channel `{twitch_user.display_name}` "
-                        f"(`{twitch_user.login}`)."
-                    ),
+                return self.localizer.thread_result(
+                    "results.channel.color_cleared",
+                    thread=thread,
                     style=DiscordResultStyle.SUCCESS,
                     ephemeral=False,
+                    DISPLAY_NAME=twitch_user.display_name,
+                    LOGIN=twitch_user.login,
                 )
             if event.color is None or not re.fullmatch(r"#[0-9A-Fa-f]{6}", event.color.strip()):
-                return DiscordCommandResult(
-                    title="Validation Error",
-                    message="Color must use the format `#RRGGBB` or be empty.",
+                return self.localizer.thread_result(
+                    "results.validation_error",
+                    thread=thread,
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
+                    DETAIL="Color must use the format `#RRGGBB` or be empty.",
                 )
             updated = self.channel_repository.set_color(
                 thread_id=thread.thread_id,
@@ -187,47 +193,45 @@ class ChannelCommandService:
                 color=event.color.strip(),
             )
             assert updated is not None
-            return DiscordCommandResult(
-                title="Channel Color Updated",
-                message=(
-                    f"Set the color for Twitch channel `{twitch_user.display_name}` (`{twitch_user.login}`) "
-                    f"to `{updated.color}`."
-                ),
+            return self.localizer.thread_result(
+                "results.channel.color_updated",
+                thread=thread,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
+                DISPLAY_NAME=twitch_user.display_name,
+                LOGIN=twitch_user.login,
+                COLOR=updated.color or "",
             )
 
         if event.action != "remove":
-            return DiscordCommandResult(
-                title="Validation Error",
-                message="Unsupported action. Use `add`, `remove`, or `color`.",
+            return self.localizer.thread_result(
+                "results.channel.unsupported_action",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
 
         if existing is None:
-            return DiscordCommandResult(
-                title="Not Found",
-                message=(
-                    f"Twitch channel `{twitch_user.display_name}` (`{twitch_user.login}`) "
-                    "is not currently tracked."
-                ),
+            return self.localizer.thread_result(
+                "results.channel.not_found",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                DISPLAY_NAME=twitch_user.display_name,
+                LOGIN=twitch_user.login,
             )
 
         if self.pattern_repository.count_channel_scope_references(
             thread_id=thread.thread_id,
             twitch_channel_id=twitch_user.user_id,
         ) > 0:
-            return DiscordCommandResult(
-                title="Channel In Use",
-                message=(
-                    f"Twitch channel `{twitch_user.display_name}` (`{twitch_user.login}`) "
-                    "is still referenced by one or more pings."
-                ),
+            return self.localizer.thread_result(
+                "results.channel.in_use",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                DISPLAY_NAME=twitch_user.display_name,
+                LOGIN=twitch_user.login,
             )
 
         self.channel_repository.remove_channel(thread.thread_id, twitch_user.user_id)
@@ -243,11 +247,11 @@ class ChannelCommandService:
             EventType.TWITCH_TRACKED_CHANNELS_CHANGED,
             TwitchTrackedChannelsChangedEvent(reason="channel_removed"),
         )
-        return DiscordCommandResult(
-            title="Channel Removed",
-            message=(
-                f"Removed Twitch channel `{twitch_user.display_name}` (`{twitch_user.login}`)"
-            ),
+        return self.localizer.thread_result(
+            "results.channel.removed",
+            thread=thread,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
+            DISPLAY_NAME=twitch_user.display_name,
+            LOGIN=twitch_user.login,
         )

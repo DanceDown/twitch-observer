@@ -8,6 +8,7 @@ import discord
 
 from src.database.connection import ChannelRecord, PatternRecord, ReplyRecord, ThreadRecord
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle, TwitchChatMessageEvent
+from src.localization import Localizer
 
 
 EMBED_COLORS: dict[DiscordResultStyle, int] = {
@@ -31,12 +32,14 @@ def build_tracking_embed(
     event: TwitchChatMessageEvent,
     pattern: PatternRecord,
     thread: ThreadRecord,
+    localizer: Localizer,
     channel: ChannelRecord | None,
     reply: ReplyRecord | None = None,
     author_icon_url: str | None = None,
     channel_display_name: str | None = None,
 ) -> discord.Embed:
     """Render one matched Twitch message as a Discord embed."""
+    language = localizer.language_for_thread(thread)
     embed = discord.Embed(
         title="",
         description=escape_discord_preserving_links(event.content),
@@ -48,10 +51,18 @@ def build_tracking_embed(
         icon_url=author_icon_url,
     )
     embed.set_footer(
-        text=f"Channel: {escape_discord_text(channel_display_name or event.channel_login)}",
+        text=localizer.text(
+            "discord.tracking_embed.footer_channel",
+            language=language,
+            CHANNEL=escape_discord_text(channel_display_name or event.channel_login),
+        ),
     )
     if reply is not None:
-        embed.add_field(name="Reply", value=escape_discord_preserving_links(reply.reply_message), inline=False)
+        embed.add_field(
+            name=localizer.text("discord.tracking_embed.reply_field", language=language),
+            value=escape_discord_preserving_links(reply.reply_message),
+            inline=False,
+        )
     return embed
 
 
@@ -60,6 +71,7 @@ def build_auto_reply_embed(
     event: TwitchChatMessageEvent,
     pattern: PatternRecord,
     thread: ThreadRecord,
+    localizer: Localizer,
     reply: ReplyRecord,
     channel: ChannelRecord | None = None,
     author_icon_url: str | None = None,
@@ -70,6 +82,7 @@ def build_auto_reply_embed(
         event=event,
         pattern=pattern,
         thread=thread,
+        localizer=localizer,
         channel=channel,
         reply=reply,
         author_icon_url=author_icon_url,
@@ -77,10 +90,16 @@ def build_auto_reply_embed(
     )
 
 
-def build_tracking_view(*, channel_login: str) -> discord.ui.View:
+def build_tracking_view(*, channel_login: str, localizer: Localizer, language: str) -> discord.ui.View:
     """Build a compact URL-button view linking to the Twitch channel."""
     view = discord.ui.View(timeout=None)
-    view.add_item(discord.ui.Button(label="Open Channel", style=discord.ButtonStyle.link, url=f"https://www.twitch.tv/{channel_login}"))
+    view.add_item(
+        discord.ui.Button(
+            label=localizer.text("discord.tracking_view.open_channel", language=language),
+            style=discord.ButtonStyle.link,
+            url=f"https://www.twitch.tv/{channel_login}",
+        )
+    )
     return view
 
 

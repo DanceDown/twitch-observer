@@ -106,6 +106,7 @@ async def dispatch_thread_command(
     action: str,
     color: str | None = None,
     clear_color: bool = False,
+    language: str | None = None,
 ) -> DiscordCommandResult:
     """Publish a join/leave request for one Discord context and await the result."""
     loop = asyncio.get_running_loop()
@@ -118,6 +119,7 @@ async def dispatch_thread_command(
             action=action,
             color=color,
             clear_color=clear_color,
+            language=language,
             result_future=result_future,
         ),
     )

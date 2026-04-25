@@ -70,6 +70,22 @@ class InMemoryThreadRepository(ThreadRepository):
         self.threads_by_channel_id[discord_channel_id] = updated
         return updated
 
+    def set_language(self, *, discord_channel_id: int, language: str) -> ThreadRecord | None:
+        thread = self.threads_by_channel_id.get(discord_channel_id)
+        if thread is None:
+            return None
+        updated = ThreadRecord(
+            thread_id=thread.thread_id,
+            owner_id=thread.owner_id,
+            discord_channel_id=thread.discord_channel_id,
+            enabled=thread.enabled,
+            color=thread.color,
+            language=language,
+            account_id=thread.account_id,
+        )
+        self.threads_by_channel_id[discord_channel_id] = updated
+        return updated
+
 
 @dataclass
 class InMemoryChannelRepository(ChannelRepository):
@@ -211,11 +227,10 @@ async def test_channel_command_adds_new_channel_and_joins_irc() -> None:
         twitch_channel_login="Example",
     )
 
-    assert join_result.title == "Observer Joined"
+    assert join_result.style == DiscordResultStyle.SUCCESS
+    assert join_result.ephemeral is False
     assert result.ephemeral is False
-    assert result.title == "Channel Added"
     assert result.style == DiscordResultStyle.SUCCESS
-    assert "Added Twitch channel" in result.message
     assert irc_manager.joined == ["example"]
     assert thread_repository.get_by_discord_channel_id(100) is not None
 
@@ -250,9 +265,7 @@ async def test_channel_command_removes_existing_channel_and_parts_last_irc_subsc
     )
 
     assert result.ephemeral is False
-    assert result.title == "Channel Removed"
     assert result.style == DiscordResultStyle.SUCCESS
-    assert "Removed Twitch channel" in result.message
     assert irc_manager.left == ["example"]
 
 
@@ -285,9 +298,7 @@ async def test_channel_command_rejects_non_owner_changes() -> None:
     )
 
     assert result.ephemeral is True
-    assert result.title == "Permission Denied"
     assert result.style == DiscordResultStyle.ERROR
-    assert "do not have permission" in result.message
 
 
 @pytest.mark.asyncio
@@ -317,7 +328,8 @@ async def test_channel_command_requires_join_before_adding_channels() -> None:
         twitch_channel_login="example",
     )
 
-    assert result.title == "Not Joined"
+    assert result.style == DiscordResultStyle.ERROR
+    assert result.ephemeral is True
     assert thread_repository.get_by_discord_channel_id(100) is None
     assert irc_manager.joined == []
 
@@ -352,7 +364,7 @@ async def test_channel_command_reports_already_added_instead_of_toggling() -> No
     )
 
     assert result.ephemeral is True
-    assert result.title == "Already Added"
+    assert result.style == DiscordResultStyle.INFO
     assert channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, "42") is not None
     assert irc_manager.joined == []
 
@@ -386,7 +398,7 @@ async def test_channel_command_reports_missing_channel_on_remove() -> None:
     )
 
     assert result.ephemeral is True
-    assert result.title == "Not Found"
+    assert result.style == DiscordResultStyle.ERROR
     assert irc_manager.left == []
 
 
@@ -420,7 +432,7 @@ async def test_channel_command_rejects_remove_when_scope_still_references_channe
     )
 
     assert result.ephemeral is True
-    assert result.title == "Channel In Use"
+    assert result.style == DiscordResultStyle.ERROR
     assert channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, "42") is not None
     assert irc_manager.left == []
 
@@ -449,9 +461,7 @@ async def test_channel_command_returns_ephemeral_error_for_missing_twitch_creden
     )
 
     assert result.ephemeral is True
-    assert result.title == "Validation Error"
     assert result.style == DiscordResultStyle.ERROR
-    assert result.message == "Missing Twitch credentials."
 
 
 @pytest.mark.asyncio
@@ -480,7 +490,6 @@ async def test_leave_command_deletes_thread_and_parts_last_irc_channels() -> Non
         action="leave",
     )
 
-    assert result.title == "Observer Left"
     assert result.style == DiscordResultStyle.SUCCESS
     assert thread_repository.get_by_discord_channel_id(100) is None
     assert irc_manager.left == ["example"]
@@ -507,7 +516,7 @@ async def test_off_command_disables_existing_thread_context() -> None:
     )
 
     thread = thread_repository.get_by_discord_channel_id(100)
-    assert result.title == "Observer Disabled"
+    assert result.style == DiscordResultStyle.SUCCESS
     assert thread is not None
     assert thread.enabled is False
 
@@ -534,7 +543,7 @@ async def test_on_command_reenables_existing_thread_context() -> None:
     )
 
     thread = thread_repository.get_by_discord_channel_id(100)
-    assert result.title == "Observer Enabled"
+    assert result.style == DiscordResultStyle.SUCCESS
     assert thread is not None
     assert thread.enabled is True
 
@@ -569,7 +578,7 @@ async def test_channel_color_command_sets_color_for_tracked_channel() -> None:
     )
 
     stored = channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, "42")
-    assert result.title == "Channel Color Updated"
+    assert result.style == DiscordResultStyle.SUCCESS
     assert stored is not None
     assert stored.color == "#123456"
 
@@ -597,6 +606,34 @@ async def test_context_color_command_sets_thread_color() -> None:
     )
 
     thread = thread_repository.get_by_discord_channel_id(100)
-    assert result.title == "Observer Color Updated"
+    assert result.style == DiscordResultStyle.SUCCESS
     assert thread is not None
     assert thread.color == "#abcdef"
+
+
+@pytest.mark.asyncio
+async def test_language_command_updates_thread_language_and_returns_localized_result() -> None:
+    event_bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread_repository.create(owner_id=200, discord_channel_id=100)
+    ThreadLifecycleService(
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        channel_repository=InMemoryChannelRepository(),
+        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        irc_manager=FakeIRCManager(),
+    )
+
+    result = await dispatch_thread_command(
+        event_bus,
+        discord_channel_id=100,
+        requester_id=200,
+        action="language",
+        language="german",
+    )
+
+    thread = thread_repository.get_by_discord_channel_id(100)
+    assert thread is not None
+    assert thread.language == "german"
+    assert result.style == DiscordResultStyle.SUCCESS
+    assert result.ephemeral is False

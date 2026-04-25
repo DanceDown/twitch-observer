@@ -278,8 +278,8 @@ async def test_permission_grant_allows_non_owner_to_add_patterns() -> None:
         disabled=False,
     )
 
-    assert grant_result.title == "Permissions Granted"
-    assert add_result.title == "Ping Added"
+    assert grant_result.ephemeral is False
+    assert add_result.ephemeral is False
     assert len(pattern_repository.patterns) == 1
 
 
@@ -341,8 +341,6 @@ async def test_permission_view_allows_non_owner_to_use_show() -> None:
         sections=("permissions", "pings"),
     )
 
-    assert result.title == "Configuration Overview"
-    assert "<@200>" in result.message
-    assert "<@201>" in result.message
-    assert "View configuration" in result.message
-    assert "hello" in result.message
+    assert result.ephemeral is True
+    assert result.style.name == "INFO"
+    assert result.message

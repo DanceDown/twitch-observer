@@ -73,6 +73,7 @@ class DiscordThreadRequestedEvent:
     result_future: Future[DiscordCommandResult]
     color: str | None = None
     clear_color: bool = False
+    language: str | None = None
 
 
 @dataclass(slots=True, frozen=True)

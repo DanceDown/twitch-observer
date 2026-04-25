@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Business logic for tracked Twitch-user management commands."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
 
 from src.adapters.twitch_api import (
@@ -19,6 +19,7 @@ from src.events.event_types import (
     DiscordUserRequestedEvent,
     EventType,
 )
+from src.localization import Localizer
 from src.services.authz import thread_has_permission
 from src.utils.permissions import ObserverPermission
 
@@ -33,6 +34,7 @@ class UserCommandService:
     thread_repository: ThreadRepository
     tracked_user_repository: TrackedUserRepository
     twitch_api: TwitchAPIClient
+    localizer: Localizer = field(default_factory=Localizer.from_directory)
     permission_repository: UserPermissionRepository | None = None
 
     def __post_init__(self) -> None:
@@ -42,26 +44,32 @@ class UserCommandService:
         try:
             result = await self._handle_action(event)
         except (TwitchAPIConfigurationError, TwitchChannelNotFoundError) as error:
-            result = DiscordCommandResult(
-                title="Validation Error",
-                message=str(error),
+            thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+            result = self.localizer.thread_result(
+                "results.validation_error",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                DETAIL=str(error),
             )
         except TwitchAPIError as error:
-            result = DiscordCommandResult(
-                title="Twitch API Error",
-                message=str(error),
+            thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+            result = self.localizer.thread_result(
+                "results.twitch_api_error",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                DETAIL=str(error),
             )
         except Exception as error:
             logger.exception("Unexpected error while handling tracked-user command.")
-            result = DiscordCommandResult(
-                title="Unexpected Error",
-                message=str(error),
+            thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+            result = self.localizer.thread_result(
+                "results.unexpected_error",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                DETAIL=str(error),
             )
         if not event.result_future.done():
             event.result_future.set_result(result)
@@ -69,9 +77,9 @@ class UserCommandService:
     async def _handle_action(self, event: DiscordUserRequestedEvent) -> DiscordCommandResult:
         thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
         if thread is None:
-            return DiscordCommandResult(
-                title="Not Joined",
-                message="This Discord channel is not connected yet. Use `/join` first.",
+            return self.localizer.result(
+                "results.not_joined",
+                language=self.localizer.default_language,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -81,9 +89,9 @@ class UserCommandService:
             permission_repository=self.permission_repository,
             required_permission=ObserverPermission.MANAGE_PATTERNS,
         ):
-            return DiscordCommandResult(
-                title="Permission Denied",
-                message="You do not have permission to change tracked Twitch users in this Discord channel.",
+            return self.localizer.thread_result(
+                "results.user.permission_denied",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -94,51 +102,57 @@ class UserCommandService:
 
         if event.action == "add":
             if existing is not None:
-                return DiscordCommandResult(
-                    title="Already Added",
-                    message=f"{twitch_user.display_name} is already in the tracked Twitch-user list.",
+                return self.localizer.thread_result(
+                    "results.user.already_added",
+                    thread=thread,
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
+                    DISPLAY_NAME=twitch_user.display_name,
                 )
             self.tracked_user_repository.add_user(thread.thread_id, twitch_user.user_id)
-            return DiscordCommandResult(
-                title="Tracked User Added",
-                message=f"Added [{twitch_user.display_name}](https://www.twitch.tv/{twitch_user.login}) to the tracked Twitch-user list.",
+            return self.localizer.thread_result(
+                "results.user.added",
+                thread=thread,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
+                DISPLAY_NAME=twitch_user.display_name,
+                LOGIN=twitch_user.login,
             )
 
         if event.action != "remove":
-            return DiscordCommandResult(
-                title="Validation Error",
-                message="Unsupported action. Use `add` or `remove`.",
+            return self.localizer.thread_result(
+                "results.user.unsupported_action",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
 
         if existing is None:
-            return DiscordCommandResult(
-                title="Not Found",
-                message=f"{twitch_user.display_name} is not in the tracked Twitch-user list.",
+            return self.localizer.thread_result(
+                "results.user.not_found",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                DISPLAY_NAME=twitch_user.display_name,
             )
 
         if self.tracked_user_repository.count_pattern_scope_references(
             thread_id=thread.thread_id,
             twitch_user_id=twitch_user.user_id,
         ) > 0:
-            return DiscordCommandResult(
-                title="User In Use",
-                message=f"{twitch_user.display_name} is still referenced by one or more pings.",
+            return self.localizer.thread_result(
+                "results.user.in_use",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                DISPLAY_NAME=twitch_user.display_name,
             )
 
         self.tracked_user_repository.remove_user(thread.thread_id, twitch_user.user_id)
-        return DiscordCommandResult(
-            title="Tracked User Removed",
-            message=f"Removed {twitch_user.display_name} from the tracked Twitch-user list.",
+        return self.localizer.thread_result(
+            "results.user.removed",
+            thread=thread,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
+            DISPLAY_NAME=twitch_user.display_name,
         )

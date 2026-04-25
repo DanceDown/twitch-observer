@@ -28,6 +28,7 @@ from src.events.event_types import (
     EventType,
     TwitchChatMessageEvent,
 )
+from src.localization import Localizer
 from src.services.twitch_runtime import (
     ensure_fresh_linked_account,
     expand_pattern_for_tracked_users,
@@ -54,6 +55,7 @@ class AutoReplyService:
     account_repository: TwitchAccountRepository
     twitch_api: TwitchAPIClient
     token_refresh_skew_seconds: int
+    localizer: Localizer = field(default_factory=Localizer.from_directory)
     tracked_user_repository: TrackedUserRepository | None = None
     notifier: object | None = None
     handled_messages: int = field(default=0, init=False)
@@ -371,6 +373,7 @@ class AutoReplyService:
                 event=event,
                 pattern=pattern,
                 thread=thread,
+                localizer=self.localizer,
                 reply=reply,
                 channel=source_channel,
                 author_icon_url=author_icon_url,

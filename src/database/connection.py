@@ -74,6 +74,19 @@ class PostgresDatabase:
             cursor.execute(
                 """
                 ALTER TABLE thread
+                ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'english'
+                """
+            )
+            cursor.execute(
+                """
+                UPDATE thread
+                SET language = 'english'
+                WHERE language IS NULL OR btrim(language) = ''
+                """
+            )
+            cursor.execute(
+                """
+                ALTER TABLE thread
                 ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE
                 """
             )
@@ -328,7 +341,7 @@ class PostgresThreadRepository(ThreadRepository):
         with self.database.connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT thread_id, owner_id, discord_channel_id, enabled, color, account_id
+                SELECT thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
                 FROM thread
                 WHERE discord_channel_id = %s
                 """,
@@ -341,9 +354,10 @@ class PostgresThreadRepository(ThreadRepository):
             thread_id=row[0],
             owner_id=row[1],
             discord_channel_id=row[2],
-            enabled=row[3],
-            color=row[4],
-            account_id=row[5],
+            language=row[3],
+            enabled=row[4],
+            color=row[5],
+            account_id=row[6],
         )
 
     def list_by_owner_id(self, owner_id: int) -> list[ThreadRecord]:
@@ -352,7 +366,7 @@ class PostgresThreadRepository(ThreadRepository):
         with self.database.connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT thread_id, owner_id, discord_channel_id, enabled, color, account_id
+                SELECT thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
                 FROM thread
                 WHERE owner_id = %s
                 ORDER BY thread_id
@@ -365,9 +379,10 @@ class PostgresThreadRepository(ThreadRepository):
                 thread_id=row[0],
                 owner_id=row[1],
                 discord_channel_id=row[2],
-                enabled=row[3],
-                color=row[4],
-                account_id=row[5],
+                language=row[3],
+                enabled=row[4],
+                color=row[5],
+                account_id=row[6],
             )
             for row in rows
         ]
@@ -378,7 +393,7 @@ class PostgresThreadRepository(ThreadRepository):
         with self.database.connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT thread_id, owner_id, discord_channel_id, enabled, color, account_id
+                SELECT thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
                 FROM thread
                 WHERE thread_id = %s
                 """,
@@ -391,9 +406,10 @@ class PostgresThreadRepository(ThreadRepository):
             thread_id=row[0],
             owner_id=row[1],
             discord_channel_id=row[2],
-            enabled=row[3],
-            color=row[4],
-            account_id=row[5],
+            language=row[3],
+            enabled=row[4],
+            color=row[5],
+            account_id=row[6],
         )
 
     def create(self, owner_id: int, discord_channel_id: int) -> ThreadRecord:
@@ -404,7 +420,7 @@ class PostgresThreadRepository(ThreadRepository):
                 """
                 INSERT INTO thread (owner_id, discord_channel_id)
                 VALUES (%s, %s)
-                RETURNING thread_id, owner_id, discord_channel_id, enabled, color, account_id
+                RETURNING thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
                 """,
                 (owner_id, discord_channel_id),
             )
@@ -414,9 +430,10 @@ class PostgresThreadRepository(ThreadRepository):
             thread_id=row[0],
             owner_id=row[1],
             discord_channel_id=row[2],
-            enabled=row[3],
-            color=row[4],
-            account_id=row[5],
+            language=row[3],
+            enabled=row[4],
+            color=row[5],
+            account_id=row[6],
         )
 
     def delete_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
@@ -427,7 +444,7 @@ class PostgresThreadRepository(ThreadRepository):
                 """
                 DELETE FROM thread
                 WHERE discord_channel_id = %s
-                RETURNING thread_id, owner_id, discord_channel_id, enabled, color, account_id
+                RETURNING thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
                 """,
                 (discord_channel_id,),
             )
@@ -438,9 +455,10 @@ class PostgresThreadRepository(ThreadRepository):
             thread_id=row[0],
             owner_id=row[1],
             discord_channel_id=row[2],
-            enabled=row[3],
-            color=row[4],
-            account_id=row[5],
+            language=row[3],
+            enabled=row[4],
+            color=row[5],
+            account_id=row[6],
         )
 
     def set_enabled(self, *, discord_channel_id: int, enabled: bool) -> ThreadRecord | None:
@@ -452,7 +470,7 @@ class PostgresThreadRepository(ThreadRepository):
                 UPDATE thread
                 SET enabled = %s
                 WHERE discord_channel_id = %s
-                RETURNING thread_id, owner_id, discord_channel_id, enabled, color, account_id
+                RETURNING thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
                 """,
                 (enabled, discord_channel_id),
             )
@@ -463,9 +481,10 @@ class PostgresThreadRepository(ThreadRepository):
             thread_id=row[0],
             owner_id=row[1],
             discord_channel_id=row[2],
-            enabled=row[3],
-            color=row[4],
-            account_id=row[5],
+            language=row[3],
+            enabled=row[4],
+            color=row[5],
+            account_id=row[6],
         )
 
     def set_color(self, *, discord_channel_id: int, color: str | None) -> ThreadRecord | None:
@@ -477,7 +496,7 @@ class PostgresThreadRepository(ThreadRepository):
                 UPDATE thread
                 SET color = %s
                 WHERE discord_channel_id = %s
-                RETURNING thread_id, owner_id, discord_channel_id, enabled, color, account_id
+                RETURNING thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
                 """,
                 (color, discord_channel_id),
             )
@@ -488,9 +507,10 @@ class PostgresThreadRepository(ThreadRepository):
             thread_id=row[0],
             owner_id=row[1],
             discord_channel_id=row[2],
-            enabled=row[3],
-            color=row[4],
-            account_id=row[5],
+            language=row[3],
+            enabled=row[4],
+            color=row[5],
+            account_id=row[6],
         )
 
     def set_account_id(self, *, discord_channel_id: int, account_id: int | None) -> ThreadRecord | None:
@@ -502,7 +522,7 @@ class PostgresThreadRepository(ThreadRepository):
                 UPDATE thread
                 SET account_id = %s
                 WHERE discord_channel_id = %s
-                RETURNING thread_id, owner_id, discord_channel_id, enabled, color, account_id
+                RETURNING thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
                 """,
                 (account_id, discord_channel_id),
             )
@@ -513,9 +533,36 @@ class PostgresThreadRepository(ThreadRepository):
             thread_id=row[0],
             owner_id=row[1],
             discord_channel_id=row[2],
-            enabled=row[3],
-            color=row[4],
-            account_id=row[5],
+            language=row[3],
+            enabled=row[4],
+            color=row[5],
+            account_id=row[6],
+        )
+
+    def set_language(self, *, discord_channel_id: int, language: str) -> ThreadRecord | None:
+        self.database.connect()
+        assert self.database.connection is not None
+        with self.database.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE thread
+                SET language = %s
+                WHERE discord_channel_id = %s
+                RETURNING thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
+                """,
+                (language, discord_channel_id),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return ThreadRecord(
+            thread_id=row[0],
+            owner_id=row[1],
+            discord_channel_id=row[2],
+            language=row[3],
+            enabled=row[4],
+            color=row[5],
+            account_id=row[6],
         )
 
 

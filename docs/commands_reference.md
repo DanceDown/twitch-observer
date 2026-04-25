@@ -9,6 +9,9 @@ All successful responses are embeds in the current Discord context.
 
 Validation, permission, and lookup errors are normally ephemeral embeds.
 
+Each joined Discord context also stores its own UI language. Localized strings
+are loaded from `lang/*.json` at startup and then served from memory.
+
 ## General Rules
 
 ### Joined context required
@@ -145,6 +148,30 @@ Parameters:
   - optional color in `#RRGGBB`
 - `clear`
   - set to `true` to remove the stored context color
+
+### `/language`
+
+Purpose:
+
+- set the response language for the current Discord context
+
+Syntax:
+
+```text
+/language language:english
+/language language:german
+```
+
+Parameters:
+
+- `language`
+  - one configured language from the `lang/` directory
+
+Behavior:
+
+- stores the selected language on the current Discord channel/thread context
+- affects later command results and other localized Discord output in that
+  context
 
 ## Channel Commands
 

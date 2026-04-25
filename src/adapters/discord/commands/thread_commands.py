@@ -9,15 +9,22 @@ import discord
 
 from src.events.event_bus import EventBus
 from src.events.event_types import DiscordResultStyle
+from src.localization import Localizer
 
 from ..dispatch import dispatch_thread_command
 from ..helpers import command_unavailable_result, send_initial_result
 from ..ui.thread_ui import LeaveConfirmationModal, ThreadColorModal
+from ..ui_data import DiscordUIDataProvider
 
 logger = logging.getLogger(__name__)
 
 
-def register_thread_commands(tree: discord.app_commands.CommandTree, event_bus: EventBus) -> None:
+def register_thread_commands(
+    tree: discord.app_commands.CommandTree,
+    event_bus: EventBus,
+    ui_data_provider: DiscordUIDataProvider,
+    localizer: Localizer,
+) -> None:
     """Register Discord context lifecycle commands on the shared command tree."""
 
     @tree.command(name="join", description="Let the Twitch Observer join this Discord channel.")
@@ -58,6 +65,8 @@ def register_thread_commands(tree: discord.app_commands.CommandTree, event_bus: 
                 event_bus=event_bus,
                 discord_channel_id=interaction.channel_id,
                 requester_id=interaction.user.id,
+                data_provider=ui_data_provider,
+                localizer=localizer,
             )
         )
 
@@ -79,8 +88,34 @@ def register_thread_commands(tree: discord.app_commands.CommandTree, event_bus: 
                 event_bus=event_bus,
                 discord_channel_id=interaction.channel_id,
                 requester_id=interaction.user.id,
+                data_provider=ui_data_provider,
+                localizer=localizer,
             ),
         )
+
+    @tree.command(name="language", description="Set the language for this Discord channel.")
+    @discord.app_commands.describe(language="Language used for this Discord channel.")
+    @discord.app_commands.choices(
+        language=[
+            discord.app_commands.Choice(name="english", value="english"),
+            discord.app_commands.Choice(name="german", value="german"),
+        ]
+    )
+    async def language(
+        interaction: discord.Interaction,
+        language: discord.app_commands.Choice[str],
+    ) -> None:
+        if interaction.channel_id is None:
+            await send_initial_result(interaction, command_unavailable_result())
+            return
+        result = await dispatch_thread_command(
+            event_bus,
+            discord_channel_id=interaction.channel_id,
+            requester_id=interaction.user.id,
+            action="language",
+            language=language.value,
+        )
+        await send_initial_result(interaction, result)
 
 
 async def _handle_state_command(

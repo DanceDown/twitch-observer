@@ -73,6 +73,7 @@ CREATE TABLE thread (
     thread_id             SERIAL PRIMARY KEY,
     owner_id              BIGINT NOT NULL,
     discord_channel_id    BIGINT NOT NULL,
+    language              TEXT NOT NULL DEFAULT 'english',
     account_id            INTEGER REFERENCES twitch_account(account_id) ON DELETE SET NULL,
     enabled               BOOLEAN NOT NULL DEFAULT TRUE,
     color                 TEXT,

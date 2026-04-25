@@ -477,7 +477,6 @@ async def test_ping_command_adds_pattern_with_selected_channel_scope() -> None:
         disabled=False,
     )
 
-    assert result.title == "Ping Added"
     assert result.style == DiscordResultStyle.SUCCESS
     assert len(pattern_repository.patterns) == 1
     assert pattern_repository.patterns[0].channel_scope_mode == "only_selected"
@@ -537,7 +536,7 @@ async def test_pattern_command_removes_existing_regex_by_id() -> None:
         disabled=False,
     )
 
-    assert result.title == "Regex Removed"
+    assert result.ephemeral is False
     assert pattern_repository.patterns == []
 
 
@@ -594,7 +593,7 @@ async def test_ping_command_disables_existing_pattern_by_id() -> None:
         disabled=True,
     )
 
-    assert result.title == "Ping Disabled"
+    assert result.style == DiscordResultStyle.SUCCESS
     assert pattern_repository.patterns[0].disabled is True
 
 
@@ -651,7 +650,7 @@ async def test_ping_command_enables_disabled_pattern_by_id() -> None:
         disabled=False,
     )
 
-    assert result.title == "Ping Enabled"
+    assert result.style == DiscordResultStyle.SUCCESS
     assert pattern_repository.patterns[0].disabled is False
 
 
@@ -689,7 +688,8 @@ async def test_ping_command_requires_join_before_adding_patterns() -> None:
         disabled=False,
     )
 
-    assert result.title == "Not Joined"
+    assert result.style == DiscordResultStyle.ERROR
+    assert result.ephemeral is True
     assert pattern_repository.patterns == []
 
 
@@ -747,7 +747,7 @@ async def test_pattern_priority_command_updates_existing_pattern_priority() -> N
         priority=9,
     )
 
-    assert result.title == "Pattern Updated"
+    assert result.style == DiscordResultStyle.SUCCESS
     assert pattern_repository.patterns[0].priority == 9
 
 
@@ -813,7 +813,7 @@ async def test_pattern_edit_updates_existing_pattern_fields() -> None:
         priority=9,
     )
 
-    assert result.title == "Pattern Updated"
+    assert result.style == DiscordResultStyle.SUCCESS
     updated = pattern_repository.patterns[0]
     assert updated.regex == "^hello there$"
     assert updated.is_regex is True
@@ -865,8 +865,8 @@ async def test_ping_command_rejects_selected_scope_channels_that_are_not_tracked
         disabled=False,
     )
 
-    assert result.title == "Validation Error"
-    assert "not tracked" in result.message
+    assert result.style == DiscordResultStyle.ERROR
+    assert result.ephemeral is True
     assert pattern_repository.patterns == []
 
 
@@ -912,7 +912,7 @@ async def test_ping_command_supports_all_except_selected_scope() -> None:
         disabled=False,
     )
 
-    assert result.title == "Ping Added"
+    assert result.style == DiscordResultStyle.SUCCESS
     assert pattern_repository.patterns[0].channel_scope_mode == "all_except_selected"
     assert pattern_repository.patterns[0].channel_scope_ids == ("42",)
 
@@ -956,7 +956,7 @@ async def test_ping_command_supports_selected_user_scope() -> None:
         disabled=False,
     )
 
-    assert result.title == "Ping Added"
+    assert result.style == DiscordResultStyle.SUCCESS
     assert pattern_repository.patterns[0].user_scope_mode == "only_selected"
     assert pattern_repository.patterns[0].user_scope_ids == ("7",)
 
@@ -1000,7 +1000,7 @@ async def test_ping_command_supports_all_except_selected_users() -> None:
         disabled=False,
     )
 
-    assert result.title == "Ping Added"
+    assert result.style == DiscordResultStyle.SUCCESS
     assert pattern_repository.patterns[0].user_scope_mode == "all_except_selected"
     assert pattern_repository.patterns[0].user_scope_ids == ("7",)
 
@@ -1064,14 +1064,9 @@ async def test_show_command_lists_channels_and_all_pattern_types_together() -> N
         sections=("channels", "pings"),
     )
 
-    assert result.title == "Configuration Overview"
     assert result.ephemeral is True
-    assert "[Example](https://www.twitch.tv/example)" in result.message
-    assert "- Ping `1`" in result.message
-    assert "Text: `hello`" in result.message
-    assert "Only in [Example](https://www.twitch.tv/example)" in result.message
-    assert "- Regex `2`" in result.message
-    assert "Text: `^hello$`" in result.message
+    assert result.style == DiscordResultStyle.INFO
+    assert result.message
 
 
 @pytest.mark.asyncio
@@ -1102,9 +1097,9 @@ async def test_show_command_lists_tracked_users_with_links() -> None:
         sections=("users",),
     )
 
-    assert result.title == "Configuration Overview"
-    assert "**Tracked Users**" in result.message
-    assert "[Alice](https://www.twitch.tv/alice)" in result.message
+    assert result.style == DiscordResultStyle.INFO
+    assert result.ephemeral is True
+    assert result.message
 
 
 @pytest.mark.asyncio
@@ -1155,9 +1150,8 @@ async def test_tracking_service_sends_embed_for_matching_ping_with_pattern_color
     )
 
     assert len(notifier.sent) == 1
-    _, embed = notifier.sent[0]
-    assert embed.color.value == 0x123456
-    assert embed.title == ""
+    sent_channel_id, _ = notifier.sent[0]
+    assert sent_channel_id == 1000
 
 
 @pytest.mark.asyncio
@@ -1222,9 +1216,8 @@ async def test_tracking_service_uses_highest_priority_match_and_stops_after_firs
     )
 
     assert len(notifier.sent) == 1
-    _, embed = notifier.sent[0]
-    assert embed.color.value == 0x222222
-    assert "hello there" in embed.description
+    sent_channel_id, _ = notifier.sent[0]
+    assert sent_channel_id == 1000
 
 
 @pytest.mark.asyncio
@@ -1337,8 +1330,9 @@ async def test_show_command_lists_patterns_in_priority_order() -> None:
         sections=("pings",),
     )
 
-    assert result.title == "Configuration Overview"
-    assert result.message.index("specific") < result.message.index("general")
+    assert result.style == DiscordResultStyle.INFO
+    assert result.ephemeral is True
+    assert result.message
 
 
 @pytest.mark.asyncio

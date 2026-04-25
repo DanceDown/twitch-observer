@@ -27,6 +27,7 @@ from src.database.connection import (
     PostgresUserPermissionRepository,
 )
 from src.events.event_bus import EventBus
+from src.localization import Localizer
 from src.services.account_service import AccountCommandService, DeviceFlowPollingService
 from src.services.channel_command_service import ChannelCommandService
 from src.services.channel_live_state_service import (
@@ -55,6 +56,7 @@ async def _run() -> None:
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
     event_bus = EventBus()
+    localizer = Localizer.from_directory()
     database = PostgresDatabase(config)
     message_repository = PostgresMessageRepository(database)
     thread_repository = PostgresThreadRepository(database)
@@ -95,6 +97,7 @@ async def _run() -> None:
         channel_repository=channel_repository,
         twitch_api=twitch_api,
         irc_manager=irc_adapter,
+        localizer=localizer,
         permission_repository=permission_repository,
     )
     ChannelCommandService(
@@ -104,6 +107,7 @@ async def _run() -> None:
         pattern_repository=pattern_repository,
         twitch_api=twitch_api,
         irc_manager=irc_adapter,
+        localizer=localizer,
         permission_repository=permission_repository,
     )
     ChannelEventCommandService(
@@ -123,6 +127,7 @@ async def _run() -> None:
         thread_repository=thread_repository,
         tracked_user_repository=tracked_user_repository,
         twitch_api=twitch_api,
+        localizer=localizer,
         permission_repository=permission_repository,
     )
     discord_adapter = DiscordAdapter(
@@ -136,6 +141,7 @@ async def _run() -> None:
         adapter_event_repository=adapter_event_repository,
         adapter_event_action_repository=adapter_event_action_repository,
         twitch_api=twitch_api,
+        localizer=localizer,
     )
     device_flow_poller = DeviceFlowPollingService(
         device_flow_repository=device_flow_repository,
@@ -195,6 +201,7 @@ async def _run() -> None:
         adapter_event_repository=adapter_event_repository,
         adapter_event_action_repository=adapter_event_action_repository,
         twitch_api=twitch_api,
+        localizer=localizer,
         permission_repository=permission_repository,
     )
     PatternTrackingService(

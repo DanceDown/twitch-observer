@@ -8,36 +8,53 @@ import discord
 
 from src.events.event_bus import EventBus
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.localization import Localizer
 
 from ..dispatch import dispatch_thread_command
 from ..helpers import normalize_optional_text, send_initial_result
+from ..ui_data import DiscordUIDataProvider
 
 
-class LeaveConfirmationModal(discord.ui.Modal, title="Confirm Leave"):
+class LeaveConfirmationModal(discord.ui.Modal):
     """Require an explicit confirmation phrase before deleting one Discord context."""
 
-    confirmation = discord.ui.TextInput(
-        label="Type LEAVE to confirm",
-        placeholder="LEAVE",
-        required=True,
-        min_length=5,
-        max_length=5,
-    )
-
-    def __init__(self, *, event_bus: EventBus, discord_channel_id: int, requester_id: int) -> None:
-        super().__init__(timeout=300)
+    def __init__(
+        self,
+        *,
+        event_bus: EventBus,
+        discord_channel_id: int,
+        requester_id: int,
+        data_provider: DiscordUIDataProvider,
+        localizer: Localizer,
+    ) -> None:
+        thread = data_provider.get_thread(discord_channel_id)
+        language = localizer.language_for_thread(thread)
+        super().__init__(
+            title=localizer.text("discord.thread_modal.confirm_leave_title", language=language),
+            timeout=300,
+        )
         self._event_bus = event_bus
         self._discord_channel_id = discord_channel_id
         self._requester_id = requester_id
+        self._localizer = localizer
+        self._language = language
+        self.confirmation = discord.ui.TextInput(
+            label=localizer.text("discord.thread_modal.confirm_leave_label", language=language),
+            placeholder=localizer.text("discord.thread_modal.confirm_leave_placeholder", language=language),
+            required=True,
+            min_length=5,
+            max_length=5,
+        )
+        self.add_item(self.confirmation)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Validate the confirmation phrase and dispatch the destructive leave action."""
         if self.confirmation.value.strip().upper() != "LEAVE":
             await send_initial_result(
                 interaction,
-                DiscordCommandResult(
-                    title="Leave Cancelled",
-                    message="Type exactly `LEAVE` if you want the bot to leave this Discord channel.",
+                self._localizer.result(
+                    "discord.thread_modal.confirm_leave_cancelled",
+                    language=self._language,
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 ),
@@ -56,20 +73,33 @@ class LeaveConfirmationModal(discord.ui.Modal, title="Confirm Leave"):
                 await interaction.channel.leave()
 
 
-class ThreadColorModal(discord.ui.Modal, title="Observer Color"):
+class ThreadColorModal(discord.ui.Modal):
     """Set or clear the default embed color for one Discord context."""
 
-    color = discord.ui.TextInput(
-        label="Color",
-        placeholder="#5865F2",
-        required=False,
-    )
-
-    def __init__(self, *, event_bus: EventBus, discord_channel_id: int, requester_id: int) -> None:
-        super().__init__(timeout=300)
+    def __init__(
+        self,
+        *,
+        event_bus: EventBus,
+        discord_channel_id: int,
+        requester_id: int,
+        data_provider: DiscordUIDataProvider,
+        localizer: Localizer,
+    ) -> None:
+        thread = data_provider.get_thread(discord_channel_id)
+        language = localizer.language_for_thread(thread)
+        super().__init__(
+            title=localizer.text("discord.thread_modal.observer_color_title", language=language),
+            timeout=300,
+        )
         self._event_bus = event_bus
         self._discord_channel_id = discord_channel_id
         self._requester_id = requester_id
+        self.color = discord.ui.TextInput(
+            label=localizer.text("discord.thread_modal.observer_color_label", language=language),
+            placeholder=localizer.text("discord.thread_modal.observer_color_placeholder", language=language),
+            required=False,
+        )
+        self.add_item(self.color)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Dispatch the chosen color update for the current thread."""

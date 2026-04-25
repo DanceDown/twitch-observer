@@ -372,7 +372,7 @@ async def test_write_send_posts_plain_twitch_message() -> None:
         reply_parent_message_id=None,
     )
 
-    assert result.title == "Twitch Message Sent"
+    assert result.ephemeral is False
     assert twitch_api.sent_messages[0]["message"] == "Hello Twitch"
     assert twitch_api.sent_messages[0]["reply_parent_message_id"] is None
 
@@ -419,7 +419,7 @@ async def test_write_send_can_reply_to_specific_twitch_message() -> None:
         reply_parent_message_id="msg-1",
     )
 
-    assert result.title == "Twitch Reply Sent"
+    assert result.ephemeral is False
     assert twitch_api.sent_messages[0]["reply_parent_message_id"] == "msg-1"
 
 
@@ -479,7 +479,7 @@ async def test_write_send_respects_granted_permission_for_non_owner() -> None:
         reply_parent_message_id=None,
     )
 
-    assert result.title == "Twitch Message Sent"
+    assert result.ephemeral is False
     assert twitch_api.sent_messages[0]["sender_id"] == "77"
 
 
@@ -527,5 +527,5 @@ async def test_write_send_reports_missing_owner_account_even_for_permitted_helpe
         reply_parent_message_id=None,
     )
 
-    assert result.title == "No Linked Account"
-    assert "discord channel" in result.message.lower()
+    assert result.ephemeral is True
+    assert result.style.name == "ERROR"

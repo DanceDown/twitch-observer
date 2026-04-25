@@ -80,6 +80,14 @@ class ThreadRepository:
     ) -> ThreadRecord | None:  # pragma: no cover
         raise NotImplementedError
 
+    def set_language(
+        self,
+        *,
+        discord_channel_id: int,
+        language: str,
+    ) -> ThreadRecord | None:  # pragma: no cover
+        raise NotImplementedError
+
     def list_by_owner_id(self, owner_id: int) -> list[ThreadRecord]:  # pragma: no cover
         raise NotImplementedError
 

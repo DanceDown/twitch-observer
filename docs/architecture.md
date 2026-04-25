@@ -13,6 +13,8 @@ This is the main runtime reference for the Twitch Observer.
   - coordinate repositories and side effects
 - Repositories
   - persist configuration, cache, and runtime state in PostgreSQL
+- Localization
+  - loads `lang/*.json` once at startup and resolves per-thread language keys
 - Event bus
   - keeps adapters and services decoupled
 
@@ -52,7 +54,8 @@ This is the main runtime reference for the Twitch Observer.
 2. The adapter publishes one typed command event.
 3. The matching service validates permissions and inputs.
 4. The service updates repositories and returns a `DiscordCommandResult`.
-5. The Discord adapter renders the result.
+5. The Discord adapter renders the result using the language stored on the
+   current thread/context.
 
 ## Key design decisions
 

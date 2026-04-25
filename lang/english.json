@@ -1,0 +1,272 @@
+{
+  "common": {
+    "language_name": "English",
+    "scope": {
+      "all_tracked_channels": "Every tracked channel",
+      "all_tracked_users": "All tracked Twitch users",
+      "everyone": "Everyone",
+      "only_in": "Only in {ITEMS}",
+      "everyone_except": "Everyone except {ITEMS}",
+      "all_tracked_channels_except": "Every tracked channel except {ITEMS}",
+      "only_from": "Only from {ITEMS}",
+      "all_tracked_users_except": "All tracked Twitch users except {ITEMS}"
+    },
+    "boolean": {
+      "yes": "Yes",
+      "no": "No"
+    }
+  },
+  "results": {
+    "command_unavailable": {
+      "title": "Command Unavailable",
+      "message": "This command can only be used inside a Discord channel or DM."
+    },
+    "validation_error": {
+      "title": "Validation Error",
+      "message": "{DETAIL}"
+    },
+    "twitch_api_error": {
+      "title": "Twitch API Error",
+      "message": "{DETAIL}"
+    },
+    "unexpected_error": {
+      "title": "Unexpected Error",
+      "message": "{DETAIL}"
+    },
+    "regex_error": {
+      "title": "Regex Error",
+      "message": "Invalid regex: {DETAIL}"
+    },
+    "not_joined": {
+      "title": "Not Joined",
+      "message": "This Discord channel is not connected yet. Use `/join` first."
+    },
+    "permission_denied": {
+      "title": "Permission Denied",
+      "message": "{DETAIL}"
+    },
+    "thread": {
+      "unsupported_action": {
+        "title": "Validation Error",
+        "message": "Unsupported action. Use `join`, `leave`, `enable`, `disable`, `color`, or `language`."
+      },
+      "already_joined": {
+        "title": "Already Joined",
+        "message": "This Discord channel is already connected to the observer."
+      },
+      "already_joined_other_owner": {
+        "title": "Permission Denied",
+        "message": "This Discord channel is already connected by another owner."
+      },
+      "joined": {
+        "title": "Observer Joined",
+        "message": "The bot joined this Discord channel and is ready for configuration."
+      },
+      "leave_denied": {
+        "title": "Permission Denied",
+        "message": "You do not have permission to make the bot leave this Discord channel."
+      },
+      "left": {
+        "title": "Observer Left",
+        "message": "The bot left this Discord channel and deleted all saved configuration for it."
+      },
+      "enable_denied": {
+        "title": "Permission Denied",
+        "message": "You do not have permission to change the observer state in this Discord channel."
+      },
+      "already_on": {
+        "title": "Already On",
+        "message": "The observer is already enabled in this Discord channel."
+      },
+      "already_off": {
+        "title": "Already Off",
+        "message": "The observer is already disabled in this Discord channel."
+      },
+      "enabled": {
+        "title": "Observer Enabled",
+        "message": "The observer is now enabled in this Discord channel."
+      },
+      "disabled": {
+        "title": "Observer Disabled",
+        "message": "The observer is now disabled in this Discord channel."
+      },
+      "color_denied": {
+        "title": "Permission Denied",
+        "message": "You do not have permission to change the observer color in this Discord channel."
+      },
+      "color_cleared": {
+        "title": "Observer Color Cleared",
+        "message": "Cleared the custom color for this Discord observer context."
+      },
+      "color_updated": {
+        "title": "Observer Color Updated",
+        "message": "Set the color for this Discord observer context to `{COLOR}`."
+      },
+      "language_denied": {
+        "title": "Permission Denied",
+        "message": "You do not have permission to change the language in this Discord channel."
+      },
+      "language_updated": {
+        "title": "Language Updated",
+        "message": "Set the language for this Discord channel to `{LANGUAGE_NAME}` (`{LANGUAGE_CODE}`)."
+      }
+    },
+    "channel": {
+      "permission_denied": {
+        "title": "Permission Denied",
+        "message": "You do not have permission to change tracked Twitch channels."
+      },
+      "already_added": {
+        "title": "Already Added",
+        "message": "Twitch channel `{DISPLAY_NAME}` (`{LOGIN}`) is already tracked."
+      },
+      "added": {
+        "title": "Channel Added",
+        "message": "Added Twitch channel `{DISPLAY_NAME}` (`{LOGIN}`)"
+      },
+      "not_found": {
+        "title": "Not Found",
+        "message": "Twitch channel `{DISPLAY_NAME}` (`{LOGIN}`) is not currently tracked."
+      },
+      "color_cleared": {
+        "title": "Channel Color Cleared",
+        "message": "Cleared the custom color for Twitch channel `{DISPLAY_NAME}` (`{LOGIN}`)."
+      },
+      "color_updated": {
+        "title": "Channel Color Updated",
+        "message": "Set the color for Twitch channel `{DISPLAY_NAME}` (`{LOGIN}`) to `{COLOR}`."
+      },
+      "unsupported_action": {
+        "title": "Validation Error",
+        "message": "Unsupported action. Use `add`, `remove`, or `color`."
+      },
+      "in_use": {
+        "title": "Channel In Use",
+        "message": "Twitch channel `{DISPLAY_NAME}` (`{LOGIN}`) is still referenced by one or more pings."
+      },
+      "removed": {
+        "title": "Channel Removed",
+        "message": "Removed Twitch channel `{DISPLAY_NAME}` (`{LOGIN}`)"
+      }
+    },
+    "user": {
+      "permission_denied": {
+        "title": "Permission Denied",
+        "message": "You do not have permission to change tracked Twitch users in this Discord channel."
+      },
+      "already_added": {
+        "title": "Already Added",
+        "message": "{DISPLAY_NAME} is already in the tracked Twitch-user list."
+      },
+      "added": {
+        "title": "Tracked User Added",
+        "message": "Added [{DISPLAY_NAME}](https://www.twitch.tv/{LOGIN}) to the tracked Twitch-user list."
+      },
+      "unsupported_action": {
+        "title": "Validation Error",
+        "message": "Unsupported action. Use `add` or `remove`."
+      },
+      "not_found": {
+        "title": "Not Found",
+        "message": "{DISPLAY_NAME} is not in the tracked Twitch-user list."
+      },
+      "in_use": {
+        "title": "User In Use",
+        "message": "{DISPLAY_NAME} is still referenced by one or more pings."
+      },
+      "removed": {
+        "title": "Tracked User Removed",
+        "message": "Removed {DISPLAY_NAME} from the tracked Twitch-user list."
+      }
+    },
+    "show": {
+      "permission_denied": {
+        "title": "Permission Denied",
+        "message": "You do not have permission to view the settings."
+      },
+      "overview": {
+        "title": "Configuration Overview",
+        "message": "{CONTENT}"
+      }
+    }
+  },
+  "show": {
+    "sections": {
+      "tracked_channels": "Tracked Channels",
+      "pings": "Pings",
+      "auto_replies": "Auto-Replies",
+      "tracked_users": "Tracked Users",
+      "permissions": "Permissions"
+    },
+    "empty": {
+      "tracked_channels": "No Twitch channels are connected yet.",
+      "pings": "No pings are saved yet.",
+      "auto_replies": "There are no automatic replies configured.",
+      "tracked_users": "There are no Twitch users are connected yet."
+    },
+    "channel": {
+      "custom_color": "Custom color: `{COLOR}`",
+      "live_state": "Live state: `{STATE}`",
+      "notifications": "Notifications: `{STATES}`"
+    },
+    "pattern": {
+      "line": "- {TYPE} `{ID}`",
+      "text": "Text: `{TEXT}`",
+      "priority": "Priority: `{PRIORITY}`",
+      "custom_color": "Custom color: `{COLOR}`",
+      "case_sensitive": "Case-Sensitive",
+      "disabled": "Disabled",
+      "subscribers_only": "Subscribers only",
+      "non_subscribers_only": "Non-subscribers only",
+      "only_while_live": "Only while live",
+      "only_while_offline": "Only while offline"
+    },
+    "reply": {
+      "line": "- `{ID}`",
+      "trigger": "Trigger: `{TEXT}`",
+      "reply": "Reply: `{TEXT}`"
+    },
+    "event_reply": {
+      "line": "- Event `{STATE}`",
+      "channel": "Channel: [{DISPLAY_NAME}](https://www.twitch.tv/{LOGIN})",
+      "reply": "Reply: `{TEXT}`",
+      "disabled": "Disabled"
+    },
+    "permission": {
+      "owner": "Owner (all permissions)",
+      "none": "No extra permissions",
+      "view": "View configuration",
+      "manage_channels": "Add and remove channels",
+      "toggle_patterns": "Enable and disable pings",
+      "manage_patterns": "Create, edit and remove pings",
+      "toggle_replies": "Enable and disable auto-replies",
+      "manage_replies": "Create and remove auto-replies",
+      "send_twitch_messages": "Send Twitch messages",
+      "control_observer": "Turn the observer on or off",
+      "leave_context": "Disconnect this Discord channel",
+      "manage_permissions": "Manage permissions",
+      "admin": "Administrator"
+    }
+  },
+  "discord": {
+    "tracking_embed": {
+      "footer_channel": "Channel: {CHANNEL}",
+      "reply_field": "Reply"
+    },
+    "tracking_view": {
+      "open_channel": "Open Channel"
+    },
+    "thread_modal": {
+      "confirm_leave_title": "Confirm Leave",
+      "confirm_leave_label": "Type LEAVE to confirm",
+      "confirm_leave_placeholder": "LEAVE",
+      "confirm_leave_cancelled": {
+        "title": "Leave Cancelled",
+        "message": "Type exactly `LEAVE` if you want the bot to leave this Discord channel."
+      },
+      "observer_color_title": "Observer Color",
+      "observer_color_label": "Color",
+      "observer_color_placeholder": "#5865F2"
+    }
+  }
+}

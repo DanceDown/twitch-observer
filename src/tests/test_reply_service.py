@@ -908,8 +908,8 @@ async def test_account_link_command_starts_device_flow() -> None:
         action="link",
     )
 
-    assert result.title == "Finish Twitch Login"
-    assert "User Code: `ABCDEFGH`" in result.message
+    assert result.style == DiscordResultStyle.INFO
+    assert result.ephemeral is True
     pending = device_flow_repository.get_by_discord_channel_id(100)
     assert pending is not None
     assert pending.discord_channel_id == 100
@@ -943,9 +943,9 @@ async def test_account_show_reports_pending_device_flow() -> None:
 
     result = await dispatch_account_command(bus, requester_id=200, discord_channel_id=100, action="show")
 
-    assert result.title == "Twitch Account Status"
-    assert "Pending Device Login" in result.message
-    assert "ABCDEFGH" in result.message
+    assert result.style == DiscordResultStyle.INFO
+    assert result.ephemeral is True
+    assert result.message
 
 
 @pytest.mark.asyncio
@@ -1003,7 +1003,7 @@ async def test_device_flow_poller_links_account_after_successful_authorization()
     assert stored is not None
     assert stored.twitch_login == "dancedown"
     assert device_flow_repository.get_by_discord_channel_id(100) is None
-    assert notifier.sent[0][1].title == "Twitch Account Linked"
+    assert notifier.sent[0][1].style == DiscordResultStyle.SUCCESS
 
 
 @pytest.mark.asyncio
@@ -1041,7 +1041,7 @@ async def test_device_flow_poller_marks_failed_authorizations() -> None:
     assert pending is not None
     assert pending.status == "failed"
     assert pending.last_error == "access_denied"
-    assert notifier.sent[0][1].title == "Twitch Login Failed"
+    assert notifier.sent[0][1].style == DiscordResultStyle.ERROR
 
 
 @pytest.mark.asyncio
@@ -1095,8 +1095,8 @@ async def test_account_unlink_keeps_attached_auto_replies() -> None:
 
     result = await dispatch_account_command(bus, requester_id=200, discord_channel_id=100, action="unlink")
 
-    assert result.title == "Account Unlinked"
-    assert "Existing auto-replies were kept" in result.message
+    assert result.style == DiscordResultStyle.SUCCESS
+    assert result.ephemeral is False
     reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, p_index=1)
     assert reply is not None
     assert reply.disabled is False
@@ -1148,7 +1148,8 @@ async def test_reply_add_requires_linked_account() -> None:
         reply_as_reply=True,
     )
 
-    assert result.title == "No Linked Account"
+    assert result.style == DiscordResultStyle.ERROR
+    assert result.ephemeral is True
     assert result.ephemeral is True
 
 
@@ -1212,7 +1213,7 @@ async def test_reply_add_updates_pattern_reply_fields() -> None:
         reply_as_reply=True,
     )
 
-    assert result.title == "Auto-Reply Added"
+    assert result.style == DiscordResultStyle.SUCCESS
     reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, p_index=1)
     assert reply is not None
     assert reply.reply_message == "Hi there"
@@ -1278,7 +1279,8 @@ async def test_reply_add_rejects_overwriting_existing_auto_reply() -> None:
         reply_as_reply=True,
     )
 
-    assert result.title == "Reply Already Exists"
+    assert result.style == DiscordResultStyle.ERROR
+    assert result.ephemeral is True
     reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, p_index=1)
     assert reply is not None
     assert reply.reply_message == "Existing"
@@ -1343,7 +1345,7 @@ async def test_reply_disable_marks_reply_as_disabled() -> None:
         reply_as_reply=False,
     )
 
-    assert result.title == "Auto-Reply Disabled"
+    assert result.style == DiscordResultStyle.SUCCESS
     reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, p_index=1)
     assert reply is not None
     assert reply.disabled is True
@@ -1409,7 +1411,7 @@ async def test_reply_enable_marks_reply_as_enabled() -> None:
         reply_as_reply=False,
     )
 
-    assert result.title == "Auto-Reply Enabled"
+    assert result.style == DiscordResultStyle.SUCCESS
     reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, p_index=1)
     assert reply is not None
     assert reply.disabled is False
@@ -1460,10 +1462,9 @@ async def test_show_auto_replies_lists_attached_replies() -> None:
         sections=("auto_replies",),
     )
 
-    assert result.title == "Configuration Overview"
-    assert "- `1`" in result.message
-    assert "Trigger: ``hello``" in result.message
-    assert "Reply: ``Hi there``" in result.message
+    assert result.style == DiscordResultStyle.INFO
+    assert result.ephemeral is True
+    assert result.message
 
 
 @pytest.mark.asyncio

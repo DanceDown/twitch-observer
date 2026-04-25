@@ -15,6 +15,7 @@ class ThreadRecord:
     discord_channel_id: int
     enabled: bool
     color: str | None
+    language: str = "english"
     account_id: int | None = None
 
 

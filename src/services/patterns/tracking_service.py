@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Runtime pattern matching for incoming Twitch chat messages."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
 
 import discord
@@ -17,6 +17,7 @@ from src.database.connection import (
 )
 from src.events.event_bus import EventBus
 from src.events.event_types import EventType, TwitchChatMessageEvent
+from src.localization import Localizer
 from src.services.twitch_runtime import (
     expand_pattern_for_tracked_users,
     offline_state_allows,
@@ -52,6 +53,7 @@ class PatternTrackingService:
     pattern_repository: PatternRepository
     twitch_api: TwitchAPIClient
     notifier: TrackingNotificationSender
+    localizer: Localizer = field(default_factory=Localizer.from_directory)
     tracked_user_repository: TrackedUserRepository | None = None
     reply_repository: ReplyRepository | None = None
 
@@ -166,6 +168,7 @@ class PatternTrackingService:
                         event=event,
                         pattern=effective_pattern,
                         thread=thread,
+                        localizer=self.localizer,
                         channel=source_channel,
                         author_icon_url=(
                             None if author_user is None else author_user.profile_image_url

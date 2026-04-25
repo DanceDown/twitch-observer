@@ -8,6 +8,7 @@ import discord
 
 from src.config import AppConfig
 from src.events.event_bus import EventBus
+from src.localization import Localizer
 from src.utils.discord_embeds import build_result_embed, build_tracking_view
 
 from .commands import (
@@ -30,7 +31,13 @@ logger = logging.getLogger(__name__)
 class ObserverDiscordClient(discord.Client):
     """Discord client hosting the application's slash commands."""
 
-    def __init__(self, config: AppConfig, event_bus: EventBus, ui_data_provider: DiscordUIDataProvider) -> None:
+    def __init__(
+        self,
+        config: AppConfig,
+        event_bus: EventBus,
+        ui_data_provider: DiscordUIDataProvider,
+        localizer: Localizer,
+    ) -> None:
         intents = discord.Intents.default()
         if config.discord_application_id:
             super().__init__(intents=intents, application_id=config.discord_application_id)
@@ -38,12 +45,13 @@ class ObserverDiscordClient(discord.Client):
             super().__init__(intents=intents)
         self._event_bus = event_bus
         self._ui_data_provider = ui_data_provider
+        self._localizer = localizer
         self.tree = discord.app_commands.CommandTree(self)
         self._guild_commands_cleaned = False
 
     async def setup_hook(self) -> None:
         """Register slash commands and sync them globally."""
-        register_thread_commands(self.tree, self._event_bus)
+        register_thread_commands(self.tree, self._event_bus, self._ui_data_provider, self._localizer)
         register_channel_commands(self.tree, self._event_bus, self._ui_data_provider)
         register_live_state_commands(self.tree, self._event_bus, self._ui_data_provider)
         register_user_commands(self.tree, self._event_bus, self._ui_data_provider)
@@ -78,7 +86,17 @@ class ObserverDiscordClient(discord.Client):
         if channel is None:
             channel = await self.fetch_channel(discord_channel_id)
         if isinstance(channel, (discord.TextChannel, discord.Thread, discord.DMChannel)):
-            view = None if channel_login is None else build_tracking_view(channel_login=channel_login)
+            thread = self._ui_data_provider.get_thread(discord_channel_id)
+            language = self._localizer.language_for_thread(thread)
+            view = (
+                None
+                if channel_login is None
+                else build_tracking_view(
+                    channel_login=channel_login,
+                    localizer=self._localizer,
+                    language=language,
+                )
+            )
             await channel.send(embed=embed, view=view)
 
     async def set_status_text(self, text: str) -> None:

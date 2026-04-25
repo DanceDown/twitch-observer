@@ -1,0 +1,272 @@
+{
+  "common": {
+    "language_name": "Deutsch",
+    "scope": {
+      "all_tracked_channels": "Alle getrackten Kanaele",
+      "all_tracked_users": "Alle getrackten Twitch-Nutzer",
+      "everyone": "Alle",
+      "only_in": "Nur in {ITEMS}",
+      "everyone_except": "Alle ausser {ITEMS}",
+      "all_tracked_channels_except": "Alle getrackten Kanaele ausser {ITEMS}",
+      "only_from": "Nur von {ITEMS}",
+      "all_tracked_users_except": "Alle getrackten Twitch-Nutzer ausser {ITEMS}"
+    },
+    "boolean": {
+      "yes": "Ja",
+      "no": "Nein"
+    }
+  },
+  "results": {
+    "command_unavailable": {
+      "title": "Befehl nicht verfuegbar",
+      "message": "Dieser Befehl kann nur in einem Discord-Kanal oder in einer DM verwendet werden."
+    },
+    "validation_error": {
+      "title": "Validierungsfehler",
+      "message": "{DETAIL}"
+    },
+    "twitch_api_error": {
+      "title": "Twitch-API-Fehler",
+      "message": "{DETAIL}"
+    },
+    "unexpected_error": {
+      "title": "Unerwarteter Fehler",
+      "message": "{DETAIL}"
+    },
+    "regex_error": {
+      "title": "Regex-Fehler",
+      "message": "Ungueltige Regex: {DETAIL}"
+    },
+    "not_joined": {
+      "title": "Nicht beigetreten",
+      "message": "Dieser Discord-Kanal ist noch nicht verbunden. Nutze zuerst `/join`."
+    },
+    "permission_denied": {
+      "title": "Keine Berechtigung",
+      "message": "{DETAIL}"
+    },
+    "thread": {
+      "unsupported_action": {
+        "title": "Validierungsfehler",
+        "message": "Nicht unterstuetzte Aktion. Nutze `join`, `leave`, `enable`, `disable`, `color` oder `language`."
+      },
+      "already_joined": {
+        "title": "Bereits beigetreten",
+        "message": "Dieser Discord-Kanal ist bereits mit dem Observer verbunden."
+      },
+      "already_joined_other_owner": {
+        "title": "Keine Berechtigung",
+        "message": "Dieser Discord-Kanal wurde bereits von einem anderen Besitzer verbunden."
+      },
+      "joined": {
+        "title": "Observer beigetreten",
+        "message": "Der Bot ist diesem Discord-Kanal beigetreten und kann jetzt konfiguriert werden."
+      },
+      "leave_denied": {
+        "title": "Keine Berechtigung",
+        "message": "Du darfst den Bot nicht aus diesem Discord-Kanal entfernen."
+      },
+      "left": {
+        "title": "Observer verlassen",
+        "message": "Der Bot hat diesen Discord-Kanal verlassen und alle gespeicherten Einstellungen dafuer geloescht."
+      },
+      "enable_denied": {
+        "title": "Keine Berechtigung",
+        "message": "Du darfst den Observer-Status in diesem Discord-Kanal nicht aendern."
+      },
+      "already_on": {
+        "title": "Bereits an",
+        "message": "Der Observer ist in diesem Discord-Kanal bereits aktiviert."
+      },
+      "already_off": {
+        "title": "Bereits aus",
+        "message": "Der Observer ist in diesem Discord-Kanal bereits deaktiviert."
+      },
+      "enabled": {
+        "title": "Observer aktiviert",
+        "message": "Der Observer ist jetzt in diesem Discord-Kanal aktiviert."
+      },
+      "disabled": {
+        "title": "Observer deaktiviert",
+        "message": "Der Observer ist jetzt in diesem Discord-Kanal deaktiviert."
+      },
+      "color_denied": {
+        "title": "Keine Berechtigung",
+        "message": "Du darfst die Observer-Farbe in diesem Discord-Kanal nicht aendern."
+      },
+      "color_cleared": {
+        "title": "Observer-Farbe entfernt",
+        "message": "Die benutzerdefinierte Farbe fuer diesen Discord-Observer-Kontext wurde entfernt."
+      },
+      "color_updated": {
+        "title": "Observer-Farbe aktualisiert",
+        "message": "Die Farbe fuer diesen Discord-Observer-Kontext wurde auf `{COLOR}` gesetzt."
+      },
+      "language_denied": {
+        "title": "Keine Berechtigung",
+        "message": "Du darfst die Sprache in diesem Discord-Kanal nicht aendern."
+      },
+      "language_updated": {
+        "title": "Sprache aktualisiert",
+        "message": "Die Sprache fuer diesen Discord-Kanal wurde auf `{LANGUAGE_NAME}` (`{LANGUAGE_CODE}`) gesetzt."
+      }
+    },
+    "channel": {
+      "permission_denied": {
+        "title": "Keine Berechtigung",
+        "message": "Du darfst die getrackten Twitch-Kanaele nicht aendern."
+      },
+      "already_added": {
+        "title": "Bereits hinzugefuegt",
+        "message": "Der Twitch-Kanal `{DISPLAY_NAME}` (`{LOGIN}`) wird bereits getrackt."
+      },
+      "added": {
+        "title": "Kanal hinzugefuegt",
+        "message": "Der Twitch-Kanal `{DISPLAY_NAME}` (`{LOGIN}`) wurde hinzugefuegt."
+      },
+      "not_found": {
+        "title": "Nicht gefunden",
+        "message": "Der Twitch-Kanal `{DISPLAY_NAME}` (`{LOGIN}`) wird aktuell nicht getrackt."
+      },
+      "color_cleared": {
+        "title": "Kanalfarbe entfernt",
+        "message": "Die benutzerdefinierte Farbe fuer den Twitch-Kanal `{DISPLAY_NAME}` (`{LOGIN}`) wurde entfernt."
+      },
+      "color_updated": {
+        "title": "Kanalfarbe aktualisiert",
+        "message": "Die Farbe fuer den Twitch-Kanal `{DISPLAY_NAME}` (`{LOGIN}`) wurde auf `{COLOR}` gesetzt."
+      },
+      "unsupported_action": {
+        "title": "Validierungsfehler",
+        "message": "Nicht unterstuetzte Aktion. Nutze `add`, `remove` oder `color`."
+      },
+      "in_use": {
+        "title": "Kanal wird verwendet",
+        "message": "Der Twitch-Kanal `{DISPLAY_NAME}` (`{LOGIN}`) wird noch von einem oder mehreren Pings referenziert."
+      },
+      "removed": {
+        "title": "Kanal entfernt",
+        "message": "Der Twitch-Kanal `{DISPLAY_NAME}` (`{LOGIN}`) wurde entfernt."
+      }
+    },
+    "user": {
+      "permission_denied": {
+        "title": "Keine Berechtigung",
+        "message": "Du darfst die getrackten Twitch-Nutzer in diesem Discord-Kanal nicht aendern."
+      },
+      "already_added": {
+        "title": "Bereits hinzugefuegt",
+        "message": "{DISPLAY_NAME} steht bereits in der Liste der getrackten Twitch-Nutzer."
+      },
+      "added": {
+        "title": "Getrackter Nutzer hinzugefuegt",
+        "message": "[{DISPLAY_NAME}](https://www.twitch.tv/{LOGIN}) wurde zur Liste der getrackten Twitch-Nutzer hinzugefuegt."
+      },
+      "unsupported_action": {
+        "title": "Validierungsfehler",
+        "message": "Nicht unterstuetzte Aktion. Nutze `add` oder `remove`."
+      },
+      "not_found": {
+        "title": "Nicht gefunden",
+        "message": "{DISPLAY_NAME} steht nicht in der Liste der getrackten Twitch-Nutzer."
+      },
+      "in_use": {
+        "title": "Nutzer wird verwendet",
+        "message": "{DISPLAY_NAME} wird noch von einem oder mehreren Pings referenziert."
+      },
+      "removed": {
+        "title": "Getrackter Nutzer entfernt",
+        "message": "{DISPLAY_NAME} wurde aus der Liste der getrackten Twitch-Nutzer entfernt."
+      }
+    },
+    "show": {
+      "permission_denied": {
+        "title": "Keine Berechtigung",
+        "message": "Du darfst die Einstellungen nicht ansehen."
+      },
+      "overview": {
+        "title": "Konfigurationsuebersicht",
+        "message": "{CONTENT}"
+      }
+    }
+  },
+  "show": {
+    "sections": {
+      "tracked_channels": "Getrackte Kanaele",
+      "pings": "Pings",
+      "auto_replies": "Auto-Antworten",
+      "tracked_users": "Getrackte Nutzer",
+      "permissions": "Berechtigungen"
+    },
+    "empty": {
+      "tracked_channels": "Es sind noch keine Twitch-Kanaele verbunden.",
+      "pings": "Es sind noch keine Pings gespeichert.",
+      "auto_replies": "Es sind keine automatischen Antworten konfiguriert.",
+      "tracked_users": "Es sind noch keine Twitch-Nutzer verbunden."
+    },
+    "channel": {
+      "custom_color": "Eigene Farbe: `{COLOR}`",
+      "live_state": "Live-Status: `{STATE}`",
+      "notifications": "Benachrichtigungen: `{STATES}`"
+    },
+    "pattern": {
+      "line": "- {TYPE} `{ID}`",
+      "text": "Text: `{TEXT}`",
+      "priority": "Prioritaet: `{PRIORITY}`",
+      "custom_color": "Eigene Farbe: `{COLOR}`",
+      "case_sensitive": "Gross-/Kleinschreibung beachten",
+      "disabled": "Deaktiviert",
+      "subscribers_only": "Nur fuer Abonnenten",
+      "non_subscribers_only": "Nur fuer Nicht-Abonnenten",
+      "only_while_live": "Nur waehrend der Kanal live ist",
+      "only_while_offline": "Nur waehrend der Kanal offline ist"
+    },
+    "reply": {
+      "line": "- `{ID}`",
+      "trigger": "Ausloeser: `{TEXT}`",
+      "reply": "Antwort: `{TEXT}`"
+    },
+    "event_reply": {
+      "line": "- Event `{STATE}`",
+      "channel": "Kanal: [{DISPLAY_NAME}](https://www.twitch.tv/{LOGIN})",
+      "reply": "Antwort: `{TEXT}`",
+      "disabled": "Deaktiviert"
+    },
+    "permission": {
+      "owner": "Besitzer (alle Berechtigungen)",
+      "none": "Keine zusaetzlichen Berechtigungen",
+      "view": "Konfiguration ansehen",
+      "manage_channels": "Kanaele hinzufuegen und entfernen",
+      "toggle_patterns": "Pings aktivieren und deaktivieren",
+      "manage_patterns": "Pings erstellen, bearbeiten und entfernen",
+      "toggle_replies": "Auto-Antworten aktivieren und deaktivieren",
+      "manage_replies": "Auto-Antworten erstellen und entfernen",
+      "send_twitch_messages": "Twitch-Nachrichten senden",
+      "control_observer": "Observer ein- und ausschalten",
+      "leave_context": "Diesen Discord-Kanal trennen",
+      "manage_permissions": "Berechtigungen verwalten",
+      "admin": "Administrator"
+    }
+  },
+  "discord": {
+    "tracking_embed": {
+      "footer_channel": "Kanal: {CHANNEL}",
+      "reply_field": "Antwort"
+    },
+    "tracking_view": {
+      "open_channel": "Kanal oeffnen"
+    },
+    "thread_modal": {
+      "confirm_leave_title": "Verlassen bestaetigen",
+      "confirm_leave_label": "Zum Bestaetigen LEAVE eingeben",
+      "confirm_leave_placeholder": "LEAVE",
+      "confirm_leave_cancelled": {
+        "title": "Verlassen abgebrochen",
+        "message": "Gib genau `LEAVE` ein, wenn der Bot diesen Discord-Kanal verlassen soll."
+      },
+      "observer_color_title": "Observer-Farbe",
+      "observer_color_label": "Farbe",
+      "observer_color_placeholder": "#5865F2"
+    }
+  }
+}

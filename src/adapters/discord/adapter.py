@@ -18,6 +18,7 @@ from src.database.connection import (
 from src.database.connection import TrackedUserRepository
 from src.events.event_bus import EventBus
 from src.events.event_types import DiscordCommandResult
+from src.localization import Localizer
 from src.services.discord_presence_service import DiscordPresenceStatusSender
 from src.services.pattern_service import TrackingNotificationSender
 from src.adapters.twitch_api import TwitchAPIClient
@@ -42,6 +43,7 @@ class DiscordAdapter(TrackingNotificationSender, DiscordPresenceStatusSender):
         adapter_event_repository: AdapterEventRepository,
         adapter_event_action_repository: AdapterEventActionRepository,
         twitch_api: TwitchAPIClient,
+        localizer: Localizer,
     ) -> None:
         self._config = config
         self._client = ObserverDiscordClient(
@@ -57,6 +59,7 @@ class DiscordAdapter(TrackingNotificationSender, DiscordPresenceStatusSender):
                 adapter_event_action_repository=adapter_event_action_repository,
                 twitch_api=twitch_api,
             ),
+            localizer=localizer,
         )
 
     async def start(self) -> None:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Business logic for explicitly joining and leaving Discord contexts."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
 import re
 
@@ -16,6 +16,7 @@ from src.events.event_types import (
     EventType,
     TwitchTrackedChannelsChangedEvent,
 )
+from src.localization import Localizer
 from src.services.channel_command_service import IRCChannelManager
 from src.services.authz import thread_has_permission
 from src.utils.permissions import ObserverPermission
@@ -32,6 +33,7 @@ class ThreadLifecycleService:
     channel_repository: ChannelRepository
     twitch_api: TwitchAPIClient
     irc_manager: IRCChannelManager
+    localizer: Localizer = field(default_factory=Localizer.from_directory)
     permission_repository: UserPermissionRepository | None = None
 
     def __post_init__(self) -> None:
@@ -43,19 +45,21 @@ class ThreadLifecycleService:
             result = await self._handle_action(event)
         except TwitchAPIError as error:
             logger.warning("Best-effort Twitch metadata lookup failed during thread lifecycle: %s", error)
-            result = DiscordCommandResult(
-                title="Twitch API Error",
-                message=str(error),
+            result = self.localizer.result(
+                "results.twitch_api_error",
+                language=self.localizer.default_language,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                DETAIL=str(error),
             )
         except Exception as error:
             logger.exception("Unexpected error while handling thread lifecycle command.")
-            result = DiscordCommandResult(
-                title="Unexpected Error",
-                message=str(error),
+            result = self.localizer.result(
+                "results.unexpected_error",
+                language=self.localizer.default_language,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                DETAIL=str(error),
             )
 
         if not event.result_future.done():
@@ -72,9 +76,11 @@ class ThreadLifecycleService:
             return self._set_context_enabled(event, enabled=False)
         if event.action == "color":
             return self._set_context_color(event)
-        return DiscordCommandResult(
-            title="Validation Error",
-            message="Unsupported action. Use `join`, `leave`, `enable`, `disable`, or `color`.",
+        if event.action == "language":
+            return self._set_context_language(event)
+        return self.localizer.result(
+            "results.thread.unsupported_action",
+            language=self.localizer.default_language,
             style=DiscordResultStyle.ERROR,
             ephemeral=True,
         )
@@ -83,28 +89,28 @@ class ThreadLifecycleService:
         existing = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
         if existing is not None:
             if existing.owner_id == event.requester_id:
-                return DiscordCommandResult(
-                    title="Already Joined",
-                    message="This Discord channel is already connected to the observer.",
+                return self.localizer.thread_result(
+                    "results.thread.already_joined",
+                    thread=existing,
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
-            return DiscordCommandResult(
-                title="Permission Denied",
-                message="This Discord channel is already connected by another owner.",
+            return self.localizer.thread_result(
+                "results.thread.already_joined_other_owner",
+                thread=existing,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
 
-        self.thread_repository.create(owner_id=event.requester_id, discord_channel_id=event.discord_channel_id)
+        created = self.thread_repository.create(owner_id=event.requester_id, discord_channel_id=event.discord_channel_id)
         logger.debug(
             "Joined Discord context discord_channel_id=%s owner_id=%s",
             event.discord_channel_id,
             event.requester_id,
         )
-        return DiscordCommandResult(
-            title="Observer Joined",
-            message="The bot joined this Discord channel and is ready for configuration.",
+        return self.localizer.thread_result(
+            "results.thread.joined",
+            thread=created,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
         )
@@ -112,9 +118,9 @@ class ThreadLifecycleService:
     async def _leave_context(self, event: DiscordThreadRequestedEvent) -> DiscordCommandResult:
         thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
         if thread is None:
-            return DiscordCommandResult(
-                title="Not Joined",
-                message="This Discord channel is not connected yet. Use `/join` first.",
+            return self.localizer.result(
+                "results.not_joined",
+                language=self.localizer.default_language,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -124,9 +130,9 @@ class ThreadLifecycleService:
             permission_repository=self.permission_repository,
             required_permission=ObserverPermission.LEAVE_CONTEXT,
         ):
-            return DiscordCommandResult(
-                title="Permission Denied",
-                message="You do not have permission to make the bot leave this Discord channel.",
+            return self.localizer.thread_result(
+                "results.thread.leave_denied",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -148,9 +154,9 @@ class ThreadLifecycleService:
 
         deleted = self.thread_repository.delete_by_discord_channel_id(event.discord_channel_id)
         if deleted is None:
-            return DiscordCommandResult(
-                title="Not Joined",
-                message="This Discord channel is not connected yet. Use `/join` first.",
+            return self.localizer.result(
+                "results.not_joined",
+                language=self.localizer.default_language,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -165,9 +171,9 @@ class ThreadLifecycleService:
             EventType.TWITCH_TRACKED_CHANNELS_CHANGED,
             TwitchTrackedChannelsChangedEvent(reason="thread_left"),
         )
-        return DiscordCommandResult(
-            title="Observer Left",
-            message="The bot left this Discord channel and deleted all saved configuration for it.",
+        return self.localizer.thread_result(
+            "results.thread.left",
+            thread=thread,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
         )
@@ -175,9 +181,9 @@ class ThreadLifecycleService:
     def _set_context_enabled(self, event: DiscordThreadRequestedEvent, *, enabled: bool) -> DiscordCommandResult:
         thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
         if thread is None:
-            return DiscordCommandResult(
-                title="Not Joined",
-                message="This Discord channel is not connected yet. Use `/join` first.",
+            return self.localizer.result(
+                "results.not_joined",
+                language=self.localizer.default_language,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -187,29 +193,25 @@ class ThreadLifecycleService:
             permission_repository=self.permission_repository,
             required_permission=ObserverPermission.CONTROL_OBSERVER,
         ):
-            return DiscordCommandResult(
-                title="Permission Denied",
-                message="You do not have permission to change the observer state in this Discord channel.",
+            return self.localizer.thread_result(
+                "results.thread.enable_denied",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
         if thread.enabled == enabled:
-            return DiscordCommandResult(
-                title="Already On" if enabled else "Already Off",
-                message="The observer is already enabled in this Discord channel."
-                if enabled
-                else "The observer is already disabled in this Discord channel.",
+            return self.localizer.thread_result(
+                "results.thread.already_on" if enabled else "results.thread.already_off",
+                thread=thread,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
             )
 
         updated = self.thread_repository.set_enabled(discord_channel_id=event.discord_channel_id, enabled=enabled)
         assert updated is not None
-        return DiscordCommandResult(
-            title="Observer Enabled" if enabled else "Observer Disabled",
-            message="The observer is now enabled in this Discord channel."
-            if enabled
-            else "The observer is now disabled in this Discord channel.",
+        return self.localizer.thread_result(
+            "results.thread.enabled" if enabled else "results.thread.disabled",
+            thread=updated,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
         )
@@ -217,9 +219,9 @@ class ThreadLifecycleService:
     def _set_context_color(self, event: DiscordThreadRequestedEvent) -> DiscordCommandResult:
         thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
         if thread is None:
-            return DiscordCommandResult(
-                title="Not Joined",
-                message="This Discord channel is not connected yet. Use `/join` first.",
+            return self.localizer.result(
+                "results.not_joined",
+                language=self.localizer.default_language,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -229,36 +231,89 @@ class ThreadLifecycleService:
             permission_repository=self.permission_repository,
             required_permission=ObserverPermission.CONTROL_OBSERVER,
         ):
-            return DiscordCommandResult(
-                title="Permission Denied",
-                message="You do not have permission to change the observer color in this Discord channel.",
+            return self.localizer.thread_result(
+                "results.thread.color_denied",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
         if event.clear_color:
             updated = self.thread_repository.set_color(discord_channel_id=event.discord_channel_id, color=None)
             assert updated is not None
-            return DiscordCommandResult(
-                title="Observer Color Cleared",
-                message="Cleared the custom color for this Discord observer context.",
+            return self.localizer.thread_result(
+                "results.thread.color_cleared",
+                thread=updated,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )
         if event.color is None or not re.fullmatch(r"#[0-9A-Fa-f]{6}", event.color.strip()):
-            return DiscordCommandResult(
-                title="Validation Error",
-                message="Color must use the format `#RRGGBB` or set `clear:true`.",
+            return self.localizer.thread_result(
+                "results.validation_error",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                DETAIL="Color must use the format `#RRGGBB` or set `clear:true`.",
             )
         updated = self.thread_repository.set_color(
             discord_channel_id=event.discord_channel_id,
             color=event.color.strip(),
         )
         assert updated is not None
-        return DiscordCommandResult(
-            title="Observer Color Updated",
-            message=f"Set the color for this Discord observer context to `{updated.color}`.",
+        return self.localizer.thread_result(
+            "results.thread.color_updated",
+            thread=updated,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
+            COLOR=updated.color or "",
+        )
+
+    def _set_context_language(self, event: DiscordThreadRequestedEvent) -> DiscordCommandResult:
+        thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+        if thread is None:
+            return self.localizer.result(
+                "results.not_joined",
+                language=self.localizer.default_language,
+                style=DiscordResultStyle.ERROR,
+                ephemeral=True,
+            )
+        if not thread_has_permission(
+            thread=thread,
+            requester_id=event.requester_id,
+            permission_repository=self.permission_repository,
+            required_permission=ObserverPermission.CONTROL_OBSERVER,
+        ):
+            return self.localizer.thread_result(
+                "results.thread.language_denied",
+                thread=thread,
+                style=DiscordResultStyle.ERROR,
+                ephemeral=True,
+            )
+        requested_language = self.localizer.normalize_language(event.language)
+        if not self.localizer.has_language(requested_language):
+            return self.localizer.thread_result(
+                "results.validation_error",
+                thread=thread,
+                style=DiscordResultStyle.ERROR,
+                ephemeral=True,
+                DETAIL=(
+                    "Unsupported language. Available languages: "
+                    + ", ".join(f"`{language}`" for language in self.localizer.available_languages())
+                ),
+            )
+        updated = self.thread_repository.set_language(
+            discord_channel_id=event.discord_channel_id,
+            language=requested_language,
+        )
+        assert updated is not None
+        language_name = self.localizer.text(
+            "common.language_name",
+            language=requested_language,
+        )
+        return self.localizer.thread_result(
+            "results.thread.language_updated",
+            thread=updated,
+            style=DiscordResultStyle.SUCCESS,
+            ephemeral=False,
+            LANGUAGE_NAME=language_name,
+            LANGUAGE_CODE=requested_language,
         )
