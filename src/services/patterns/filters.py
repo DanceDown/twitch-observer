@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Twitch scope resolution for pattern command requests."""
 
-"""Twitch scope resolution for pattern command requests."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -190,3 +190,4 @@ class PatternFilterResolver:
             language=self.localizer.language_for_thread(thread),
             **placeholders,
         )
+

@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-"""Anonymous Twitch IRC adapter.
+﻿"""Anonymous Twitch IRC adapter.
 
 This adapter is responsible only for transport and normalization:
 - connect to Twitch IRC anonymously
@@ -10,6 +8,8 @@ This adapter is responsible only for transport and normalization:
 
 All business logic stays outside of this module.
 """
+
+from __future__ import annotations
 
 import asyncio
 import logging
@@ -269,3 +269,4 @@ def _parse_prefix_nick(prefix: str | None) -> str:
     if not prefix:
         return ""
     return prefix.split("!", 1)[0]
+

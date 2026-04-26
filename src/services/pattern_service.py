@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Compatibility exports for pattern-related services."""
 
-"""Compatibility exports for pattern-related services."""
+from __future__ import annotations
 
 from src.services.patterns import (
     PatternCommandService,
@@ -15,3 +15,4 @@ __all__ = [
     "ShowCommandService",
     "TrackingNotificationSender",
 ]
+

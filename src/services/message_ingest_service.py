@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Business services reacting to domain events."""
 
-"""Business services reacting to domain events."""
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 
@@ -29,3 +29,4 @@ class MessageIngestService:
         """Store an incoming message and track processing metrics."""
         self.message_repository.save_twitch_message(event)
         self.handled_messages += 1
+

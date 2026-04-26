@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Tracked Twitch channel events, persistence and Discord notifications."""
 
-"""Tracked Twitch channel events, persistence and Discord notifications."""
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
@@ -362,3 +362,4 @@ class ChannelEventNotificationService:
                     ephemeral=False,
                 ),
             )
+

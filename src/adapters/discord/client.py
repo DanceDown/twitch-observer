@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Discord client implementation hosting slash commands and outbound messaging helpers."""
 
-"""Discord client implementation hosting slash commands and outbound messaging helpers."""
+from __future__ import annotations
 
 import logging
 
@@ -110,3 +110,4 @@ class ObserverDiscordClient(discord.Client):
             channel = await self.fetch_channel(discord_channel_id)
         if isinstance(channel, discord.TextChannel | discord.Thread | discord.DMChannel):
             await channel.send(embed=build_result_embed(result))
+

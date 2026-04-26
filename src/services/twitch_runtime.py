@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Shared Twitch runtime helpers used across services and adapters."""
 
-"""Shared Twitch runtime helpers used across services and adapters."""
+from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime, timedelta
@@ -194,3 +194,4 @@ def offline_state_allows(pattern: PatternRecord, live_status: bool | None) -> bo
     if pattern.offline_state == "offline":
         return not live_status
     return False
+

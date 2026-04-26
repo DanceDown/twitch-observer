@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Lifecycle wrapper around the Discord client implementation."""
 
-"""Lifecycle wrapper around the Discord client implementation."""
+from __future__ import annotations
 
 from contextlib import suppress
 
@@ -116,3 +116,4 @@ class DiscordAdapter(TrackingNotificationSender, DiscordPresenceStatusSender):
             return
         with suppress(discord.HTTPException):
             await self._client.set_status_text(text)
+

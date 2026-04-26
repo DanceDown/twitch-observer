@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Business logic for per-thread Discord permission management."""
 
-"""Business logic for per-thread Discord permission management."""
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
@@ -179,3 +179,4 @@ class PermissionCommandService:
     ) -> DiscordCommandResult:
         thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
         return self.localizer.thread_result(key, thread=thread, style=style, ephemeral=ephemeral, **placeholders)
+

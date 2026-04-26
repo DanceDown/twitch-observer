@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Periodic app-token-based Twitch live-state monitor for tracked channels."""
 
-"""Periodic app-token-based Twitch live-state monitor for tracked channels."""
+from __future__ import annotations
 
 import asyncio
 import contextlib
@@ -117,3 +117,4 @@ class TwitchLiveMonitorService:
                     changed_at=changed_at,
                 ),
             )
+

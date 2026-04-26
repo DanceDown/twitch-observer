@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Discord UI for `/show`."""
 
-"""Discord UI for `/show`."""
+from __future__ import annotations
 
 from contextlib import suppress
 
@@ -265,3 +265,4 @@ class ShowSectionModal(discord.ui.Modal):
             ephemeral=True,
         )
         view.bound_message = await interaction.original_response()
+

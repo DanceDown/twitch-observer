@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Discord UI for `/write`."""
 
-"""Discord UI for `/write`."""
+from __future__ import annotations
 
 import discord
 
@@ -72,3 +72,4 @@ class WriteModal(discord.ui.Modal):
             reply_parent_message_id=normalize_optional_text(self.reply_to.value),
         )
         await send_initial_result(interaction, result)
+

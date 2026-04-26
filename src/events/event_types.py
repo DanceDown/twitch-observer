@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Typed event declarations shared across adapters and services."""
 
-"""Typed event declarations shared across adapters and services."""
+from __future__ import annotations
 
 from asyncio import Future
 from dataclasses import dataclass, field
@@ -254,3 +254,4 @@ class TwitchChannelLiveStateChangedEvent:
     is_live: bool
     twitch_channel_login: str | None = None
     changed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+

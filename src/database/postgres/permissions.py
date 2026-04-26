@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""PostgreSQL permission persistence."""
 
-"""PostgreSQL permission persistence."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -86,3 +86,4 @@ class PostgresUserPermissionRepository(UserPermissionRepository):
             )
             rows = cursor.fetchall()
         return [UserPermissionRecord(discord_user_id=int(row[0]), thread_id=int(row[1]), permissions=int(row[2])) for row in rows]
+

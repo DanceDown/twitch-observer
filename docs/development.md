@@ -6,9 +6,7 @@ This document describes local developer tooling that is intentionally kept out o
 
 Ruff is the project's Python linter. It checks for common Python mistakes, unused code, import ordering, and small simplifications.
 
-The active rule set is configured in [ruff.toml](../ruff.toml). The project currently ignores `E402` because many files keep
-`from __future__ import annotations` before the module docstring. Treat that as an existing project convention until it is cleaned up in
-one dedicated pass.
+The active rule set is configured in [ruff.toml](../ruff.toml).
 
 ### Run Ruff in Docker
 

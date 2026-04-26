@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Shared Discord adapter helpers for command handlers and modals."""
 
-"""Shared Discord adapter helpers for command handlers and modals."""
+from __future__ import annotations
 
 from contextlib import suppress
 
@@ -156,3 +156,4 @@ def split_csv_values(value: str | None) -> tuple[str, ...]:
         if cleaned and cleaned not in unique_values:
             unique_values.append(cleaned)
     return tuple(unique_values)
+

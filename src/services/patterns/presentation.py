@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Localized presentation helpers for pattern command results."""
 
-"""Localized presentation helpers for pattern command results."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -277,3 +277,4 @@ class PatternCommandPresenter:
 
     def offline_state(self, value: str, *, language: str) -> str:
         return self.localizer.text(f"results.pattern.offline_state.{value}", language=language)
+

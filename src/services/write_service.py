@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Business logic for manually sending Twitch chat messages from Discord."""
 
-"""Business logic for manually sending Twitch chat messages from Discord."""
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
@@ -204,3 +204,4 @@ class TwitchWriteCommandService:
             ephemeral=ephemeral,
             **placeholders,
         )
+

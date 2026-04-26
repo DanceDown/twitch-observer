@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Discord UI for `/user`."""
 
-"""Discord UI for `/user`."""
+from __future__ import annotations
 
 import discord
 
@@ -184,3 +184,4 @@ class UserMenuView(BaseFormView):
                 bound_message=self.bound_message,
             )
         )
+

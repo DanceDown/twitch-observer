@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Background service updating the bot's Discord custom status from recent Twitch messages."""
 
-"""Background service updating the bot's Discord custom status from recent Twitch messages."""
+from __future__ import annotations
 
 import asyncio
 import random
@@ -68,5 +68,6 @@ class DiscordPresenceService:
             return ""
         max_content_length = max(1, self.max_status_length - len(suffix))
         if len(cleaned) > max_content_length:
-            cleaned = cleaned[: max_content_length - 1].rstrip() + "…"
+            cleaned = cleaned[: max_content_length - 1].rstrip() + "â€¦"
         return f'"{cleaned}"{suffix}'
+

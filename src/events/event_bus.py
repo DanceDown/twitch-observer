@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Simple in-process event bus connecting adapters and services."""
 
-"""Simple in-process event bus connecting adapters and services."""
+from __future__ import annotations
 
 import inspect
 import logging
@@ -57,3 +57,4 @@ def _handler_name(handler: EventHandler) -> str:
     if owner is None:
         return name
     return f"{owner.__class__.__name__}.{name}"
+

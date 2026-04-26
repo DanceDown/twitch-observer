@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Discord UI for `/reply`."""
 
-"""Discord UI for `/reply`."""
+from __future__ import annotations
 
 import discord
 
@@ -431,3 +431,4 @@ class ReplyMenuView(BaseFormView):
                 bound_message=self.bound_message,
             )
         )
+

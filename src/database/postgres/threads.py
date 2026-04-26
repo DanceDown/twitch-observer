@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""PostgreSQL repositories for thread-scoped observer state."""
 
-"""PostgreSQL repositories for thread-scoped observer state."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -521,3 +521,4 @@ class PostgresTrackedUserRepository(TrackedUserRepository):
             row = cursor.fetchone()
         assert row is not None
         return int(row[0])
+

@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Business logic for `/show` configuration overviews."""
 
-"""Business logic for `/show` configuration overviews."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -485,3 +485,4 @@ class ShowCommandService:
         if "`" in text:
             return text
         return f"`{text}`"
+

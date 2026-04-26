@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Business logic for `/ping` add/edit/remove requests."""
 
-"""Business logic for `/ping` add/edit/remove requests."""
+from __future__ import annotations
 
 import logging
 import re
@@ -649,3 +649,4 @@ class PatternCommandService:
         if offline_state != "both":
             priority += 1
         return min(priority, 9)
+

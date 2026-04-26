@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""PostgreSQL database connection helpers."""
 
-"""PostgreSQL database connection helpers."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -226,3 +226,4 @@ class PostgresDatabase:
                 END $$;
                 """
             )
+

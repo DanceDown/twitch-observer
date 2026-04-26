@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""PostgreSQL message persistence."""
 
-"""PostgreSQL message persistence."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -79,3 +79,4 @@ class PostgresMessageRepository(MessageRepository):
         """Build a deterministic fallback ID when Twitch did not provide one."""
         timestamp = event.sent_at.isoformat()
         return f"{event.channel_login}:{event.author_login}:{timestamp}:{hash(event.content)}"
+

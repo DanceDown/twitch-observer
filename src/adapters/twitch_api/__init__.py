@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Minimal Twitch API client used for validation and metadata lookup."""
 
-"""Minimal Twitch API client used for validation and metadata lookup."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -430,3 +430,4 @@ def _normalize_access_token(access_token: str) -> str:
     if normalized.lower().startswith("oauth:"):
         normalized = normalized[6:]
     return normalized
+

@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Runtime execution of live/offline event auto-replies."""
 
-"""Runtime execution of live/offline event auto-replies."""
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
@@ -152,3 +152,4 @@ class ChannelEventAutoReplyService:
     ) -> str:
         rendered = template.replace("{CHANNEL}", channel_name)
         return rendered.replace("{STATE}", state)
+

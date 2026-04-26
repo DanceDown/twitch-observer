@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Shared authorization helpers for thread-scoped Discord actions."""
 
-"""Shared authorization helpers for thread-scoped Discord actions."""
+from __future__ import annotations
 
 from src.database.connection import ThreadRecord, UserPermissionRepository
 from src.utils.permissions import ObserverPermission, has_permission
@@ -25,3 +25,4 @@ def thread_has_permission(
     if record is None:
         return False
     return has_permission(record.permissions, required_permission)
+

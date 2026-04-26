@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Startup synchronization for persisted Twitch IRC channel subscriptions."""
 
-"""Startup synchronization for persisted Twitch IRC channel subscriptions."""
+from __future__ import annotations
 
 import asyncio
 import contextlib
@@ -84,3 +84,4 @@ class IRCBootstrapService:
                 await asyncio.wait_for(self._stop_event.wait(), timeout=self.resync_interval_seconds)
             except TimeoutError:
                 await self.sync_persisted_channels()
+

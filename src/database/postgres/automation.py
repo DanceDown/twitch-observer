@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""PostgreSQL repositories for patterns, replies, and event actions."""
 
-"""PostgreSQL repositories for patterns, replies, and event actions."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -900,3 +900,4 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
             reply_as_reply=bool(row[3]),
             disabled=bool(row[4]),
         )
+

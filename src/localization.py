@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Runtime localization helpers backed by JSON language files."""
 
-"""Runtime localization helpers backed by JSON language files."""
+from __future__ import annotations
 
 import json
 from dataclasses import dataclass
@@ -187,3 +187,4 @@ class Localizer:
             parts.append(str(placeholders[name]))
             index = end_index + 1
         return "".join(parts)
+

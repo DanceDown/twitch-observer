@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Shared Discord UI primitives used across command-specific flows."""
 
-"""Shared Discord UI primitives used across command-specific flows."""
+from __future__ import annotations
 
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -224,3 +224,4 @@ class BaseFormView(discord.ui.View):
     def render_embed(self) -> discord.Embed:
         """Render the current form state into one Discord embed."""
         raise NotImplementedError
+

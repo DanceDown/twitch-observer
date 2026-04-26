@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Persistent Twitch user metadata cache backed by PostgreSQL."""
 
-"""Persistent Twitch user metadata cache backed by PostgreSQL."""
+from __future__ import annotations
 
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -250,3 +250,4 @@ class TwitchUserDirectoryIngestService:
 
     def handle_chat_message(self, event: TwitchChatMessageEvent) -> None:
         self.directory.observe_chat_message(event)
+

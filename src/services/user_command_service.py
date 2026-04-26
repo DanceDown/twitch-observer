@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Business logic for tracked Twitch-user management commands."""
 
-"""Business logic for tracked Twitch-user management commands."""
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
@@ -159,3 +159,4 @@ class UserCommandService:
             ephemeral=False,
             DISPLAY_NAME=twitch_user.display_name,
         )
+

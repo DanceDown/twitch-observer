@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Business logic for Twitch account linking through the Device Code Flow."""
 
-"""Business logic for Twitch account linking through the Device Code Flow."""
+from __future__ import annotations
 
 import asyncio
 import contextlib
@@ -472,3 +472,4 @@ class DeviceFlowPollingService:
             return True
         last_polled = datetime.fromisoformat(pending.last_polled_at)
         return now >= last_polled + timedelta(seconds=pending.interval_seconds)
+

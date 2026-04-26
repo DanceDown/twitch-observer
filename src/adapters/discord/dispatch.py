@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Event-bus dispatch helpers used by Discord slash commands and modals."""
 
-"""Event-bus dispatch helpers used by Discord slash commands and modals."""
+from __future__ import annotations
 
 import asyncio
 
@@ -374,3 +374,4 @@ async def dispatch_ui_flow_decision(
         ),
     )
     return await result_future
+

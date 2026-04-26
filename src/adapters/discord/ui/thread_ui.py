@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Discord UI for thread-level observer commands."""
 
-"""Discord UI for thread-level observer commands."""
+from __future__ import annotations
 
 from contextlib import suppress
 
@@ -115,3 +115,4 @@ class ThreadColorModal(discord.ui.Modal):
             clear_color=normalize_optional_text(self.color.value) is None,
         )
         await send_initial_result(interaction, result)
+

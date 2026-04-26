@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Application entry point wiring adapters, services and persistence together."""
 
-"""Application entry point wiring adapters, services and persistence together."""
+from __future__ import annotations
 
 import asyncio
 import logging
@@ -361,3 +361,4 @@ def _log_background_task_failure(task: asyncio.Task[object]) -> None:
 
 if __name__ == "__main__":
     main()
+

@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Runtime pattern matching for incoming Twitch chat messages."""
 
-"""Runtime pattern matching for incoming Twitch chat messages."""
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
@@ -190,3 +190,4 @@ class PatternTrackingService:
             p_index=pattern_id,
         )
         return reply is not None and not reply.disabled
+

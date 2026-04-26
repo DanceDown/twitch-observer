@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Shared PostgreSQL record dataclasses."""
 
-"""Shared PostgreSQL record dataclasses."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -166,3 +166,4 @@ class RecentMessageRecord:
     username: str
     content: str
     timestamp: datetime
+

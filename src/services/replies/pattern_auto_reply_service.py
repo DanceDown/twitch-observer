@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Runtime execution of pattern-bound Twitch auto-replies."""
 
-"""Runtime execution of pattern-bound Twitch auto-replies."""
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
@@ -375,3 +375,4 @@ class AutoReplyService:
                 ephemeral=False,
             ),
         )
+

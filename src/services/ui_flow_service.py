@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Service-owned guards for Discord UI flow steps."""
 
-"""Service-owned guards for Discord UI flow steps."""
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 
@@ -164,3 +164,4 @@ class DiscordUIFlowGuardService:
     @staticmethod
     def _blocked(event: DiscordUIFlowRequestedEvent, result: DiscordCommandResult) -> DiscordUIFlowDecision:
         return DiscordUIFlowDecision(flow=event.flow, step=event.step, open_ui=False, result=result)
+

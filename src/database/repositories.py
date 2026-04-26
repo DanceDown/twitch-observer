@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Repository interfaces for PostgreSQL-backed persistence."""
 
-"""Repository interfaces for PostgreSQL-backed persistence."""
+from __future__ import annotations
 
 from datetime import datetime
 
@@ -603,3 +603,4 @@ class UserPermissionRepository:
 
     def list_for_thread(self, *, thread_id: int) -> list[UserPermissionRecord]:  # pragma: no cover
         raise NotImplementedError
+

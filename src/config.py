@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Application configuration loaded from environment variables."""
 
-"""Application configuration loaded from environment variables."""
+from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
@@ -87,3 +87,4 @@ class AppConfig:
             f"host={self.postgres_host} "
             f"port={self.postgres_port}"
         )
+

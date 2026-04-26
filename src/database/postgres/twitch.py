@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""PostgreSQL repositories for Twitch account and cache state."""
 
-"""PostgreSQL repositories for Twitch account and cache state."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -603,3 +603,4 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
             updated_at=row[4].isoformat(),
             last_api_refresh_at=row[5].isoformat() if row[5] is not None else None,
         )
+

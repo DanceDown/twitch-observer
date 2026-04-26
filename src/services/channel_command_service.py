@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Business logic for Discord channel-management commands."""
 
-"""Business logic for Discord channel-management commands."""
+from __future__ import annotations
 
 import logging
 import re
@@ -258,3 +258,4 @@ class ChannelCommandService:
             DISPLAY_NAME=twitch_user.display_name,
             LOGIN=twitch_user.login,
         )
+

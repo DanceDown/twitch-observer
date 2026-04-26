@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Read-only data helpers used by Discord-side configuration forms."""
 
-"""Read-only data helpers used by Discord-side configuration forms."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -223,3 +223,4 @@ class DiscordUIDataProvider:
             twitch_user: TwitchUser = await self.twitch_api.get_user_by_id(user_id)
             names.append(twitch_user.display_name)
         return tuple(names)
+

@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Centralized Discord embed styling helpers."""
 
-"""Centralized Discord embed styling helpers."""
+from __future__ import annotations
 
 import re
 
@@ -145,3 +145,4 @@ def format_twitch_code_link(*, display_name: str, login: str) -> str:
     """Render a Twitch profile link whose visible name is safe from markdown."""
     safe_name = display_name.replace("`", "")
     return f"[`{safe_name}`](https://www.twitch.tv/{login})"
+

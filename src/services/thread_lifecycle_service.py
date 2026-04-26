@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿"""Business logic for explicitly joining and leaving Discord contexts."""
 
-"""Business logic for explicitly joining and leaving Discord contexts."""
+from __future__ import annotations
 
 import logging
 import re
@@ -319,3 +319,4 @@ class ThreadLifecycleService:
             LANGUAGE_NAME=language_name,
             LANGUAGE_CODE=requested_language,
         )
+
