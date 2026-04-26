@@ -10,6 +10,7 @@ from ..records import TwitchAccountRecord, TwitchDeviceFlowRecord, TwitchUserCac
 from ..repositories import TwitchAccountRepository, TwitchDeviceFlowRepository, TwitchUserCacheRepository
 from .database import PostgresDatabase
 
+
 @dataclass(slots=True)
 class PostgresTwitchAccountRepository(TwitchAccountRepository):
     """Store and retrieve linked Twitch user accounts."""
@@ -571,7 +572,7 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
                     display_name = COALESCE(%s, twitch_user_cache.display_name, EXCLUDED.display_name),
                     updated_at = CASE
                         WHEN twitch_user_cache.twitch_login IS DISTINCT FROM EXCLUDED.twitch_login
-                          OR (%s IS NOT NULL AND twitch_user_cache.display_name IS DISTINCT FROM %s)
+                          OR (%s::text IS NOT NULL AND twitch_user_cache.display_name IS DISTINCT FROM %s::text)
                         THEN NOW()
                         ELSE twitch_user_cache.updated_at
                     END

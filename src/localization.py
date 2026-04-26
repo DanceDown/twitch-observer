@@ -2,8 +2,8 @@ from __future__ import annotations
 
 """Runtime localization helpers backed by JSON language files."""
 
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -38,7 +38,7 @@ class Localizer:
     default_language: str = DEFAULT_LANGUAGE
 
     @classmethod
-    def from_directory(cls, directory: Path = _LANG_DIRECTORY) -> "Localizer":
+    def from_directory(cls, directory: Path = _LANG_DIRECTORY) -> Localizer:
         """Load every JSON language catalog from one directory into memory."""
         catalogs: dict[str, dict[str, Any]] = {}
         for path in sorted(directory.glob("*.json")):
@@ -97,6 +97,7 @@ class Localizer:
         language: str | None = None,
         style: DiscordResultStyle = DiscordResultStyle.INFO,
         ephemeral: bool = False,
+        thumbnail_url: str | None = None,
         **placeholders: object,
     ) -> DiscordCommandResult:
         """Resolve a localized command result object with `title` and `message`."""
@@ -116,6 +117,7 @@ class Localizer:
             message=self._interpolate(message, placeholders),
             style=style,
             ephemeral=ephemeral,
+            thumbnail_url=thumbnail_url,
         )
 
     def thread_result(
@@ -125,6 +127,7 @@ class Localizer:
         thread: ThreadRecord | None,
         style: DiscordResultStyle = DiscordResultStyle.INFO,
         ephemeral: bool = False,
+        thumbnail_url: str | None = None,
         **placeholders: object,
     ) -> DiscordCommandResult:
         """Resolve a localized command result using the language configured on one thread."""
@@ -133,6 +136,7 @@ class Localizer:
             language=self.language_for_thread(thread),
             style=style,
             ephemeral=ephemeral,
+            thumbnail_url=thumbnail_url,
             **placeholders,
         )
 

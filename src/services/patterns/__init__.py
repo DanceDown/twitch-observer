@@ -4,7 +4,7 @@ from .tracking_service import PatternTrackingService, TrackingNotificationSender
 
 __all__ = [
     "PatternCommandService",
-    "ShowCommandService",
     "PatternTrackingService",
+    "ShowCommandService",
     "TrackingNotificationSender",
 ]

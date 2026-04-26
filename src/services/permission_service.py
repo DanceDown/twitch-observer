@@ -2,8 +2,8 @@ from __future__ import annotations
 
 """Business logic for per-thread Discord permission management."""
 
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass, field
 
 from src.database.connection import ThreadRepository, UserPermissionRepository
 from src.events.event_bus import EventBus
@@ -13,6 +13,7 @@ from src.events.event_types import (
     DiscordResultStyle,
     EventType,
 )
+from src.localization import Localizer
 from src.services.authz import thread_has_permission
 from src.utils.permissions import ObserverPermission, permissions_mask_from_values
 
@@ -26,6 +27,7 @@ class PermissionCommandService:
     event_bus: EventBus
     thread_repository: ThreadRepository
     permission_repository: UserPermissionRepository
+    localizer: Localizer = field(default_factory=Localizer.from_directory)
 
     def __post_init__(self) -> None:
         self.event_bus.subscribe(EventType.DISCORD_PERMISSION_REQUESTED, self.handle_request)
@@ -34,17 +36,19 @@ class PermissionCommandService:
         try:
             result = self._handle_action(event)
         except ValueError as error:
-            result = DiscordCommandResult(
-                title="Validation Error",
-                message=str(error),
+            result = self._event_result(
+                event,
+                "results.validation_error",
+                DETAIL=str(error),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
         except Exception as error:
             logger.exception("Unexpected error while handling permission command.")
-            result = DiscordCommandResult(
-                title="Unexpected Error",
-                message=str(error),
+            result = self._event_result(
+                event,
+                "results.unexpected_error",
+                DETAIL=str(error),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -55,9 +59,8 @@ class PermissionCommandService:
     def _handle_action(self, event: DiscordPermissionRequestedEvent) -> DiscordCommandResult:
         thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
         if thread is None:
-            return DiscordCommandResult(
-                title="Not Joined",
-                message="This Discord channel is not connected yet. Use `/join` first.",
+            return self.localizer.result(
+                "results.not_joined",
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -68,17 +71,17 @@ class PermissionCommandService:
             permission_repository=self.permission_repository,
             required_permission=ObserverPermission.MANAGE_PERMISSIONS,
         ):
-            return DiscordCommandResult(
-                title="Permission Denied",
-                message="You do not have permission to change permissions in this Discord channel.",
+            return self.localizer.thread_result(
+                "results.permission.permission_denied",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
 
         if event.target_user_id == thread.owner_id:
-            return DiscordCommandResult(
-                title="Validation Error",
-                message="The thread owner already has all permissions and cannot be changed here.",
+            return self.localizer.thread_result(
+                "results.permission.owner_locked",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -88,19 +91,16 @@ class PermissionCommandService:
                 discord_user_id=event.target_user_id,
                 thread_id=thread.thread_id,
             )
-            return DiscordCommandResult(
-                title="Permissions Cleared" if removed else "No Permissions Found",
-                message=(
-                    f"Removed all extra permissions from <@{event.target_user_id}>."
-                    if removed
-                    else f"<@{event.target_user_id}> does not have any extra permissions here."
-                ),
+            return self.localizer.thread_result(
+                "results.permission.cleared" if removed else "results.permission.none_found",
+                thread=thread,
+                TARGET=f"<@{event.target_user_id}>",
                 style=DiscordResultStyle.SUCCESS if removed else DiscordResultStyle.INFO,
-                ephemeral=False if removed else True,
+                ephemeral=not removed,
             )
 
         if not event.permissions:
-            raise ValueError("Please choose at least one permission.")
+            raise ValueError(self.localizer.text("results.permission.empty_selection", language=thread.language))
         requested_permissions = tuple(dict.fromkeys(event.permissions))
         permission_mask = permissions_mask_from_values(requested_permissions)
         current = self.permission_repository.get_by_user_and_thread(
@@ -116,10 +116,12 @@ class PermissionCommandService:
                 thread_id=thread.thread_id,
                 permissions=new_mask,
             )
-            rendered = "\n".join(f"- {self._permission_label(value)}" for value in requested_permissions)
-            return DiscordCommandResult(
-                title="Permissions Granted",
-                message=f"Gave these permissions to <@{updated.discord_user_id}>:\n{rendered}",
+            rendered = "\n".join(f"- {self._permission_label(value, language=thread.language)}" for value in requested_permissions)
+            return self.localizer.thread_result(
+                "results.permission.granted",
+                thread=thread,
+                TARGET=f"<@{updated.discord_user_id}>",
+                PERMISSIONS=rendered,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )
@@ -127,10 +129,12 @@ class PermissionCommandService:
         if event.action == "revoke":
             matched_mask = current_mask & permission_mask
             if not matched_mask:
-                rendered = "\n".join(f"- {self._permission_label(value)}" for value in requested_permissions)
-                return DiscordCommandResult(
-                    title="Permissions Not Granted",
-                    message=f"<@{event.target_user_id}> does not explicitly have these permissions:\n{rendered}",
+                rendered = "\n".join(f"- {self._permission_label(value, language=thread.language)}" for value in requested_permissions)
+                return self.localizer.thread_result(
+                    "results.permission.not_granted",
+                    thread=thread,
+                    TARGET=f"<@{event.target_user_id}>",
+                    PERMISSIONS=rendered,
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
@@ -146,28 +150,32 @@ class PermissionCommandService:
                     thread_id=thread.thread_id,
                     permissions=new_mask,
                 )
-            rendered = "\n".join(f"- {self._permission_label(value)}" for value in requested_permissions)
-            return DiscordCommandResult(
-                title="Permissions Revoked",
-                message=f"Removed these permissions from <@{event.target_user_id}>:\n{rendered}",
+            rendered = "\n".join(f"- {self._permission_label(value, language=thread.language)}" for value in requested_permissions)
+            return self.localizer.thread_result(
+                "results.permission.revoked",
+                thread=thread,
+                TARGET=f"<@{event.target_user_id}>",
+                PERMISSIONS=rendered,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )
 
-        raise ValueError("Unsupported action. Use grant, revoke or clear.")
+        raise ValueError(self.localizer.text("results.permission.unsupported_action", language=thread.language))
 
-    @staticmethod
-    def _permission_label(value: str) -> str:
-        return {
-            "view": "View configuration",
-            "manage_channels": "Add and remove channels",
-            "toggle_patterns": "Enable and disable pings",
-            "manage_patterns": "Create, edit and remove pings",
-            "toggle_replies": "Enable and disable auto-replies",
-            "manage_replies": "Create and remove auto-replies",
-            "send_twitch_messages": "Send Twitch messages",
-            "control_observer": "Turn the observer on or off",
-            "leave_context": "Disconnect this Discord channel",
-            "manage_permissions": "Manage permissions",
-            "admin": "Administrator",
-        }.get(value, value.replace("_", " ").capitalize())
+    def _permission_label(self, value: str, *, language: str) -> str:
+        try:
+            return self.localizer.text(f"show.permission.{value}", language=language)
+        except ValueError:
+            return value.replace("_", " ").capitalize()
+
+    def _event_result(
+        self,
+        event: DiscordPermissionRequestedEvent,
+        key: str,
+        *,
+        style: DiscordResultStyle,
+        ephemeral: bool,
+        **placeholders: object,
+    ) -> DiscordCommandResult:
+        thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+        return self.localizer.thread_result(key, thread=thread, style=style, ephemeral=ephemeral, **placeholders)

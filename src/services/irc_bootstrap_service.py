@@ -3,8 +3,9 @@ from __future__ import annotations
 """Startup synchronization for persisted Twitch IRC channel subscriptions."""
 
 import asyncio
+import contextlib
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from src.adapters.twitch_api import TwitchAPIClient, TwitchAPIError
 from src.database.connection import ChannelRepository
@@ -30,6 +31,25 @@ class IRCBootstrapService:
     twitch_api: TwitchAPIClient
     irc_manager: IRCBootstrapManager
     connect_timeout_seconds: float
+    resync_interval_seconds: float | None = None
+    _task: asyncio.Task[None] | None = field(default=None, init=False)
+    _stop_event: asyncio.Event = field(default_factory=asyncio.Event, init=False)
+
+    async def start_periodic_sync(self) -> None:
+        """Start periodic idempotent IRC re-joins for persisted channels."""
+        if self.resync_interval_seconds is None or self.resync_interval_seconds <= 0:
+            return
+        if self._task is None:
+            self._task = asyncio.create_task(self._run_periodic_sync(), name="twitch-irc-channel-resync")
+
+    async def stop_periodic_sync(self) -> None:
+        """Stop the periodic IRC re-join loop."""
+        self._stop_event.set()
+        if self._task is not None:
+            self._task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._task
+            self._task = None
 
     async def sync_persisted_channels(self) -> None:
         """Load all stored channels from the DB and join them on IRC."""
@@ -40,7 +60,7 @@ class IRCBootstrapService:
 
         try:
             await asyncio.wait_for(self.irc_manager.wait_until_connected(), timeout=self.connect_timeout_seconds)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(
                 "Timed out waiting for Twitch IRC to become ready; persisted channels were not re-joined yet."
             )
@@ -58,3 +78,11 @@ class IRCBootstrapService:
                 )
                 continue
             await self.irc_manager.join_channel(user.login)
+
+    async def _run_periodic_sync(self) -> None:
+        assert self.resync_interval_seconds is not None
+        while not self._stop_event.is_set():
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), timeout=self.resync_interval_seconds)
+            except TimeoutError:
+                await self.sync_persisted_channels()

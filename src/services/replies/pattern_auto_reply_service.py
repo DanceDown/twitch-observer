@@ -2,8 +2,8 @@ from __future__ import annotations
 
 """Runtime execution of pattern-bound Twitch auto-replies."""
 
-from dataclasses import dataclass, field
 import logging
+from dataclasses import dataclass, field
 
 from src.adapters.twitch_api import (
     TwitchAPIClient,
@@ -325,17 +325,16 @@ class AutoReplyService:
                 )
                 continue
             current_live_status = live_status
-            if effective_pattern.offline_state != "both":
-                if not offline_state_allows(effective_pattern, current_live_status):
-                    logger.debug(
-                        "Pattern %s matched text but was filtered by "
-                        "offline_state=%s live_status=%s during auto-reply "
-                        "evaluation.",
-                        effective_pattern.p_index,
-                        effective_pattern.offline_state,
-                        current_live_status,
-                    )
-                    continue
+            if effective_pattern.offline_state != "both" and not offline_state_allows(effective_pattern, current_live_status):
+                logger.debug(
+                    "Pattern %s matched text but was filtered by "
+                    "offline_state=%s live_status=%s during auto-reply "
+                    "evaluation.",
+                    effective_pattern.p_index,
+                    effective_pattern.offline_state,
+                    current_live_status,
+                )
+                continue
             reply = self.reply_repository.get_by_pattern(
                 thread_id=thread.thread_id,
                 p_index=effective_pattern.p_index,
@@ -390,8 +389,7 @@ class AutoReplyService:
         """Expand reply placeholders using the matched Twitch chat message."""
         rendered = template.replace("{NAME}", event.author_display_name or event.author_login)
         rendered = rendered.replace("{CHANNEL}", event.channel_login)
-        rendered = rendered.replace("{MESSAGE}", event.content)
-        return rendered
+        return rendered.replace("{MESSAGE}", event.content)
 
     async def _notify_account_expired(self, discord_channel_id: int) -> None:
         sender = getattr(self.notifier, "send_account_result", None)

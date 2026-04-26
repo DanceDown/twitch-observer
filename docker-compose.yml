@@ -26,6 +26,8 @@ services:
     build:
       context: .
       dockerfile: docker/app/Dockerfile
+      args:
+        INSTALL_DEV: ${INSTALL_DEV:-false}
     restart: unless-stopped
     env_file:
       - .env

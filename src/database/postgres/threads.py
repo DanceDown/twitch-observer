@@ -3,11 +3,12 @@ from __future__ import annotations
 """PostgreSQL repositories for thread-scoped observer state."""
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ..records import ChannelRecord, ThreadRecord, TrackedChannelStateRecord, TrackedUserRecord
 from ..repositories import ChannelRepository, ThreadRepository, TrackedUserRepository
 from .database import PostgresDatabase
+
 
 @dataclass(slots=True)
 class PostgresThreadRepository(ThreadRepository):
@@ -333,7 +334,7 @@ class PostgresChannelRepository(ChannelRepository):
         effective_changed_at = (
             datetime.fromisoformat(changed_at)
             if changed_at is not None
-            else datetime.now(timezone.utc)
+            else datetime.now(UTC)
         )
         self.database.connect()
         assert self.database.connection is not None

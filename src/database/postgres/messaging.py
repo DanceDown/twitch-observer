@@ -11,6 +11,7 @@ from ..records import RecentMessageRecord
 from ..repositories import MessageRepository
 from .database import PostgresDatabase
 
+
 @dataclass(slots=True)
 class PostgresMessageRepository(MessageRepository):
     """Store normalized Twitch chat messages in PostgreSQL."""

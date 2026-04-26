@@ -6,9 +6,12 @@ from contextlib import suppress
 
 import discord
 
+from src.events.event_bus import EventBus
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer, resolve_deferred_placeholders
 from src.utils.discord_embeds import build_result_embed
+
+from .dispatch import dispatch_ui_flow_decision
 
 
 def build_public_result_embed(result: DiscordCommandResult, actor_mention: str) -> discord.Embed:
@@ -31,10 +34,8 @@ async def send_initial_result(interaction: discord.Interaction, result: DiscordC
     if result.ephemeral:
         embed = build_result_embed(result)
         if interaction.response.is_done():
-            try:
+            with suppress(discord.HTTPException):
                 await interaction.edit_original_response(embed=embed)
-            except discord.HTTPException:
-                pass
             return
         await interaction.response.send_message(embed=embed, ephemeral=True)
         return
@@ -54,6 +55,29 @@ async def send_initial_result(interaction: discord.Interaction, result: DiscordC
         await interaction.delete_original_response()
 
 
+async def ensure_ui_flow_allowed(
+    interaction: discord.Interaction,
+    event_bus: EventBus,
+    *,
+    flow: str,
+    step: str,
+    discord_channel_id: int | None = None,
+) -> bool:
+    """Render a service-owned guard result or allow the UI step to continue."""
+    decision = await dispatch_ui_flow_decision(
+        event_bus,
+        discord_channel_id=interaction.channel_id if discord_channel_id is None else discord_channel_id,
+        requester_id=interaction.user.id,
+        flow=flow,
+        step=step,
+    )
+    if decision.open_ui:
+        return True
+    if decision.result is not None:
+        await send_initial_result(interaction, decision.result)
+    return False
+
+
 async def complete_bound_result(
     interaction: discord.Interaction,
     *,
@@ -65,10 +89,8 @@ async def complete_bound_result(
     if bound_message is None:
         if interaction.response.is_done():
             if result.ephemeral:
-                try:
+                with suppress(discord.HTTPException):
                     await interaction.edit_original_response(embed=embed)
-                except discord.HTTPException:
-                    pass
             elif interaction.channel is not None:
                 await interaction.channel.send(embed=build_public_result_embed(result, interaction.user.mention))
         else:

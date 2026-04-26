@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Discord UI for `/account`."""
+
+from __future__ import annotations
 
 import discord
 
@@ -37,7 +37,6 @@ class AccountMenuView(BaseFormView):
         self._discord_channel_id = discord_channel_id
         self.link.label = self.text("discord.account_ui.actions.connect")
         self.unlink.label = self.text("discord.account_ui.actions.disconnect")
-        self.show.label = self.text("discord.account_ui.actions.show")
 
     def render_embed(self) -> discord.Embed:
         return self.form_embed("discord.account_ui.menu.title", "discord.account_ui.menu.message")
@@ -50,11 +49,15 @@ class AccountMenuView(BaseFormView):
     async def unlink(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._run(interaction, "unlink")
 
-    @discord.ui.button(label="Show", style=discord.ButtonStyle.secondary)
-    async def show(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
-        await self._run(interaction, "show")
-
     async def _run(self, interaction: discord.Interaction, action: str) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="account",
+            step=action,
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         result = await dispatch_account_command(
             self._event_bus,
             requester_id=interaction.user.id,

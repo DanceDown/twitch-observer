@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.localization import Localizer, LocalizationError, resolve_deferred_placeholders
+from src.localization import LocalizationError, Localizer, resolve_deferred_placeholders
 
 
 def test_localizer_interpolates_placeholders_and_supports_backslash_escaping() -> None:

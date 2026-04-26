@@ -3,7 +3,7 @@ from __future__ import annotations
 """Minimal Twitch API client used for validation and metadata lookup."""
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import aiohttp
 
@@ -402,7 +402,7 @@ class TwitchAPIClient:
                 "Twitch API validation requires TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET."
             )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if (
             self._app_access_token is not None
             and self._app_access_token_expires_at is not None

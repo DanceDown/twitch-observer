@@ -8,6 +8,7 @@ from ..records import UserPermissionRecord
 from ..repositories import UserPermissionRepository
 from .database import PostgresDatabase
 
+
 @dataclass(slots=True)
 class PostgresUserPermissionRepository(UserPermissionRepository):
     """Store and retrieve additional per-thread Discord permission grants."""

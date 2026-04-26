@@ -2,8 +2,8 @@ from __future__ import annotations
 
 """Shared Twitch runtime helpers used across services and adapters."""
 
-from datetime import datetime, timedelta, timezone
 import logging
+from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
 from src.adapters.twitch_api import TwitchAPIClient, TwitchAPIError, TwitchUser
@@ -58,7 +58,7 @@ async def ensure_fresh_linked_account(
         expires_at = datetime.fromisoformat(account.expires_at)
     except ValueError:
         return account
-    if expires_at > datetime.now(timezone.utc) + timedelta(seconds=token_refresh_skew_seconds):
+    if expires_at > datetime.now(UTC) + timedelta(seconds=token_refresh_skew_seconds):
         return account
     return await refresh_linked_account(
         account=account,
@@ -87,7 +87,7 @@ async def refresh_linked_account(
         logger.warning("Failed to refresh Twitch account for account_id=%s: %s", account.account_id, error)
         return None
 
-    expires_at = (datetime.now(timezone.utc) + timedelta(seconds=refreshed.expires_in)).isoformat()
+    expires_at = (datetime.now(UTC) + timedelta(seconds=refreshed.expires_in)).isoformat()
     stored = account_repository.update_account(
         account_id=account.account_id,
         twitch_user_id=validated.user_id,
@@ -114,7 +114,7 @@ async def safe_get_twitch_user_by_login(twitch_api: object, login: str) -> Twitc
         cached_lookup = getattr(twitch_api, "get_cached_user_by_login", None)
         if callable(cached_lookup):
             cached = cached_lookup(normalized_login)
-            if cached is not None:
+            if cached is not None and cached.profile_image_url:
                 return cached
         get_user = getattr(twitch_api, "get_user_by_login", None)
         if callable(get_user):
@@ -133,7 +133,7 @@ async def safe_get_twitch_user_by_id(twitch_api: object, user_id: str | None) ->
         cached_lookup = getattr(twitch_api, "get_cached_user_by_id", None)
         if callable(cached_lookup):
             cached = cached_lookup(normalized_user_id)
-            if cached is not None:
+            if cached is not None and cached.profile_image_url:
                 return cached
         get_user = getattr(twitch_api, "get_user_by_id", None)
         if callable(get_user):

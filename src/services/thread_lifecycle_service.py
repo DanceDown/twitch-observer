@@ -2,9 +2,9 @@ from __future__ import annotations
 
 """Business logic for explicitly joining and leaving Discord contexts."""
 
-from dataclasses import dataclass, field
 import logging
 import re
+from dataclasses import dataclass, field
 
 from src.adapters.twitch_api import TwitchAPIClient, TwitchAPIError
 from src.database.connection import ChannelRepository, ThreadRepository, UserPermissionRepository
@@ -17,8 +17,8 @@ from src.events.event_types import (
     TwitchTrackedChannelsChangedEvent,
 )
 from src.localization import Localizer
-from src.services.channel_command_service import IRCChannelManager
 from src.services.authz import thread_has_permission
+from src.services.channel_command_service import IRCChannelManager
 from src.utils.permissions import ObserverPermission
 
 logger = logging.getLogger(__name__)
@@ -137,7 +137,9 @@ class ThreadLifecycleService:
                 ephemeral=True,
             )
 
-        removed_channel_ids = sorted({channel.twitch_channel_id for channel in self.channel_repository.list_channels_for_thread(thread.thread_id)})
+        removed_channel_ids = sorted(
+            {channel.twitch_channel_id for channel in self.channel_repository.list_channels_for_thread(thread.thread_id)}
+        )
         for twitch_channel_id in removed_channel_ids:
             self.channel_repository.remove_channel(thread.thread_id, twitch_channel_id)
             if self.channel_repository.count_threads_by_twitch_channel_id(twitch_channel_id) == 0:

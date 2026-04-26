@@ -2,8 +2,8 @@ from __future__ import annotations
 
 """Runtime pattern matching for incoming Twitch chat messages."""
 
-from dataclasses import dataclass, field
 import logging
+from dataclasses import dataclass, field
 
 import discord
 
@@ -72,7 +72,19 @@ class PatternTrackingService:
             event.content,
         )
         if not event.broadcaster_id:
-            logger.debug("Skipping Twitch message because broadcaster_id is missing.")
+            logger.warning(
+                "Skipping Twitch message in #%s because Twitch IRC room-id is missing; "
+                "pattern matching needs channel metadata.",
+                event.channel_login,
+            )
+            return
+        if not event.author_id:
+            logger.warning(
+                "Skipping Twitch message in #%s from %s because Twitch IRC user-id is missing; "
+                "pattern matching needs author metadata.",
+                event.channel_login,
+                event.author_login,
+            )
             return
 
         thread_ids = self.channel_repository.list_thread_ids_by_twitch_channel_id(
@@ -156,7 +168,7 @@ class PatternTrackingService:
                     self.twitch_api,
                     event.broadcaster_id,
                 )
-                logger.debug(
+                logger.info(
                     "Pattern %s matched. Sending tracking embed to "
                     "discord_channel_id=%s",
                     effective_pattern.p_index,

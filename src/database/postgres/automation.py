@@ -8,6 +8,7 @@ from ..records import AdapterEventActionRecord, AdapterEventRecord, PatternRecor
 from ..repositories import AdapterEventActionRepository, AdapterEventRepository, PatternRepository, ReplyRepository
 from .database import PostgresDatabase
 
+
 @dataclass(slots=True)
 class PostgresPatternRepository(PatternRepository):
     """Store and retrieve ping/regex rules."""
@@ -578,6 +579,7 @@ class PostgresReplyRepository(ReplyRepository):
             disabled=row[4],
         )
 
+@dataclass(slots=True)
 class PostgresAdapterEventRepository(AdapterEventRepository):
     """Store and retrieve external adapter event triggers."""
 

@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Slash-command registration for Discord context lifecycle commands."""
+
+from __future__ import annotations
 
 import logging
 from contextlib import suppress

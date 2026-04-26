@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from random import seed
 
+import pytest
+
 from src.database.connection import MessageRepository, RecentMessageRecord
 from src.events.event_bus import EventBus
 from src.events.event_types import EventType, TwitchChatMessageEvent
@@ -40,21 +42,21 @@ class FakePresenceNotifier(DiscordPresenceStatusSender):
         self.statuses.append(text)
 
 
-def test_message_ingest_service_registers_and_persists_messages() -> None:
+@pytest.mark.asyncio
+async def test_message_ingest_service_registers_and_persists_messages() -> None:
     bus = EventBus()
     repository = InMemoryMessageRepository()
     service = MessageIngestService(event_bus=bus, message_repository=repository)
 
     event = TwitchChatMessageEvent(channel_login="channel", author_login="bob", content="hey")
-    import asyncio
-
-    asyncio.run(bus.publish(EventType.TWITCH_CHAT_MESSAGE, event))
+    await bus.publish(EventType.TWITCH_CHAT_MESSAGE, event)
 
     assert repository.messages == [event]
     assert service.handled_messages == 1
 
 
-def test_presence_service_uses_recent_message_as_status() -> None:
+@pytest.mark.asyncio
+async def test_presence_service_uses_recent_message_as_status() -> None:
     bus = EventBus()
     repository = InMemoryMessageRepository()
     MessageIngestService(event_bus=bus, message_repository=repository)
@@ -69,17 +71,17 @@ def test_presence_service_uses_recent_message_as_status() -> None:
     )
 
     event = TwitchChatMessageEvent(channel_login="channel", author_login="bob", author_display_name="Bob", content="A tracked message")
-    import asyncio
 
-    asyncio.run(bus.publish(EventType.TWITCH_CHAT_MESSAGE, event))
+    await bus.publish(EventType.TWITCH_CHAT_MESSAGE, event)
     seed(1)
-    asyncio.run(service.poll_once())
+    await service.poll_once()
 
     assert notifier.statuses
     assert notifier.statuses[-1] == "\"A tracked message\" ~Bob"
 
 
-def test_presence_service_keeps_current_status_when_no_recent_message_exists() -> None:
+@pytest.mark.asyncio
+async def test_presence_service_keeps_current_status_when_no_recent_message_exists() -> None:
     repository = InMemoryMessageRepository()
     notifier = FakePresenceNotifier(statuses=["old status"])
     service = DiscordPresenceService(
@@ -91,8 +93,6 @@ def test_presence_service_keeps_current_status_when_no_recent_message_exists() -
         max_status_length=120,
     )
 
-    import asyncio
-
-    asyncio.run(service.poll_once())
+    await service.poll_once()
 
     assert notifier.statuses == ["old status"]

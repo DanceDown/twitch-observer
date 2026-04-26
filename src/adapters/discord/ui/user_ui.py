@@ -131,6 +131,14 @@ class UserMenuView(BaseFormView):
 
     @discord.ui.button(label="Add", style=discord.ButtonStyle.primary)
     async def add(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="user",
+            step="add",
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         await interaction.response.send_modal(
             UserNameModal(
                 event_bus=self._event_bus,
@@ -145,6 +153,14 @@ class UserMenuView(BaseFormView):
 
     @discord.ui.button(label="Remove", style=discord.ButtonStyle.secondary)
     async def remove(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="user",
+            step="remove",
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         tracked_users = await self._data_provider.list_tracked_users(self._discord_channel_id)
         if not tracked_users:
             await self.finish_with_interaction(

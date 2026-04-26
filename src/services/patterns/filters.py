@@ -167,6 +167,7 @@ class PatternFilterResolver:
             ),
             color=event.color,
             disabled=pattern.disabled,
+            priority=event.priority,
             result_future=event.result_future,
         )
         return await self.resolve_filters(resolved_event, thread)
@@ -190,6 +191,16 @@ class PatternFilterResolver:
             user = await self.twitch_api.get_user_by_id(twitch_user_id)
             logins.append(user.login)
         return tuple(logins)
+
+    async def resolve_display_names_from_ids(
+        self,
+        twitch_user_ids: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        names: list[str] = []
+        for twitch_user_id in twitch_user_ids:
+            user = await self.twitch_api.get_user_by_id(twitch_user_id)
+            names.append(user.display_name)
+        return tuple(names)
 
     def _text(
         self,

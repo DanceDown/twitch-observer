@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 import logging
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from src.adapters.twitch_api import TwitchAPIClient, TwitchAPIError
 from src.database.connection import ChannelRepository
@@ -67,7 +67,7 @@ class TwitchLiveMonitorService:
             try:
                 await asyncio.wait_for(self._wake_event.wait(), timeout=self.poll_interval_seconds)
                 self._wake_event.clear()
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
 
             if self._stop_event.is_set():
@@ -91,7 +91,7 @@ class TwitchLiveMonitorService:
             logger.warning("Failed to refresh Twitch live states for batch polling: %s", error)
             return
 
-        changed_at = datetime.now(timezone.utc)
+        changed_at = datetime.now(UTC)
         tracked_channels_by_id = {channel.twitch_channel_id: channel for channel in tracked_channels}
         for twitch_channel_id in channel_ids:
             previous = tracked_channels_by_id[twitch_channel_id]

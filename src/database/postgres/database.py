@@ -8,6 +8,7 @@ import psycopg
 
 from src.config import AppConfig
 
+
 @dataclass(slots=True)
 class PostgresDatabase:
     """Thin wrapper around a psycopg connection."""

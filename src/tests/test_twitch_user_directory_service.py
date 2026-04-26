@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -34,7 +34,7 @@ class InMemoryTwitchUserCacheRepository(TwitchUserCacheRepository):
         display_name: str,
         profile_image_url: str | None,
     ) -> TwitchUserCacheRecord:
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         record = TwitchUserCacheRecord(
             twitch_user_id=twitch_user_id,
             twitch_login=twitch_login.strip().lower(),
@@ -307,7 +307,7 @@ async def test_directory_refreshes_stale_api_cache_based_on_configured_interval(
                 display_name="Example",
                 profile_image_url="https://cdn.example/old.png",
                 updated_at="cached",
-                last_api_refresh_at=(datetime.now(timezone.utc) - timedelta(seconds=120)).isoformat(),
+                last_api_refresh_at=(datetime.now(UTC) - timedelta(seconds=120)).isoformat(),
             )
         }
     )

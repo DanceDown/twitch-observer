@@ -1,13 +1,13 @@
-from __future__ import annotations
-
 """Slash-command registration for permission management."""
+
+from __future__ import annotations
 
 import discord
 
 from src.events.event_bus import EventBus
 from src.localization import Localizer
 
-from ..helpers import command_unavailable_result, send_initial_result
+from ..helpers import command_unavailable_result, ensure_ui_flow_allowed, send_initial_result
 from ..ui.permission_ui import PermissionMenuView
 from ..ui.shared import start_form
 from ..ui_data import DiscordUIDataProvider
@@ -25,6 +25,8 @@ def register_permission_commands(
     async def permission(interaction: discord.Interaction) -> None:
         if interaction.channel_id is None:
             await send_initial_result(interaction, command_unavailable_result())
+            return
+        if not await ensure_ui_flow_allowed(interaction, event_bus, flow="permission", step="root"):
             return
         await start_form(
             interaction,

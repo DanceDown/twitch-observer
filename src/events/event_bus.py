@@ -34,10 +34,26 @@ class EventBus:
         """Publish an event and await async handlers when needed."""
         logger.debug("Publishing event %s to %d subscriber(s): %r", event_type, len(self._subscribers[event_type]), event)
         for handler in list(self._subscribers[event_type]):
-            result = handler(event)
-            if inspect.isawaitable(result):
-                await result
+            try:
+                result = handler(event)
+                if inspect.isawaitable(result):
+                    await result
+            except Exception:
+                logger.exception(
+                    "Subscriber %s failed while handling event %s; continuing with remaining subscriber(s).",
+                    _handler_name(handler),
+                    event_type.value,
+                )
 
     def subscriber_count(self, event_type: EventType) -> int:
         """Return how many handlers currently listen to an event type."""
         return len(self._subscribers[event_type])
+
+
+def _handler_name(handler: EventHandler) -> str:
+    """Return a compact, useful name for debug and error logs."""
+    owner = getattr(handler, "__self__", None)
+    name = getattr(handler, "__name__", repr(handler))
+    if owner is None:
+        return name
+    return f"{owner.__class__.__name__}.{name}"

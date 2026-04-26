@@ -2,9 +2,10 @@ from __future__ import annotations
 
 """Tracked Twitch channel events, persistence and Discord notifications."""
 
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass, field
 
+from src.adapters.twitch_api import TwitchAPIClient, TwitchAPIError
 from src.database.connection import (
     AdapterEventActionRepository,
     AdapterEventRepository,
@@ -21,6 +22,7 @@ from src.events.event_types import (
     EventType,
     TwitchChannelLiveStateChangedEvent,
 )
+from src.localization import Localizer
 from src.services.authz import thread_has_permission
 from src.services.twitch_runtime import (
     CHANNEL_SUBJECT_TYPE,
@@ -54,7 +56,9 @@ class ChannelEventCommandService:
     channel_repository: ChannelRepository
     adapter_event_repository: AdapterEventRepository
     adapter_event_action_repository: AdapterEventActionRepository
+    twitch_api: TwitchAPIClient | None = None
     permission_repository: UserPermissionRepository | None = None
+    localizer: Localizer = field(default_factory=Localizer.from_directory)
 
     def __post_init__(self) -> None:
         self.event_bus.subscribe(EventType.DISCORD_CHANNEL_EVENT_REQUESTED, self.handle_request)
@@ -63,17 +67,19 @@ class ChannelEventCommandService:
         try:
             result = await self._handle_action(event)
         except ValueError as error:
-            result = DiscordCommandResult(
-                title="Validation Error",
-                message=str(error),
+            result = self._event_result(
+                event,
+                "results.validation_error",
+                DETAIL=str(error),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
         except Exception as error:
             logger.exception("Unexpected error while handling channel event command.")
-            result = DiscordCommandResult(
-                title="Unexpected Error",
-                message=str(error),
+            result = self._event_result(
+                event,
+                "results.unexpected_error",
+                DETAIL=str(error),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -87,15 +93,28 @@ class ChannelEventCommandService:
 
         tracked_channel = self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, event.twitch_channel_id)
         if tracked_channel is None:
-            return DiscordCommandResult(
-                title="Channel Not Tracked",
-                message="This Twitch channel is not tracked in the current Discord channel.",
+            return self.localizer.thread_result(
+                "results.channel_event.channel_not_tracked",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
         if event.event_key not in {STREAM_ONLINE_EVENT_KEY, STREAM_OFFLINE_EVENT_KEY}:
-            raise ValueError("Unsupported tracked channel event.")
+            raise ValueError(self.localizer.text("results.channel_event.unsupported_event", language=thread.language))
 
+        channel_name = await self._channel_display_name(event.twitch_channel_id)
+        if event.action == "add":
+            return self._add_notification(event, thread, channel_name)
+        if event.action in {"remove", "disable", "enable"}:
+            return self._update_notification(event, thread, channel_name)
+        raise ValueError(self.localizer.text("results.channel_event.unsupported_action", language=thread.language))
+
+    def _add_notification(
+        self,
+        event: DiscordChannelEventRequestedEvent,
+        thread: ThreadRecord,
+        channel_name: str,
+    ) -> DiscordCommandResult:
         adapter_event = self.adapter_event_repository.upsert_event(
             thread_id=thread.thread_id,
             adapter_key=TWITCH_ADAPTER_KEY,
@@ -113,16 +132,18 @@ class ChannelEventCommandService:
             message_template=None,
             reply_as_reply=False,
         )
-        action_label = "live" if event.event_key == STREAM_ONLINE_EVENT_KEY else "offline"
         if existing_action is None:
-            title = "Notification Added"
-            message = f"This Discord channel will now be notified when the tracked Twitch channel goes {action_label}."
+            key = "results.channel_event.notification_added"
+            style = DiscordResultStyle.SUCCESS
+            ephemeral = False
         elif existing_action.disabled:
-            title = "Notification Enabled"
-            message = f"The {action_label} notification was re-enabled for this tracked Twitch channel."
+            key = "results.channel_event.notification_enabled"
+            style = DiscordResultStyle.SUCCESS
+            ephemeral = False
         else:
-            title = "Already Configured"
-            message = f"A {action_label} notification is already configured for this tracked Twitch channel."
+            key = "results.channel_event.already_configured"
+            style = DiscordResultStyle.INFO
+            ephemeral = True
         logger.debug(
             "Configured tracked channel event thread_id=%s event_id=%s action=%s event_key=%s",
             thread.thread_id,
@@ -130,12 +151,105 @@ class ChannelEventCommandService:
             action.action_type,
             adapter_event.event_key,
         )
-        return DiscordCommandResult(
-            title=title,
-            message=message,
-            style=DiscordResultStyle.SUCCESS if title != "Already Configured" else DiscordResultStyle.INFO,
-            ephemeral=title == "Already Configured",
+        return self.localizer.thread_result(
+            key,
+            thread=thread,
+            STATE=self._state_label(event.event_key, thread),
+            CHANNEL=channel_name,
+            style=style,
+            ephemeral=ephemeral,
         )
+
+    def _update_notification(
+        self,
+        event: DiscordChannelEventRequestedEvent,
+        thread: ThreadRecord,
+        channel_name: str,
+    ) -> DiscordCommandResult:
+        adapter_event = self.adapter_event_repository.get_event(
+            thread_id=thread.thread_id,
+            adapter_key=TWITCH_ADAPTER_KEY,
+            subject_type=CHANNEL_SUBJECT_TYPE,
+            subject_id=event.twitch_channel_id,
+            event_key=event.event_key,
+        )
+        existing_action = (
+            None
+            if adapter_event is None
+            else self.adapter_event_action_repository.get_action(
+                event_id=adapter_event.event_id,
+                action_type=DISCORD_NOTIFY_ACTION,
+            )
+        )
+        if adapter_event is None or existing_action is None:
+            return self.localizer.thread_result(
+                "results.channel_event.none_configured",
+                thread=thread,
+                STATE=self._state_label(event.event_key, thread),
+                CHANNEL=channel_name,
+                style=DiscordResultStyle.ERROR,
+                ephemeral=True,
+            )
+
+        if event.action == "remove":
+            self.adapter_event_action_repository.remove_action(
+                event_id=adapter_event.event_id,
+                action_type=DISCORD_NOTIFY_ACTION,
+            )
+            key = "results.channel_event.notification_removed"
+        elif event.action == "disable":
+            if existing_action.disabled:
+                return self.localizer.thread_result(
+                    "results.channel_event.already_disabled",
+                    thread=thread,
+                    STATE=self._state_label(event.event_key, thread),
+                    CHANNEL=channel_name,
+                    style=DiscordResultStyle.INFO,
+                    ephemeral=True,
+                )
+            self.adapter_event_action_repository.set_action_disabled(
+                event_id=adapter_event.event_id,
+                action_type=DISCORD_NOTIFY_ACTION,
+                disabled=True,
+            )
+            key = "results.channel_event.notification_disabled"
+        else:
+            if not existing_action.disabled:
+                return self.localizer.thread_result(
+                    "results.channel_event.already_enabled",
+                    thread=thread,
+                    STATE=self._state_label(event.event_key, thread),
+                    CHANNEL=channel_name,
+                    style=DiscordResultStyle.INFO,
+                    ephemeral=True,
+                )
+            self.adapter_event_action_repository.set_action_disabled(
+                event_id=adapter_event.event_id,
+                action_type=DISCORD_NOTIFY_ACTION,
+                disabled=False,
+            )
+            key = "results.channel_event.notification_enabled"
+
+        return self.localizer.thread_result(
+            key,
+            thread=thread,
+            STATE=self._state_label(event.event_key, thread),
+            CHANNEL=channel_name,
+            style=DiscordResultStyle.SUCCESS,
+            ephemeral=False,
+        )
+
+    async def _channel_display_name(self, twitch_channel_id: str) -> str:
+        if self.twitch_api is None:
+            return twitch_channel_id
+        try:
+            return (await self.twitch_api.get_user_by_id(twitch_channel_id)).display_name
+        except TwitchAPIError:
+            return twitch_channel_id
+
+    def _state_label(self, event_key: str, thread: ThreadRecord) -> str:
+        state_key = "live" if event_key == STREAM_ONLINE_EVENT_KEY else "offline"
+        return self.localizer.text(f"results.channel_event.state.{state_key}", language=thread.language)
 
     def _ensure_permission(
         self,
@@ -143,9 +257,8 @@ class ChannelEventCommandService:
     ) -> ThreadRecord | DiscordCommandResult:
         thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
         if thread is None:
-            return DiscordCommandResult(
-                title="Not Joined",
-                message="This Discord channel is not connected yet. Use `/join` first.",
+            return self.localizer.result(
+                "results.not_joined",
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -155,13 +268,25 @@ class ChannelEventCommandService:
             permission_repository=self.permission_repository,
             required_permission=ObserverPermission.MANAGE_CHANNELS,
         ):
-            return DiscordCommandResult(
-                title="Permission Denied",
-                message="You do not have permission to configure tracked channel notifications.",
+            return self.localizer.thread_result(
+                "results.channel_event.permission_denied",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
         return thread
+
+    def _event_result(
+        self,
+        event: DiscordChannelEventRequestedEvent,
+        key: str,
+        *,
+        style: DiscordResultStyle,
+        ephemeral: bool,
+        **placeholders: object,
+    ) -> DiscordCommandResult:
+        thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+        return self.localizer.thread_result(key, thread=thread, style=style, ephemeral=ephemeral, **placeholders)
 
 
 @dataclass(slots=True)
@@ -197,6 +322,7 @@ class ChannelEventNotificationService:
     adapter_event_repository: AdapterEventRepository
     adapter_event_action_repository: AdapterEventActionRepository
     notifier: ChannelEventNotificationSender | None = None
+    localizer: Localizer = field(default_factory=Localizer.from_directory)
 
     def __post_init__(self) -> None:
         self.event_bus.subscribe(EventType.TWITCH_CHANNEL_LIVE_STATE_CHANGED, self.handle_change)
@@ -216,7 +342,6 @@ class ChannelEventNotificationService:
             return
 
         channel_name = event.twitch_channel_login or event.twitch_channel_id
-        state_text = "live" if event.is_live else "offline"
         for configured_event in configured_events:
             thread = self.thread_repository.get_by_thread_id(configured_event.thread_id)
             if thread is None or not thread.enabled:
@@ -229,9 +354,10 @@ class ChannelEventNotificationService:
                 continue
             await self.notifier.send_channel_result(
                 thread.discord_channel_id,
-                DiscordCommandResult(
-                    title=f"Channel Went {'Live' if event.is_live else 'Offline'}",
-                    message=f"`{channel_name}` is now {state_text}.",
+                self.localizer.thread_result(
+                    "results.channel_event.went_live" if event.is_live else "results.channel_event.went_offline",
+                    thread=thread,
+                    CHANNEL=channel_name,
                     style=DiscordResultStyle.INFO,
                     ephemeral=False,
                 ),

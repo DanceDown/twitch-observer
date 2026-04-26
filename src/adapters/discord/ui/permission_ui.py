@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Discord UI for `/permission`."""
+
+from __future__ import annotations
 
 import discord
 
@@ -113,6 +113,14 @@ class PermissionMenuView(BaseFormView):
         await self._open_modal(interaction, "clear")
 
     async def _open_modal(self, interaction: discord.Interaction, action: str) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="permission",
+            step=action,
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         await interaction.response.send_modal(
             PermissionModal(
                 title=self.text(f"discord.permission_ui.modal.{action}.title"),

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
 import logging
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 
 from src.adapters.twitch_api import (
     TwitchAPIClient,
@@ -30,6 +30,7 @@ from src.events.event_types import (
     DiscordResultStyle,
     EventType,
 )
+from src.localization import Localizer
 from src.services.authz import thread_has_permission
 from src.utils.permissions import ObserverPermission
 
@@ -69,6 +70,7 @@ class AccountCommandService:
     thread_repository: ThreadRepository
     twitch_api: TwitchAPIClient
     permission_repository: UserPermissionRepository | None = None
+    localizer: Localizer = field(default_factory=Localizer.from_directory)
 
     def __post_init__(self) -> None:
         self.event_bus.subscribe(EventType.DISCORD_ACCOUNT_REQUESTED, self.handle_request)
@@ -78,27 +80,28 @@ class AccountCommandService:
             if event.action == "link":
                 result = await self._start_link(event)
             elif event.action == "unlink":
-                result = self._unlink_account(event)
+                result = await self._unlink_account(event)
             elif event.action == "show":
-                result = self._show_account(event)
+                result = self._show_account_removed(event)
             else:
-                result = DiscordCommandResult(
-                    title="Validation Error",
-                    message="Unsupported account action.",
+                result = self.localizer.result(
+                    "results.account.unsupported_action",
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 )
         except (TwitchAuthenticationError, TwitchDeviceFlowError, TwitchAPIConfigurationError, ValueError) as error:
-            result = DiscordCommandResult(
-                title="Validation Error",
-                message=str(error),
+            result = self._event_result(
+                event,
+                "results.validation_error",
+                DETAIL=str(error),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
         except TwitchAPIError as error:
-            result = DiscordCommandResult(
-                title="Twitch API Error",
-                message=str(error),
+            result = self._event_result(
+                event,
+                "results.twitch_api_error",
+                DETAIL=str(error),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -112,30 +115,27 @@ class AccountCommandService:
             return thread
         if thread.account_id is not None:
             account = self.account_repository.get_by_account_id(thread.account_id)
-            account_name = account.twitch_login if account is not None else "an existing Twitch account"
-            return DiscordCommandResult(
-                title="Account Already Linked",
-                message=(
-                    f"This Discord channel is already linked to `{account_name}`. "
-                    "Disconnect it first before starting a new Twitch login."
-                ),
+            account_name = await self._display_name_for_account(account) if account is not None else None
+            return self.localizer.thread_result(
+                "results.account.already_linked",
+                thread=thread,
+                DISPLAY_NAME=account_name or self.localizer.text("results.account.existing_account", language=thread.language),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
         existing_pending = self.device_flow_repository.get_by_discord_channel_id(thread.discord_channel_id)
         if existing_pending is not None and existing_pending.status == "pending":
-            return DiscordCommandResult(
-                title="Login Already Pending",
-                message=(
-                    f"Click this link to connect your Twitch account: [Open Twitch Login]({existing_pending.verification_uri})\n\n"
-                    f"User Code: `{existing_pending.user_code}`\n"
-                    f"Valid until: `{_format_timestamp(existing_pending.expires_at)}`"
-                ),
+            return self.localizer.thread_result(
+                "results.account.login_pending",
+                thread=thread,
+                VERIFICATION_URI=existing_pending.verification_uri,
+                USER_CODE=existing_pending.user_code,
+                EXPIRES_AT=_format_timestamp(existing_pending.expires_at),
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
             )
         start = await self.twitch_api.start_device_code_flow(scopes=("user:write:chat",))
-        expires_at = (datetime.now(timezone.utc) + timedelta(seconds=start.expires_in)).isoformat()
+        expires_at = (datetime.now(UTC) + timedelta(seconds=start.expires_in)).isoformat()
         pending = self.device_flow_repository.upsert_pending_flow(
             discord_user_id=event.requester_id,
             discord_channel_id=thread.discord_channel_id,
@@ -146,88 +146,49 @@ class AccountCommandService:
             expires_at=expires_at,
             scope=("user:write:chat",),
         )
-        return DiscordCommandResult(
-            title="Finish Twitch Login",
-            message=(
-                f"Click this link to connect your Twitch account: [Open Twitch Login]({pending.verification_uri})\n\n"
-                f"User Code: `{pending.user_code}`\n"
-                f"Valid until: `{_format_timestamp(pending.expires_at)}`"
-            ),
+        return self.localizer.thread_result(
+            "results.account.finish_login",
+            thread=thread,
+            VERIFICATION_URI=pending.verification_uri,
+            USER_CODE=pending.user_code,
+            EXPIRES_AT=_format_timestamp(pending.expires_at),
             style=DiscordResultStyle.INFO,
             ephemeral=True,
         )
 
-    def _unlink_account(self, event: DiscordAccountRequestedEvent) -> DiscordCommandResult:
+    async def _unlink_account(self, event: DiscordAccountRequestedEvent) -> DiscordCommandResult:
         thread = self._require_owner_thread(event=event)
         if isinstance(thread, DiscordCommandResult):
             return thread
 
         removed_account = False
+        account_name = None
         if thread.account_id is not None:
+            account = self.account_repository.get_by_account_id(thread.account_id)
+            account_name = await self._display_name_for_account(account) if account is not None else None
             removed_account = self.account_repository.remove_by_account_id(thread.account_id)
             self.thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
         removed_pending = self.device_flow_repository.remove_by_discord_channel_id(thread.discord_channel_id)
         if not removed_account and not removed_pending:
-            return DiscordCommandResult(
-                title="No Linked Account",
-                message="There is no linked or pending Twitch account.",
+            return self.localizer.thread_result(
+                "results.account.no_linked_account",
+                thread=thread,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
             )
-        return DiscordCommandResult(
-                title="Account Unlinked",
-                message=(
-                    "Removed the linked Twitch account and any pending login flow. "
-                    "Existing auto-replies were kept and will work again after you link an account later."
-                ),
-                style=DiscordResultStyle.SUCCESS,
-                ephemeral=False,
-            )
-
-    def _show_account(self, event: DiscordAccountRequestedEvent) -> DiscordCommandResult:
-        thread = self._require_thread_with_permission(
-            event=event,
-            required_permission=ObserverPermission.VIEW,
-            denial_message="You do not have permission to view the linked Twitch account.",
+        return self.localizer.thread_result(
+            "results.account.unlinked",
+            thread=thread,
+            DISPLAY_NAME=account_name or self.localizer.text("results.account.existing_account", language=thread.language),
+            style=DiscordResultStyle.SUCCESS,
+            ephemeral=False,
         )
-        if isinstance(thread, DiscordCommandResult):
-            return thread
 
-        account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
-        pending = self.device_flow_repository.get_by_discord_channel_id(thread.discord_channel_id)
-
-        sections: list[str] = []
-        if account is not None:
-            sections.append(
-                "Linked Account:\n"
-                f"- [{account.twitch_login}](https://www.twitch.tv/{account.twitch_login})"
-            )
-
-        if pending is not None:
-            if pending.status == "pending":
-                sections.append(
-                    "Pending Device Login:\n"
-                    f"- Verification Link: [Open Twitch Login]({pending.verification_uri})\n"
-                    f"- User Code: `{pending.user_code}`\n"
-                    f"- Valid Until: `{_format_timestamp(pending.expires_at)}`"
-                )
-            else:
-                sections.append(
-                    "Failed Device Login:\n"
-                    f"- Last Error: `{pending.last_error or 'unknown'}`\n"
-                    "Run `/account link` again to start a new login."
-                )
-
-        if not sections:
-            return DiscordCommandResult(
-                title="No Linked Account",
-                message="No Twitch account is currently linked, and no login is pending.",
-                style=DiscordResultStyle.INFO,
-                ephemeral=True,
-            )
-        return DiscordCommandResult(
-            title="Twitch Account Status",
-            message="\n\n".join(sections),
+    def _show_account_removed(self, event: DiscordAccountRequestedEvent) -> DiscordCommandResult:
+        thread = None if event.discord_channel_id is None else self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+        return self.localizer.thread_result(
+            "results.account.show_moved",
+            thread=thread,
             style=DiscordResultStyle.INFO,
             ephemeral=True,
         )
@@ -237,12 +198,14 @@ class AccountCommandService:
         *,
         event: DiscordAccountRequestedEvent,
         required_permission: ObserverPermission,
-        denial_message: str,
+        denial_key: str,
     ) -> ThreadRecord | DiscordCommandResult:
-        if event.discord_channel_id is None or (thread := self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)) is None:
-            return DiscordCommandResult(
-                title="Not Joined",
-                message="The Twitch Observer has to join this channel first.",
+        if (
+            event.discord_channel_id is None
+            or (thread := self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)) is None
+        ):
+            return self.localizer.result(
+                "results.not_joined",
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -252,9 +215,9 @@ class AccountCommandService:
             permission_repository=self.permission_repository,
             required_permission=required_permission,
         ):
-            return DiscordCommandResult(
-                title="Permission Denied",
-                message=denial_message,
+            return self.localizer.thread_result(
+                denial_key,
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -264,18 +227,39 @@ class AccountCommandService:
         thread = self._require_thread_with_permission(
             event=event,
             required_permission=ObserverPermission.CONTROL_OBSERVER,
-            denial_message="You do not have permission to change the Twitch account.",
+            denial_key="results.account.permission_denied",
         )
         if isinstance(thread, DiscordCommandResult):
             return thread
         if thread.owner_id != event.requester_id:
-            return DiscordCommandResult(
-                title="Permission Denied",
-                message="Only the thread owner may link or unlink the Twitch account used by this Discord channel.",
+            return self.localizer.thread_result(
+                "results.account.owner_denied",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
         return thread
+
+    async def _display_name_for_account(self, account) -> str | None:
+        if account is None:
+            return None
+        try:
+            user = await self.twitch_api.get_user_by_id(account.twitch_user_id)
+        except Exception:
+            return account.twitch_login
+        return user.display_name
+
+    def _event_result(
+        self,
+        event: DiscordAccountRequestedEvent,
+        key: str,
+        *,
+        style: DiscordResultStyle,
+        ephemeral: bool,
+        **placeholders: object,
+    ) -> DiscordCommandResult:
+        thread = None if event.discord_channel_id is None else self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+        return self.localizer.thread_result(key, thread=thread, style=style, ephemeral=ephemeral, **placeholders)
 
 
 @dataclass(slots=True)
@@ -288,6 +272,7 @@ class DeviceFlowPollingService:
     twitch_api: TwitchAPIClient
     poll_interval_seconds: float
     notifier: AccountNotificationSender | None = None
+    localizer: Localizer = field(default_factory=Localizer.from_directory)
     _task: asyncio.Task[None] | None = field(default=None, init=False)
     _stop_event: asyncio.Event = field(default_factory=asyncio.Event, init=False)
 
@@ -315,7 +300,7 @@ class DeviceFlowPollingService:
 
     async def poll_once(self) -> None:
         """Poll every currently pending device flow that is due."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for pending in self.device_flow_repository.list_pending_flows():
             try:
                 if self._is_expired(pending, now):
@@ -325,9 +310,9 @@ class DeviceFlowPollingService:
                     )
                     await self._notify(
                         pending.discord_user_id,
-                        DiscordCommandResult(
-                            title="Twitch Login Expired",
-                            message="The pending Twitch device login expired. Run `/account link` again.",
+                        self._result_for_pending(
+                            pending,
+                            "results.account.login_expired",
                             style=DiscordResultStyle.ERROR,
                             ephemeral=True,
                         ),
@@ -358,12 +343,9 @@ class DeviceFlowPollingService:
                     )
                     await self._notify(
                         pending.discord_user_id,
-                        DiscordCommandResult(
-                            title="Twitch Login Failed",
-                            message=(
-                                "The Twitch device login did not complete successfully. "
-                                "Run `/account link` again to retry."
-                            ),
+                        self._result_for_pending(
+                            pending,
+                            "results.account.login_failed",
                             style=DiscordResultStyle.ERROR,
                             ephemeral=True,
                         ),
@@ -381,9 +363,9 @@ class DeviceFlowPollingService:
                     )
                     await self._notify(
                         pending.discord_user_id,
-                        DiscordCommandResult(
-                            title="Twitch Login Failed",
-                            message="The authorized token did not include the required `user:write:chat` scope.",
+                        self._result_for_pending(
+                            pending,
+                            "results.account.login_missing_scope",
                             style=DiscordResultStyle.ERROR,
                             ephemeral=True,
                         ),
@@ -425,12 +407,10 @@ class DeviceFlowPollingService:
                 self.device_flow_repository.remove_by_discord_channel_id(thread.discord_channel_id)
                 await self._notify(
                     pending.discord_user_id,
-                    DiscordCommandResult(
-                        title="Twitch Account Linked",
-                        message=(
-                            f"Linked Twitch account `{stored.twitch_login}`. "
-                            "Auto-replies can now send messages as this account."
-                        ),
+                    self._result_for_thread(
+                        thread,
+                        "results.account.linked",
+                        DISPLAY_NAME=await self._display_name_for_user_id(stored.twitch_user_id, stored.twitch_login),
                         style=DiscordResultStyle.SUCCESS,
                         ephemeral=True,
                     ),
@@ -449,6 +429,40 @@ class DeviceFlowPollingService:
         if self.notifier is None:
             return
         await self.notifier.send_account_result(discord_user_id, discord_channel_id, result)
+
+    def _result_for_pending(
+        self,
+        pending: TwitchDeviceFlowRecord,
+        key: str,
+        *,
+        style: DiscordResultStyle,
+        ephemeral: bool,
+        **placeholders: object,
+    ) -> DiscordCommandResult:
+        thread = (
+            None
+            if pending.discord_channel_id is None
+            else self.thread_repository.get_by_discord_channel_id(pending.discord_channel_id)
+        )
+        return self.localizer.thread_result(key, thread=thread, style=style, ephemeral=ephemeral, **placeholders)
+
+    def _result_for_thread(
+        self,
+        thread: ThreadRecord,
+        key: str,
+        *,
+        style: DiscordResultStyle,
+        ephemeral: bool,
+        **placeholders: object,
+    ) -> DiscordCommandResult:
+        return self.localizer.thread_result(key, thread=thread, style=style, ephemeral=ephemeral, **placeholders)
+
+    async def _display_name_for_user_id(self, twitch_user_id: str, fallback: str) -> str:
+        try:
+            user = await self.twitch_api.get_user_by_id(twitch_user_id)
+        except Exception:
+            return fallback
+        return user.display_name
 
     @staticmethod
     def _is_expired(pending: TwitchDeviceFlowRecord, now: datetime) -> bool:

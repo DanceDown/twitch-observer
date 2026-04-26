@@ -6,6 +6,7 @@ from contextlib import suppress
 
 import discord
 
+from src.adapters.twitch_api import TwitchAPIClient
 from src.config import AppConfig
 from src.database.connection import (
     AdapterEventActionRepository,
@@ -14,14 +15,13 @@ from src.database.connection import (
     PatternRepository,
     ReplyRepository,
     ThreadRepository,
+    TrackedUserRepository,
 )
-from src.database.connection import TrackedUserRepository
 from src.events.event_bus import EventBus
 from src.events.event_types import DiscordCommandResult
 from src.localization import Localizer
 from src.services.discord_presence_service import DiscordPresenceStatusSender
 from src.services.pattern_service import TrackingNotificationSender
-from src.adapters.twitch_api import TwitchAPIClient
 
 from .client import ObserverDiscordClient
 from .ui_data import DiscordUIDataProvider

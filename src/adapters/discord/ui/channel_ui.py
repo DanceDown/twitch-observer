@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Discord UI for `/channel`."""
+
+from __future__ import annotations
 
 import discord
 
@@ -161,6 +161,14 @@ class ChannelMenuView(BaseFormView):
 
     @discord.ui.button(label="Add", style=discord.ButtonStyle.primary)
     async def add(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="channel",
+            step="add",
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         await interaction.response.send_modal(
             ChannelNameModal(
                 event_bus=self._event_bus,
@@ -182,6 +190,14 @@ class ChannelMenuView(BaseFormView):
         await self._open_selection_modal(interaction, action="color")
 
     async def _open_selection_modal(self, interaction: discord.Interaction, *, action: str) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="channel",
+            step=action,
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         tracked_channels = await self._data_provider.list_tracked_channels(self._discord_channel_id)
         if not tracked_channels:
             await self.finish_with_interaction(

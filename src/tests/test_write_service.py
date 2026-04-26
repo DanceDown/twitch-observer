@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import pytest
 
 from src.adapters.discord import dispatch_permission_command, dispatch_write_command
-from src.adapters.twitch_api import TwitchUser, TwitchValidatedToken, TwitchUserTokenBundle
+from src.adapters.twitch_api import TwitchUser, TwitchUserTokenBundle, TwitchValidatedToken
 from src.database.connection import (
     ChannelRecord,
     ChannelRepository,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from src.adapters.twitch_api import (
     TwitchAPIClient,
@@ -228,7 +228,7 @@ class TwitchUserDirectoryService:
             last_refresh = datetime.fromisoformat(record.last_api_refresh_at)
         except ValueError:
             return True
-        return datetime.now(timezone.utc) >= last_refresh + timedelta(seconds=self.api_refresh_interval_seconds)
+        return datetime.now(UTC) >= last_refresh + timedelta(seconds=self.api_refresh_interval_seconds)
 
     def _trim_memory_cache(self) -> None:
         while len(self._users_by_id) > max(1, self.memory_cache_size):

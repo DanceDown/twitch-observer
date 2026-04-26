@@ -10,7 +10,6 @@ from src.database.connection import ChannelRecord, PatternRecord, ReplyRecord, T
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle, TwitchChatMessageEvent
 from src.localization import Localizer
 
-
 EMBED_COLORS: dict[DiscordResultStyle, int] = {
     DiscordResultStyle.SUCCESS: 0x2ECC71,
     DiscordResultStyle.ERROR: 0xE74C3C,
@@ -20,11 +19,14 @@ EMBED_COLORS: dict[DiscordResultStyle, int] = {
 
 def build_result_embed(result: DiscordCommandResult) -> discord.Embed:
     """Render a command result into a consistently styled Discord embed."""
-    return discord.Embed(
+    embed = discord.Embed(
         title=result.title,
         description=result.message,
         color=EMBED_COLORS[result.style],
     )
+    if result.thumbnail_url:
+        embed.set_thumbnail(url=result.thumbnail_url)
+    return embed
 
 
 def build_tracking_embed(
@@ -91,19 +93,6 @@ def build_auto_reply_embed(
     )
 
 
-def build_tracking_view(*, channel_login: str, localizer: Localizer, language: str) -> discord.ui.View:
-    """Build a compact URL-button view linking to the Twitch channel."""
-    view = discord.ui.View(timeout=None)
-    view.add_item(
-        discord.ui.Button(
-            label=localizer.text("discord.tracking_view.open_channel", language=language),
-            style=discord.ButtonStyle.link,
-            url=f"https://www.twitch.tv/{channel_login}",
-        )
-    )
-    return view
-
-
 def resolve_tracking_color(
     *,
     event: TwitchChatMessageEvent,
@@ -129,11 +118,14 @@ def _parse_hex_color(value: str) -> int:
 
 
 _URL_PATTERN = re.compile(r"https?://[^\s]+")
+_DISCORD_MARKDOWN_PATTERN = re.compile(r"([\\*_`~|>\[\]()])")
+_DISCORD_MENTION_PATTERN = re.compile(r"@(everyone|here|[!&]?\d{15,20})")
 
 
 def escape_discord_text(text: str) -> str:
     """Escape Discord markdown and mentions for display-only text fragments."""
-    return discord.utils.escape_mentions(discord.utils.escape_markdown(text))
+    escaped_markdown = _DISCORD_MARKDOWN_PATTERN.sub(r"\\\1", text)
+    return _DISCORD_MENTION_PATTERN.sub(lambda match: f"@\u200b{match.group(1)}", escaped_markdown)
 
 
 def escape_discord_preserving_links(text: str) -> str:
@@ -147,3 +139,9 @@ def escape_discord_preserving_links(text: str) -> str:
         last_end = end
     rendered.append(escape_discord_text(text[last_end:]))
     return "".join(rendered)
+
+
+def format_twitch_code_link(*, display_name: str, login: str) -> str:
+    """Render a Twitch profile link whose visible name is safe from markdown."""
+    safe_name = display_name.replace("`", "")
+    return f"[`{safe_name}`](https://www.twitch.tv/{login})"

@@ -16,7 +16,6 @@ from ..helpers import send_initial_result
 from ..ui_data import DiscordUIDataProvider
 from .shared import resolve_context_language
 
-
 SHOW_EMBED_DESCRIPTION_LIMIT = 4096
 
 
@@ -232,6 +231,10 @@ class ShowSectionModal(discord.ui.Modal):
                     discord.RadioGroupOption(
                         label=localizer.text("show.sections.permissions", language=language),
                         value="permissions",
+                    ),
+                    discord.RadioGroupOption(
+                        label=localizer.text("show.sections.account", language=language),
+                        value="account",
                     ),
                 ]
             ),

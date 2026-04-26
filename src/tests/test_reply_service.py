@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from src.adapters.discord import dispatch_account_command, dispatch_reply_command, dispatch_show_command
+from src.adapters.discord import (
+    dispatch_account_command,
+    dispatch_channel_event_command,
+    dispatch_reply_command,
+    dispatch_show_command,
+)
 from src.adapters.twitch_api import (
     TwitchDeviceCodeStart,
     TwitchDevicePollResult,
@@ -40,6 +45,7 @@ from src.events.event_types import (
     TwitchChatMessageEvent,
 )
 from src.services.account_service import AccountCommandService, AccountNotificationSender, DeviceFlowPollingService
+from src.services.channel_live_state_service import ChannelEventCommandService
 from src.services.pattern_service import ShowCommandService
 from src.services.reply_service import AutoReplyService, ChannelEventAutoReplyService, ReplyCommandService
 
@@ -558,6 +564,91 @@ class InMemoryAdapterEventActionRepository(AdapterEventActionRepository):
         return results
 
 
+@pytest.mark.asyncio
+async def test_channel_event_command_manages_live_and_offline_notifications() -> None:
+    bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    channel_repository = InMemoryChannelRepository()
+    channel_repository.add_channel(thread.thread_id, "42")
+    adapter_event_repository = InMemoryAdapterEventRepository()
+    adapter_event_action_repository = InMemoryAdapterEventActionRepository(event_repository=adapter_event_repository)
+    ChannelEventCommandService(
+        event_bus=bus,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        adapter_event_repository=adapter_event_repository,
+        adapter_event_action_repository=adapter_event_action_repository,
+        twitch_api=FakeTwitchAPI(
+            users_by_id={
+                "42": TwitchUser(user_id="42", login="example", display_name="ExampleChannel"),
+            }
+        ),  # type: ignore[arg-type]
+    )
+
+    add_result = await dispatch_channel_event_command(
+        bus,
+        discord_channel_id=100,
+        requester_id=200,
+        action="add",
+        twitch_channel_id="42",
+        event_key="stream.offline",
+    )
+    event = adapter_event_repository.get_event(
+        thread_id=thread.thread_id,
+        adapter_key="twitch",
+        subject_type="channel",
+        subject_id="42",
+        event_key="stream.offline",
+    )
+    assert event is not None
+    assert add_result.style == DiscordResultStyle.SUCCESS
+    assert "ExampleChannel" in add_result.message
+
+    disable_result = await dispatch_channel_event_command(
+        bus,
+        discord_channel_id=100,
+        requester_id=200,
+        action="disable",
+        twitch_channel_id="42",
+        event_key="stream.offline",
+    )
+    disabled_action = adapter_event_action_repository.get_action(
+        event_id=event.event_id,
+        action_type="discord_notify",
+    )
+    assert disable_result.style == DiscordResultStyle.SUCCESS
+    assert disabled_action is not None
+    assert disabled_action.disabled is True
+
+    enable_result = await dispatch_channel_event_command(
+        bus,
+        discord_channel_id=100,
+        requester_id=200,
+        action="enable",
+        twitch_channel_id="42",
+        event_key="stream.offline",
+    )
+    enabled_action = adapter_event_action_repository.get_action(
+        event_id=event.event_id,
+        action_type="discord_notify",
+    )
+    assert enable_result.style == DiscordResultStyle.SUCCESS
+    assert enabled_action is not None
+    assert enabled_action.disabled is False
+
+    remove_result = await dispatch_channel_event_command(
+        bus,
+        discord_channel_id=100,
+        requester_id=200,
+        action="remove",
+        twitch_channel_id="42",
+        event_key="stream.offline",
+    )
+    assert remove_result.style == DiscordResultStyle.SUCCESS
+    assert adapter_event_action_repository.get_action(event_id=event.event_id, action_type="discord_notify") is None
+
+
 @dataclass
 class InMemoryAccountRepository(TwitchAccountRepository):
     accounts_by_account_id: dict[int, TwitchAccountRecord] = field(default_factory=dict)
@@ -759,7 +850,7 @@ class InMemoryDeviceFlowRepository(TwitchDeviceFlowRepository):
             scope=existing.scope,
             status=existing.status,
             last_error=existing.last_error,
-            last_polled_at=datetime.now(timezone.utc).isoformat(),
+            last_polled_at=datetime.now(UTC).isoformat(),
         )
 
     def update_interval(self, *, discord_channel_id: int, interval_seconds: int) -> None:
@@ -930,7 +1021,7 @@ async def test_account_show_reports_pending_device_flow() -> None:
         user_code="ABCDEFGH",
         verification_uri="https://example.test/activate",
         interval_seconds=5,
-        expires_at=datetime.now(timezone.utc).isoformat(),
+        expires_at=datetime.now(UTC).isoformat(),
         scope=("user:write:chat",),
     )
     AccountCommandService(
@@ -949,6 +1040,52 @@ async def test_account_show_reports_pending_device_flow() -> None:
 
 
 @pytest.mark.asyncio
+async def test_show_account_lists_linked_account_with_display_name_and_thumbnail() -> None:
+    bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread_repository.create(owner_id=200, discord_channel_id=100)
+    account_repository = InMemoryAccountRepository()
+    account = account_repository.create_account(
+        discord_user_id=200,
+        twitch_user_id="77",
+        twitch_login="test__user",
+        client_id="client-123",
+        access_token="oauth:test-token",
+        refresh_token="refresh-123",
+        expires_at=None,
+        scope=("user:write:chat",),
+        token_type="bearer",
+    )
+    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    ShowCommandService(
+        event_bus=bus,
+        thread_repository=thread_repository,
+        channel_repository=InMemoryChannelRepository(),
+        pattern_repository=InMemoryPatternRepository(),
+        reply_repository=InMemoryReplyRepository(),
+        twitch_api=FakeTwitchAPI(
+            users_by_id={
+                "77": TwitchUser(
+                    user_id="77",
+                    login="test__user",
+                    display_name="Test__User",
+                    profile_image_url="https://example.test/avatar.png",
+                )
+            }
+        ),  # type: ignore[arg-type]
+        account_repository=account_repository,
+        device_flow_repository=InMemoryDeviceFlowRepository(),
+    )
+
+    result = await dispatch_show_command(bus, discord_channel_id=100, requester_id=200, sections=("account",))
+
+    assert result.style == DiscordResultStyle.INFO
+    assert "[`Test__User`](https://www.twitch.tv/test__user)" in result.message
+    assert "\\_" not in result.message
+    assert result.thumbnail_url == "https://example.test/avatar.png"
+
+
+@pytest.mark.asyncio
 async def test_device_flow_poller_links_account_after_successful_authorization() -> None:
     account_repository = InMemoryAccountRepository()
     device_flow_repository = InMemoryDeviceFlowRepository()
@@ -961,7 +1098,7 @@ async def test_device_flow_poller_links_account_after_successful_authorization()
         user_code="ABCDEFGH",
         verification_uri="https://example.test/activate",
         interval_seconds=5,
-        expires_at=(datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat(),
+        expires_at=(datetime.now(UTC) + timedelta(minutes=30)).isoformat(),
         scope=("user:write:chat",),
     )
     twitch_api = FakeTwitchAPI(
@@ -1019,7 +1156,7 @@ async def test_device_flow_poller_marks_failed_authorizations() -> None:
         user_code="ABCDEFGH",
         verification_uri="https://example.test/activate",
         interval_seconds=5,
-        expires_at=(datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat(),
+        expires_at=(datetime.now(UTC) + timedelta(minutes=30)).isoformat(),
         scope=("user:write:chat",),
     )
     twitch_api = FakeTwitchAPI(
@@ -1538,7 +1675,7 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
             broadcaster_id="42",
             message_id="msg-1",
             content="hello there",
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
             raw_tags={"badges": ""},
         )
     )
@@ -1615,7 +1752,7 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
             broadcaster_id="42",
             message_id="msg-1",
             content="hello there",
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
             raw_tags={"badges": ""},
         )
     )
@@ -1689,7 +1826,7 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
             broadcaster_id="42",
             message_id="msg-1",
             content="hello there",
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
             raw_tags={"badges": ""},
         )
     )
@@ -1764,7 +1901,7 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
             broadcaster_id="42",
             message_id="msg-1",
             content="hello there",
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
             raw_tags={"badges": ""},
         )
     )
@@ -1855,7 +1992,7 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
             broadcaster_id="42",
             message_id="msg-1",
             content="hello there everyone",
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
             raw_tags={"badges": ""},
         )
     )
@@ -1930,7 +2067,7 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
             broadcaster_id="42",
             message_id="msg-1",
             content="hello there",
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
             raw_tags={"badges": ""},
         )
     )

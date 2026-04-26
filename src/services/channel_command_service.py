@@ -2,9 +2,9 @@ from __future__ import annotations
 
 """Business logic for Discord channel-management commands."""
 
-from dataclasses import dataclass, field
 import logging
 import re
+from dataclasses import dataclass, field
 
 from src.adapters.twitch_api import (
     TwitchAPIClient,

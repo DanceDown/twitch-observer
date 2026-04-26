@@ -2,8 +2,8 @@ from __future__ import annotations
 
 """Business logic for tracked Twitch-user management commands."""
 
-from dataclasses import dataclass, field
 import logging
+from dataclasses import dataclass, field
 
 from src.adapters.twitch_api import (
     TwitchAPIClient,

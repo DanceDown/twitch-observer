@@ -7,6 +7,7 @@ import discord
 from src.events.event_bus import EventBus
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
+from src.services.twitch_runtime import TWITCH_SEND_MESSAGE_ACTION
 
 from ..dispatch import dispatch_reply_command
 from ..helpers import complete_bound_result, normalize_optional_text
@@ -72,7 +73,11 @@ class PatternReplyAddModal(discord.ui.Modal, title="Add Pattern Auto-Reply"):
         self.message = discord.ui.TextInput(
             label=localizer.text("discord.reply_ui.pattern_add.message_label", language=language),
             style=discord.TextStyle.paragraph,
-            placeholder=localizer.text("discord.reply_ui.pattern_add.message_placeholder", language=language),
+            placeholder=localizer.text(
+                "discord.reply_ui.pattern_add.message_placeholder",
+                language=language,
+                NAME=localizer.text("discord.reply_ui.common.example_name", language=language),
+            ),
             required=True,
             max_length=500,
         )
@@ -157,7 +162,12 @@ class EventReplyAddModal(discord.ui.Modal):
         self.message = discord.ui.TextInput(
             label=localizer.text("discord.reply_ui.event_add.message_label", language=language),
             style=discord.TextStyle.paragraph,
-            placeholder=localizer.text("discord.reply_ui.event_add.message_placeholder", language=language),
+            placeholder=localizer.text(
+                "discord.reply_ui.event_add.message_placeholder",
+                language=language,
+                CHANNEL=localizer.text("discord.reply_ui.common.example_channel", language=language),
+                STATE=localizer.text("discord.reply_ui.common.example_state", language=language),
+            ),
             required=True,
             max_length=500,
         )
@@ -169,7 +179,7 @@ class EventReplyAddModal(discord.ui.Modal):
                     discord.SelectOption(
                         label=_adapter_event_label(event),
                         value=_encode_adapter_event_target(event.event.event_id),
-                            description=f"{event.channel.login[:80]} - {_event_state_label(event.event.event_key).lower()} notification",
+                        description=f"{event.channel.login[:80]} - {_event_state_label(event.event.event_key).lower()} notification",
                     )
                     for event in adapter_events[:25]
                 ],
@@ -304,6 +314,14 @@ class ReplyMenuView(BaseFormView):
 
     @discord.ui.button(label="Add Pattern", style=discord.ButtonStyle.primary)
     async def add_pattern(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="reply",
+            step="add_pattern",
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         patterns = await self._data_provider.list_patterns(self._discord_channel_id)
         if not patterns:
             await self.finish_with_interaction(
@@ -330,6 +348,14 @@ class ReplyMenuView(BaseFormView):
 
     @discord.ui.button(label="Add Event", style=discord.ButtonStyle.primary)
     async def add_event(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="reply",
+            step="add_event",
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         adapter_events = await self._data_provider.list_adapter_events(self._discord_channel_id)
         if not adapter_events:
             await self.finish_with_interaction(
@@ -367,8 +393,20 @@ class ReplyMenuView(BaseFormView):
         await self._open_action_modal(interaction, "enable")
 
     async def _open_action_modal(self, interaction: discord.Interaction, action: str) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="reply",
+            step=action,
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         replies = list(await self._data_provider.list_replies(self._discord_channel_id))
-        replies.extend(await self._data_provider.list_adapter_event_actions(self._discord_channel_id))
+        replies.extend(
+            action
+            for action in await self._data_provider.list_adapter_event_actions(self._discord_channel_id)
+            if action.action.action_type == TWITCH_SEND_MESSAGE_ACTION
+        )
         if not replies:
             await self.finish_with_interaction(
                 interaction,

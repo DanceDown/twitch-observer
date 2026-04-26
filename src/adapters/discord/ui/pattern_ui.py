@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Discord UI for `/ping`."""
+
+from __future__ import annotations
 
 import discord
 
@@ -12,7 +12,7 @@ from src.utils.discord_embeds import build_result_embed
 from ..dispatch import dispatch_pattern_command, dispatch_pattern_edit_command
 from ..ui_data import DiscordUIDataProvider, PatternPresentation, TrackedChannelPresentation, TrackedUserPresentation
 from .patterns.text import channel_scope_text, offline_state_text, sub_state_text, user_scope_text
-from .shared import BaseFormView, COLOR_PICKER_URL, PatternFormState, resolve_context_language
+from .shared import COLOR_PICKER_URL, BaseFormView, PatternFormState, resolve_context_language
 
 
 class PingMenuView(BaseFormView):
@@ -50,6 +50,14 @@ class PingMenuView(BaseFormView):
 
     @discord.ui.button(label="Add", style=discord.ButtonStyle.primary)
     async def add(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="ping",
+            step="add",
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         view = PatternHomeView(
             owner_id=self.owner_id,
             event_bus=self._event_bus,
@@ -63,6 +71,14 @@ class PingMenuView(BaseFormView):
 
     @discord.ui.button(label="Edit", style=discord.ButtonStyle.secondary)
     async def edit(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="ping",
+            step="edit",
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         view = PatternPickerView(
             owner_id=self.owner_id,
             event_bus=self._event_bus,
@@ -75,7 +91,14 @@ class PingMenuView(BaseFormView):
             await self.finish_with_interaction(interaction, prepare_result)
             return
         view.bound_message = self.bound_message
-        await interaction.response.send_modal(PatternEditSelectionModal(parent=view, patterns=view._patterns))
+        await interaction.response.send_modal(
+            PatternEditSelectionModal(
+                parent=view,
+                patterns=view._patterns,
+                localizer=self._localizer,
+                language=self.language,
+            )
+        )
 
     @discord.ui.button(label="Remove", style=discord.ButtonStyle.secondary)
     async def remove(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
@@ -90,6 +113,14 @@ class PingMenuView(BaseFormView):
         await self._open_id_action(interaction, "enable")
 
     async def _open_id_action(self, interaction: discord.Interaction, action: str) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="ping",
+            step=action,
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         view = PatternIdActionView(
             owner_id=self.owner_id,
             event_bus=self._event_bus,
@@ -265,8 +296,10 @@ class PatternPickerView(BaseFormView):
             is_regex=pattern.pattern.is_regex,
             channel_scope_mode=pattern.pattern.channel_scope_mode,
             selected_channels=list(pattern.channel_logins),
+            selected_channel_names=list(pattern.channel_display_names),
             user_scope_mode=pattern.pattern.user_scope_mode,
             selected_users=list(pattern.user_logins),
+            selected_user_names=list(pattern.user_display_names),
             sub_state=pattern.pattern.sub_state,
             offline_state=pattern.pattern.offline_state,
             case_sensitive=pattern.pattern.case_sensitive,
@@ -331,11 +364,21 @@ class PatternHomeView(BaseFormView):
             ),
             self.text(
                 "discord.pattern_ui.summary.where",
-                VALUE=channel_scope_text(self._localizer, self.language, self.state.channel_scope_mode, self.state.selected_channels),
+                VALUE=channel_scope_text(
+                    self._localizer,
+                    self.language,
+                    self.state.channel_scope_mode,
+                    self.state.selected_channel_names,
+                ),
             ),
             self.text(
                 "discord.pattern_ui.summary.who",
-                VALUE=user_scope_text(self._localizer, self.language, self.state.user_scope_mode, self.state.selected_users),
+                VALUE=user_scope_text(
+                    self._localizer,
+                    self.language,
+                    self.state.user_scope_mode,
+                    self.state.selected_user_names,
+                ),
             ),
             self.text(
                 "discord.pattern_ui.summary.subscribers",
@@ -368,10 +411,26 @@ class PatternHomeView(BaseFormView):
 
     @discord.ui.button(label="Basics", style=discord.ButtonStyle.primary)
     async def basics(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="ping",
+            step="basics",
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         await interaction.response.send_modal(PatternBasicsModal(parent=self))
 
     @discord.ui.button(label="Channels", style=discord.ButtonStyle.secondary)
     async def channels(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="ping",
+            step="channels",
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         tracked_channels = await self._data_provider.list_tracked_channels(self._discord_channel_id)
         if not tracked_channels:
             await self.finish_with_interaction(
@@ -388,6 +447,14 @@ class PatternHomeView(BaseFormView):
 
     @discord.ui.button(label="Users", style=discord.ButtonStyle.secondary)
     async def users(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="ping",
+            step="users",
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         tracked_users = await self._data_provider.list_tracked_users(self._discord_channel_id)
         if not tracked_users:
             await self.finish_with_interaction(
@@ -404,10 +471,26 @@ class PatternHomeView(BaseFormView):
 
     @discord.ui.button(label="Options", style=discord.ButtonStyle.secondary)
     async def options(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="ping",
+            step="options",
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         await interaction.response.send_modal(PatternOptionsModal(parent=self))
 
     @discord.ui.button(label="Save", style=discord.ButtonStyle.success)
     async def save(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        if not await self.ensure_step_allowed(
+            interaction,
+            self._event_bus,
+            flow="ping",
+            step="save",
+            discord_channel_id=self._discord_channel_id,
+        ):
+            return
         if self._action == "add":
             result = await dispatch_pattern_command(
                 self._event_bus,
@@ -426,6 +509,7 @@ class PatternHomeView(BaseFormView):
                 case_sensitive=self.state.case_sensitive,
                 color=self.state.color,
                 disabled=False,
+                priority=self.state.priority,
             )
         else:
             result = await dispatch_pattern_edit_command(
@@ -520,6 +604,7 @@ class PatternChannelsModal(discord.ui.Modal):
     def __init__(self, *, parent: PatternHomeView, tracked_channels: list[TrackedChannelPresentation]) -> None:
         super().__init__(title=parent.text("discord.pattern_ui.channels.title"), timeout=300)
         self._parent_view = parent
+        self._tracked_channels = tracked_channels
         self.scope = discord.ui.Label(
             text=parent.text("discord.pattern_ui.channels.scope_label"),
             component=discord.ui.RadioGroup(
@@ -551,6 +636,7 @@ class PatternChannelsModal(discord.ui.Modal):
                         label=channel.display_name[:100],
                         value=channel.login,
                         description=channel.login[:100],
+                        default=channel.login in parent.state.selected_channels,
                     )
                     for channel in tracked_channels[:25]
                 ],
@@ -566,8 +652,14 @@ class PatternChannelsModal(discord.ui.Modal):
         self._parent_view.state.channel_scope_mode = self.scope.component.value
         if self.scope.component.value == "all_tracked":
             self._parent_view.state.selected_channels.clear()
+            self._parent_view.state.selected_channel_names.clear()
         elif self.channels.component.values:
             self._parent_view.state.selected_channels = list(self.channels.component.values)
+            name_by_login = {channel.login: channel.display_name for channel in self._tracked_channels}
+            self._parent_view.state.selected_channel_names = [
+                name_by_login.get(login, login)
+                for login in self._parent_view.state.selected_channels
+            ]
         await interaction.response.defer()
         await self._parent_view.rerender()
 
@@ -578,6 +670,7 @@ class PatternUsersModal(discord.ui.Modal):
     def __init__(self, *, parent: PatternHomeView, tracked_users: list[TrackedUserPresentation]) -> None:
         super().__init__(title=parent.text("discord.pattern_ui.users.title"), timeout=300)
         self._parent_view = parent
+        self._tracked_users = tracked_users
         self.scope = discord.ui.Label(
             text=parent.text("discord.pattern_ui.users.scope_label"),
             component=discord.ui.RadioGroup(
@@ -619,6 +712,7 @@ class PatternUsersModal(discord.ui.Modal):
                         label=user.display_name[:100],
                         value=user.login,
                         description=user.login[:100],
+                        default=user.login in parent.state.selected_users,
                     )
                     for user in tracked_users[:25]
                 ],
@@ -635,8 +729,14 @@ class PatternUsersModal(discord.ui.Modal):
         state.user_scope_mode = self.scope.component.value
         if state.user_scope_mode in {"all_users", "all_tracked"}:
             state.selected_users.clear()
+            state.selected_user_names.clear()
         elif self.users.component.values:
             state.selected_users = list(self.users.component.values)
+            name_by_login = {user.login: user.display_name for user in self._tracked_users}
+            state.selected_user_names = [
+                name_by_login.get(login, login)
+                for login in state.selected_users
+            ]
         await interaction.response.defer()
         await self._parent_view.rerender()
 
@@ -651,9 +751,21 @@ class PatternOptionsModal(discord.ui.Modal):
             text=parent.text("discord.pattern_ui.options.sub_state_label"),
             component=discord.ui.RadioGroup(
                 options=[
-                    discord.RadioGroupOption(label=parent.text("discord.pattern_ui.summary.sub_state_all"), value="all", default=parent.state.sub_state == "all"),
-                    discord.RadioGroupOption(label=parent.text("discord.pattern_ui.summary.sub_state_subs"), value="subs", default=parent.state.sub_state == "subs"),
-                    discord.RadioGroupOption(label=parent.text("discord.pattern_ui.summary.sub_state_non_subs"), value="non_subs", default=parent.state.sub_state == "non_subs"),
+                    discord.RadioGroupOption(
+                        label=parent.text("discord.pattern_ui.summary.sub_state_all"),
+                        value="all",
+                        default=parent.state.sub_state == "all",
+                    ),
+                    discord.RadioGroupOption(
+                        label=parent.text("discord.pattern_ui.summary.sub_state_subs"),
+                        value="subs",
+                        default=parent.state.sub_state == "subs",
+                    ),
+                    discord.RadioGroupOption(
+                        label=parent.text("discord.pattern_ui.summary.sub_state_non_subs"),
+                        value="non_subs",
+                        default=parent.state.sub_state == "non_subs",
+                    ),
                 ]
             ),
         )
@@ -661,9 +773,21 @@ class PatternOptionsModal(discord.ui.Modal):
             text=parent.text("discord.pattern_ui.options.offline_state_label"),
             component=discord.ui.RadioGroup(
                 options=[
-                    discord.RadioGroupOption(label=parent.text("discord.pattern_ui.summary.offline_state_both"), value="both", default=parent.state.offline_state == "both"),
-                    discord.RadioGroupOption(label=parent.text("discord.pattern_ui.summary.offline_state_online"), value="online", default=parent.state.offline_state == "online"),
-                    discord.RadioGroupOption(label=parent.text("discord.pattern_ui.summary.offline_state_offline"), value="offline", default=parent.state.offline_state == "offline"),
+                    discord.RadioGroupOption(
+                        label=parent.text("discord.pattern_ui.summary.offline_state_both"),
+                        value="both",
+                        default=parent.state.offline_state == "both",
+                    ),
+                    discord.RadioGroupOption(
+                        label=parent.text("discord.pattern_ui.summary.offline_state_online"),
+                        value="online",
+                        default=parent.state.offline_state == "online",
+                    ),
+                    discord.RadioGroupOption(
+                        label=parent.text("discord.pattern_ui.summary.offline_state_offline"),
+                        value="offline",
+                        default=parent.state.offline_state == "offline",
+                    ),
                 ]
             ),
         )
@@ -738,7 +862,11 @@ class PatternEditSelectionModal(discord.ui.Modal):
                             "discord.pattern_ui.selection.option_description",
                             language=language,
                             TYPE=localizer.text(
-                                "discord.pattern_ui.summary.mode_regex" if item.pattern.is_regex else "discord.pattern_ui.summary.mode_ping",
+                                (
+                                    "discord.pattern_ui.summary.mode_regex"
+                                    if item.pattern.is_regex
+                                    else "discord.pattern_ui.summary.mode_ping"
+                                ),
                                 language=language,
                             ),
                         ),
@@ -780,7 +908,11 @@ class PatternActionSelectionModal(discord.ui.Modal):
                             "discord.pattern_ui.selection.option_description",
                             language=language,
                             TYPE=localizer.text(
-                                "discord.pattern_ui.summary.mode_regex" if item.pattern.is_regex else "discord.pattern_ui.summary.mode_ping",
+                                (
+                                    "discord.pattern_ui.summary.mode_regex"
+                                    if item.pattern.is_regex
+                                    else "discord.pattern_ui.summary.mode_ping"
+                                ),
                                 language=language,
                             ),
                         ),

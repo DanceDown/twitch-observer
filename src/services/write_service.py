@@ -2,8 +2,8 @@ from __future__ import annotations
 
 """Business logic for manually sending Twitch chat messages from Discord."""
 
-from dataclasses import dataclass, field
 import logging
+from dataclasses import dataclass, field
 
 from src.adapters.twitch_api import TwitchAPIClient, TwitchAPIError, TwitchAuthenticationError
 from src.database.connection import ChannelRepository, ThreadRepository, TwitchAccountRepository, UserPermissionRepository

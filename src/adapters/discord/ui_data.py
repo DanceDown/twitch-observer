@@ -15,9 +15,9 @@ from src.database.connection import (
     PatternRepository,
     ReplyRecord,
     ReplyRepository,
-    TrackedUserRepository,
     ThreadRecord,
     ThreadRepository,
+    TrackedUserRepository,
 )
 
 
@@ -37,7 +37,9 @@ class PatternPresentation:
 
     pattern: PatternRecord
     channel_logins: tuple[str, ...]
+    channel_display_names: tuple[str, ...]
     user_logins: tuple[str, ...]
+    user_display_names: tuple[str, ...]
 
 
 @dataclass(slots=True, frozen=True)
@@ -122,7 +124,9 @@ class DiscordUIDataProvider:
                 PatternPresentation(
                     pattern=pattern,
                     channel_logins=await self._resolve_logins(pattern.channel_scope_ids),
+                    channel_display_names=await self._resolve_display_names(pattern.channel_scope_ids),
                     user_logins=await self._resolve_logins(pattern.user_scope_ids),
+                    user_display_names=await self._resolve_display_names(pattern.user_scope_ids),
                 )
             )
         return presentations
@@ -215,3 +219,11 @@ class DiscordUIDataProvider:
             twitch_user: TwitchUser = await self.twitch_api.get_user_by_id(user_id)
             logins.append(twitch_user.login)
         return tuple(logins)
+
+    async def _resolve_display_names(self, user_ids: tuple[str, ...]) -> tuple[str, ...]:
+        """Resolve Twitch user IDs to display names for user-facing Discord text."""
+        names: list[str] = []
+        for user_id in user_ids:
+            twitch_user: TwitchUser = await self.twitch_api.get_user_by_id(user_id)
+            names.append(twitch_user.display_name)
+        return tuple(names)

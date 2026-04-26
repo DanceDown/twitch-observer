@@ -69,7 +69,7 @@ At minimum the application currently needs:
 - per-user permissions can delegate configuration access inside one Discord context
 - linked users can manually send Twitch messages and replies from Discord
 - tracked channels are live-monitored globally through app-token Helix polling
-- `/live` and `/offline` configure notifications, not the monitoring itself
+- `/live` configures live and offline notifications, not the monitoring itself
 - color inheritance for Discord embeds is:
   - pattern color
   - source channel color
@@ -93,3 +93,4 @@ At minimum the application currently needs:
 - [docs/discord_interaction_flows.md](docs/discord_interaction_flows.md)
 - [docs/twitch_irc.md](docs/twitch_irc.md)
 - [docs/adding_commands.md](docs/adding_commands.md)
+- [docs/development.md](docs/development.md)

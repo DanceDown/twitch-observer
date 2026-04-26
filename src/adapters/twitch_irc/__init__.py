@@ -16,7 +16,7 @@ import logging
 import random
 import ssl
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from src.config import AppConfig
 from src.events.event_bus import EventBus
@@ -79,9 +79,9 @@ def build_chat_message_event(message: IRCMessage) -> TwitchChatMessageEvent | No
     author_login = _parse_prefix_nick(message.prefix)
     display_name = message.tags.get("display-name") or author_login
     timestamp_ms = message.tags.get("tmi-sent-ts")
-    sent_at = datetime.now(timezone.utc)
+    sent_at = datetime.now(UTC)
     if timestamp_ms and timestamp_ms.isdigit():
-        sent_at = datetime.fromtimestamp(int(timestamp_ms) / 1000, tz=timezone.utc)
+        sent_at = datetime.fromtimestamp(int(timestamp_ms) / 1000, tz=UTC)
 
     return TwitchChatMessageEvent(
         channel_login=channel_login,
@@ -223,14 +223,18 @@ class AnonymousTwitchIRCAdapter:
             raw_bytes = await self._reader.readline()
             if not raw_bytes:
                 break
-            await self.handle_line(raw_bytes.decode("utf-8", errors="replace"))
+            raw_line = raw_bytes.decode("utf-8", errors="replace")
+            try:
+                await self.handle_line(raw_line)
+            except Exception:
+                logger.exception("Failed to handle Twitch IRC line; continuing read loop. raw_line=%r", raw_line)
 
     async def _send_line(self, line: str) -> None:
         """Send one IRC command line to the server."""
         if self._writer is None:
             return
         logger.debug("Sending IRC line: %s", line)
-        self._writer.write(f"{line}\r\n".encode("utf-8"))
+        self._writer.write(f"{line}\r\n".encode())
         await self._writer.drain()
 
     @staticmethod
@@ -257,8 +261,7 @@ def _decode_tag_value(value: str) -> str:
     decoded = decoded.replace(r"\:", ";")
     decoded = decoded.replace(r"\\", "\\")
     decoded = decoded.replace(r"\r", "\r")
-    decoded = decoded.replace(r"\n", "\n")
-    return decoded
+    return decoded.replace(r"\n", "\n")
 
 
 def _parse_prefix_nick(prefix: str | None) -> str:

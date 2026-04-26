@@ -9,14 +9,14 @@ import discord
 from src.config import AppConfig
 from src.events.event_bus import EventBus
 from src.localization import Localizer
-from src.utils.discord_embeds import build_result_embed, build_tracking_view
+from src.utils.discord_embeds import build_result_embed
 
 from .commands import (
     register_account_commands,
     register_channel_commands,
     register_live_state_commands,
-    register_permission_commands,
     register_pattern_commands,
+    register_permission_commands,
     register_reply_commands,
     register_show_commands,
     register_thread_commands,
@@ -85,19 +85,8 @@ class ObserverDiscordClient(discord.Client):
         channel = self.get_channel(discord_channel_id)
         if channel is None:
             channel = await self.fetch_channel(discord_channel_id)
-        if isinstance(channel, (discord.TextChannel, discord.Thread, discord.DMChannel)):
-            thread = self._ui_data_provider.get_thread(discord_channel_id)
-            language = self._localizer.language_for_thread(thread)
-            view = (
-                None
-                if channel_login is None
-                else build_tracking_view(
-                    channel_login=channel_login,
-                    localizer=self._localizer,
-                    language=language,
-                )
-            )
-            await channel.send(embed=embed, view=view)
+        if isinstance(channel, discord.TextChannel | discord.Thread | discord.DMChannel):
+            await channel.send(embed=embed)
 
     async def set_status_text(self, text: str) -> None:
         """Update the bot's global Discord custom status text."""
@@ -119,5 +108,5 @@ class ObserverDiscordClient(discord.Client):
         channel = self.get_channel(discord_channel_id)
         if channel is None:
             channel = await self.fetch_channel(discord_channel_id)
-        if isinstance(channel, (discord.TextChannel, discord.Thread, discord.DMChannel)):
+        if isinstance(channel, discord.TextChannel | discord.Thread | discord.DMChannel):
             await channel.send(embed=build_result_embed(result))

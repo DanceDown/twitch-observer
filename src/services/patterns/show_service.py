@@ -18,6 +18,8 @@ from src.database.connection import (
     ThreadRecord,
     ThreadRepository,
     TrackedUserRepository,
+    TwitchAccountRepository,
+    TwitchDeviceFlowRepository,
     UserPermissionRepository,
 )
 from src.events.event_bus import EventBus
@@ -34,7 +36,7 @@ from src.services.twitch_runtime import (
     TWITCH_ADAPTER_KEY,
     TWITCH_SEND_MESSAGE_ACTION,
 )
-from src.utils.discord_embeds import escape_discord_text
+from src.utils.discord_embeds import format_twitch_code_link
 from src.utils.permissions import ObserverPermission, explicit_permission_labels
 
 
@@ -53,6 +55,8 @@ class ShowCommandService:
     adapter_event_action_repository: AdapterEventActionRepository | None = None
     localizer: Localizer | None = None
     permission_repository: UserPermissionRepository | None = None
+    account_repository: TwitchAccountRepository | None = None
+    device_flow_repository: TwitchDeviceFlowRepository | None = None
 
     def __post_init__(self) -> None:
         """Subscribe the service to `/show` requests."""
@@ -102,12 +106,17 @@ class ShowCommandService:
                 lines.append(await self._render_users_section(thread.thread_id))
             if "permissions" in sections:
                 lines.append(self._render_permissions_section(thread))
+            thumbnail_url = None
+            if "account" in sections:
+                account_section, thumbnail_url = await self._render_account_section(thread)
+                lines.append(account_section)
             result = self._localizer.thread_result(
                 "results.show.overview",
                 thread=thread,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
                 CONTENT="\n\n".join(section for section in lines if section),
+                thumbnail_url=thumbnail_url,
             )
 
         if not event.result_future.done():
@@ -119,7 +128,7 @@ class ShowCommandService:
         if not raw_sections:
             return ("channels",)
 
-        allowed = {"channels", "pings", "auto_replies", "users", "permissions"}
+        allowed = {"channels", "pings", "auto_replies", "users", "permissions", "account"}
         normalized = tuple(section for section in raw_sections if section in allowed)
         if normalized:
             return normalized
@@ -161,8 +170,7 @@ class ShowCommandService:
         for channel in channels:
             twitch_user = await self.twitch_api.get_user_by_id(channel.twitch_channel_id)
             line = (
-                f"- [{escape_discord_text(twitch_user.display_name)}]"
-                f"(https://www.twitch.tv/{twitch_user.login})"
+                f"- {format_twitch_code_link(display_name=twitch_user.display_name, login=twitch_user.login)}"
             )
             if channel.color:
                 line += "\n  " + self._localizer.text(
@@ -264,15 +272,14 @@ class ShowCommandService:
         for tracked_user in tracked_users:
             twitch_user = await self.twitch_api.get_user_by_id(tracked_user.twitch_user_id)
             rows.append(
-                f"- [{escape_discord_text(twitch_user.display_name)}]"
-                f"(https://www.twitch.tv/{twitch_user.login})"
+                f"- {format_twitch_code_link(display_name=twitch_user.display_name, login=twitch_user.login)}"
             )
         return f"**{self._localizer.text('show.sections.tracked_users', language=language)}**\n" + "\n".join(rows)
 
     def _render_permissions_section(self, thread: ThreadRecord) -> str:
         language = self._localizer.language_for_thread(thread)
         rows = [
-            f"- <@{thread.owner_id}>\n  `{self._localizer.text('show.permission.owner', language=language)}`"
+            f"- <@{thread.owner_id}>\n  {self._localizer.text('show.permission.owner', language=language)}"
         ]
         if self.permission_repository is None:
             return f"**{self._localizer.text('show.sections.permissions', language=language)}**\n" + "\n".join(rows)
@@ -335,7 +342,7 @@ class ShowCommandService:
         details.append("  " + self._localizer.text(
             "show.event_reply.channel",
             language=language,
-            DISPLAY_NAME=escape_discord_text(channel_user.display_name),
+            DISPLAY_NAME=channel_user.display_name,
             LOGIN=channel_user.login,
         ))
         details.append("  " + self._localizer.text("show.event_reply.reply", language=language, TEXT=response))
@@ -350,7 +357,13 @@ class ShowCommandService:
             if pattern.channel_scope_mode == "only_selected":
                 details.append(self._localizer.text("common.scope.only_in", language=language, ITEMS=", ".join(channel_names)))
             elif pattern.channel_scope_mode == "all_except_selected":
-                details.append(self._localizer.text("common.scope.all_tracked_channels_except", language=language, ITEMS=", ".join(channel_names)))
+                details.append(
+                    self._localizer.text(
+                        "common.scope.all_tracked_channels_except",
+                        language=language,
+                        ITEMS=", ".join(channel_names),
+                    )
+                )
         if pattern.user_scope_mode != "all_users":
             user_names = await self._resolve_twitch_names(pattern.user_scope_ids)
             if pattern.user_scope_mode == "only_selected":
@@ -360,7 +373,13 @@ class ShowCommandService:
             elif pattern.user_scope_mode == "all_tracked":
                 details.append(self._localizer.text("common.scope.all_tracked_users", language=language))
             elif pattern.user_scope_mode == "all_tracked_except_selected":
-                details.append(self._localizer.text("common.scope.all_tracked_users_except", language=language, ITEMS=", ".join(user_names)))
+                details.append(
+                    self._localizer.text(
+                        "common.scope.all_tracked_users_except",
+                        language=language,
+                        ITEMS=", ".join(user_names),
+                    )
+                )
         if pattern.sub_state != "all":
             details.append(self._localizer.text(
                 "show.pattern.subscribers_only" if pattern.sub_state == "subs" else "show.pattern.non_subscribers_only",
@@ -388,8 +407,7 @@ class ShowCommandService:
         for twitch_id in twitch_ids:
             user = await self.twitch_api.get_user_by_id(twitch_id)
             resolved.append(
-                f"[{escape_discord_text(user.display_name)}]"
-                f"(https://www.twitch.tv/{user.login})"
+                format_twitch_code_link(display_name=user.display_name, login=user.login)
             )
         return tuple(resolved)
 
@@ -401,10 +419,59 @@ class ShowCommandService:
         for twitch_id in twitch_ids:
             user = await self.twitch_api.get_user_by_id(twitch_id)
             resolved.append(
-                f"[{escape_discord_text(user.display_name)}]"
-                f"(https://www.twitch.tv/{user.login})"
+                format_twitch_code_link(display_name=user.display_name, login=user.login)
             )
         return tuple(resolved)
+
+    async def _render_account_section(self, thread: ThreadRecord) -> tuple[str, str | None]:
+        language = self._localizer.language_for_thread(thread)
+        title = self._localizer.text("show.sections.account", language=language)
+        rows: list[str] = []
+        thumbnail_url = None
+        account = (
+            None
+            if self.account_repository is None or thread.account_id is None
+            else self.account_repository.get_by_account_id(thread.account_id)
+        )
+        if account is not None:
+            twitch_user = await self.twitch_api.get_user_by_id(account.twitch_user_id)
+            thumbnail_url = twitch_user.profile_image_url
+            rows.append(
+                self._localizer.text(
+                    "show.account.linked",
+                    language=language,
+                    USER=f"<@{account.discord_user_id}>",
+                    TWITCH=format_twitch_code_link(display_name=twitch_user.display_name, login=twitch_user.login),
+                )
+            )
+            rows.append(
+                self._localizer.text(
+                    "show.account.token_status",
+                    language=language,
+                    STATUS=self._localizer.text(
+                        "show.account.token_available" if account.access_token else "show.account.token_missing",
+                        language=language,
+                    ),
+                )
+            )
+        pending = (
+            None
+            if self.device_flow_repository is None
+            else self.device_flow_repository.get_by_discord_channel_id(thread.discord_channel_id)
+        )
+        if pending is not None:
+            rows.append(
+                self._localizer.text(
+                    "show.account.pending",
+                    language=language,
+                    USER=f"<@{pending.discord_user_id}>",
+                    STATUS=pending.status,
+                    USER_CODE=pending.user_code,
+                )
+            )
+        if not rows:
+            rows.append(self._localizer.text("show.account.empty", language=language))
+        return f"**{title}**\n" + "\n".join(f"- {row}" for row in rows), thumbnail_url
 
     def _permission_label(self, label: str, *, language: str) -> str:
         key = f"show.permission.{label}"

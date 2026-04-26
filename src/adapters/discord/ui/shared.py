@@ -2,8 +2,8 @@ from __future__ import annotations
 
 """Shared Discord UI primitives used across command-specific flows."""
 
-from dataclasses import dataclass, field
 from contextlib import suppress
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import discord
@@ -12,6 +12,8 @@ from src.adapters.discord.helpers import build_public_result_embed
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 from src.localization import DEFAULT_LANGUAGE, Localizer
 from src.utils.discord_embeds import build_result_embed
+
+from ..dispatch import dispatch_ui_flow_decision
 
 if TYPE_CHECKING:
     from ..ui_data import DiscordUIDataProvider
@@ -44,7 +46,7 @@ async def start_form(
 def resolve_context_language(
     *,
     localizer: Localizer,
-    data_provider: "DiscordUIDataProvider | None" = None,
+    data_provider: DiscordUIDataProvider | None = None,
     discord_channel_id: int | None = None,
 ) -> str:
     """Resolve the active UI language for one Discord context."""
@@ -68,8 +70,10 @@ class PatternFormState:
     is_regex: bool = False
     channel_scope_mode: str = "all_tracked"
     selected_channels: list[str] = field(default_factory=list)
+    selected_channel_names: list[str] = field(default_factory=list)
     user_scope_mode: str = "all_users"
     selected_users: list[str] = field(default_factory=list)
+    selected_user_names: list[str] = field(default_factory=list)
     sub_state: str = "all"
     offline_state: str = "both"
     case_sensitive: bool = False
@@ -154,10 +158,8 @@ class BaseFormView(discord.ui.View):
         if self.bound_message is None:
             if interaction.response.is_done():
                 if result.ephemeral:
-                    try:
+                    with suppress(discord.HTTPException):
                         await interaction.edit_original_response(embed=embed)
-                    except discord.HTTPException:
-                        pass
                 elif interaction.channel is not None:
                     await interaction.channel.send(embed=build_public_result_embed(result, interaction.user.mention))
             else:
@@ -192,6 +194,29 @@ class BaseFormView(discord.ui.View):
             await interaction.delete_original_response()
         with suppress(discord.HTTPException):
             await self.bound_message.delete()
+
+    async def ensure_step_allowed(
+        self,
+        interaction: discord.Interaction,
+        event_bus,
+        *,
+        flow: str,
+        step: str,
+        discord_channel_id: int | None,
+    ) -> bool:
+        """Ask services before opening the next UI step."""
+        decision = await dispatch_ui_flow_decision(
+            event_bus,
+            discord_channel_id=discord_channel_id,
+            requester_id=interaction.user.id,
+            flow=flow,
+            step=step,
+        )
+        if decision.open_ui:
+            return True
+        if decision.result is not None:
+            await self.finish_with_interaction(interaction, decision.result)
+        return False
 
     async def rerender(self) -> None:
         """Refresh the original interaction response with the current form state."""

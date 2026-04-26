@@ -12,15 +12,15 @@ from src.adapters.twitch_api import TwitchAPIClient
 from src.adapters.twitch_irc import AnonymousTwitchIRCAdapter
 from src.config import AppConfig
 from src.database.connection import (
+    PostgresAdapterEventActionRepository,
+    PostgresAdapterEventRepository,
     PostgresChannelRepository,
     PostgresDatabase,
     PostgresMessageRepository,
-    PostgresAdapterEventActionRepository,
-    PostgresAdapterEventRepository,
     PostgresPatternRepository,
     PostgresReplyRepository,
-    PostgresTrackedUserRepository,
     PostgresThreadRepository,
+    PostgresTrackedUserRepository,
     PostgresTwitchAccountRepository,
     PostgresTwitchDeviceFlowRepository,
     PostgresTwitchUserCacheRepository,
@@ -44,8 +44,21 @@ from src.services.reply_service import AutoReplyService, ChannelEventAutoReplySe
 from src.services.thread_lifecycle_service import ThreadLifecycleService
 from src.services.twitch_live_monitor_service import TwitchLiveMonitorService
 from src.services.twitch_user_directory_service import TwitchUserDirectoryIngestService, TwitchUserDirectoryService
+from src.services.ui_flow_service import DiscordUIFlowGuardService
 from src.services.user_command_service import UserCommandService
 from src.services.write_service import TwitchWriteCommandService
+
+
+class _DiscordOptionalVoiceWarningFilter(logging.Filter):
+    """Hide optional voice dependency warnings because the bot never uses voice."""
+
+    _IGNORED_MESSAGES = (
+        "PyNaCl is not installed, voice will NOT be supported",
+        "davey is not installed, voice will NOT be supported",
+    )
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.getMessage() not in self._IGNORED_MESSAGES
 
 
 async def _run() -> None:
@@ -55,6 +68,7 @@ async def _run() -> None:
         level=getattr(logging, config.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
+    logging.getLogger("discord.client").addFilter(_DiscordOptionalVoiceWarningFilter())
     event_bus = EventBus()
     localizer = Localizer.from_directory()
     database = PostgresDatabase(config)
@@ -88,6 +102,7 @@ async def _run() -> None:
         thread_repository=thread_repository,
         twitch_api=twitch_api,
         permission_repository=permission_repository,
+        localizer=localizer,
     )
 
     irc_adapter = AnonymousTwitchIRCAdapter(config=config, event_bus=event_bus)
@@ -116,11 +131,23 @@ async def _run() -> None:
         channel_repository=channel_repository,
         adapter_event_repository=adapter_event_repository,
         adapter_event_action_repository=adapter_event_action_repository,
+        twitch_api=twitch_api,
         permission_repository=permission_repository,
+        localizer=localizer,
     )
     ChannelLiveStatePersistenceService(
         event_bus=event_bus,
         channel_repository=channel_repository,
+    )
+    DiscordUIFlowGuardService(
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        pattern_repository=pattern_repository,
+        reply_repository=reply_repository,
+        account_repository=account_repository,
+        permission_repository=permission_repository,
+        localizer=localizer,
     )
     UserCommandService(
         event_bus=event_bus,
@@ -150,6 +177,7 @@ async def _run() -> None:
         twitch_api=twitch_api,
         notifier=discord_adapter,
         poll_interval_seconds=config.twitch_device_flow_poll_interval_seconds,
+        localizer=localizer,
     )
     presence_service = DiscordPresenceService(
         message_repository=message_repository,
@@ -164,6 +192,7 @@ async def _run() -> None:
         twitch_api=twitch_api,
         irc_manager=irc_adapter,
         connect_timeout_seconds=config.irc_bootstrap_connect_timeout_seconds,
+        resync_interval_seconds=config.irc_channel_resync_interval_seconds,
     )
     PatternCommandService(
         event_bus=event_bus,
@@ -179,6 +208,7 @@ async def _run() -> None:
         event_bus=event_bus,
         thread_repository=thread_repository,
         permission_repository=permission_repository,
+        localizer=localizer,
     )
     ReplyCommandService(
         event_bus=event_bus,
@@ -191,6 +221,7 @@ async def _run() -> None:
         adapter_event_repository=adapter_event_repository,
         adapter_event_action_repository=adapter_event_action_repository,
         permission_repository=permission_repository,
+        localizer=localizer,
     )
     ShowCommandService(
         event_bus=event_bus,
@@ -204,6 +235,8 @@ async def _run() -> None:
         twitch_api=twitch_api,
         localizer=localizer,
         permission_repository=permission_repository,
+        account_repository=account_repository,
+        device_flow_repository=device_flow_repository,
     )
     PatternTrackingService(
         event_bus=event_bus,
@@ -245,6 +278,7 @@ async def _run() -> None:
         adapter_event_repository=adapter_event_repository,
         adapter_event_action_repository=adapter_event_action_repository,
         notifier=discord_adapter,
+        localizer=localizer,
     )
     TwitchWriteCommandService(
         event_bus=event_bus,
@@ -268,6 +302,7 @@ async def _run() -> None:
             loop.add_signal_handler(signum, _request_stop)
 
     irc_task = asyncio.create_task(irc_adapter.start(), name="twitch-irc-adapter")
+    irc_task.add_done_callback(_log_background_task_failure)
     live_monitor_service = TwitchLiveMonitorService(
         event_bus=event_bus,
         channel_repository=channel_repository,
@@ -278,7 +313,9 @@ async def _run() -> None:
     )
     await live_monitor_service.start()
     discord_task = asyncio.create_task(discord_adapter.start(), name="discord-adapter")
+    discord_task.add_done_callback(_log_background_task_failure)
     await irc_bootstrap_service.sync_persisted_channels()
+    await irc_bootstrap_service.start_periodic_sync()
     await device_flow_poller.start()
     await presence_service.start()
 
@@ -292,6 +329,7 @@ async def _run() -> None:
         with suppress(asyncio.CancelledError):
             await discord_task
         await live_monitor_service.stop()
+        await irc_bootstrap_service.stop_periodic_sync()
         await device_flow_poller.stop()
         await presence_service.stop()
         await twitch_api.close()
@@ -303,6 +341,22 @@ async def _run() -> None:
 def main() -> None:
     """Start the async application runtime."""
     asyncio.run(_run())
+
+
+def _log_background_task_failure(task: asyncio.Task[object]) -> None:
+    """Log unexpected background task failures immediately."""
+    if task.cancelled():
+        return
+    try:
+        error = task.exception()
+    except asyncio.CancelledError:
+        return
+    if error is not None:
+        logging.getLogger(__name__).error(
+            "Background task %s stopped unexpectedly.",
+            task.get_name(),
+            exc_info=(type(error), error, error.__traceback__),
+        )
 
 
 if __name__ == "__main__":

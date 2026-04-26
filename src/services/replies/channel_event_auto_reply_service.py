@@ -2,8 +2,8 @@ from __future__ import annotations
 
 """Runtime execution of live/offline event auto-replies."""
 
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 
 from src.adapters.twitch_api import (
     TwitchAPIClient,
@@ -159,5 +159,4 @@ class ChannelEventAutoReplyService:
         state: str,
     ) -> str:
         rendered = template.replace("{CHANNEL}", channel_name)
-        rendered = rendered.replace("{STATE}", state)
-        return rendered
+        return rendered.replace("{STATE}", state)

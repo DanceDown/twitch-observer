@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -18,10 +18,10 @@ from src.database.connection import (
     PatternRepository,
     ReplyRecord,
     ReplyRepository,
-    TrackedUserRecord,
-    TrackedUserRepository,
     ThreadRecord,
     ThreadRepository,
+    TrackedUserRecord,
+    TrackedUserRepository,
 )
 from src.events.event_bus import EventBus
 from src.events.event_types import DiscordResultStyle, TwitchChatMessageEvent
@@ -409,14 +409,18 @@ class InMemoryTrackedUserRepository(TrackedUserRepository):
 @dataclass
 class FakeTwitchAPI:
     users_by_login: dict[str, TwitchUser] = field(default_factory=dict)
+    cached_users_by_login: dict[str, TwitchUser] = field(default_factory=dict)
     live_by_user_id: dict[str, bool] = field(default_factory=dict)
     error: Exception | None = None
     live_requests: list[str] = field(default_factory=list)
+    login_requests: list[str] = field(default_factory=list)
 
     async def get_user_by_login(self, login: str) -> TwitchUser:
         if self.error is not None:
             raise self.error
-        return self.users_by_login[login.strip().lower()]
+        normalized = login.strip().lower()
+        self.login_requests.append(normalized)
+        return self.users_by_login[normalized]
 
     async def get_user_by_id(self, user_id: str) -> TwitchUser:
         if self.error is not None:
@@ -425,6 +429,15 @@ class FakeTwitchAPI:
             if user.user_id == user_id:
                 return user
         raise KeyError(user_id)
+
+    def get_cached_user_by_login(self, login: str) -> TwitchUser | None:
+        return self.cached_users_by_login.get(login.strip().lower())
+
+    def get_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
+        for user in self.cached_users_by_login.values():
+            if user.user_id == user_id:
+                return user
+        return None
 
     async def is_user_live(self, user_id: str) -> bool:
         self.live_requests.append(user_id)
@@ -481,6 +494,44 @@ async def test_ping_command_adds_pattern_with_selected_channel_scope() -> None:
     assert len(pattern_repository.patterns) == 1
     assert pattern_repository.patterns[0].channel_scope_mode == "only_selected"
     assert pattern_repository.patterns[0].channel_scope_ids == ("42",)
+
+
+@pytest.mark.asyncio
+async def test_ping_command_add_saves_explicit_priority() -> None:
+    event_bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread_repository.create(owner_id=200, discord_channel_id=100)
+    pattern_repository = InMemoryPatternRepository()
+    PatternCommandService(
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        channel_repository=InMemoryChannelRepository(),
+        pattern_repository=pattern_repository,
+        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+    )
+
+    result = await dispatch_pattern_command(
+        event_bus,
+        discord_channel_id=100,
+        requester_id=200,
+        action="add",
+        pattern_text="hello",
+        pattern_id=None,
+        is_regex=False,
+        channel_scope_mode="all_tracked",
+        twitch_channel_logins=(),
+        user_scope_mode="all_users",
+        twitch_user_logins=(),
+        sub_state="all",
+        offline_state="both",
+        case_sensitive=False,
+        color=None,
+        disabled=False,
+        priority=9,
+    )
+
+    assert result.style == DiscordResultStyle.SUCCESS
+    assert pattern_repository.patterns[0].priority == 9
 
 
 @pytest.mark.asyncio
@@ -1144,7 +1195,7 @@ async def test_tracking_service_sends_embed_for_matching_ping_with_pattern_color
             broadcaster_id="42",
             color="#ffffff",
             content="hello there",
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
             raw_tags={"badges": ""},
         )
     )
@@ -1152,6 +1203,119 @@ async def test_tracking_service_sends_embed_for_matching_ping_with_pattern_color
     assert len(notifier.sent) == 1
     sent_channel_id, _ = notifier.sent[0]
     assert sent_channel_id == 1000
+
+
+@pytest.mark.asyncio
+async def test_tracking_service_refreshes_missing_author_profile_image_once() -> None:
+    event_bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread = thread_repository.create(owner_id=200, discord_channel_id=1000)
+    channel_repository = InMemoryChannelRepository()
+    channel_repository.add_channel(thread.thread_id, "42")
+    pattern_repository = InMemoryPatternRepository()
+    pattern_repository.add_pattern(
+        thread_id=thread.thread_id,
+        regex="hello",
+        channel_scope_mode="all_tracked",
+        channel_scope_ids=(),
+        user_scope_mode="all_users",
+        user_scope_ids=(),
+        sub_state="all",
+        offline_state="both",
+        is_regex=False,
+        case_sensitive=False,
+        color=None,
+        disabled=False,
+        priority=0,
+    )
+    twitch_api = FakeTwitchAPI(
+        cached_users_by_login={
+            "alice": TwitchUser(user_id="7", login="alice", display_name="Alice", profile_image_url=None)
+        },
+        users_by_login={
+            "alice": TwitchUser(
+                user_id="7",
+                login="alice",
+                display_name="Alice",
+                profile_image_url="https://example.test/alice.png",
+            )
+        },
+    )
+    notifier = FakeNotifier()
+    service = PatternTrackingService(
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        pattern_repository=pattern_repository,
+        twitch_api=twitch_api,  # type: ignore[arg-type]
+        notifier=notifier,
+    )
+
+    await service.handle_chat_message(
+        TwitchChatMessageEvent(
+            channel_login="example",
+            author_login="alice",
+            author_display_name="Alice",
+            author_id="7",
+            broadcaster_id="42",
+            content="hello there",
+            sent_at=datetime.now(UTC),
+            raw_tags={"badges": ""},
+        )
+    )
+
+    assert twitch_api.login_requests == ["alice"]
+    _, embed = notifier.sent[0]
+    assert embed.author.icon_url == "https://example.test/alice.png"
+
+
+@pytest.mark.asyncio
+async def test_tracking_service_sends_embed_for_case_sensitive_ping_match() -> None:
+    event_bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread = thread_repository.create(owner_id=200, discord_channel_id=1000)
+    channel_repository = InMemoryChannelRepository()
+    channel_repository.add_channel(thread.thread_id, "42")
+    pattern_repository = InMemoryPatternRepository()
+    pattern_repository.add_pattern(
+        thread_id=thread.thread_id,
+        regex="test",
+        channel_scope_mode="all_tracked",
+        channel_scope_ids=(),
+        user_scope_mode="all_users",
+        user_scope_ids=(),
+        sub_state="all",
+        offline_state="both",
+        is_regex=False,
+        case_sensitive=True,
+        color=None,
+        disabled=False,
+        priority=0,
+    )
+    notifier = FakeNotifier()
+    service = PatternTrackingService(
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        pattern_repository=pattern_repository,
+        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        notifier=notifier,
+    )
+
+    await service.handle_chat_message(
+        TwitchChatMessageEvent(
+            channel_login="example",
+            author_login="alice",
+            author_display_name="Alice",
+            author_id="7",
+            broadcaster_id="42",
+            content="test",
+            sent_at=datetime.now(UTC),
+            raw_tags={"badges": ""},
+        )
+    )
+
+    assert len(notifier.sent) == 1
 
 
 @pytest.mark.asyncio
@@ -1210,7 +1374,7 @@ async def test_tracking_service_uses_highest_priority_match_and_stops_after_firs
             author_id="7",
             broadcaster_id="42",
             content="hello there everyone",
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
             raw_tags={"badges": ""},
         )
     )
@@ -1264,7 +1428,7 @@ async def test_tracking_service_skips_normal_embed_when_pattern_has_enabled_repl
             author_id="7",
             broadcaster_id="42",
             content="hello there",
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
             raw_tags={"badges": ""},
         )
     )
@@ -1377,7 +1541,7 @@ async def test_tracking_service_respects_all_except_selected_user_scope() -> Non
             broadcaster_id="42",
             color="#ffffff",
             content="hello there",
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
             raw_tags={"badges": ""},
         )
     )
@@ -1431,7 +1595,7 @@ async def test_tracking_service_respects_all_tracked_except_selected_user_scope(
             broadcaster_id="42",
             color="#ffffff",
             content="hello there",
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
             raw_tags={"badges": ""},
         )
     )
@@ -1481,7 +1645,7 @@ async def test_tracking_service_skips_disabled_thread() -> None:
             author_id="7",
             broadcaster_id="42",
             content="hello there",
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
             raw_tags={"badges": ""},
         )
     )
@@ -1532,7 +1696,7 @@ async def test_tracking_service_uses_persisted_channel_live_state_without_twitch
             author_id="7",
             broadcaster_id="42",
             content="hello there",
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
             raw_tags={"badges": ""},
         )
     )

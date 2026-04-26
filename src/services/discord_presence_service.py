@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import random
+from contextlib import suppress
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from src.database.connection import MessageRepository
 
@@ -40,15 +41,13 @@ class DiscordPresenceService:
         self._stop_event.set()
         if self._task is not None:
             self._task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
             self._task = None
 
     async def poll_once(self) -> None:
         """Choose one recent message and publish it as Discord custom status."""
-        since = datetime.now(timezone.utc) - timedelta(minutes=self.lookback_minutes)
+        since = datetime.now(UTC) - timedelta(minutes=self.lookback_minutes)
         messages = self.message_repository.list_recent_messages(since=since, limit=self.message_limit)
         if not messages:
             return

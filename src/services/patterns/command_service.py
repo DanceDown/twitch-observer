@@ -2,9 +2,9 @@ from __future__ import annotations
 
 """Business logic for `/ping` add/edit/remove requests."""
 
+import logging
 import re
 from dataclasses import dataclass, field
-import logging
 
 from src.adapters.twitch_api import (
     TwitchAPIClient,
@@ -16,9 +16,9 @@ from src.database.connection import (
     ChannelRepository,
     PatternRecord,
     PatternRepository,
-    TrackedUserRepository,
     ThreadRecord,
     ThreadRepository,
+    TrackedUserRepository,
     UserPermissionRepository,
 )
 from src.events.event_bus import EventBus
@@ -231,6 +231,8 @@ class PatternCommandService:
             raise ValueError(self._text(thread, "results.pattern.invalid_color"))
         if event.is_regex:
             re.compile(text)
+        if event.priority is not None and not 0 <= event.priority <= 9:
+            raise ValueError(self._text(thread, "results.pattern.invalid_priority"))
 
         scoped_channels, scoped_users = await self._filter_resolver().resolve_filters(event, thread)
 
@@ -269,11 +271,15 @@ class PatternCommandService:
             case_sensitive=event.case_sensitive,
             color=event.color.strip() if event.color else None,
             disabled=event.disabled,
-            priority=self._default_priority_for(
-                channel_scope_mode=event.channel_scope_mode,
-                user_scope_mode=event.user_scope_mode,
-                sub_state=event.sub_state,
-                offline_state=event.offline_state,
+            priority=(
+                event.priority
+                if event.priority is not None
+                else self._default_priority_for(
+                    channel_scope_mode=event.channel_scope_mode,
+                    user_scope_mode=event.user_scope_mode,
+                    sub_state=event.sub_state,
+                    offline_state=event.offline_state,
+                )
             ),
         )
         mode_name = self._pattern_type(event.is_regex, language=thread.language)
@@ -296,8 +302,8 @@ class PatternCommandService:
             message=self._presenter().format_pattern_summary(
                 action=self.localizer.text("results.pattern.actions.added", language=thread.language),
                 pattern=created,
-                channel_logins=tuple(channel.login for channel in scoped_channels),
-                user_logins=tuple(user.login for user in scoped_users),
+                channel_logins=tuple(channel.display_name for channel in scoped_channels),
+                user_logins=tuple(user.display_name for user in scoped_users),
                 language=thread.language,
             ),
             style=DiscordResultStyle.SUCCESS,
@@ -555,10 +561,10 @@ class PatternCommandService:
             priority=new_priority,
         )
         assert updated is not None
-        old_channel_logins = await self._filter_resolver().resolve_channel_logins_from_ids(
+        old_channel_logins = await self._filter_resolver().resolve_display_names_from_ids(
             pattern.channel_scope_ids,
         )
-        old_user_logins = await self._filter_resolver().resolve_user_logins_from_ids(
+        old_user_logins = await self._filter_resolver().resolve_display_names_from_ids(
             pattern.user_scope_ids,
         )
         return DiscordCommandResult(
@@ -567,9 +573,9 @@ class PatternCommandService:
                 before=pattern,
                 after=updated,
                 old_channel_logins=old_channel_logins,
-                new_channel_logins=tuple(channel.login for channel in scoped_channels),
+                new_channel_logins=tuple(channel.display_name for channel in scoped_channels),
                 old_user_logins=old_user_logins,
-                new_user_logins=tuple(user.login for user in scoped_users),
+                new_user_logins=tuple(user.display_name for user in scoped_users),
                 language=thread.language,
             ),
             style=DiscordResultStyle.SUCCESS,

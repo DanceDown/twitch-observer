@@ -2,18 +2,18 @@
   "common": {
     "language_name": "English",
     "scope": {
-      "all_tracked_channels": "Every tracked channel",
-      "all_tracked_users": "All tracked Twitch users",
+      "all_tracked_channels": "Every watched channel",
+      "all_tracked_users": "All known Twitch users",
       "everyone": "Everyone",
       "only_in": "Only in {ITEMS}",
       "everyone_except": "Everyone except {ITEMS}",
-      "all_tracked_channels_except": "Every tracked channel except {ITEMS}",
+      "all_tracked_channels_except": "Every watched channel except {ITEMS}",
       "only_from": "Only from {ITEMS}",
-      "all_tracked_users_except": "All tracked Twitch users except {ITEMS}"
+      "all_tracked_users_except": "All known Twitch users except {ITEMS}"
     },
     "boolean": {
-      "yes": "Yes <a:yes:1497686393369919559>",
-      "no": "No <a:nope:1497686414328860713>"
+      "yes": "Yes",
+      "no": "No"
     }
   },
   "results": {
@@ -160,7 +160,7 @@
       },
       "added": {
         "title": "User Added",
-        "message": "{USER} told me to remember [{DISPLAY_NAME}](https://www.twitch.tv/{LOGIN}) <a:peepoSmart:1497731090704498781>"
+        "message": "{USER} told me to remember [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) <a:peepoSmart:1497731090704498781>"
       },
       "unsupported_action": {
         "title": "Validation Error",
@@ -182,22 +182,250 @@
     "show": {
       "permission_denied": {
         "title": "Permission Denied",
-        "message": "I won't show you <:_b:1497722659793014966>"
+        "message": "You may not view this configuration here <a:Tssk:1497685026945630208>"
       },
       "overview": {
         "title": "Configuration Overview",
         "message": "{CONTENT}"
       }
     },
+    "account": {
+      "existing_account": "an existing Twitch account",
+      "unsupported_action": {
+        "title": "Validation Error",
+        "message": "I don't know that account action <a:peepoConfused:1497729266266275840>"
+      },
+      "permission_denied": {
+        "title": "Permission Denied",
+        "message": "You can't change the Twitch account here <a:Tssk:1497685026945630208>"
+      },
+      "owner_denied": {
+        "title": "Permission Denied",
+        "message": "Only the owner may link or unlink the Twitch account <a:Tssk:1497685026945630208>"
+      },
+      "already_linked": {
+        "title": "Account Already Linked",
+        "message": "`{DISPLAY_NAME}` is already connected here. Disconnect it before linking another Twitch account <:oopsie:1497720439810687006>"
+      },
+      "login_pending": {
+        "title": "Login Already Pending",
+        "message": "Open the Twitch login here: [Connect Twitch]({VERIFICATION_URI})\n\nCode: `{USER_CODE}`\nValid until: `{EXPIRES_AT}` <a:peepoSmart:1497731090704498781>"
+      },
+      "finish_login": {
+        "title": "Finish Twitch Login",
+        "message": "Open the Twitch login here: [Connect Twitch]({VERIFICATION_URI})\n\nCode: `{USER_CODE}`\nValid until: `{EXPIRES_AT}` <a:peepoSmart:1497731090704498781>"
+      },
+      "no_linked_account": {
+        "title": "No Twitch Account",
+        "message": "There is no Twitch account connected here right now <:oopsie:1497720439810687006>"
+      },
+      "unlinked": {
+        "title": "Twitch Account Unlinked",
+        "message": "{USER} disconnected `{DISPLAY_NAME}`. Auto-replies stay saved and will work again once an account is linked <:ApuApproved:1497724288256446465>"
+      },
+      "show_moved": {
+        "title": "Display Moved",
+        "message": "You can now find the account status in `/show` under `Account` <a:peepoSmart:1497731090704498781>"
+      },
+      "login_expired": {
+        "title": "Twitch Login Expired",
+        "message": "The Twitch code expired. Start a new try with `/account` <a:sadcat:1497721262645051392>"
+      },
+      "login_failed": {
+        "title": "Twitch Login Failed",
+        "message": "The Twitch login didn't work. Start a new try with `/account` <a:OhNo:1497685055948980306>"
+      },
+      "login_missing_scope": {
+        "title": "Missing Twitch Permission",
+        "message": "The Twitch login is missing chat write permission. Please connect the account again <:oopsie:1497720439810687006>"
+      },
+      "linked": {
+        "title": "Twitch Account Linked",
+        "message": "{USER} connected `{DISPLAY_NAME}`. Auto-replies can now write as this account <a:yo:1497686448717959369>"
+      }
+    },
+    "permission": {
+      "generic_denied": "You are missing the right permission for that",
+      "permission_denied": {
+        "title": "Permission Denied",
+        "message": "You can't change permissions here <a:Tssk:1497685026945630208>"
+      },
+      "owner_locked": {
+        "title": "Owner Protected",
+        "message": "The owner automatically has all permissions and can't be changed here <:oopsie:1497720439810687006>"
+      },
+      "cleared": {
+        "title": "Permissions Cleared",
+        "message": "{USER} removed all extra permissions from {TARGET} <:ApuApproved:1497724288256446465>"
+      },
+      "none_found": {
+        "title": "No Permissions Found",
+        "message": "{TARGET} has no extra permissions here <:ShrugMan:1497685241962430717>"
+      },
+      "empty_selection": "Choose at least one permission first <:oopsie:1497720439810687006>",
+      "granted": {
+        "title": "Permissions Granted",
+        "message": "{USER} gave {TARGET} these permissions:\n{PERMISSIONS} <a:yes:1497686393369919559>"
+      },
+      "not_granted": {
+        "title": "Not Granted",
+        "message": "{TARGET} does not explicitly have these permissions here:\n{PERMISSIONS} <:ShrugMan:1497685241962430717>"
+      },
+      "revoked": {
+        "title": "Permissions Revoked",
+        "message": "{USER} removed these permissions from {TARGET}:\n{PERMISSIONS} <a:yes:1497686393369919559>"
+      },
+      "unsupported_action": "I don't know that permission action <a:peepoConfused:1497729266266275840>"
+    },
+    "reply": {
+      "manage_permission_denied": {
+        "title": "Permission Denied",
+        "message": "You can't add or remove auto-replies here <a:Tssk:1497685026945630208>"
+      },
+      "toggle_permission_denied": {
+        "title": "Permission Denied",
+        "message": "You can't switch auto-replies on or off here <a:Tssk:1497685026945630208>"
+      },
+      "pattern_not_found": {
+        "title": "Ping Not Found",
+        "message": "I can't find a ping with that ID <a:OhNo:1497685055948980306>"
+      },
+      "no_linked_account": {
+        "title": "No Twitch Account",
+        "message": "Connect a Twitch account with `/account` first, then I can send auto-replies <:oopsie:1497720439810687006>"
+      },
+      "empty_message": "Enter a reply message first <:oopsie:1497720439810687006>",
+      "message_too_long": "Twitch messages may be at most 500 characters <a:OhNo:1497685055948980306>",
+      "already_exists": {
+        "title": "Auto-Reply Already Exists",
+        "message": "This ping already has an auto-reply. Remove it first <:oopsie:1497720439810687006>"
+      },
+      "mode": {
+        "message": "Normal Twitch message",
+        "reply": "Reply to the matched message"
+      },
+      "added_pattern": {
+        "title": "Auto-Reply Added",
+        "message": "{USER} attached an auto-reply to ping `{ID}`.\nMode: `{MODE}`\nMessage: {MESSAGE} <a:yo:1497686448717959369>"
+      },
+      "none_configured": {
+        "title": "No Auto-Reply",
+        "message": "This ping has no auto-reply <:ShrugMan:1497685241962430717>"
+      },
+      "removed_pattern": {
+        "title": "Auto-Reply Removed",
+        "message": "{USER} removed the auto-reply from ping `{ID}` <:ApuApproved:1497724288256446465>"
+      },
+      "already_disabled": {
+        "title": "Already Disabled",
+        "message": "This auto-reply is already asleep <:oopsie:1497720439810687006>"
+      },
+      "already_enabled": {
+        "title": "Already Enabled",
+        "message": "This auto-reply is already awake <:oopsie:1497720439810687006>"
+      },
+      "disabled_pattern": {
+        "title": "Auto-Reply Disabled",
+        "message": "{USER} disabled the auto-reply from ping `{ID}` <a:yes:1497686393369919559>"
+      },
+      "enabled_pattern": {
+        "title": "Auto-Reply Enabled",
+        "message": "{USER} enabled the auto-reply from ping `{ID}` <a:yes:1497686393369919559>"
+      },
+      "event_unavailable": "Event auto-replies are not available here right now <a:peepoConfused:1497729266266275840>",
+      "missing_event": "Choose a live or offline event first <:oopsie:1497720439810687006>",
+      "event_not_found": {
+        "title": "Event Not Found",
+        "message": "That live or offline event is not configured here <a:OhNo:1497685055948980306>"
+      },
+      "unsupported_event": "Only live and offline events from watched Twitch channels fit here <:oopsie:1497720439810687006>",
+      "added_event": {
+        "title": "Auto-Reply Added",
+        "message": "{USER} added an auto-reply for `{CHANNEL}` on `{STATE}`.\nMessage: {MESSAGE} <a:yo:1497686448717959369>"
+      },
+      "none_configured_event": {
+        "title": "No Auto-Reply",
+        "message": "This live or offline event has no auto-reply <:ShrugMan:1497685241962430717>"
+      },
+      "removed_event": {
+        "title": "Auto-Reply Removed",
+        "message": "{USER} removed the `{STATE}` auto-reply for `{CHANNEL}` <:ApuApproved:1497724288256446465>"
+      },
+      "disabled_event": {
+        "title": "Auto-Reply Disabled",
+        "message": "{USER} disabled the `{STATE}` auto-reply for `{CHANNEL}` <a:yes:1497686393369919559>"
+      },
+      "enabled_event": {
+        "title": "Auto-Reply Enabled",
+        "message": "{USER} enabled the `{STATE}` auto-reply for `{CHANNEL}` <a:yes:1497686393369919559>"
+      },
+      "unsupported_action": "I don't know that auto-reply action <a:peepoConfused:1497729266266275840>"
+    },
+    "channel_event": {
+      "permission_denied": {
+        "title": "Permission Denied",
+        "message": "You can't change live or offline notifications here <a:Tssk:1497685026945630208>"
+      },
+      "channel_not_tracked": {
+        "title": "Channel Not Watched",
+        "message": "This Twitch channel is not watched here <:Binoculars:1497727665283662077>"
+      },
+      "unsupported_event": "I don't know that Twitch event <a:peepoConfused:1497729266266275840>",
+      "unsupported_action": "I don't know that live action <a:peepoConfused:1497729266266275840>",
+      "state": {
+        "live": "Live",
+        "offline": "Offline"
+      },
+      "notification_added": {
+        "title": "Notification Added",
+        "message": "{USER} added the `{STATE}` ping for `{CHANNEL}` <:Binoculars:1497727665283662077>"
+      },
+      "notification_removed": {
+        "title": "Notification Removed",
+        "message": "{USER} removed the `{STATE}` ping for `{CHANNEL}` <:ApuApproved:1497724288256446465>"
+      },
+      "notification_disabled": {
+        "title": "Notification Disabled",
+        "message": "{USER} disabled the `{STATE}` ping for `{CHANNEL}` <:ApuApproved:1497724288256446465>"
+      },
+      "notification_enabled": {
+        "title": "Notification Enabled",
+        "message": "{USER} enabled the `{STATE}` ping for `{CHANNEL}` <a:yes:1497686393369919559>"
+      },
+      "already_configured": {
+        "title": "Already Configured",
+        "message": "The `{STATE}` ping for `{CHANNEL}` is already configured <:oopsie:1497720439810687006>"
+      },
+      "none_configured": {
+        "title": "Not Configured",
+        "message": "There is no `{STATE}` ping for `{CHANNEL}` yet <:oopsie:1497720439810687006>"
+      },
+      "already_disabled": {
+        "title": "Already Disabled",
+        "message": "The `{STATE}` ping for `{CHANNEL}` is already disabled <a:Lurk:1497684902135463986>"
+      },
+      "already_enabled": {
+        "title": "Already Enabled",
+        "message": "The `{STATE}` ping for `{CHANNEL}` is already active <a:yes:1497686393369919559>"
+      },
+      "went_live": {
+        "title": "Channel Is Live",
+        "message": "`{CHANNEL}` is now live <:Binoculars:1497727665283662077>"
+      },
+      "went_offline": {
+        "title": "Channel Is Offline",
+        "message": "`{CHANNEL}` is now offline <a:Lurk:1497684902135463986>"
+      }
+    },
     "write": {
       "permission_denied": {
         "title": "Permission Denied",
-        "message": "You can't make me send Twitch messages from here <:_b:1497722659793014966>"
+        "message": "You may not send Twitch messages here <a:Tssk:1497685026945630208>"
       },
       "empty_message": "Give me a message first, then I can send it <a:OhNo:1497685055948980306>",
       "message_too_long": "That message is too long for Twitch. Please keep it at 500 characters or less <a:OhNo:1497685055948980306>",
       "channel_not_tracked": {
-        "title": "Channel Not Tracked",
+        "title": "Channel Not Watched",
         "message": "I'm not watching `{DISPLAY_NAME}` yet. Add the channel first with `/channel add` <:Binoculars:1497727665283662077>"
       },
       "no_linked_account": {
@@ -220,19 +448,19 @@
     "pattern": {
       "manage_permission_denied": {
         "title": "Permission Denied",
-        "message": "You can't make me add or remove pings from here <:_b:1497722659793014966>"
+        "message": "You may not add or remove pings here <a:Tssk:1497685026945630208>"
       },
       "toggle_permission_denied": {
         "title": "Permission Denied",
-        "message": "You can't switch my pings on or off from here <:_b:1497722659793014966>"
+        "message": "You may not switch pings on or off here <a:Tssk:1497685026945630208>"
       },
       "change_permission_denied": {
         "title": "Permission Denied",
-        "message": "You can't change my pings from here <:_b:1497722659793014966>"
+        "message": "You may not change pings here <a:Tssk:1497685026945630208>"
       },
       "edit_permission_denied": {
         "title": "Permission Denied",
-        "message": "You can't edit my pings from here <:_b:1497722659793014966>"
+        "message": "You may not edit pings here <a:Tssk:1497685026945630208>"
       },
       "unsupported_action": "That ping action confused me. Please use add, remove, disable or enable <a:peepoConfused:1497729266266275840>",
       "empty_pattern": "Tell me what I should look for first <a:OhNo:1497685055948980306>",
@@ -240,7 +468,7 @@
       "invalid_color": "That color looks suspicious. Please use something like `#9146FF` <:d_:1497685665960165417>",
       "invalid_priority": "Priority has to be a number between `0` and `9` <:oopsie:1497720439810687006>",
       "unsupported_channel_scope": "That channel scope confused me <a:peepoConfused:1497729266266275840>",
-      "unexpected_selected_channels": "For every tracked channel, I don't need selected channels too <:ShrugMan:1497685241962430717>",
+      "unexpected_selected_channels": "For every watched channel, I don't need selected channels too <:ShrugMan:1497685241962430717>",
       "missing_selected_channels": "Pick at least one channel for this scope first <:Binoculars:1497727665283662077>",
       "channel_not_tracked": "I'm not watching `{DISPLAY_NAME}` yet. Add the channel first with `/channel` <:Binoculars:1497727665283662077>",
       "unsupported_user_scope": "That user scope confused me <a:peepoConfused:1497729266266275840>",
@@ -284,11 +512,11 @@
       "disabled_title": "{TYPE} Disabled",
       "enabled_title": "{TYPE} Enabled",
       "updated_title": "Pattern Updated",
-      "removed": "I forgot {TYPE} `{ID}` <a:peepoSmart:1497731090704498781>\n{TEXT}",
-      "disabled": "I told {TYPE} `{ID}` to quietly lurk <a:Lurk:1497684902135463986>\n{TEXT}",
-      "enabled": "I woke {TYPE} `{ID}` back up <a:Lurk:1497684902135463986>\n{TEXT}",
+      "removed": "removed {TYPE} `{ID}` <:ApuApproved:1497724288256446465>\n{TYPE}: `{TEXT}`",
+      "disabled": "disabled {TYPE} `{ID}` <:ApuApproved:1497724288256446465>\n{TYPE}: `{TEXT}`",
+      "enabled": "enabled {TYPE} `{ID}` <a:yes:1497686393369919559>\n{TYPE}: `{TEXT}`",
       "actions": {
-        "added": "Remembered"
+        "added": "added"
       },
       "type": {
         "ping": "ping",
@@ -313,17 +541,17 @@
         "offline": "Only while offline"
       },
       "scope": {
-        "channel_all": "Every tracked channel",
+        "channel_all": "Every watched channel",
         "channel_only": "Only in {ITEMS}",
-        "channel_except": "Every tracked channel except {ITEMS}",
-        "channel_tracked_except": "Every tracked channel except {ITEMS}",
-        "user_all": "All tracked Twitch users",
+        "channel_except": "Every watched channel except {ITEMS}",
+        "channel_tracked_except": "Every watched channel except {ITEMS}",
+        "user_all": "All known Twitch users",
         "user_only": "Only from {ITEMS}",
         "user_except": "Everyone except {ITEMS}",
-        "user_tracked_except": "All tracked Twitch users except {ITEMS}"
+        "user_tracked_except": "All known Twitch users except {ITEMS}"
       },
       "summary": {
-        "action": "{ACTION} {TYPE} `{ID}`.",
+        "action": "{ACTION} {TYPE} `{ID}`:",
         "text": "Text: `{TEXT}`",
         "subscribers_only": "Subscribers only",
         "non_subscribers_only": "Non-subscribers only",
@@ -354,7 +582,8 @@
       "pings": "Pings",
       "auto_replies": "Auto-Replies",
       "tracked_users": "Users I know",
-      "permissions": "Permissions"
+      "permissions": "Permissions",
+      "account": "Twitch Account"
     },
     "empty": {
       "tracked_channels": "I'm not watching any channels yet <a:OhNo:1497685055948980306>",
@@ -386,7 +615,7 @@
     },
     "event_reply": {
       "line": "- Event `{STATE}`",
-      "channel": "- Channel: [{DISPLAY_NAME}](https://www.twitch.tv/{LOGIN})",
+      "channel": "- Channel: [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN})",
       "reply": "- Reply: `{TEXT}`",
       "disabled": "- Disabled"
     },
@@ -404,15 +633,20 @@
       "leave_context": "Kick me out of this channel",
       "manage_permissions": "Manage permissions",
       "admin": "Administrator"
+    },
+    "account": {
+      "linked": "{USER} is connected with {TWITCH}",
+      "token_status": "Token status: `{STATUS}`",
+      "token_available": "ready",
+      "token_missing": "missing",
+      "pending": "{USER} has a `{STATUS}` login code `{USER_CODE}`",
+      "empty": "No Twitch account is connected here <:oopsie:1497720439810687006>"
     }
   },
   "discord": {
     "tracking_embed": {
-      "footer_channel": "Channel: {CHANNEL}\nMessage-ID: {MESSAGE_ID}",
+      "footer_channel": "Channel: {CHANNEL}\n{MESSAGE_ID}",
       "reply_field": "Reply"
-    },
-    "tracking_view": {
-      "open_channel": "Open Channel"
     },
     "shared": {
       "form_locked": {
@@ -422,8 +656,8 @@
     },
     "thread_modal": {
       "confirm_leave_title": "Confirm Leave",
-      "confirm_leave_label": "Type 'You're no longer welcome and should therefore leave!' to confirm",
-      "confirm_leave_placeholder": "You're no longer welcome and should therefore leave!",
+      "confirm_leave_label": "Type LEAVE to confirm",
+      "confirm_leave_placeholder": "LEAVE",
       "confirm_leave_cancelled": {
         "title": "Kick Cancelled",
         "message": "Did you just attempt to kick me out? <:d_:1497685665960165417>"
@@ -439,8 +673,7 @@
       },
       "actions": {
         "connect": "Connect",
-        "disconnect": "Disconnect",
-        "show": "Show"
+        "disconnect": "Disconnect"
       }
     },
     "channel_ui": {
@@ -466,7 +699,7 @@
           "title": "Channel Color"
         },
         "select": {
-          "channel_label": "Tracked Channel",
+          "channel_label": "Twitch Channel",
           "channel_description": "Choose a Twitch channel.",
           "color_label": "Color",
           "color_placeholder": "e.g. #9146FF"
@@ -481,7 +714,7 @@
     },
     "user_ui": {
       "menu": {
-        "title": "Tracked Users",
+        "title": "Twitch Users",
         "message": "Add or remove Twitch users."
       },
       "actions": {
@@ -502,7 +735,7 @@
       "errors": {
         "no_users": {
           "title": "No Users",
-          "message": "There are no tracked Twitch users to remove <a:OhNo:1497685055948980306>"
+          "message": "There are no known Twitch users to remove <a:OhNo:1497685055948980306>"
         }
       }
     },
@@ -531,11 +764,30 @@
       }
     },
     "live_state_ui": {
+      "menu": {
+        "title": "Live Pings",
+        "message": "Manage Discord notifications when watched Twitch channels go live or offline."
+      },
+      "actions": {
+        "add_live": "Add Live Ping",
+        "add_offline": "Add Offline Ping",
+        "remove": "Remove",
+        "disable": "Disable",
+        "enable": "Enable"
+      },
       "states": {
         "stream": {
           "online": "live",
           "offline": "offline"
         }
+      },
+      "action": {
+        "remove_title": "Remove Live Ping",
+        "disable_title": "Disable Live Ping",
+        "enable_title": "Enable Live Ping",
+        "notification_label": "Live or Offline Ping",
+        "notification_description": "Choose which Discord notification should change.",
+        "notification_option": "{CHANNEL} - {STATE}"
       },
       "modal": {
         "channel_label": "Twitch Channel",
@@ -557,6 +809,18 @@
         "no_channels": {
           "title": "No Channels Available",
           "message": "You need to add a channel first <:oopsie:1497720439810687006>"
+        },
+        "no_remove_actions": {
+          "title": "No Live Pings",
+          "message": "There are no live or offline pings to remove yet <:oopsie:1497720439810687006>"
+        },
+        "no_disable_actions": {
+          "title": "No Active Live Pings",
+          "message": "There are no active live or offline pings to disable <:oopsie:1497720439810687006>"
+        },
+        "no_enable_actions": {
+          "title": "No Disabled Live Pings",
+          "message": "There are no disabled live or offline pings to enable <:oopsie:1497720439810687006>"
         }
       }
     },
@@ -642,15 +906,15 @@
         "priority_auto": "Automatic",
         "not_set": "not set yet",
         "embed_message": "{CONTENT}\n\nUse the buttons below to fill out each section.\nNeed a hex color? [Open color picker]({COLOR_PICKER_URL})",
-        "channel_scope_all": "All tracked Twitch channels",
+        "channel_scope_all": "All watched Twitch channels",
         "channel_scope_only": "Only: {ITEMS}",
         "channel_scope_only_fallback": "Only selected channels",
         "channel_scope_except": "All except: {ITEMS}",
         "channel_scope_except_fallback": "All except selected channels",
         "user_scope_everyone": "Everyone",
-        "user_scope_all_tracked": "All tracked Twitch users",
-        "user_scope_all_tracked_except": "All tracked except: {ITEMS}",
-        "user_scope_all_tracked_except_fallback": "All tracked except selected Twitch names",
+        "user_scope_all_tracked": "All known Twitch users",
+        "user_scope_all_tracked_except": "All known except: {ITEMS}",
+        "user_scope_all_tracked_except_fallback": "All known except selected Twitch names",
         "user_scope_only": "Only: {ITEMS}",
         "user_scope_only_fallback": "Only selected Twitch names",
         "user_scope_except": "Everyone except: {ITEMS}",
@@ -676,21 +940,21 @@
       "channels": {
         "title": "Where Should It Match?",
         "scope_label": "Channel scope",
-        "scope_all": "Every tracked channel",
+        "scope_all": "Every watched channel",
         "scope_only": "Only these channels",
         "scope_except": "Every channel except these",
-        "tracked_label": "Tracked Twitch channels",
+        "tracked_label": "Watched Twitch channels",
         "tracked_description": "Choose channels only when you use one of the selected-channel scopes."
       },
       "users": {
         "title": "Who Can Trigger It?",
         "scope_label": "Twitch name scope",
         "scope_everyone": "Everyone",
-        "scope_all_tracked": "All tracked Twitch users",
-        "scope_all_tracked_except": "All tracked except selected names",
+        "scope_all_tracked": "All known Twitch users",
+        "scope_all_tracked_except": "All known except selected names",
         "scope_only": "Only selected names",
         "scope_everyone_except": "Everyone except selected names",
-        "tracked_label": "Tracked Twitch users",
+        "tracked_label": "Twitch users",
         "tracked_description": "Choose users only when you use one of the selected-user scopes."
       },
       "options": {
@@ -743,15 +1007,18 @@
         "untitled_ping": "Untitled ping",
         "untitled_event_action": "Untitled event action",
         "regex_type": "Regex",
-        "ping_type": "Ping"
+        "ping_type": "Ping",
+        "example_name": "Name",
+        "example_channel": "Channel",
+        "example_state": "live"
       },
       "menu": {
         "title": "Auto-Replies",
         "message": "Attach automatic Twitch messages either to a ping or regex pattern or to a configured live or offline event trigger."
       },
       "actions": {
-        "add_pattern": "Add Pattern",
-        "add_event": "Add Event",
+        "add_pattern": "On Ping",
+        "add_event": "On Live Ping",
         "remove": "Remove",
         "disable": "Disable",
         "enable": "Enable"

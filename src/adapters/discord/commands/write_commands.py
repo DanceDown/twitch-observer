@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Slash-command registration for manual Twitch writing."""
+
+from __future__ import annotations
 
 import discord
 
@@ -8,7 +8,7 @@ from src.events.event_bus import EventBus
 from src.events.event_types import DiscordResultStyle
 from src.localization import Localizer
 
-from ..helpers import command_unavailable_result, send_initial_result
+from ..helpers import command_unavailable_result, ensure_ui_flow_allowed, send_initial_result
 from ..ui.shared import resolve_context_language
 from ..ui.write_ui import WriteModal
 from ..ui_data import DiscordUIDataProvider
@@ -26,6 +26,8 @@ def register_write_commands(
     async def write(interaction: discord.Interaction) -> None:
         if interaction.channel_id is None:
             await send_initial_result(interaction, command_unavailable_result())
+            return
+        if not await ensure_ui_flow_allowed(interaction, event_bus, flow="write", step="root"):
             return
         language = resolve_context_language(
             localizer=localizer,

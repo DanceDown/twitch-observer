@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Localized display helpers for the ping UI."""
+
+from __future__ import annotations
 
 from src.localization import Localizer
 

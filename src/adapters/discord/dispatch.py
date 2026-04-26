@@ -7,16 +7,18 @@ import asyncio
 from src.events.event_bus import EventBus
 from src.events.event_types import (
     DiscordAccountRequestedEvent,
-    DiscordChannelRequestedEvent,
     DiscordChannelEventRequestedEvent,
+    DiscordChannelRequestedEvent,
     DiscordCommandResult,
-    DiscordUserRequestedEvent,
     DiscordPatternEditRequestedEvent,
     DiscordPatternRequestedEvent,
     DiscordPermissionRequestedEvent,
     DiscordReplyRequestedEvent,
     DiscordShowRequestedEvent,
     DiscordThreadRequestedEvent,
+    DiscordUIFlowDecision,
+    DiscordUIFlowRequestedEvent,
+    DiscordUserRequestedEvent,
     DiscordWriteRequestedEvent,
     EventType,
 )
@@ -55,6 +57,7 @@ async def dispatch_channel_event_command(
     *,
     discord_channel_id: int,
     requester_id: int,
+    action: str = "add",
     twitch_channel_id: str,
     event_key: str,
 ) -> DiscordCommandResult:
@@ -66,6 +69,7 @@ async def dispatch_channel_event_command(
         DiscordChannelEventRequestedEvent(
             discord_channel_id=discord_channel_id,
             requester_id=requester_id,
+            action=action,
             twitch_channel_id=twitch_channel_id,
             event_key=event_key,
             result_future=result_future,
@@ -144,6 +148,7 @@ async def dispatch_pattern_command(
     case_sensitive: bool,
     color: str | None,
     disabled: bool,
+    priority: int | None = None,
 ) -> DiscordCommandResult:
     """Publish a ping or regex command request and await the service result."""
     loop = asyncio.get_running_loop()
@@ -166,6 +171,7 @@ async def dispatch_pattern_command(
             case_sensitive=case_sensitive,
             color=color,
             disabled=disabled,
+            priority=priority,
             result_future=result_future,
         ),
     )
@@ -340,6 +346,30 @@ async def dispatch_write_command(
             twitch_channel_login=twitch_channel_login,
             message=message,
             reply_parent_message_id=reply_parent_message_id,
+            result_future=result_future,
+        ),
+    )
+    return await result_future
+
+
+async def dispatch_ui_flow_decision(
+    event_bus: EventBus,
+    *,
+    discord_channel_id: int | None,
+    requester_id: int,
+    flow: str,
+    step: str,
+) -> DiscordUIFlowDecision:
+    """Ask services whether a Discord UI step may be rendered."""
+    loop = asyncio.get_running_loop()
+    result_future: asyncio.Future[DiscordUIFlowDecision] = loop.create_future()
+    await event_bus.publish(
+        EventType.DISCORD_UI_FLOW_REQUESTED,
+        DiscordUIFlowRequestedEvent(
+            discord_channel_id=discord_channel_id,
+            requester_id=requester_id,
+            flow=flow,
+            step=step,
             result_future=result_future,
         ),
     )

@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Slash-command registration for configuration overview."""
+
+from __future__ import annotations
 
 import discord
 

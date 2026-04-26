@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Business logic for managing auto-reply configuration."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from src.adapters.twitch_api import TwitchAPIClient
 from src.database.connection import (
@@ -10,10 +10,10 @@ from src.database.connection import (
     AdapterEventRepository,
     ChannelRepository,
     PatternRepository,
+    ReplyRepository,
     ThreadRecord,
     ThreadRepository,
     TwitchAccountRepository,
-    ReplyRepository,
     UserPermissionRepository,
 )
 from src.events.event_bus import EventBus
@@ -23,6 +23,7 @@ from src.events.event_types import (
     DiscordResultStyle,
     EventType,
 )
+from src.localization import Localizer
 from src.services.authz import thread_has_permission
 from src.services.twitch_runtime import (
     CHANNEL_SUBJECT_TYPE,
@@ -48,6 +49,7 @@ class ReplyCommandService:
     adapter_event_repository: AdapterEventRepository | None = None
     adapter_event_action_repository: AdapterEventActionRepository | None = None
     permission_repository: UserPermissionRepository | None = None
+    localizer: Localizer = field(default_factory=Localizer.from_directory)
 
     def __post_init__(self) -> None:
         self.event_bus.subscribe(EventType.DISCORD_REPLY_REQUESTED, self.handle_request)
@@ -56,9 +58,10 @@ class ReplyCommandService:
         try:
             result = await self._handle_action(event)
         except ValueError as error:
-            result = DiscordCommandResult(
-                title="Validation Error",
-                message=str(error),
+            result = self._event_result(
+                event,
+                "results.validation_error",
+                DETAIL=str(error),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -71,22 +74,16 @@ class ReplyCommandService:
     ) -> DiscordCommandResult:
         if event.action in {"add", "remove"}:
             required_permission = ObserverPermission.MANAGE_REPLIES
-            denial_message = (
-                "You do not have permission to add or remove auto-replies in this "
-                "Discord channel."
-            )
+            denial_key = "results.reply.manage_permission_denied"
         else:
             required_permission = ObserverPermission.TOGGLE_REPLIES
-            denial_message = (
-                "You do not have permission to enable or disable auto-replies in this "
-                "Discord channel."
-            )
+            denial_key = "results.reply.toggle_permission_denied"
 
         thread = self._ensure_thread_permission(
             event.discord_channel_id,
             event.requester_id,
             required_permission=required_permission,
-            denial_message=denial_message,
+            denial_key=denial_key,
         )
         if isinstance(thread, DiscordCommandResult):
             return thread
@@ -99,9 +96,9 @@ class ReplyCommandService:
             p_index=event.pattern_id,
         )
         if pattern is None:
-            return DiscordCommandResult(
-                title="Pattern Not Found",
-                message="No ping or regex rule with that ID exists.",
+            return self.localizer.thread_result(
+                "results.reply.pattern_not_found",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -113,32 +110,26 @@ class ReplyCommandService:
                 else None
             )
             if linked_account is None:
-                return DiscordCommandResult(
-                    title="No Linked Account",
-                    message=(
-                        "This Discord channel must link a Twitch account first with "
-                        "`/account link` before auto-replies can be enabled."
-                    ),
+                return self.localizer.thread_result(
+                    "results.reply.no_linked_account",
+                    thread=thread,
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 )
 
             message = (event.message or "").strip()
             if not message:
-                raise ValueError("Please provide the reply message.")
+                raise ValueError(self.localizer.text("results.reply.empty_message", language=thread.language))
             if len(message) > 500:
-                raise ValueError("Twitch chat messages are limited to 500 characters.")
+                raise ValueError(self.localizer.text("results.reply.message_too_long", language=thread.language))
             existing_reply = self.reply_repository.get_by_pattern(
                 thread_id=thread.thread_id,
                 p_index=pattern.p_index,
             )
             if existing_reply is not None:
-                return DiscordCommandResult(
-                    title="Reply Already Exists",
-                    message=(
-                        "This pattern already has an attached auto-reply. Remove it "
-                        "first before creating a new one."
-                    ),
+                return self.localizer.thread_result(
+                    "results.reply.already_exists",
+                    thread=thread,
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 )
@@ -150,14 +141,15 @@ class ReplyCommandService:
                 reply_as_reply=event.reply_as_reply,
             )
             assert created is not None
-            return DiscordCommandResult(
-                title="Auto-Reply Added",
-                message=(
-                    f"Added an auto-reply to pattern #{pattern.p_index}.\n"
-                    "Mode: "
-                    f"{'Reply to the matched message' if created.reply_as_reply else 'Send a separate Twitch message'}\n"
-                    f"Message: {escape_discord_preserving_links(created.reply_message)}"
+            return self.localizer.thread_result(
+                "results.reply.added_pattern",
+                thread=thread,
+                ID=pattern.p_index,
+                MODE=self.localizer.text(
+                    "results.reply.mode.reply" if created.reply_as_reply else "results.reply.mode.message",
+                    language=thread.language,
                 ),
+                MESSAGE=escape_discord_preserving_links(created.reply_message),
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )
@@ -168,9 +160,9 @@ class ReplyCommandService:
                 p_index=pattern.p_index,
             )
             if existing_reply is None:
-                return DiscordCommandResult(
-                    title="No Auto-Reply Configured",
-                    message="This pattern does not have an auto-reply.",
+                return self.localizer.thread_result(
+                    "results.reply.none_configured",
+                    thread=thread,
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
@@ -179,9 +171,10 @@ class ReplyCommandService:
                 p_index=pattern.p_index,
             )
             assert cleared is not None
-            return DiscordCommandResult(
-                title="Auto-Reply Removed",
-                message=f"Removed the auto-reply from pattern `{pattern.p_index}`.",
+            return self.localizer.thread_result(
+                "results.reply.removed_pattern",
+                thread=thread,
+                ID=pattern.p_index,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )
@@ -192,16 +185,16 @@ class ReplyCommandService:
                 p_index=pattern.p_index,
             )
             if existing_reply is None:
-                return DiscordCommandResult(
-                    title="No Auto-Reply Configured",
-                    message="This pattern does not have an auto-reply.",
+                return self.localizer.thread_result(
+                    "results.reply.none_configured",
+                    thread=thread,
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
             if existing_reply.disabled:
-                return DiscordCommandResult(
-                    title="Already Disabled",
-                    message="This auto-reply is already disabled.",
+                return self.localizer.thread_result(
+                    "results.reply.already_disabled",
+                    thread=thread,
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
@@ -211,9 +204,10 @@ class ReplyCommandService:
                 disabled=True,
             )
             assert disabled_reply is not None
-            return DiscordCommandResult(
-                title="Auto-Reply Disabled",
-                message=f"Disabled the auto-reply on pattern `{pattern.p_index}`.",
+            return self.localizer.thread_result(
+                "results.reply.disabled_pattern",
+                thread=thread,
+                ID=pattern.p_index,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )
@@ -224,16 +218,16 @@ class ReplyCommandService:
                 p_index=pattern.p_index,
             )
             if existing_reply is None:
-                return DiscordCommandResult(
-                    title="No Auto-Reply Configured",
-                    message="This pattern does not have an auto-reply.",
+                return self.localizer.thread_result(
+                    "results.reply.none_configured",
+                    thread=thread,
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
             if not existing_reply.disabled:
-                return DiscordCommandResult(
-                    title="Already Enabled",
-                    message="This auto-reply is already enabled.",
+                return self.localizer.thread_result(
+                    "results.reply.already_enabled",
+                    thread=thread,
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
@@ -243,14 +237,15 @@ class ReplyCommandService:
                 disabled=False,
             )
             assert enabled_reply is not None
-            return DiscordCommandResult(
-                title="Auto-Reply Enabled",
-                message=f"Enabled the auto-reply on pattern `{pattern.p_index}`.",
+            return self.localizer.thread_result(
+                "results.reply.enabled_pattern",
+                thread=thread,
+                ID=pattern.p_index,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )
 
-        raise ValueError("Unsupported reply action. Use add, remove, disable or enable.")
+        raise ValueError(self.localizer.text("results.reply.unsupported_action", language=thread.language))
 
     async def _handle_adapter_event_action(
         self,
@@ -261,9 +256,9 @@ class ReplyCommandService:
             self.adapter_event_repository is None
             or self.adapter_event_action_repository is None
         ):
-            raise ValueError("External event auto-replies are not available in this runtime.")
+            raise ValueError(self.localizer.text("results.reply.event_unavailable", language=thread.language))
         if event.adapter_event_id is None:
-            raise ValueError("Please choose a configured live or offline event first.")
+            raise ValueError(self.localizer.text("results.reply.missing_event", language=thread.language))
 
         adapter_event = next(
             (
@@ -277,9 +272,9 @@ class ReplyCommandService:
             None,
         )
         if adapter_event is None:
-            return DiscordCommandResult(
-                title="Event Trigger Not Found",
-                message="That live or offline trigger is not configured in this Discord channel.",
+            return self.localizer.thread_result(
+                "results.reply.event_not_found",
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -290,7 +285,7 @@ class ReplyCommandService:
             or adapter_event.subject_type != CHANNEL_SUBJECT_TYPE
             or state_label is None
         ):
-            raise ValueError("Only tracked Twitch channel live/offline events can be used here.")
+            raise ValueError(self.localizer.text("results.reply.unsupported_event", language=thread.language))
 
         channel_name = adapter_event.subject_id
         if self.twitch_api is not None:
@@ -314,40 +309,37 @@ class ReplyCommandService:
                 else None
             )
             if linked_account is None:
-                return DiscordCommandResult(
-                    title="No Linked Account",
-                    message=(
-                        "This Discord channel must link a Twitch account first with "
-                        "`/account link` before auto-replies can be enabled."
-                    ),
+                return self.localizer.thread_result(
+                    "results.reply.no_linked_account",
+                    thread=thread,
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 )
             message = (event.message or "").strip()
             if not message:
-                raise ValueError("Please provide the reply message.")
+                raise ValueError(self.localizer.text("results.reply.empty_message", language=thread.language))
             if len(message) > 500:
-                raise ValueError("Twitch chat messages are limited to 500 characters.")
+                raise ValueError(self.localizer.text("results.reply.message_too_long", language=thread.language))
             created = self.adapter_event_action_repository.upsert_action(
                 event_id=adapter_event.event_id,
                 action_type=TWITCH_SEND_MESSAGE_ACTION,
                 message_template=message,
                 reply_as_reply=False,
             )
-            return DiscordCommandResult(
-                title="Auto-Reply Added",
-                message=(
-                    f"Added an auto-reply for `{channel_name}` when it goes {state_label}.\n"
-                    f"Message: {escape_discord_preserving_links(created.message_template or '')}"
-                ),
+            return self.localizer.thread_result(
+                "results.reply.added_event",
+                thread=thread,
+                CHANNEL=channel_name,
+                STATE=state_label,
+                MESSAGE=escape_discord_preserving_links(created.message_template or ""),
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )
 
         if existing_reply is None:
-            return DiscordCommandResult(
-                title="No Auto-Reply Configured",
-                message="This live/offline trigger does not have an auto-reply.",
+            return self.localizer.thread_result(
+                "results.reply.none_configured_event",
+                thread=thread,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
             )
@@ -358,18 +350,20 @@ class ReplyCommandService:
                 action_type=TWITCH_SEND_MESSAGE_ACTION,
             )
             assert removed is not None
-            return DiscordCommandResult(
-                title="Auto-Reply Removed",
-                message=f"Removed the {state_label} auto-reply for `{channel_name}`.",
+            return self.localizer.thread_result(
+                "results.reply.removed_event",
+                thread=thread,
+                CHANNEL=channel_name,
+                STATE=state_label,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )
 
         if event.action == "disable":
             if existing_reply.disabled:
-                return DiscordCommandResult(
-                    title="Already Disabled",
-                    message="This auto-reply is already disabled.",
+                return self.localizer.thread_result(
+                    "results.reply.already_disabled",
+                    thread=thread,
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
@@ -379,18 +373,20 @@ class ReplyCommandService:
                 disabled=True,
             )
             assert disabled_reply is not None
-            return DiscordCommandResult(
-                title="Auto-Reply Disabled",
-                message=f"Disabled the {state_label} auto-reply for `{channel_name}`.",
+            return self.localizer.thread_result(
+                "results.reply.disabled_event",
+                thread=thread,
+                CHANNEL=channel_name,
+                STATE=state_label,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )
 
         if event.action == "enable":
             if not existing_reply.disabled:
-                return DiscordCommandResult(
-                    title="Already Enabled",
-                    message="This auto-reply is already enabled.",
+                return self.localizer.thread_result(
+                    "results.reply.already_enabled",
+                    thread=thread,
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
@@ -400,14 +396,16 @@ class ReplyCommandService:
                 disabled=False,
             )
             assert enabled_reply is not None
-            return DiscordCommandResult(
-                title="Auto-Reply Enabled",
-                message=f"Enabled the {state_label} auto-reply for `{channel_name}`.",
+            return self.localizer.thread_result(
+                "results.reply.enabled_event",
+                thread=thread,
+                CHANNEL=channel_name,
+                STATE=state_label,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )
 
-        raise ValueError("Unsupported reply action. Use add, remove, disable or enable.")
+        raise ValueError(self.localizer.text("results.reply.unsupported_action", language=thread.language))
 
     def _ensure_thread_permission(
         self,
@@ -415,13 +413,12 @@ class ReplyCommandService:
         requester_id: int,
         *,
         required_permission: ObserverPermission,
-        denial_message: str,
+        denial_key: str,
     ) -> ThreadRecord | DiscordCommandResult:
         thread = self.thread_repository.get_by_discord_channel_id(discord_channel_id)
         if thread is None:
-            return DiscordCommandResult(
-                title="Not Joined",
-                message="This Discord channel is not connected yet. Use `/join` first.",
+            return self.localizer.result(
+                "results.not_joined",
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -431,10 +428,22 @@ class ReplyCommandService:
             permission_repository=self.permission_repository,
             required_permission=required_permission,
         ):
-            return DiscordCommandResult(
-                title="Permission Denied",
-                message=denial_message,
+            return self.localizer.thread_result(
+                denial_key,
+                thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
         return thread
+
+    def _event_result(
+        self,
+        event: DiscordReplyRequestedEvent,
+        key: str,
+        *,
+        style: DiscordResultStyle,
+        ephemeral: bool,
+        **placeholders: object,
+    ) -> DiscordCommandResult:
+        thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+        return self.localizer.thread_result(key, thread=thread, style=style, ephemeral=ephemeral, **placeholders)

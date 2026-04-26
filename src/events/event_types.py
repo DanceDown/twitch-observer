@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from asyncio import Future
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 
 
@@ -22,6 +22,7 @@ class EventType(StrEnum):
     DISCORD_PERMISSION_REQUESTED = "discord.permission.requested"
     DISCORD_WRITE_REQUESTED = "discord.write.requested"
     DISCORD_SHOW_REQUESTED = "discord.show.requested"
+    DISCORD_UI_FLOW_REQUESTED = "discord.ui_flow.requested"
     TWITCH_CHAT_MESSAGE = "twitch.chat.message"
     TWITCH_TRACKED_CHANNELS_CHANGED = "twitch.tracked_channels.changed"
     TWITCH_CHANNEL_LIVE_STATE_CHANGED = "twitch.channel_live_state.changed"
@@ -43,6 +44,28 @@ class DiscordCommandResult:
     message: str
     style: DiscordResultStyle = DiscordResultStyle.INFO
     ephemeral: bool = False
+    thumbnail_url: str | None = None
+
+
+@dataclass(slots=True, frozen=True)
+class DiscordUIFlowDecision:
+    """Decision for opening the next Discord UI step."""
+
+    flow: str
+    step: str
+    open_ui: bool
+    result: DiscordCommandResult | None = None
+
+
+@dataclass(slots=True, frozen=True)
+class DiscordUIFlowRequestedEvent:
+    """Request a service-owned decision before rendering a Discord UI step."""
+
+    discord_channel_id: int | None
+    requester_id: int
+    flow: str
+    step: str
+    result_future: Future[DiscordUIFlowDecision]
 
 
 @dataclass(slots=True, frozen=True)
@@ -58,7 +81,7 @@ class TwitchChatMessageEvent:
     author_id: str | None = None
     color: str | None = None
     reply_parent_message_id: str | None = None
-    sent_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    sent_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     raw_line: str | None = None
     raw_tags: dict[str, str] = field(default_factory=dict)
 
@@ -119,6 +142,7 @@ class DiscordPatternRequestedEvent:
     case_sensitive: bool
     color: str | None
     disabled: bool
+    priority: int | None
     result_future: Future[DiscordCommandResult]
 
 @dataclass(slots=True, frozen=True)
@@ -198,6 +222,7 @@ class DiscordChannelEventRequestedEvent:
 
     discord_channel_id: int
     requester_id: int
+    action: str
     twitch_channel_id: str
     event_key: str
     result_future: Future[DiscordCommandResult]
@@ -227,4 +252,4 @@ class TwitchChannelLiveStateChangedEvent:
     twitch_channel_id: str
     is_live: bool
     twitch_channel_login: str | None = None
-    changed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    changed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
