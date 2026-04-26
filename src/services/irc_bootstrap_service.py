@@ -61,9 +61,7 @@ class IRCBootstrapService:
         try:
             await asyncio.wait_for(self.irc_manager.wait_until_connected(), timeout=self.connect_timeout_seconds)
         except TimeoutError:
-            logger.warning(
-                "Timed out waiting for Twitch IRC to become ready; persisted channels were not re-joined yet."
-            )
+            logger.warning("Timed out waiting for Twitch IRC to become ready; persisted channels were not re-joined yet.")
             return
 
         logger.debug("Rehydrating %s persisted Twitch IRC channel subscriptions from the database.", len(channel_ids))

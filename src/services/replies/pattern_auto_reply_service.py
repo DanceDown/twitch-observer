@@ -67,8 +67,7 @@ class AutoReplyService:
     async def handle_chat_message(self, event: TwitchChatMessageEvent) -> None:
         self.handled_messages += 1
         logger.debug(
-            "Evaluating auto-replies channel=%s broadcaster_id=%s author=%s "
-            "author_id=%s message_id=%s content=%r",
+            "Evaluating auto-replies channel=%s broadcaster_id=%s author=%s author_id=%s message_id=%s content=%r",
             event.channel_login,
             event.broadcaster_id,
             event.author_login,
@@ -87,8 +86,7 @@ class AutoReplyService:
         )
         if not thread_ids:
             logger.debug(
-                "No configured threads for broadcaster_id=%s when evaluating "
-                "auto-replies.",
+                "No configured threads for broadcaster_id=%s when evaluating auto-replies.",
                 event.broadcaster_id,
             )
             return
@@ -108,11 +106,7 @@ class AutoReplyService:
                 )
                 continue
 
-            account = (
-                self.account_repository.get_by_account_id(thread.account_id)
-                if thread.account_id is not None
-                else None
-            )
+            account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
             if account is None or not account.access_token:
                 logger.debug(
                     "Skipping auto-replies for thread_id=%s because no account is linked.",
@@ -143,28 +137,28 @@ class AutoReplyService:
             )
 
             try:
-                account = await ensure_fresh_linked_account(
-                    account=account,
-                    account_repository=self.account_repository,
-                    twitch_api=self.twitch_api,
-                    token_refresh_skew_seconds=self.token_refresh_skew_seconds,
-                    thread_repository=self.thread_repository,
-                    thread=thread,
-                ) or account
+                account = (
+                    await ensure_fresh_linked_account(
+                        account=account,
+                        account_repository=self.account_repository,
+                        twitch_api=self.twitch_api,
+                        token_refresh_skew_seconds=self.token_refresh_skew_seconds,
+                        thread_repository=self.thread_repository,
+                        thread=thread,
+                    )
+                    or account
+                )
                 await self.twitch_api.send_chat_message(
                     access_token=account.access_token,
                     client_id=account.client_id,
                     sender_id=account.twitch_user_id,
                     broadcaster_id=event.broadcaster_id,
                     message=rendered_reply_message,
-                    reply_parent_message_id=(
-                        event.message_id if matching_reply.reply_as_reply else None
-                    ),
+                    reply_parent_message_id=(event.message_id if matching_reply.reply_as_reply else None),
                 )
                 self.sent_replies += 1
                 logger.debug(
-                    "Sent auto-reply thread_id=%s pattern_id=%s broadcaster_id=%s "
-                    "sender_id=%s",
+                    "Sent auto-reply thread_id=%s pattern_id=%s broadcaster_id=%s sender_id=%s",
                     thread.thread_id,
                     matching_pattern.p_index,
                     event.broadcaster_id,
@@ -182,12 +176,8 @@ class AutoReplyService:
                     thread=thread,
                     event=event,
                     pattern=matching_pattern,
-                    author_icon_url=(
-                        None if author_user is None else author_user.profile_image_url
-                    ),
-                    channel_display_name=(
-                        None if channel_user is None else channel_user.display_name
-                    ),
+                    author_icon_url=(None if author_user is None else author_user.profile_image_url),
+                    channel_display_name=(None if channel_user is None else channel_user.display_name),
                     channel_login=None if channel_user is None else channel_user.login,
                     reply=ReplyRecord(
                         thread_id=matching_reply.thread_id,
@@ -213,16 +203,11 @@ class AutoReplyService:
                             sender_id=refreshed.twitch_user_id,
                             broadcaster_id=event.broadcaster_id,
                             message=rendered_reply_message,
-                            reply_parent_message_id=(
-                                event.message_id
-                                if matching_reply.reply_as_reply
-                                else None
-                            ),
+                            reply_parent_message_id=(event.message_id if matching_reply.reply_as_reply else None),
                         )
                         self.sent_replies += 1
                         logger.debug(
-                            "Sent auto-reply after token refresh thread_id=%s "
-                            "pattern_id=%s broadcaster_id=%s sender_id=%s",
+                            "Sent auto-reply after token refresh thread_id=%s pattern_id=%s broadcaster_id=%s sender_id=%s",
                             thread.thread_id,
                             matching_pattern.p_index,
                             event.broadcaster_id,
@@ -240,19 +225,9 @@ class AutoReplyService:
                             thread=thread,
                             event=event,
                             pattern=matching_pattern,
-                            author_icon_url=(
-                                None
-                                if author_user is None
-                                else author_user.profile_image_url
-                            ),
-                            channel_display_name=(
-                                None
-                                if channel_user is None
-                                else channel_user.display_name
-                            ),
-                            channel_login=(
-                                None if channel_user is None else channel_user.login
-                            ),
+                            author_icon_url=(None if author_user is None else author_user.profile_image_url),
+                            channel_display_name=(None if channel_user is None else channel_user.display_name),
+                            channel_login=(None if channel_user is None else channel_user.login),
                             reply=ReplyRecord(
                                 thread_id=matching_reply.thread_id,
                                 p_index=matching_reply.p_index,
@@ -264,8 +239,7 @@ class AutoReplyService:
                         continue
                     except TwitchAPIError as retry_error:
                         logger.warning(
-                            "Failed to send auto-reply after refresh thread_id=%s "
-                            "pattern_id=%s: %s",
+                            "Failed to send auto-reply after refresh thread_id=%s pattern_id=%s: %s",
                             thread.thread_id,
                             matching_pattern.p_index,
                             retry_error,
@@ -277,8 +251,7 @@ class AutoReplyService:
                         account_id=None,
                     )
                 logger.warning(
-                    "Removed invalid linked Twitch account for thread_id=%s after "
-                    "auth failure. Error: %s",
+                    "Removed invalid linked Twitch account for thread_id=%s after auth failure. Error: %s",
                     thread.thread_id,
                     error,
                 )
@@ -308,18 +281,13 @@ class AutoReplyService:
             )
             if not matches_pattern(effective_pattern, event):
                 logger.debug(
-                    "Pattern %s did not match incoming message for auto-reply "
-                    "evaluation.",
+                    "Pattern %s did not match incoming message for auto-reply evaluation.",
                     effective_pattern.p_index,
                 )
                 continue
-            if (
-                event.author_id == linked_twitch_user_id
-                and effective_pattern.user_scope_mode != "only_selected"
-            ):
+            if event.author_id == linked_twitch_user_id and effective_pattern.user_scope_mode != "only_selected":
                 logger.debug(
-                    "Skipping self-triggered auto-reply for pattern %s because "
-                    "user_scope_mode=%s is not self-explicit.",
+                    "Skipping self-triggered auto-reply for pattern %s because user_scope_mode=%s is not self-explicit.",
                     effective_pattern.p_index,
                     effective_pattern.user_scope_mode,
                 )
@@ -327,9 +295,7 @@ class AutoReplyService:
             current_live_status = live_status
             if effective_pattern.offline_state != "both" and not offline_state_allows(effective_pattern, current_live_status):
                 logger.debug(
-                    "Pattern %s matched text but was filtered by "
-                    "offline_state=%s live_status=%s during auto-reply "
-                    "evaluation.",
+                    "Pattern %s matched text but was filtered by offline_state=%s live_status=%s during auto-reply evaluation.",
                     effective_pattern.p_index,
                     effective_pattern.offline_state,
                     current_live_status,

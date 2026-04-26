@@ -119,14 +119,17 @@ class TwitchWriteCommandService:
                 ephemeral=True,
             )
 
-        account = await ensure_fresh_linked_account(
-            account=account,
-            account_repository=self.account_repository,
-            twitch_api=self.twitch_api,
-            token_refresh_skew_seconds=self.token_refresh_skew_seconds,
-            thread_repository=self.thread_repository,
-            thread=thread,
-        ) or account
+        account = (
+            await ensure_fresh_linked_account(
+                account=account,
+                account_repository=self.account_repository,
+                twitch_api=self.twitch_api,
+                token_refresh_skew_seconds=self.token_refresh_skew_seconds,
+                thread_repository=self.thread_repository,
+                thread=thread,
+            )
+            or account
+        )
         try:
             await self.twitch_api.send_chat_message(
                 access_token=account.access_token,

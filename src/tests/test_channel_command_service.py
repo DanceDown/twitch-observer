@@ -191,9 +191,7 @@ async def test_channel_command_adds_new_channel_and_joins_irc() -> None:
     event_bus = EventBus()
     thread_repository = InMemoryThreadRepository()
     channel_repository = InMemoryChannelRepository()
-    twitch_api = FakeTwitchAPI(
-        users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")}
-    )
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     irc_manager = FakeIRCManager()
     pattern_repository = FakePatternRepository()
     ChannelCommandService(
@@ -242,9 +240,7 @@ async def test_channel_command_removes_existing_channel_and_parts_last_irc_subsc
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     channel_repository.add_channel(thread.thread_id, "42")
-    twitch_api = FakeTwitchAPI(
-        users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")}
-    )
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     irc_manager = FakeIRCManager()
     pattern_repository = FakePatternRepository()
     ChannelCommandService(
@@ -275,9 +271,7 @@ async def test_channel_command_rejects_non_owner_changes() -> None:
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    twitch_api = FakeTwitchAPI(
-        users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")}
-    )
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     irc_manager = FakeIRCManager()
     pattern_repository = FakePatternRepository()
     ChannelCommandService(
@@ -306,9 +300,7 @@ async def test_channel_command_requires_join_before_adding_channels() -> None:
     event_bus = EventBus()
     thread_repository = InMemoryThreadRepository()
     channel_repository = InMemoryChannelRepository()
-    twitch_api = FakeTwitchAPI(
-        users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")}
-    )
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     irc_manager = FakeIRCManager()
     pattern_repository = FakePatternRepository()
     ChannelCommandService(
@@ -341,9 +333,7 @@ async def test_channel_command_reports_already_added_instead_of_toggling() -> No
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     channel_repository.add_channel(thread.thread_id, "42")
-    twitch_api = FakeTwitchAPI(
-        users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")}
-    )
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     irc_manager = FakeIRCManager()
     pattern_repository = FakePatternRepository()
     ChannelCommandService(
@@ -375,9 +365,7 @@ async def test_channel_command_reports_missing_channel_on_remove() -> None:
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    twitch_api = FakeTwitchAPI(
-        users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")}
-    )
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     irc_manager = FakeIRCManager()
     pattern_repository = FakePatternRepository()
     ChannelCommandService(
@@ -409,9 +397,7 @@ async def test_channel_command_rejects_remove_when_scope_still_references_channe
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     channel_repository.add_channel(thread.thread_id, "42")
-    twitch_api = FakeTwitchAPI(
-        users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")}
-    )
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     irc_manager = FakeIRCManager()
     pattern_repository = FakePatternRepository(references_by_channel={(thread.thread_id, "42"): 1})
     ChannelCommandService(
@@ -471,9 +457,7 @@ async def test_leave_command_deletes_thread_and_parts_last_irc_channels() -> Non
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     channel_repository.add_channel(thread.thread_id, "42")
-    twitch_api = FakeTwitchAPI(
-        users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")}
-    )
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     irc_manager = FakeIRCManager()
     ThreadLifecycleService(
         event_bus=event_bus,
@@ -555,9 +539,7 @@ async def test_channel_color_command_sets_color_for_tracked_channel() -> None:
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     channel_repository.add_channel(thread.thread_id, "42")
-    twitch_api = FakeTwitchAPI(
-        users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")}
-    )
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     ChannelCommandService(
         event_bus=event_bus,
         thread_repository=thread_repository,

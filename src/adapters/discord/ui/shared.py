@@ -136,9 +136,7 @@ class BaseFormView(discord.ui.View):
         if interaction.user.id == self.owner_id:
             return True
         await interaction.response.send_message(
-            embed=build_result_embed(
-                self.result("discord.shared.form_locked", style=DiscordResultStyle.ERROR, ephemeral=True)
-            ),
+            embed=build_result_embed(self.result("discord.shared.form_locked", style=DiscordResultStyle.ERROR, ephemeral=True)),
             ephemeral=True,
         )
         return False

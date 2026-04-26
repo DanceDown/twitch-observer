@@ -44,10 +44,7 @@ class PermissionModal(discord.ui.Modal):
             self.permission = discord.ui.Label(
                 text=localizer.text("discord.permission_ui.modal.permissions_label", language=language),
                 component=discord.ui.Select(
-                    options=[
-                        discord.SelectOption(label=value[:100], value=value)
-                        for value, _ in PERMISSION_CHOICES[:25]
-                    ],
+                    options=[discord.SelectOption(label=value[:100], value=value) for value, _ in PERMISSION_CHOICES[:25]],
                     min_values=1,
                     max_values=min(len(PERMISSION_CHOICES), 25),
                 ),

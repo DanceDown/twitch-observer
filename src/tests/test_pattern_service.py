@@ -229,11 +229,7 @@ class InMemoryPatternRepository(PatternRepository):
         return record
 
     def remove_pattern(self, *, thread_id: int, p_index: int) -> None:
-        self.patterns = [
-            pattern
-            for pattern in self.patterns
-            if not (pattern.thread_id == thread_id and pattern.p_index == p_index)
-        ]
+        self.patterns = [pattern for pattern in self.patterns if not (pattern.thread_id == thread_id and pattern.p_index == p_index)]
 
     def set_pattern_disabled(self, *, thread_id: int, p_index: int, disabled: bool) -> PatternRecord | None:
         for index, pattern in enumerate(self.patterns):
@@ -340,11 +336,7 @@ class InMemoryPatternRepository(PatternRepository):
         return sorted(rows, key=lambda pattern: (-pattern.priority, pattern.p_index))
 
     def count_channel_scope_references(self, *, thread_id: int, twitch_channel_id: str) -> int:
-        return sum(
-            1
-            for pattern in self.patterns
-            if pattern.thread_id == thread_id and twitch_channel_id in pattern.channel_scope_ids
-        )
+        return sum(1 for pattern in self.patterns if pattern.thread_id == thread_id and twitch_channel_id in pattern.channel_scope_ids)
 
 
 @dataclass
@@ -460,9 +452,7 @@ async def test_ping_command_adds_pattern_with_selected_channel_scope() -> None:
     channel_repository = InMemoryChannelRepository()
     channel_repository.add_channel(1, "42")
     pattern_repository = InMemoryPatternRepository()
-    twitch_api = FakeTwitchAPI(
-        users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")}
-    )
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     PatternCommandService(
         event_bus=event_bus,
         thread_repository=thread_repository,
@@ -886,9 +876,7 @@ async def test_ping_command_rejects_selected_scope_channels_that_are_not_tracked
     thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository()
     channel_repository = InMemoryChannelRepository()
-    twitch_api = FakeTwitchAPI(
-        users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")}
-    )
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     PatternCommandService(
         event_bus=event_bus,
         thread_repository=thread_repository,
@@ -1229,9 +1217,7 @@ async def test_tracking_service_refreshes_missing_author_profile_image_once() ->
         priority=0,
     )
     twitch_api = FakeTwitchAPI(
-        cached_users_by_login={
-            "alice": TwitchUser(user_id="7", login="alice", display_name="Alice", profile_image_url=None)
-        },
+        cached_users_by_login={"alice": TwitchUser(user_id="7", login="alice", display_name="Alice", profile_image_url=None)},
         users_by_login={
             "alice": TwitchUser(
                 user_id="7",

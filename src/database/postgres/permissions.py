@@ -85,8 +85,4 @@ class PostgresUserPermissionRepository(UserPermissionRepository):
                 (thread_id,),
             )
             rows = cursor.fetchall()
-        return [
-            UserPermissionRecord(discord_user_id=int(row[0]), thread_id=int(row[1]), permissions=int(row[2]))
-            for row in rows
-        ]
-
+        return [UserPermissionRecord(discord_user_id=int(row[0]), thread_id=int(row[1]), permissions=int(row[2])) for row in rows]

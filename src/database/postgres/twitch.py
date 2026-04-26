@@ -238,6 +238,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
             token_type=row[9],
         )
 
+
 @dataclass(slots=True)
 class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
     """Store and retrieve pending Twitch Device Code authorizations."""
@@ -437,6 +438,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
             last_polled_at=row[10].isoformat() if row[10] is not None else None,
         )
 
+
 @dataclass(slots=True)
 class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
     """Store and retrieve cached Twitch user metadata."""
@@ -601,4 +603,3 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
             updated_at=row[4].isoformat(),
             last_api_refresh_at=row[5].isoformat() if row[5] is not None else None,
         )
-

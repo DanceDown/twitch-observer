@@ -185,11 +185,7 @@ class DiscordUIDataProvider:
     async def list_adapter_event_actions(self, discord_channel_id: int) -> list[AdapterEventActionPresentation]:
         """Resolve configured external adapter event actions for one Discord context."""
         thread = self.get_thread(discord_channel_id)
-        if (
-            thread is None
-            or self.adapter_event_repository is None
-            or self.adapter_event_action_repository is None
-        ):
+        if thread is None or self.adapter_event_repository is None or self.adapter_event_action_repository is None:
             return []
 
         event_map = {item.event.event_id: item for item in await self.list_adapter_events(discord_channel_id)}

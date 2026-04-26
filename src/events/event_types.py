@@ -145,6 +145,7 @@ class DiscordPatternRequestedEvent:
     priority: int | None
     result_future: Future[DiscordCommandResult]
 
+
 @dataclass(slots=True, frozen=True)
 class DiscordPatternEditRequestedEvent:
     """Normalized command event for editing an existing ping or regex pattern."""

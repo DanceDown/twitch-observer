@@ -69,4 +69,4 @@ class DiscordPresenceService:
         max_content_length = max(1, self.max_status_length - len(suffix))
         if len(cleaned) > max_content_length:
             cleaned = cleaned[: max_content_length - 1].rstrip() + "…"
-        return f"\"{cleaned}\"{suffix}"
+        return f'"{cleaned}"{suffix}'

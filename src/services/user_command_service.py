@@ -136,10 +136,13 @@ class UserCommandService:
                 DISPLAY_NAME=twitch_user.display_name,
             )
 
-        if self.tracked_user_repository.count_pattern_scope_references(
-            thread_id=thread.thread_id,
-            twitch_user_id=twitch_user.user_id,
-        ) > 0:
+        if (
+            self.tracked_user_repository.count_pattern_scope_references(
+                thread_id=thread.thread_id,
+                twitch_user_id=twitch_user.user_id,
+            )
+            > 0
+        ):
             return self.localizer.thread_result(
                 "results.user.in_use",
                 thread=thread,

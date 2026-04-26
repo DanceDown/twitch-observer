@@ -200,11 +200,7 @@ class InMemoryPatternRepository(PatternRepository):
         raise NotImplementedError
 
     def remove_pattern(self, *, thread_id: int, p_index: int) -> None:
-        self.patterns = [
-            pattern
-            for pattern in self.patterns
-            if not (pattern.thread_id == thread_id and pattern.p_index == p_index)
-        ]
+        self.patterns = [pattern for pattern in self.patterns if not (pattern.thread_id == thread_id and pattern.p_index == p_index)]
 
     def set_pattern_disabled(self, *, thread_id: int, p_index: int, disabled: bool) -> PatternRecord | None:
         for index, pattern in enumerate(self.patterns):
@@ -311,11 +307,7 @@ class InMemoryPatternRepository(PatternRepository):
         return sorted(rows, key=lambda pattern: (-pattern.priority, pattern.p_index))
 
     def count_channel_scope_references(self, *, thread_id: int, twitch_channel_id: str) -> int:
-        return sum(
-            1
-            for pattern in self.patterns
-            if pattern.thread_id == thread_id and twitch_channel_id in pattern.channel_scope_ids
-        )
+        return sum(1 for pattern in self.patterns if pattern.thread_id == thread_id and twitch_channel_id in pattern.channel_scope_ids)
 
 
 @dataclass

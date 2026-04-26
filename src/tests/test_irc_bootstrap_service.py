@@ -100,9 +100,7 @@ async def test_bootstrap_service_skips_channels_that_cannot_be_resolved() -> Non
     repository = InMemoryChannelRepository()
     repository.add_channel(1, "42")
     repository.add_channel(1, "404")
-    twitch_api = FakeTwitchAPI(
-        users_by_id={"42": TwitchUser(user_id="42", login="example", display_name="Example")}
-    )
+    twitch_api = FakeTwitchAPI(users_by_id={"42": TwitchUser(user_id="42", login="example", display_name="Example")})
     irc_manager = FakeIRCManager()
     service = IRCBootstrapService(
         channel_repository=repository,

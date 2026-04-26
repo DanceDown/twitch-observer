@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def _batched(values: list[str], batch_size: int) -> list[list[str]]:
     effective_batch_size = max(1, batch_size)
-    return [values[index:index + effective_batch_size] for index in range(0, len(values), effective_batch_size)]
+    return [values[index : index + effective_batch_size] for index in range(0, len(values), effective_batch_size)]
 
 
 @dataclass(slots=True)

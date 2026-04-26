@@ -40,10 +40,7 @@ class PatternFilterResolver:
         if event.channel_scope_mode == "all_tracked" and event.twitch_channel_logins:
             raise ValueError(self._text(thread, "results.pattern.unexpected_selected_channels"))
 
-        if (
-            event.channel_scope_mode in {"only_selected", "all_except_selected"}
-            and not event.twitch_channel_logins
-        ):
+        if event.channel_scope_mode in {"only_selected", "all_except_selected"} and not event.twitch_channel_logins:
             raise ValueError(self._text(thread, "results.pattern.missing_selected_channels"))
 
         scoped_channels = []
@@ -77,11 +74,7 @@ class PatternFilterResolver:
         else:
             event_user_logins = event.twitch_user_logins
 
-        if (
-            event.user_scope_mode
-            in {"only_selected", "all_except_selected", "all_tracked_except_selected"}
-            and not event_user_logins
-        ):
+        if event.user_scope_mode in {"only_selected", "all_except_selected", "all_tracked_except_selected"} and not event_user_logins:
             raise ValueError(self._text(thread, "results.pattern.missing_selected_users"))
 
         scoped_users = []
@@ -112,16 +105,8 @@ class PatternFilterResolver:
         thread: ThreadRecord,
         pattern: PatternRecord,
     ):
-        channel_scope_mode = (
-            pattern.channel_scope_mode
-            if event.channel_scope_mode is None
-            else event.channel_scope_mode
-        )
-        user_scope_mode = (
-            pattern.user_scope_mode
-            if event.user_scope_mode is None
-            else event.user_scope_mode
-        )
+        channel_scope_mode = pattern.channel_scope_mode if event.channel_scope_mode is None else event.channel_scope_mode
+        user_scope_mode = pattern.user_scope_mode if event.user_scope_mode is None else event.user_scope_mode
 
         if event.twitch_channel_logins is None:
             if event.channel_scope_mode is None:
@@ -155,16 +140,8 @@ class PatternFilterResolver:
             user_scope_mode=user_scope_mode,
             twitch_user_logins=twitch_user_logins,
             sub_state=pattern.sub_state if event.sub_state is None else event.sub_state,
-            offline_state=(
-                pattern.offline_state
-                if event.offline_state is None
-                else event.offline_state
-            ),
-            case_sensitive=(
-                pattern.case_sensitive
-                if event.case_sensitive is None
-                else event.case_sensitive
-            ),
+            offline_state=(pattern.offline_state if event.offline_state is None else event.offline_state),
+            case_sensitive=(pattern.case_sensitive if event.case_sensitive is None else event.case_sensitive),
             color=event.color,
             disabled=pattern.disabled,
             priority=event.priority,

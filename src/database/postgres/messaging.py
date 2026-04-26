@@ -79,4 +79,3 @@ class PostgresMessageRepository(MessageRepository):
         """Build a deterministic fallback ID when Twitch did not provide one."""
         timestamp = event.sent_at.isoformat()
         return f"{event.channel_login}:{event.author_login}:{timestamp}:{hash(event.content)}"
-

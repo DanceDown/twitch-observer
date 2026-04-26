@@ -246,6 +246,7 @@ class PostgresThreadRepository(ThreadRepository):
             account_id=row[6],
         )
 
+
 @dataclass(slots=True)
 class PostgresChannelRepository(ChannelRepository):
     """Store and retrieve per-thread Twitch channel subscriptions."""
@@ -331,11 +332,7 @@ class PostgresChannelRepository(ChannelRepository):
         is_live: bool,
         changed_at: str | None,
     ) -> int:
-        effective_changed_at = (
-            datetime.fromisoformat(changed_at)
-            if changed_at is not None
-            else datetime.now(UTC)
-        )
+        effective_changed_at = datetime.fromisoformat(changed_at) if changed_at is not None else datetime.now(UTC)
         self.database.connect()
         assert self.database.connection is not None
         with self.database.connection.cursor() as cursor:
@@ -444,6 +441,7 @@ class PostgresChannelRepository(ChannelRepository):
             for row in rows
         ]
 
+
 @dataclass(slots=True)
 class PostgresTrackedUserRepository(TrackedUserRepository):
     """Store and retrieve per-thread tracked Twitch users."""
@@ -523,4 +521,3 @@ class PostgresTrackedUserRepository(TrackedUserRepository):
             row = cursor.fetchone()
         assert row is not None
         return int(row[0])
-

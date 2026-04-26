@@ -63,8 +63,7 @@ class PatternTrackingService:
     async def handle_chat_message(self, event: TwitchChatMessageEvent) -> None:
         """Check all interested Discord channels for pattern matches."""
         logger.debug(
-            "Evaluating incoming Twitch message channel=%s broadcaster_id=%s "
-            "author=%s author_id=%s content=%r",
+            "Evaluating incoming Twitch message channel=%s broadcaster_id=%s author=%s author_id=%s content=%r",
             event.channel_login,
             event.broadcaster_id,
             event.author_login,
@@ -73,15 +72,13 @@ class PatternTrackingService:
         )
         if not event.broadcaster_id:
             logger.warning(
-                "Skipping Twitch message in #%s because Twitch IRC room-id is missing; "
-                "pattern matching needs channel metadata.",
+                "Skipping Twitch message in #%s because Twitch IRC room-id is missing; pattern matching needs channel metadata.",
                 event.channel_login,
             )
             return
         if not event.author_id:
             logger.warning(
-                "Skipping Twitch message in #%s from %s because Twitch IRC user-id is missing; "
-                "pattern matching needs author metadata.",
+                "Skipping Twitch message in #%s from %s because Twitch IRC user-id is missing; pattern matching needs author metadata.",
                 event.channel_login,
                 event.author_login,
             )
@@ -130,8 +127,7 @@ class PatternTrackingService:
                 )
                 if not matches_pattern(effective_pattern, event):
                     logger.debug(
-                        "Pattern %s did not match message. regex=%r channel_filter=%s "
-                        "user_filter=%s sub=%s offline=%s is_regex=%s",
+                        "Pattern %s did not match message. regex=%r channel_filter=%s user_filter=%s sub=%s offline=%s is_regex=%s",
                         effective_pattern.p_index,
                         effective_pattern.regex,
                         effective_pattern.channel_scope_ids,
@@ -143,8 +139,7 @@ class PatternTrackingService:
                     continue
                 if not offline_state_allows(effective_pattern, live_status):
                     logger.debug(
-                        "Pattern %s matched text but was filtered by "
-                        "offline_state=%s live_status=%s",
+                        "Pattern %s matched text but was filtered by offline_state=%s live_status=%s",
                         effective_pattern.p_index,
                         effective_pattern.offline_state,
                         live_status,
@@ -153,8 +148,7 @@ class PatternTrackingService:
 
                 if self._has_enabled_reply(thread.thread_id, effective_pattern.p_index):
                     logger.debug(
-                        "Pattern %s matched for thread_id=%s but notification is "
-                        "delegated to auto-reply handling.",
+                        "Pattern %s matched for thread_id=%s but notification is delegated to auto-reply handling.",
                         effective_pattern.p_index,
                         thread.thread_id,
                     )
@@ -169,8 +163,7 @@ class PatternTrackingService:
                     event.broadcaster_id,
                 )
                 logger.info(
-                    "Pattern %s matched. Sending tracking embed to "
-                    "discord_channel_id=%s",
+                    "Pattern %s matched. Sending tracking embed to discord_channel_id=%s",
                     effective_pattern.p_index,
                     thread.discord_channel_id,
                 )
@@ -182,12 +175,8 @@ class PatternTrackingService:
                         thread=thread,
                         localizer=self.localizer,
                         channel=source_channel,
-                        author_icon_url=(
-                            None if author_user is None else author_user.profile_image_url
-                        ),
-                        channel_display_name=(
-                            None if channel_user is None else channel_user.display_name
-                        ),
+                        author_icon_url=(None if author_user is None else author_user.profile_image_url),
+                        channel_display_name=(None if channel_user is None else channel_user.display_name),
                     ),
                     channel_login=None if channel_user is None else channel_user.login,
                 )

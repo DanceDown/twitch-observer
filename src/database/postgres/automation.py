@@ -427,6 +427,7 @@ class PostgresPatternRepository(PatternRepository):
             priority=int(row[12]),
         )
 
+
 @dataclass(slots=True)
 class PostgresReplyRepository(ReplyRepository):
     """Store and retrieve auto-replies attached to patterns."""
@@ -579,6 +580,7 @@ class PostgresReplyRepository(ReplyRepository):
             disabled=row[4],
         )
 
+
 @dataclass(slots=True)
 class PostgresAdapterEventRepository(AdapterEventRepository):
     """Store and retrieve external adapter event triggers."""
@@ -720,6 +722,7 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
             event_key=str(row[5]),
             disabled=bool(row[6]),
         )
+
 
 @dataclass(slots=True)
 class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
@@ -897,4 +900,3 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
             reply_as_reply=bool(row[3]),
             disabled=bool(row[4]),
         )
-

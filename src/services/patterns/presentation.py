@@ -154,10 +154,8 @@ class PatternCommandPresenter:
                 self.localizer.text(
                     "results.pattern.changes.where",
                     language=language,
-                    BEFORE=old_channel_scope
-                    or self.localizer.text("common.scope.all_tracked_channels", language=language),
-                    AFTER=new_channel_scope
-                    or self.localizer.text("common.scope.all_tracked_channels", language=language),
+                    BEFORE=old_channel_scope or self.localizer.text("common.scope.all_tracked_channels", language=language),
+                    AFTER=new_channel_scope or self.localizer.text("common.scope.all_tracked_channels", language=language),
                 )
             )
 
@@ -214,10 +212,8 @@ class PatternCommandPresenter:
                 self.localizer.text(
                     "results.pattern.changes.color",
                     language=language,
-                    BEFORE=before.color
-                    or self.localizer.text("results.pattern.summary.color_inherited", language=language),
-                    AFTER=after.color
-                    or self.localizer.text("results.pattern.summary.color_inherited", language=language),
+                    BEFORE=before.color or self.localizer.text("results.pattern.summary.color_inherited", language=language),
+                    AFTER=after.color or self.localizer.text("results.pattern.summary.color_inherited", language=language),
                 )
             )
         if before.priority != after.priority:

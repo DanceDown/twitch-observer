@@ -232,9 +232,7 @@ class TwitchAPIClient:
     async def start_device_code_flow(self, *, scopes: tuple[str, ...]) -> TwitchDeviceCodeStart:
         """Start Twitch's OAuth Device Code Flow for a user login."""
         if not self._config.twitch_client_id:
-            raise TwitchAPIConfigurationError(
-                "Twitch Device Code Flow requires TWITCH_CLIENT_ID."
-            )
+            raise TwitchAPIConfigurationError("Twitch Device Code Flow requires TWITCH_CLIENT_ID.")
 
         await self.start()
         assert self._session is not None
@@ -267,9 +265,7 @@ class TwitchAPIClient:
     ) -> TwitchDevicePollResult:
         """Poll Twitch for a completed Device Code Flow authorization."""
         if not self._config.twitch_client_id:
-            raise TwitchAPIConfigurationError(
-                "Twitch Device Code Flow requires TWITCH_CLIENT_ID."
-            )
+            raise TwitchAPIConfigurationError("Twitch Device Code Flow requires TWITCH_CLIENT_ID.")
 
         await self.start()
         assert self._session is not None
@@ -398,16 +394,10 @@ class TwitchAPIClient:
 
     async def _get_app_access_token(self) -> str:
         if not self._config.twitch_client_id or not self._config.twitch_client_secret:
-            raise TwitchAPIConfigurationError(
-                "Twitch API validation requires TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET."
-            )
+            raise TwitchAPIConfigurationError("Twitch API validation requires TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET.")
 
         now = datetime.now(UTC)
-        if (
-            self._app_access_token is not None
-            and self._app_access_token_expires_at is not None
-            and now < self._app_access_token_expires_at
-        ):
+        if self._app_access_token is not None and self._app_access_token_expires_at is not None and now < self._app_access_token_expires_at:
             return self._app_access_token
 
         await self.start()

@@ -350,9 +350,7 @@ async def test_write_send_posts_plain_twitch_message() -> None:
         token_type="bearer",
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
-    twitch_api = FakeTwitchAPI(
-        users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")}
-    )
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     TwitchWriteCommandService(
         event_bus=bus,
         thread_repository=thread_repository,
@@ -397,9 +395,7 @@ async def test_write_send_can_reply_to_specific_twitch_message() -> None:
         token_type="bearer",
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
-    twitch_api = FakeTwitchAPI(
-        users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")}
-    )
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     TwitchWriteCommandService(
         event_bus=bus,
         thread_repository=thread_repository,
@@ -444,9 +440,7 @@ async def test_write_send_respects_granted_permission_for_non_owner() -> None:
         token_type="bearer",
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
-    twitch_api = FakeTwitchAPI(
-        users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")}
-    )
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     PermissionCommandService(
         event_bus=bus,
         thread_repository=thread_repository,
@@ -492,9 +486,7 @@ async def test_write_send_reports_missing_owner_account_even_for_permitted_helpe
     channel_repository.add_channel(1, "42")
     permission_repository = InMemoryPermissionRepository()
     account_repository = InMemoryAccountRepository()
-    twitch_api = FakeTwitchAPI(
-        users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")}
-    )
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     PermissionCommandService(
         event_bus=bus,
         thread_repository=thread_repository,

@@ -77,7 +77,7 @@ async def test_presence_service_uses_recent_message_as_status() -> None:
     await service.poll_once()
 
     assert notifier.statuses
-    assert notifier.statuses[-1] == "\"A tracked message\" ~Bob"
+    assert notifier.statuses[-1] == '"A tracked message" ~Bob'
 
 
 @pytest.mark.asyncio

@@ -40,32 +40,20 @@ class AppConfig:
     postgres_host: str = field(default_factory=lambda: os.getenv("POSTGRES_HOST", "localhost"))
     postgres_port: int = field(default_factory=lambda: int(os.getenv("POSTGRES_PORT", "5432")))
     twitch_api_base_url: str = field(default_factory=lambda: os.getenv("TWITCH_API_BASE_URL", "https://api.twitch.tv/helix"))
-    twitch_auth_base_url: str = field(
-        default_factory=lambda: os.getenv("TWITCH_AUTH_BASE_URL", "https://id.twitch.tv/oauth2")
-    )
+    twitch_auth_base_url: str = field(default_factory=lambda: os.getenv("TWITCH_AUTH_BASE_URL", "https://id.twitch.tv/oauth2"))
     twitch_client_id: str = field(default_factory=lambda: os.getenv("TWITCH_CLIENT_ID", ""))
     twitch_client_secret: str = field(default_factory=lambda: os.getenv("TWITCH_CLIENT_SECRET", ""))
     twitch_irc_host: str = field(default_factory=lambda: os.getenv("TWITCH_IRC_HOST", "irc.chat.twitch.tv"))
     twitch_irc_port: int = field(default_factory=lambda: int(os.getenv("TWITCH_IRC_PORT", "6697")))
-    twitch_irc_use_ssl: bool = field(
-        default_factory=lambda: os.getenv("TWITCH_IRC_USE_SSL", "true").lower() in {"1", "true", "yes", "on"}
-    )
-    twitch_irc_channels: list[str] = field(
-        default_factory=lambda: _split_csv(os.getenv("TWITCH_IRC_CHANNELS", ""))
-    )
+    twitch_irc_use_ssl: bool = field(default_factory=lambda: os.getenv("TWITCH_IRC_USE_SSL", "true").lower() in {"1", "true", "yes", "on"})
+    twitch_irc_channels: list[str] = field(default_factory=lambda: _split_csv(os.getenv("TWITCH_IRC_CHANNELS", "")))
     twitch_irc_nick_prefix: str = field(default_factory=lambda: os.getenv("TWITCH_IRC_NICK_PREFIX", "justinfan"))
-    twitch_user_cache_memory_size: int = field(
-        default_factory=lambda: _get_int("TWITCH_USER_CACHE_MEMORY_SIZE", "2048")
-    )
-    twitch_user_cache_api_refresh_seconds: int = field(
-        default_factory=lambda: _get_int("TWITCH_USER_CACHE_API_REFRESH_SECONDS", "43200")
-    )
+    twitch_user_cache_memory_size: int = field(default_factory=lambda: _get_int("TWITCH_USER_CACHE_MEMORY_SIZE", "2048"))
+    twitch_user_cache_api_refresh_seconds: int = field(default_factory=lambda: _get_int("TWITCH_USER_CACHE_API_REFRESH_SECONDS", "43200"))
     twitch_live_monitor_poll_interval_seconds: float = field(
         default_factory=lambda: _get_float("TWITCH_LIVE_MONITOR_POLL_INTERVAL_SECONDS", "30")
     )
-    twitch_live_monitor_batch_size: int = field(
-        default_factory=lambda: _get_int("TWITCH_LIVE_MONITOR_BATCH_SIZE", "100")
-    )
+    twitch_live_monitor_batch_size: int = field(default_factory=lambda: _get_int("TWITCH_LIVE_MONITOR_BATCH_SIZE", "100"))
     twitch_live_monitor_refresh_on_startup: bool = field(
         default_factory=lambda: _get_bool("TWITCH_LIVE_MONITOR_REFRESH_ON_STARTUP", "true")
     )
@@ -78,27 +66,15 @@ class AppConfig:
     twitch_device_flow_poll_interval_seconds: float = field(
         default_factory=lambda: _get_float("TWITCH_DEVICE_FLOW_POLL_INTERVAL_SECONDS", "2")
     )
-    twitch_device_flow_slowdown_step_seconds: int = field(
-        default_factory=lambda: _get_int("TWITCH_DEVICE_FLOW_SLOWDOWN_STEP_SECONDS", "5")
-    )
+    twitch_device_flow_slowdown_step_seconds: int = field(default_factory=lambda: _get_int("TWITCH_DEVICE_FLOW_SLOWDOWN_STEP_SECONDS", "5"))
     discord_presence_poll_interval_seconds: float = field(
         default_factory=lambda: _get_float("DISCORD_PRESENCE_POLL_INTERVAL_SECONDS", "60")
     )
-    discord_presence_lookback_minutes: int = field(
-        default_factory=lambda: _get_int("DISCORD_PRESENCE_LOOKBACK_MINUTES", "5")
-    )
-    discord_presence_message_limit: int = field(
-        default_factory=lambda: _get_int("DISCORD_PRESENCE_MESSAGE_LIMIT", "50")
-    )
-    discord_presence_max_status_length: int = field(
-        default_factory=lambda: _get_int("DISCORD_PRESENCE_MAX_STATUS_LENGTH", "120")
-    )
-    irc_bootstrap_connect_timeout_seconds: float = field(
-        default_factory=lambda: _get_float("IRC_BOOTSTRAP_CONNECT_TIMEOUT_SECONDS", "15")
-    )
-    irc_channel_resync_interval_seconds: float = field(
-        default_factory=lambda: _get_float("IRC_CHANNEL_RESYNC_INTERVAL_SECONDS", "300")
-    )
+    discord_presence_lookback_minutes: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_LOOKBACK_MINUTES", "5"))
+    discord_presence_message_limit: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_MESSAGE_LIMIT", "50"))
+    discord_presence_max_status_length: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_MAX_STATUS_LENGTH", "120"))
+    irc_bootstrap_connect_timeout_seconds: float = field(default_factory=lambda: _get_float("IRC_BOOTSTRAP_CONNECT_TIMEOUT_SECONDS", "15"))
+    irc_channel_resync_interval_seconds: float = field(default_factory=lambda: _get_float("IRC_CHANNEL_RESYNC_INTERVAL_SECONDS", "300"))
     log_level: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
 
     @property

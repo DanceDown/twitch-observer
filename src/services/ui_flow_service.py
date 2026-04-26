@@ -48,11 +48,7 @@ class DiscordUIFlowGuardService:
             event.result_future.set_result(decision)
 
     def _decide(self, event: DiscordUIFlowRequestedEvent) -> DiscordUIFlowDecision:
-        thread = (
-            None
-            if event.discord_channel_id is None
-            else self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
-        )
+        thread = None if event.discord_channel_id is None else self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
         if thread is None:
             return self._blocked(
                 event,
@@ -135,16 +131,10 @@ class DiscordUIFlowGuardService:
         }.get(flow)
         if flow == "ping":
             key = (
-                "results.pattern.toggle_permission_denied"
-                if step in {"disable", "enable"}
-                else "results.pattern.manage_permission_denied"
+                "results.pattern.toggle_permission_denied" if step in {"disable", "enable"} else "results.pattern.manage_permission_denied"
             )
         if flow == "reply":
-            key = (
-                "results.reply.toggle_permission_denied"
-                if step in {"disable", "enable"}
-                else "results.reply.manage_permission_denied"
-            )
+            key = "results.reply.toggle_permission_denied" if step in {"disable", "enable"} else "results.reply.manage_permission_denied"
         if key is None:
             return self.localizer.thread_result(
                 "results.permission_denied",

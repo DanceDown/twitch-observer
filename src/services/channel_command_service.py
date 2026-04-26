@@ -221,10 +221,13 @@ class ChannelCommandService:
                 LOGIN=twitch_user.login,
             )
 
-        if self.pattern_repository.count_channel_scope_references(
-            thread_id=thread.thread_id,
-            twitch_channel_id=twitch_user.user_id,
-        ) > 0:
+        if (
+            self.pattern_repository.count_channel_scope_references(
+                thread_id=thread.thread_id,
+                twitch_channel_id=twitch_user.user_id,
+            )
+            > 0
+        ):
             return self.localizer.thread_result(
                 "results.channel.in_use",
                 thread=thread,

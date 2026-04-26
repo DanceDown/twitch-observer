@@ -76,14 +76,8 @@ class ChannelEventAutoReplyService:
             self.twitch_api,
             event.twitch_channel_id,
         )
-        channel_login = event.twitch_channel_login or (
-            None if channel_user is None else channel_user.login
-        )
-        channel_name = (
-            event.twitch_channel_login
-            if channel_user is None
-            else channel_user.display_name
-        ) or event.twitch_channel_id
+        channel_login = event.twitch_channel_login or (None if channel_user is None else channel_user.login)
+        channel_name = (event.twitch_channel_login if channel_user is None else channel_user.display_name) or event.twitch_channel_id
         event_state = STREAM_EVENT_KEY_TO_STATE[event_key]
         for configured_event in configured_events:
             reply = self.adapter_event_action_repository.get_action(
@@ -95,21 +89,20 @@ class ChannelEventAutoReplyService:
             thread = self.thread_repository.get_by_thread_id(configured_event.thread_id)
             if thread is None or not thread.enabled:
                 continue
-            account = (
-                self.account_repository.get_by_account_id(thread.account_id)
-                if thread.account_id is not None
-                else None
-            )
+            account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
             if account is None or not account.access_token:
                 continue
-            account = await ensure_fresh_linked_account(
-                account=account,
-                account_repository=self.account_repository,
-                twitch_api=self.twitch_api,
-                token_refresh_skew_seconds=self.token_refresh_skew_seconds,
-                thread_repository=self.thread_repository,
-                thread=thread,
-            ) or account
+            account = (
+                await ensure_fresh_linked_account(
+                    account=account,
+                    account_repository=self.account_repository,
+                    twitch_api=self.twitch_api,
+                    token_refresh_skew_seconds=self.token_refresh_skew_seconds,
+                    thread_repository=self.thread_repository,
+                    thread=thread,
+                )
+                or account
+            )
             rendered_message = self._render_channel_event_reply(
                 reply.message_template,
                 channel_name=channel_name,
@@ -142,8 +135,7 @@ class ChannelEventAutoReplyService:
                 )
             except TwitchAPIError as error:
                 logger.warning(
-                    "Failed to send channel-event auto-reply thread_id=%s "
-                    "twitch_channel_id=%s state=%s channel_login=%s: %s",
+                    "Failed to send channel-event auto-reply thread_id=%s twitch_channel_id=%s state=%s channel_login=%s: %s",
                     configured_event.thread_id,
                     event.twitch_channel_id,
                     event_state,

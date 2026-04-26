@@ -164,14 +164,11 @@ class ShowCommandService:
                 and item.event_key in STREAM_EVENT_KEY_TO_STATE
             )
             for event in thread_events
-            if event.adapter_key == TWITCH_ADAPTER_KEY
-            and event.subject_type == CHANNEL_SUBJECT_TYPE
+            if event.adapter_key == TWITCH_ADAPTER_KEY and event.subject_type == CHANNEL_SUBJECT_TYPE
         }
         for channel in channels:
             twitch_user = await self.twitch_api.get_user_by_id(channel.twitch_channel_id)
-            line = (
-                f"- {format_twitch_code_link(display_name=twitch_user.display_name, login=twitch_user.login)}"
-            )
+            line = f"- {format_twitch_code_link(display_name=twitch_user.display_name, login=twitch_user.login)}"
             if channel.color:
                 line += "\n  " + self._localizer.text(
                     "show.channel.custom_color",
@@ -217,8 +214,7 @@ class ShowCommandService:
         )
         adapter_event_actions = (
             []
-            if self.adapter_event_action_repository is None
-            or self.adapter_event_repository is None
+            if self.adapter_event_action_repository is None or self.adapter_event_repository is None
             else [
                 (event_record, action_record)
                 for event_record, action_record in (
@@ -271,16 +267,12 @@ class ShowCommandService:
         rows: list[str] = []
         for tracked_user in tracked_users:
             twitch_user = await self.twitch_api.get_user_by_id(tracked_user.twitch_user_id)
-            rows.append(
-                f"- {format_twitch_code_link(display_name=twitch_user.display_name, login=twitch_user.login)}"
-            )
+            rows.append(f"- {format_twitch_code_link(display_name=twitch_user.display_name, login=twitch_user.login)}")
         return f"**{self._localizer.text('show.sections.tracked_users', language=language)}**\n" + "\n".join(rows)
 
     def _render_permissions_section(self, thread: ThreadRecord) -> str:
         language = self._localizer.language_for_thread(thread)
-        rows = [
-            f"- <@{thread.owner_id}>\n  {self._localizer.text('show.permission.owner', language=language)}"
-        ]
+        rows = [f"- <@{thread.owner_id}>\n  {self._localizer.text('show.permission.owner', language=language)}"]
         if self.permission_repository is None:
             return f"**{self._localizer.text('show.sections.permissions', language=language)}**\n" + "\n".join(rows)
         grants = self.permission_repository.list_for_thread(thread_id=thread.thread_id)
@@ -303,7 +295,8 @@ class ShowCommandService:
                 TYPE="Regex" if pattern.is_regex else "Ping",
                 ID=pattern.p_index,
             ),
-            "  " + self._localizer.text(
+            "  "
+            + self._localizer.text(
                 "show.pattern.text",
                 language=language,
                 TEXT=pattern.regex,
@@ -339,12 +332,15 @@ class ShowCommandService:
         response = self._format_show_code_unescaped(action.message_template or "")
         state_label = STREAM_EVENT_KEY_TO_STATE.get(event.event_key, event.event_key)
         details = [self._localizer.text("show.event_reply.line", language=language, STATE=state_label)]
-        details.append("  " + self._localizer.text(
-            "show.event_reply.channel",
-            language=language,
-            DISPLAY_NAME=channel_user.display_name,
-            LOGIN=channel_user.login,
-        ))
+        details.append(
+            "  "
+            + self._localizer.text(
+                "show.event_reply.channel",
+                language=language,
+                DISPLAY_NAME=channel_user.display_name,
+                LOGIN=channel_user.login,
+            )
+        )
         details.append("  " + self._localizer.text("show.event_reply.reply", language=language, TEXT=response))
         if action.disabled:
             details.append("  " + self._localizer.text("show.event_reply.disabled", language=language))
@@ -381,15 +377,19 @@ class ShowCommandService:
                     )
                 )
         if pattern.sub_state != "all":
-            details.append(self._localizer.text(
-                "show.pattern.subscribers_only" if pattern.sub_state == "subs" else "show.pattern.non_subscribers_only",
-                language=language,
-            ))
+            details.append(
+                self._localizer.text(
+                    "show.pattern.subscribers_only" if pattern.sub_state == "subs" else "show.pattern.non_subscribers_only",
+                    language=language,
+                )
+            )
         if pattern.offline_state != "both":
-            details.append(self._localizer.text(
-                "show.pattern.only_while_live" if pattern.offline_state == "online" else "show.pattern.only_while_offline",
-                language=language,
-            ))
+            details.append(
+                self._localizer.text(
+                    "show.pattern.only_while_live" if pattern.offline_state == "online" else "show.pattern.only_while_offline",
+                    language=language,
+                )
+            )
         if pattern.case_sensitive:
             details.append(self._localizer.text("show.pattern.case_sensitive", language=language))
         if pattern.color:
@@ -406,9 +406,7 @@ class ShowCommandService:
         resolved: list[str] = []
         for twitch_id in twitch_ids:
             user = await self.twitch_api.get_user_by_id(twitch_id)
-            resolved.append(
-                format_twitch_code_link(display_name=user.display_name, login=user.login)
-            )
+            resolved.append(format_twitch_code_link(display_name=user.display_name, login=user.login))
         return tuple(resolved)
 
     async def _resolve_twitch_names(
@@ -418,9 +416,7 @@ class ShowCommandService:
         resolved: list[str] = []
         for twitch_id in twitch_ids:
             user = await self.twitch_api.get_user_by_id(twitch_id)
-            resolved.append(
-                format_twitch_code_link(display_name=user.display_name, login=user.login)
-            )
+            resolved.append(format_twitch_code_link(display_name=user.display_name, login=user.login))
         return tuple(resolved)
 
     async def _render_account_section(self, thread: ThreadRecord) -> tuple[str, str | None]:

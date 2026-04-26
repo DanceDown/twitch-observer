@@ -175,7 +175,7 @@ class Localizer:
                 end_index += 1
             if end_index >= length:
                 raise LocalizationError(f"Unclosed placeholder in template: {template!r}")
-            name = template[index + 1:end_index]
+            name = template[index + 1 : end_index]
             if not name:
                 raise LocalizationError("Empty placeholder names are not allowed.")
             if name not in placeholders:

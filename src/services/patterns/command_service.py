@@ -284,8 +284,7 @@ class PatternCommandService:
         )
         mode_name = self._pattern_type(event.is_regex, language=thread.language)
         logger.debug(
-            "Added %s pattern thread_id=%s pattern_id=%s regex=%r channel_filter=%s "
-            "user_filter=%s",
+            "Added %s pattern thread_id=%s pattern_id=%s regex=%r channel_filter=%s user_filter=%s",
             mode_name,
             thread.thread_id,
             created.p_index,
@@ -485,27 +484,11 @@ class PatternCommandService:
         if new_is_regex:
             re.compile(new_text)
 
-        new_channel_scope_mode = (
-            pattern.channel_scope_mode
-            if event.channel_scope_mode is None
-            else event.channel_scope_mode
-        )
-        new_user_scope_mode = (
-            pattern.user_scope_mode
-            if event.user_scope_mode is None
-            else event.user_scope_mode
-        )
+        new_channel_scope_mode = pattern.channel_scope_mode if event.channel_scope_mode is None else event.channel_scope_mode
+        new_user_scope_mode = pattern.user_scope_mode if event.user_scope_mode is None else event.user_scope_mode
         new_sub_state = pattern.sub_state if event.sub_state is None else event.sub_state
-        new_offline_state = (
-            pattern.offline_state
-            if event.offline_state is None
-            else event.offline_state
-        )
-        new_case_sensitive = (
-            pattern.case_sensitive
-            if event.case_sensitive is None
-            else event.case_sensitive
-        )
+        new_offline_state = pattern.offline_state if event.offline_state is None else event.offline_state
+        new_case_sensitive = pattern.case_sensitive if event.case_sensitive is None else event.case_sensitive
         if event.clear_color:
             new_color = None
         elif event.color is None:
@@ -593,9 +576,7 @@ class PatternCommandService:
                 thread_id=thread.thread_id,
                 p_index=event.pattern_id,
             )
-        raise ValueError(
-            self._text(thread, "results.pattern.missing_stable_id")
-        )
+        raise ValueError(self._text(thread, "results.pattern.missing_stable_id"))
 
     def _event_result(
         self,
@@ -668,4 +649,3 @@ class PatternCommandService:
         if offline_state != "both":
             priority += 1
         return min(priority, 9)
-

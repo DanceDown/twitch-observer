@@ -440,9 +440,7 @@ class DeviceFlowPollingService:
         **placeholders: object,
     ) -> DiscordCommandResult:
         thread = (
-            None
-            if pending.discord_channel_id is None
-            else self.thread_repository.get_by_discord_channel_id(pending.discord_channel_id)
+            None if pending.discord_channel_id is None else self.thread_repository.get_by_discord_channel_id(pending.discord_channel_id)
         )
         return self.localizer.thread_result(key, thread=thread, style=style, ephemeral=ephemeral, **placeholders)
 

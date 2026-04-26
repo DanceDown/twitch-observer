@@ -104,11 +104,7 @@ class ReplyCommandService:
             )
 
         if event.action == "add":
-            linked_account = (
-                self.account_repository.get_by_account_id(thread.account_id)
-                if thread.account_id is not None
-                else None
-            )
+            linked_account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
             if linked_account is None:
                 return self.localizer.thread_result(
                     "results.reply.no_linked_account",
@@ -252,10 +248,7 @@ class ReplyCommandService:
         thread: ThreadRecord,
         event: DiscordReplyRequestedEvent,
     ) -> DiscordCommandResult:
-        if (
-            self.adapter_event_repository is None
-            or self.adapter_event_action_repository is None
-        ):
+        if self.adapter_event_repository is None or self.adapter_event_action_repository is None:
             raise ValueError(self.localizer.text("results.reply.event_unavailable", language=thread.language))
         if event.adapter_event_id is None:
             raise ValueError(self.localizer.text("results.reply.missing_event", language=thread.language))
@@ -280,11 +273,7 @@ class ReplyCommandService:
             )
 
         state_label = STREAM_EVENT_KEY_TO_STATE.get(adapter_event.event_key)
-        if (
-            adapter_event.adapter_key != TWITCH_ADAPTER_KEY
-            or adapter_event.subject_type != CHANNEL_SUBJECT_TYPE
-            or state_label is None
-        ):
+        if adapter_event.adapter_key != TWITCH_ADAPTER_KEY or adapter_event.subject_type != CHANNEL_SUBJECT_TYPE or state_label is None:
             raise ValueError(self.localizer.text("results.reply.unsupported_event", language=thread.language))
 
         channel_name = adapter_event.subject_id
@@ -303,11 +292,7 @@ class ReplyCommandService:
         )
 
         if event.action == "add":
-            linked_account = (
-                self.account_repository.get_by_account_id(thread.account_id)
-                if thread.account_id is not None
-                else None
-            )
+            linked_account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
             if linked_account is None:
                 return self.localizer.thread_result(
                     "results.reply.no_linked_account",

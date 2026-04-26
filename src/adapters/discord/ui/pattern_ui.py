@@ -657,8 +657,7 @@ class PatternChannelsModal(discord.ui.Modal):
             self._parent_view.state.selected_channels = list(self.channels.component.values)
             name_by_login = {channel.login: channel.display_name for channel in self._tracked_channels}
             self._parent_view.state.selected_channel_names = [
-                name_by_login.get(login, login)
-                for login in self._parent_view.state.selected_channels
+                name_by_login.get(login, login) for login in self._parent_view.state.selected_channels
             ]
         await interaction.response.defer()
         await self._parent_view.rerender()
@@ -733,10 +732,7 @@ class PatternUsersModal(discord.ui.Modal):
         elif self.users.component.values:
             state.selected_users = list(self.users.component.values)
             name_by_login = {user.login: user.display_name for user in self._tracked_users}
-            state.selected_user_names = [
-                name_by_login.get(login, login)
-                for login in state.selected_users
-            ]
+            state.selected_user_names = [name_by_login.get(login, login) for login in state.selected_users]
         await interaction.response.defer()
         await self._parent_view.rerender()
 
