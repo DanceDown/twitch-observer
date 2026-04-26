@@ -188,6 +188,164 @@
         "title": "Konfigurationsübersicht",
         "message": "{CONTENT}"
       }
+    },
+    "write": {
+      "permission_denied": {
+        "title": "Keine Berechtigung",
+        "message": "Du kannst mich von hier aus keine Twitch-Nachrichten senden lassen <:_b:1497722659793014966>"
+      },
+      "empty_message": "Gib mir zuerst eine Nachricht, dann kann ich sie senden <a:OhNo:1497685055948980306>",
+      "message_too_long": "Die Nachricht ist zu lang für Twitch. Bitte bleib bei höchstens 500 Zeichen <a:OhNo:1497685055948980306>",
+      "channel_not_tracked": {
+        "title": "Kanal nicht getrackt",
+        "message": "Ich beobachte `{DISPLAY_NAME}` noch nicht. Füge den Kanal zuerst mit `/channel add` hinzu <:Binoculars:1497727665283662077>"
+      },
+      "no_linked_account": {
+        "title": "Kein verknüpftes Konto",
+        "message": "Verknüpfe zuerst mit `/account link` ein Twitch-Konto, dann kann ich im Chat sprechen <:oopsie:1497720439810687006>"
+      },
+      "account_expired": {
+        "title": "Twitch-Konto abgelaufen",
+        "message": "Das verknüpfte Twitch-Konto funktioniert nicht mehr. Verknüpfe es erneut mit `/account link` <a:sadcat:1497721262645051392>"
+      },
+      "reply_sent": {
+        "title": "Twitch-Antwort gesendet",
+        "message": "Ich habe im Chat von `{DISPLAY_NAME}` geantwortet <a:yo:1497686448717959369>\nAntwort-Ziel: `{REPLY_TARGET}`\nNachricht: `{MESSAGE}`"
+      },
+      "message_sent": {
+        "title": "Twitch-Nachricht gesendet",
+        "message": "Ich habe das in den Chat von `{DISPLAY_NAME}` geschickt <a:yo:1497686448717959369>\nNachricht: `{MESSAGE}`"
+      }
+    },
+    "pattern": {
+      "manage_permission_denied": {
+        "title": "Keine Berechtigung",
+        "message": "Du kannst mich von hier aus keine Pings hinzufügen oder entfernen lassen <:_b:1497722659793014966>"
+      },
+      "toggle_permission_denied": {
+        "title": "Keine Berechtigung",
+        "message": "Du kannst meine Pings von hier aus nicht ein- oder ausschalten <:_b:1497722659793014966>"
+      },
+      "change_permission_denied": {
+        "title": "Keine Berechtigung",
+        "message": "Du kannst meine Pings von hier aus nicht ändern <:_b:1497722659793014966>"
+      },
+      "edit_permission_denied": {
+        "title": "Keine Berechtigung",
+        "message": "Du kannst meine Pings von hier aus nicht bearbeiten <:_b:1497722659793014966>"
+      },
+      "unsupported_action": "Diese Ping-Aktion verwirrt mich. Nutze bitte add, remove, disable oder enable <a:peepoConfused:1497729266266275840>",
+      "empty_pattern": "Sag mir zuerst, wonach ich Ausschau halten soll <a:OhNo:1497685055948980306>",
+      "missing_mode": "Sag mir zuerst, ob das ein normaler Ping oder eine Regex sein soll <a:OhNo:1497685055948980306>",
+      "invalid_color": "Diese Farbe sieht verdächtig aus. Nutze bitte etwas wie `#9146FF` <:d_:1497685665960165417>",
+      "invalid_priority": "Die Priorität muss eine Zahl zwischen `0` und `9` sein <:oopsie:1497720439810687006>",
+      "unsupported_channel_scope": "Dieser Kanalbereich verwirrt mich <a:peepoConfused:1497729266266275840>",
+      "unexpected_selected_channels": "Bei allen getrackten Kanälen brauche ich keine extra Auswahl <:ShrugMan:1497685241962430717>",
+      "missing_selected_channels": "Wähle für diesen Bereich zuerst mindestens einen Kanal aus <:Binoculars:1497727665283662077>",
+      "channel_not_tracked": "Ich beobachte `{DISPLAY_NAME}` noch nicht. Füge den Kanal zuerst mit `/channel` hinzu <:Binoculars:1497727665283662077>",
+      "unsupported_user_scope": "Dieser Nutzerbereich verwirrt mich <a:peepoConfused:1497729266266275840>",
+      "missing_selected_users": "Wähle für diesen Bereich zuerst mindestens einen Twitch-Nutzer aus <a:peepoSmart:1497731090704498781>",
+      "user_not_tracked": "Ich erinnere mich noch nicht an `{DISPLAY_NAME}`. Füge den Nutzer zuerst mit `/user` hinzu <a:peepoSmart:1497731090704498781>",
+      "missing_stable_id": "Nutze die ID aus `/show`, damit ich genau weiß, welchen Ping du meinst <a:peepoSmart:1497731090704498781>",
+      "already_exists": {
+        "title": "Bereits vorhanden",
+        "message": "Dieses {TYPE} kenne ich schon als ID `{ID}` <:oopsie:1497720439810687006>"
+      },
+      "already_exists_other": {
+        "title": "Bereits vorhanden",
+        "message": "Ein anderer Ping nutzt diese Einstellungen schon als ID `{ID}` <:oopsie:1497720439810687006>"
+      },
+      "not_found_remove": {
+        "title": "Nicht gefunden",
+        "message": "Ich konnte diesen Ping zum Entfernen nicht finden <a:OhNo:1497685055948980306>"
+      },
+      "not_found_disable": {
+        "title": "Nicht gefunden",
+        "message": "Ich konnte diesen Ping zum Deaktivieren nicht finden <a:OhNo:1497685055948980306>"
+      },
+      "not_found_enable": {
+        "title": "Nicht gefunden",
+        "message": "Ich konnte diesen Ping zum Aktivieren nicht finden <a:OhNo:1497685055948980306>"
+      },
+      "not_found_id": {
+        "title": "Nicht gefunden",
+        "message": "Ich kenne keinen Ping mit dieser ID <a:nope:1497686414328860713>"
+      },
+      "already_disabled": {
+        "title": "Bereits deaktiviert",
+        "message": "Dieses {TYPE} lurkt schon ganz leise <a:Lurk:1497684902135463986>"
+      },
+      "already_enabled": {
+        "title": "Bereits aktiviert",
+        "message": "Dieses {TYPE} ist schon wach <a:yes:1497686393369919559>"
+      },
+      "added_title": "{TYPE} hinzugefügt",
+      "removed_title": "{TYPE} entfernt",
+      "disabled_title": "{TYPE} deaktiviert",
+      "enabled_title": "{TYPE} aktiviert",
+      "updated_title": "Pattern aktualisiert",
+      "removed": "Ich habe {TYPE} `{ID}` vergessen <a:peepoSmart:1497731090704498781>\n{TEXT}",
+      "disabled": "Ich habe {TYPE} `{ID}` leise lurken lassen <a:Lurk:1497684902135463986>\n{TEXT}",
+      "enabled": "Ich habe {TYPE} `{ID}` wieder geweckt <a:Lurk:1497684902135463986>\n{TEXT}",
+      "actions": {
+        "added": "Gemerkt"
+      },
+      "type": {
+        "ping": "Ping",
+        "regex": "Regex"
+      },
+      "mode": {
+        "ping": "Normaler Ping",
+        "regex": "Regex"
+      },
+      "boolean": {
+        "yes": "Ja",
+        "no": "Nein"
+      },
+      "sub_state": {
+        "all": "Alle",
+        "subs": "Nur Abonnenten",
+        "non_subs": "Nur Nicht-Abonnenten"
+      },
+      "offline_state": {
+        "both": "Online und offline",
+        "online": "Nur während live",
+        "offline": "Nur während offline"
+      },
+      "scope": {
+        "channel_all": "Jeder getrackte Kanal",
+        "channel_only": "Nur in {ITEMS}",
+        "channel_except": "Jeder getrackte Kanal außer {ITEMS}",
+        "channel_tracked_except": "Jeder getrackte Kanal außer {ITEMS}",
+        "user_all": "Alle getrackten Twitch-Nutzer",
+        "user_only": "Nur von {ITEMS}",
+        "user_except": "Alle außer {ITEMS}",
+        "user_tracked_except": "Alle getrackten Twitch-Nutzer außer {ITEMS}"
+      },
+      "summary": {
+        "action": "{ACTION} {TYPE} `{ID}`.",
+        "text": "Text: `{TEXT}`",
+        "subscribers_only": "Nur Abonnenten",
+        "non_subscribers_only": "Nur Nicht-Abonnenten",
+        "only_while_live": "Nur während live",
+        "only_while_offline": "Nur während offline",
+        "case_sensitive": "Groß-/Kleinschreibung: `{VALUE}`",
+        "custom_color": "Eigene Farbe: `{COLOR}`",
+        "color_inherited": "Automatisch geerbt",
+        "priority": "Priorität: `{PRIORITY}`"
+      },
+      "changes": {
+        "updated": "{TYPE} `{ID}` aktualisiert.",
+        "text": "Text: Von `{BEFORE}` zu `{AFTER}`",
+        "mode": "Modus: Von `{BEFORE}` zu `{AFTER}`",
+        "where": "Wo: Von `{BEFORE}` zu `{AFTER}`",
+        "who": "Wer: Von `{BEFORE}` zu `{AFTER}`",
+        "subscribers": "Abonnenten: Von `{BEFORE}` zu `{AFTER}`",
+        "stream_state": "Stream-Status: Von `{BEFORE}` zu `{AFTER}`",
+        "case_sensitive": "Groß-/Kleinschreibung: Von `{BEFORE}` zu `{AFTER}`",
+        "color": "Farbe: Von `{BEFORE}` zu `{AFTER}`",
+        "priority": "Priorität: Von `{BEFORE}` zu `{AFTER}`"
+      }
     }
   },
   "show": {
@@ -250,7 +408,7 @@
   },
   "discord": {
     "tracking_embed": {
-      "footer_channel": "Kanal: {CHANNEL}",
+      "footer_channel": "Kanal: {CHANNEL}\nNachrichten-ID: {MESSAGE_ID}",
       "reply_field": "Antwort"
     },
     "tracking_view": {

@@ -188,6 +188,164 @@
         "title": "Configuration Overview",
         "message": "{CONTENT}"
       }
+    },
+    "write": {
+      "permission_denied": {
+        "title": "Permission Denied",
+        "message": "You can't make me send Twitch messages from here <:_b:1497722659793014966>"
+      },
+      "empty_message": "Give me a message first, then I can send it <a:OhNo:1497685055948980306>",
+      "message_too_long": "That message is too long for Twitch. Please keep it at 500 characters or less <a:OhNo:1497685055948980306>",
+      "channel_not_tracked": {
+        "title": "Channel Not Tracked",
+        "message": "I'm not watching `{DISPLAY_NAME}` yet. Add the channel first with `/channel add` <:Binoculars:1497727665283662077>"
+      },
+      "no_linked_account": {
+        "title": "No Linked Account",
+        "message": "Link a Twitch account first with `/account link`, then I can talk in chat <:oopsie:1497720439810687006>"
+      },
+      "account_expired": {
+        "title": "Twitch Account Expired",
+        "message": "The linked Twitch account stopped working. Link it again with `/account link` <a:sadcat:1497721262645051392>"
+      },
+      "reply_sent": {
+        "title": "Twitch Reply Sent",
+        "message": "I replied in `{DISPLAY_NAME}`'s chat <a:yo:1497686448717959369>\nReply target: `{REPLY_TARGET}`\nMessage: `{MESSAGE}`"
+      },
+      "message_sent": {
+        "title": "Twitch Message Sent",
+        "message": "I sent that to `{DISPLAY_NAME}`'s chat <a:yo:1497686448717959369>\nMessage: `{MESSAGE}`"
+      }
+    },
+    "pattern": {
+      "manage_permission_denied": {
+        "title": "Permission Denied",
+        "message": "You can't make me add or remove pings from here <:_b:1497722659793014966>"
+      },
+      "toggle_permission_denied": {
+        "title": "Permission Denied",
+        "message": "You can't switch my pings on or off from here <:_b:1497722659793014966>"
+      },
+      "change_permission_denied": {
+        "title": "Permission Denied",
+        "message": "You can't change my pings from here <:_b:1497722659793014966>"
+      },
+      "edit_permission_denied": {
+        "title": "Permission Denied",
+        "message": "You can't edit my pings from here <:_b:1497722659793014966>"
+      },
+      "unsupported_action": "That ping action confused me. Please use add, remove, disable or enable <a:peepoConfused:1497729266266275840>",
+      "empty_pattern": "Tell me what I should look for first <a:OhNo:1497685055948980306>",
+      "missing_mode": "Tell me whether this should be a normal ping or a regex first <a:OhNo:1497685055948980306>",
+      "invalid_color": "That color looks suspicious. Please use something like `#9146FF` <:d_:1497685665960165417>",
+      "invalid_priority": "Priority has to be a number between `0` and `9` <:oopsie:1497720439810687006>",
+      "unsupported_channel_scope": "That channel scope confused me <a:peepoConfused:1497729266266275840>",
+      "unexpected_selected_channels": "For every tracked channel, I don't need selected channels too <:ShrugMan:1497685241962430717>",
+      "missing_selected_channels": "Pick at least one channel for this scope first <:Binoculars:1497727665283662077>",
+      "channel_not_tracked": "I'm not watching `{DISPLAY_NAME}` yet. Add the channel first with `/channel` <:Binoculars:1497727665283662077>",
+      "unsupported_user_scope": "That user scope confused me <a:peepoConfused:1497729266266275840>",
+      "missing_selected_users": "Pick at least one Twitch user for this scope first <a:peepoSmart:1497731090704498781>",
+      "user_not_tracked": "I don't remember `{DISPLAY_NAME}` yet. Add the user first with `/user` <a:peepoSmart:1497731090704498781>",
+      "missing_stable_id": "Use the ID from `/show` so I know exactly which ping you mean <a:peepoSmart:1497731090704498781>",
+      "already_exists": {
+        "title": "Already Exists",
+        "message": "I already know this {TYPE} as ID `{ID}` <:oopsie:1497720439810687006>"
+      },
+      "already_exists_other": {
+        "title": "Already Exists",
+        "message": "Another ping already uses those settings as ID `{ID}` <:oopsie:1497720439810687006>"
+      },
+      "not_found_remove": {
+        "title": "Not Found",
+        "message": "I couldn't find that ping to remove it <a:OhNo:1497685055948980306>"
+      },
+      "not_found_disable": {
+        "title": "Not Found",
+        "message": "I couldn't find that ping to disable it <a:OhNo:1497685055948980306>"
+      },
+      "not_found_enable": {
+        "title": "Not Found",
+        "message": "I couldn't find that ping to enable it <a:OhNo:1497685055948980306>"
+      },
+      "not_found_id": {
+        "title": "Not Found",
+        "message": "I don't know a ping with that ID <a:nope:1497686414328860713>"
+      },
+      "already_disabled": {
+        "title": "Already Disabled",
+        "message": "This {TYPE} is already quietly lurking <a:Lurk:1497684902135463986>"
+      },
+      "already_enabled": {
+        "title": "Already Enabled",
+        "message": "This {TYPE} is already awake <a:yes:1497686393369919559>"
+      },
+      "added_title": "{TYPE} Added",
+      "removed_title": "{TYPE} Removed",
+      "disabled_title": "{TYPE} Disabled",
+      "enabled_title": "{TYPE} Enabled",
+      "updated_title": "Pattern Updated",
+      "removed": "I forgot {TYPE} `{ID}` <a:peepoSmart:1497731090704498781>\n{TEXT}",
+      "disabled": "I told {TYPE} `{ID}` to quietly lurk <a:Lurk:1497684902135463986>\n{TEXT}",
+      "enabled": "I woke {TYPE} `{ID}` back up <a:Lurk:1497684902135463986>\n{TEXT}",
+      "actions": {
+        "added": "Remembered"
+      },
+      "type": {
+        "ping": "ping",
+        "regex": "regex"
+      },
+      "mode": {
+        "ping": "Normal ping",
+        "regex": "Regex"
+      },
+      "boolean": {
+        "yes": "Yes",
+        "no": "No"
+      },
+      "sub_state": {
+        "all": "Everyone",
+        "subs": "Subscribers only",
+        "non_subs": "Non-subscribers only"
+      },
+      "offline_state": {
+        "both": "Online and offline",
+        "online": "Only while live",
+        "offline": "Only while offline"
+      },
+      "scope": {
+        "channel_all": "Every tracked channel",
+        "channel_only": "Only in {ITEMS}",
+        "channel_except": "Every tracked channel except {ITEMS}",
+        "channel_tracked_except": "Every tracked channel except {ITEMS}",
+        "user_all": "All tracked Twitch users",
+        "user_only": "Only from {ITEMS}",
+        "user_except": "Everyone except {ITEMS}",
+        "user_tracked_except": "All tracked Twitch users except {ITEMS}"
+      },
+      "summary": {
+        "action": "{ACTION} {TYPE} `{ID}`.",
+        "text": "Text: `{TEXT}`",
+        "subscribers_only": "Subscribers only",
+        "non_subscribers_only": "Non-subscribers only",
+        "only_while_live": "Only while live",
+        "only_while_offline": "Only while offline",
+        "case_sensitive": "Case-Sensitive: `{VALUE}`",
+        "custom_color": "Custom color: `{COLOR}`",
+        "color_inherited": "Inherited automatically",
+        "priority": "Priority: `{PRIORITY}`"
+      },
+      "changes": {
+        "updated": "Updated {TYPE} `{ID}`.",
+        "text": "Text: From `{BEFORE}` to `{AFTER}`",
+        "mode": "Mode: From `{BEFORE}` to `{AFTER}`",
+        "where": "Where: From `{BEFORE}` to `{AFTER}`",
+        "who": "Who: From `{BEFORE}` to `{AFTER}`",
+        "subscribers": "Subscribers: From `{BEFORE}` to `{AFTER}`",
+        "stream_state": "Stream state: From `{BEFORE}` to `{AFTER}`",
+        "case_sensitive": "Case-Sensitive: From `{BEFORE}` to `{AFTER}`",
+        "color": "Color: From `{BEFORE}` to `{AFTER}`",
+        "priority": "Priority: From `{BEFORE}` to `{AFTER}`"
+      }
     }
   },
   "show": {
@@ -250,7 +408,7 @@
   },
   "discord": {
     "tracking_embed": {
-      "footer_channel": "Channel: {CHANNEL}",
+      "footer_channel": "Channel: {CHANNEL}\nMessage-ID: {MESSAGE_ID}",
       "reply_field": "Reply"
     },
     "tracking_view": {

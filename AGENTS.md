@@ -45,6 +45,7 @@
 - Keep docs focused on actual runtime behavior, tradeoffs, and operational guidance.
 - Avoid overlapping documentation; prefer one canonical document per topic.
 - `docs/architecture.md` is the main runtime overview, `docs/database.md` is the schema guide, and `docs/commands_reference.md` is the user-facing command surface.
+- German user-facing text must always use proper German characters: write `ä`, `ö`, `ü`, and `ß`; never replace them with `ae`, `oe`, `ue`, or `ss`.
 
 ## Testing
 

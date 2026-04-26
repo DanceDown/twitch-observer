@@ -173,6 +173,7 @@ async def _run() -> None:
         pattern_repository=pattern_repository,
         twitch_api=twitch_api,
         permission_repository=permission_repository,
+        localizer=localizer,
     )
     PermissionCommandService(
         event_bus=event_bus,
@@ -212,6 +213,7 @@ async def _run() -> None:
         pattern_repository=pattern_repository,
         twitch_api=twitch_api,
         notifier=discord_adapter,
+        localizer=localizer,
         reply_repository=reply_repository,
     )
     AutoReplyService(
@@ -252,6 +254,7 @@ async def _run() -> None:
         twitch_api=twitch_api,
         permission_repository=permission_repository,
         token_refresh_skew_seconds=config.twitch_account_token_refresh_skew_seconds,
+        localizer=localizer,
     )
 
     stop_event = asyncio.Event()
