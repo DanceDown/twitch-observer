@@ -12,10 +12,22 @@ from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 
 DEFAULT_LANGUAGE = "english"
 _LANG_DIRECTORY = Path(__file__).resolve().parent.parent / "lang"
+DEFERRED_PLACEHOLDER_TOKENS: dict[str, str] = {
+    "USER": "\u0000LOCALIZER_USER\u0000",
+}
 
 
 class LocalizationError(ValueError):
     """Raised when a translation catalog is invalid or a lookup fails."""
+
+
+def resolve_deferred_placeholders(template: str, **placeholders: object) -> str:
+    """Resolve placeholders intentionally deferred until one later rendering step."""
+    rendered = template
+    for name, token in DEFERRED_PLACEHOLDER_TOKENS.items():
+        if name in placeholders:
+            rendered = rendered.replace(token, str(placeholders[name]))
+    return rendered
 
 
 @dataclass(slots=True, frozen=True)
@@ -163,6 +175,10 @@ class Localizer:
             if not name:
                 raise LocalizationError("Empty placeholder names are not allowed.")
             if name not in placeholders:
+                if name in DEFERRED_PLACEHOLDER_TOKENS:
+                    parts.append(DEFERRED_PLACEHOLDER_TOKENS[name])
+                    index = end_index + 1
+                    continue
                 raise LocalizationError(f"Missing placeholder value for {name!r}.")
             parts.append(str(placeholders[name]))
             index = end_index + 1

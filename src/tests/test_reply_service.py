@@ -1049,7 +1049,7 @@ async def test_account_unlink_keeps_attached_auto_replies() -> None:
     bus = EventBus()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
-    pattern_repository = InMemoryPatternRepository(
+    InMemoryPatternRepository(
         patterns=[
             PatternRecord(
                 thread_id=thread.thread_id,

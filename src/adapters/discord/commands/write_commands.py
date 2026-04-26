@@ -5,9 +5,11 @@ from __future__ import annotations
 import discord
 
 from src.events.event_bus import EventBus
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.events.event_types import DiscordResultStyle
+from src.localization import Localizer
 
 from ..helpers import command_unavailable_result, send_initial_result
+from ..ui.shared import resolve_context_language
 from ..ui.write_ui import WriteModal
 from ..ui_data import DiscordUIDataProvider
 
@@ -16,6 +18,7 @@ def register_write_commands(
     tree: discord.app_commands.CommandTree,
     event_bus: EventBus,
     ui_data_provider: DiscordUIDataProvider,
+    localizer: Localizer,
 ) -> None:
     """Register the single-word `/write` command."""
 
@@ -24,13 +27,18 @@ def register_write_commands(
         if interaction.channel_id is None:
             await send_initial_result(interaction, command_unavailable_result())
             return
+        language = resolve_context_language(
+            localizer=localizer,
+            data_provider=ui_data_provider,
+            discord_channel_id=interaction.channel_id,
+        )
         tracked_channels = await ui_data_provider.list_tracked_channels(interaction.channel_id)
         if not tracked_channels:
             await send_initial_result(
                 interaction,
-                DiscordCommandResult(
-                    title="No Tracked Channels",
-                    message="Track a Twitch channel first before sending messages.",
+                localizer.result(
+                    "discord.write_ui.errors.no_channels",
+                    language=language,
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 ),
@@ -42,5 +50,7 @@ def register_write_commands(
                 discord_channel_id=interaction.channel_id,
                 requester_id=interaction.user.id,
                 tracked_channels=tracked_channels,
+                localizer=localizer,
+                language=language,
             )
         )

@@ -5,6 +5,7 @@ from __future__ import annotations
 import discord
 
 from src.events.event_bus import EventBus
+from src.localization import Localizer
 
 from ..helpers import command_unavailable_result, send_initial_result
 from ..ui.live_state_ui import open_channel_event_modal
@@ -15,6 +16,7 @@ def register_live_state_commands(
     tree: discord.app_commands.CommandTree,
     event_bus: EventBus,
     ui_data_provider: DiscordUIDataProvider,
+    localizer: Localizer,
 ) -> None:
     """Register `/live` and `/offline` as tracked event-notification commands."""
 
@@ -25,10 +27,10 @@ def register_live_state_commands(
             return
         await open_channel_event_modal(
             interaction,
-            title="Add Live Notification",
             event_bus=event_bus,
             ui_data_provider=ui_data_provider,
             event_key="stream.online",
+            localizer=localizer,
         )
 
     @tree.command(name="offline", description="Notify this Discord channel when a tracked Twitch channel goes offline.")
@@ -38,8 +40,8 @@ def register_live_state_commands(
             return
         await open_channel_event_modal(
             interaction,
-            title="Add Offline Notification",
             event_bus=event_bus,
             ui_data_provider=ui_data_provider,
             event_key="stream.offline",
+            localizer=localizer,
         )

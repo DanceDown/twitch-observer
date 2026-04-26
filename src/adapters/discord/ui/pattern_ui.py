@@ -6,59 +6,13 @@ import discord
 
 from src.events.event_bus import EventBus
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.localization import Localizer
 from src.utils.discord_embeds import build_result_embed
 
 from ..dispatch import dispatch_pattern_command, dispatch_pattern_edit_command
 from ..ui_data import DiscordUIDataProvider, PatternPresentation, TrackedChannelPresentation, TrackedUserPresentation
-from .shared import BaseFormView, COLOR_PICKER_URL, PatternFormState, build_form_embed
-
-
-def _channel_scope_text(mode: str, selected: list[str]) -> str:
-    """Render one human-friendly summary for the channel scope."""
-    if mode == "all_tracked":
-        return "All tracked Twitch channels"
-    if mode == "only_selected":
-        return f"Only: {', '.join(selected)}" if selected else "Only selected channels"
-    if mode == "all_except_selected":
-        return f"All except: {', '.join(selected)}" if selected else "All except selected channels"
-    return mode
-
-
-def _user_scope_text(mode: str, selected: list[str]) -> str:
-    """Render one human-friendly summary for the user scope."""
-    if mode == "all_users":
-        return "Everyone"
-    if mode == "all_tracked":
-        return "All tracked Twitch users"
-    if mode == "all_tracked_except_selected":
-        return (
-            f"All tracked except: {', '.join(selected)}"
-            if selected
-            else "All tracked except selected Twitch names"
-        )
-    if mode == "only_selected":
-        return f"Only: {', '.join(selected)}" if selected else "Only selected Twitch names"
-    if mode == "all_except_selected":
-        return f"Everyone except: {', '.join(selected)}" if selected else "Everyone except selected Twitch names"
-    return mode
-
-
-def _sub_state_text(value: str) -> str:
-    """Render the subscriber scope in friendly language."""
-    return {
-        "all": "Everyone",
-        "subs": "Subscribers only",
-        "non_subs": "Non-subscribers only",
-    }.get(value, value)
-
-
-def _offline_state_text(value: str) -> str:
-    """Render the stream-state filter in friendly language."""
-    return {
-        "both": "Online and offline",
-        "online": "Only while live",
-        "offline": "Only while offline",
-    }.get(value, value)
+from .patterns.text import channel_scope_text, offline_state_text, sub_state_text, user_scope_text
+from .shared import BaseFormView, COLOR_PICKER_URL, PatternFormState, resolve_context_language
 
 
 class PingMenuView(BaseFormView):
@@ -71,17 +25,28 @@ class PingMenuView(BaseFormView):
         event_bus: EventBus,
         data_provider: DiscordUIDataProvider,
         discord_channel_id: int,
+        localizer: Localizer,
     ) -> None:
-        super().__init__(owner_id=owner_id)
+        super().__init__(
+            owner_id=owner_id,
+            localizer=localizer,
+            language=resolve_context_language(
+                localizer=localizer,
+                data_provider=data_provider,
+                discord_channel_id=discord_channel_id,
+            ),
+        )
         self._event_bus = event_bus
         self._data_provider = data_provider
         self._discord_channel_id = discord_channel_id
+        self.add.label = self.text("discord.pattern_ui.actions.add")
+        self.edit.label = self.text("discord.pattern_ui.actions.edit")
+        self.remove.label = self.text("discord.pattern_ui.actions.remove")
+        self.disable.label = self.text("discord.pattern_ui.actions.disable")
+        self.enable.label = self.text("discord.pattern_ui.actions.enable")
 
     def render_embed(self) -> discord.Embed:
-        return build_form_embed(
-            "Pings",
-            "Create a new ping, edit an existing one, or disable/enable it.",
-        )
+        return self.form_embed("discord.pattern_ui.menu.title", "discord.pattern_ui.menu.message")
 
     @discord.ui.button(label="Add", style=discord.ButtonStyle.primary)
     async def add(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
@@ -91,6 +56,7 @@ class PingMenuView(BaseFormView):
             data_provider=self._data_provider,
             discord_channel_id=self._discord_channel_id,
             action="add",
+            localizer=self._localizer,
         )
         view.bound_message = self.bound_message
         await interaction.response.edit_message(embed=view.render_embed(), view=view)
@@ -102,6 +68,7 @@ class PingMenuView(BaseFormView):
             event_bus=self._event_bus,
             data_provider=self._data_provider,
             discord_channel_id=self._discord_channel_id,
+            localizer=self._localizer,
         )
         prepare_result = await view.prepare()
         if prepare_result is not None:
@@ -129,6 +96,7 @@ class PingMenuView(BaseFormView):
             data_provider=self._data_provider,
             discord_channel_id=self._discord_channel_id,
             action=action,
+            localizer=self._localizer,
         )
         prepare_result = await view.prepare()
         if prepare_result is not None:
@@ -138,12 +106,14 @@ class PingMenuView(BaseFormView):
         await interaction.response.send_modal(
             PatternActionSelectionModal(
                 title={
-                    "remove": "Remove Ping",
-                    "disable": "Disable Ping",
-                    "enable": "Enable Ping",
-                }.get(action, "Choose Ping"),
+                    "remove": self.text("discord.pattern_ui.action.remove_title"),
+                    "disable": self.text("discord.pattern_ui.action.disable_title"),
+                    "enable": self.text("discord.pattern_ui.action.enable_title"),
+                }.get(action, self.text("discord.pattern_ui.action.choose_title")),
                 parent=view,
                 patterns=view._patterns,
+                localizer=self._localizer,
+                language=self.language,
             )
         )
 
@@ -159,8 +129,17 @@ class PatternIdActionView(BaseFormView):
         data_provider: DiscordUIDataProvider,
         discord_channel_id: int,
         action: str,
+        localizer: Localizer,
     ) -> None:
-        super().__init__(owner_id=owner_id)
+        super().__init__(
+            owner_id=owner_id,
+            localizer=localizer,
+            language=resolve_context_language(
+                localizer=localizer,
+                data_provider=data_provider,
+                discord_channel_id=discord_channel_id,
+            ),
+        )
         self._event_bus = event_bus
         self._data_provider = data_provider
         self._discord_channel_id = discord_channel_id
@@ -177,13 +156,13 @@ class PatternIdActionView(BaseFormView):
         if not self._patterns:
             return DiscordCommandResult(
                 title={
-                    "disable": "No Enabled Pings",
-                    "enable": "No Disabled Pings",
-                }.get(self._action, "No Pings Yet"),
+                    "disable": self.text("discord.pattern_ui.errors.no_enabled.title"),
+                    "enable": self.text("discord.pattern_ui.errors.no_disabled.title"),
+                }.get(self._action, self.text("discord.pattern_ui.errors.no_pings.title")),
                 message={
-                    "disable": "There are no enabled pings to disable.",
-                    "enable": "There are no disabled pings to enable.",
-                }.get(self._action, "There are no pings yet."),
+                    "disable": self.text("discord.pattern_ui.errors.no_enabled.message"),
+                    "enable": self.text("discord.pattern_ui.errors.no_disabled.message"),
+                }.get(self._action, self.text("discord.pattern_ui.errors.no_pings.message")),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -191,13 +170,14 @@ class PatternIdActionView(BaseFormView):
 
     def render_embed(self) -> discord.Embed:
         action_label = {
-            "remove": "Remove Ping",
-            "disable": "Disable Ping",
-            "enable": "Enable Ping",
-        }.get(self._action, "Manage Ping")
-        return build_form_embed(
-            action_label,
-            "Choose the ping you want to update.",
+            "remove": self.text("discord.pattern_ui.action.remove_title"),
+            "disable": self.text("discord.pattern_ui.action.disable_title"),
+            "enable": self.text("discord.pattern_ui.action.enable_title"),
+        }.get(self._action, self.text("discord.pattern_ui.action.manage_title"))
+        return self.form_embed(
+            "discord.pattern_ui.action.embed_title",
+            "discord.pattern_ui.action.embed_message",
+            ACTION=action_label,
         )
 
     async def run_action(self, interaction: discord.Interaction, pattern_id: int) -> None:
@@ -232,8 +212,17 @@ class PatternPickerView(BaseFormView):
         event_bus: EventBus,
         data_provider: DiscordUIDataProvider,
         discord_channel_id: int,
+        localizer: Localizer,
     ) -> None:
-        super().__init__(owner_id=owner_id)
+        super().__init__(
+            owner_id=owner_id,
+            localizer=localizer,
+            language=resolve_context_language(
+                localizer=localizer,
+                data_provider=data_provider,
+                discord_channel_id=discord_channel_id,
+            ),
+        )
         self._event_bus = event_bus
         self._data_provider = data_provider
         self._discord_channel_id = discord_channel_id
@@ -243,18 +232,15 @@ class PatternPickerView(BaseFormView):
         self._patterns = await self._data_provider.list_patterns(self._discord_channel_id)
         if not self._patterns:
             return DiscordCommandResult(
-                title="No Pings Yet",
-                message="There are no pings yet.",
+                title=self.text("discord.pattern_ui.errors.no_pings.title"),
+                message=self.text("discord.pattern_ui.errors.no_pings.message"),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
         return None
 
     def render_embed(self) -> discord.Embed:
-        return build_form_embed(
-            "Edit Ping",
-            "Choose the ping you want to change.",
-        )
+        return self.form_embed("discord.pattern_ui.edit.title", "discord.pattern_ui.edit.message")
 
     async def submit_selection(self, interaction: discord.Interaction, pattern_id: int) -> None:
         pattern = await self._data_provider.get_pattern(self._discord_channel_id, pattern_id)
@@ -264,8 +250,8 @@ class PatternPickerView(BaseFormView):
                 await self.bound_message.edit(
                     embed=build_result_embed(
                         DiscordCommandResult(
-                            title="Ping Not Found",
-                            message="The selected ping no longer exists.",
+                            title=self.text("discord.pattern_ui.errors.not_found.title"),
+                            message=self.text("discord.pattern_ui.errors.not_found.message"),
                             style=DiscordResultStyle.ERROR,
                             ephemeral=True,
                         )
@@ -294,6 +280,7 @@ class PatternPickerView(BaseFormView):
             discord_channel_id=self._discord_channel_id,
             action="edit",
             state=state,
+            localizer=self._localizer,
         )
         view.bound_message = self.bound_message
         await interaction.response.defer()
@@ -313,33 +300,70 @@ class PatternHomeView(BaseFormView):
         discord_channel_id: int,
         action: str,
         state: PatternFormState | None = None,
+        localizer: Localizer,
     ) -> None:
-        super().__init__(owner_id=owner_id)
+        super().__init__(
+            owner_id=owner_id,
+            localizer=localizer,
+            language=resolve_context_language(
+                localizer=localizer,
+                data_provider=data_provider,
+                discord_channel_id=discord_channel_id,
+            ),
+        )
         self._event_bus = event_bus
         self._data_provider = data_provider
         self._discord_channel_id = discord_channel_id
         self._action = action
         self.state = state or PatternFormState()
+        self.basics.label = self.text("discord.pattern_ui.actions.basics")
+        self.channels.label = self.text("discord.pattern_ui.actions.channels")
+        self.users.label = self.text("discord.pattern_ui.actions.users")
+        self.options.label = self.text("discord.pattern_ui.actions.options")
+        self.save.label = self.text("discord.pattern_ui.actions.save")
 
     def render_embed(self) -> discord.Embed:
         lines = [
-            f"Text: `{self.state.pattern_text or 'not set yet'}`",
-            f"Mode: `{'Regex' if self.state.is_regex else 'Normal ping'}`",
-            f"Where: `{_channel_scope_text(self.state.channel_scope_mode, self.state.selected_channels)}`",
-            f"Who: `{_user_scope_text(self.state.user_scope_mode, self.state.selected_users)}`",
-            f"Subscribers: `{_sub_state_text(self.state.sub_state)}`",
-            f"Stream state: `{_offline_state_text(self.state.offline_state)}`",
-            f"Case sensitive: `{'Yes' if self.state.case_sensitive else 'No'}`",
-            f"Color: `{self.state.color or 'Inherited automatically'}`",
-            f"Priority: `{self.state.priority if self.state.priority is not None else 'Automatic'}`",
-        ]
-        return build_form_embed(
-            "New Ping" if self._action == "add" else "Edit Ping",
-            (
-                "\n".join(lines)
-                + "\n\nUse the buttons below to fill out each section."
-                + f"\nNeed a hex color? [Open color picker]({COLOR_PICKER_URL})"
+            self.text("discord.pattern_ui.summary.text", TEXT=self.state.pattern_text or self.text("discord.pattern_ui.summary.not_set")),
+            self.text(
+                "discord.pattern_ui.summary.mode",
+                MODE=self.text("discord.pattern_ui.summary.mode_regex" if self.state.is_regex else "discord.pattern_ui.summary.mode_ping"),
             ),
+            self.text(
+                "discord.pattern_ui.summary.where",
+                VALUE=channel_scope_text(self._localizer, self.language, self.state.channel_scope_mode, self.state.selected_channels),
+            ),
+            self.text(
+                "discord.pattern_ui.summary.who",
+                VALUE=user_scope_text(self._localizer, self.language, self.state.user_scope_mode, self.state.selected_users),
+            ),
+            self.text(
+                "discord.pattern_ui.summary.subscribers",
+                VALUE=sub_state_text(self._localizer, self.language, self.state.sub_state),
+            ),
+            self.text(
+                "discord.pattern_ui.summary.stream_state",
+                VALUE=offline_state_text(self._localizer, self.language, self.state.offline_state),
+            ),
+            self.text(
+                "discord.pattern_ui.summary.case_sensitive",
+                VALUE=self.text("common.boolean.yes" if self.state.case_sensitive else "common.boolean.no"),
+            ),
+            self.text(
+                "discord.pattern_ui.summary.color",
+                VALUE=self.state.color or self.text("discord.pattern_ui.summary.color_inherited"),
+            ),
+            self.text(
+                "discord.pattern_ui.summary.priority",
+                VALUE=self.state.priority if self.state.priority is not None else self.text("discord.pattern_ui.summary.priority_auto"),
+            ),
+        ]
+        title_key = "discord.pattern_ui.create.title" if self._action == "add" else "discord.pattern_ui.edit.title"
+        return self.form_embed(
+            title_key,
+            "discord.pattern_ui.summary.embed_message",
+            CONTENT="\n".join(lines),
+            COLOR_PICKER_URL=COLOR_PICKER_URL,
         )
 
     @discord.ui.button(label="Basics", style=discord.ButtonStyle.primary)
@@ -353,8 +377,8 @@ class PatternHomeView(BaseFormView):
             await self.finish_with_interaction(
                 interaction,
                 DiscordCommandResult(
-                    title="No Channels",
-                    message="Add at least one Twitch channel first before narrowing a ping to specific channels.",
+                    title=self.text("discord.pattern_ui.errors.no_channels.title"),
+                    message=self.text("discord.pattern_ui.errors.no_channels.message"),
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 ),
@@ -369,8 +393,8 @@ class PatternHomeView(BaseFormView):
             await self.finish_with_interaction(
                 interaction,
                 DiscordCommandResult(
-                    title="No Tracked Users",
-                    message="Add Twitch users with `/user` before narrowing a ping to specific users.",
+                    title=self.text("discord.pattern_ui.errors.no_users.title"),
+                    message=self.text("discord.pattern_ui.errors.no_users.message"),
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 ),
@@ -425,36 +449,44 @@ class PatternHomeView(BaseFormView):
         await self.finish_with_interaction(interaction, result)
 
 
-class PatternBasicsModal(discord.ui.Modal, title="Ping Basics"):
+class PatternBasicsModal(discord.ui.Modal):
     """Collect text, mode, casing, and color in one modal."""
 
     def __init__(self, *, parent: PatternHomeView) -> None:
-        super().__init__(timeout=300)
+        super().__init__(title=parent.text("discord.pattern_ui.basics.title"), timeout=300)
         self._parent_view = parent
         self.pattern_text = discord.ui.TextInput(
-            label="What should I look for?",
-            placeholder="e.g. your name",
+            label=parent.text("discord.pattern_ui.basics.pattern_text_label"),
+            placeholder=parent.text("discord.pattern_ui.basics.pattern_text_placeholder"),
             default=parent.state.pattern_text,
             required=True,
             style=discord.TextStyle.paragraph,
         )
         self.mode = discord.ui.Label(
-            text="How should it match?",
+            text=parent.text("discord.pattern_ui.basics.mode_label"),
             component=discord.ui.RadioGroup(
                 options=[
-                    discord.RadioGroupOption(label="Normal ping", value="ping", default=not parent.state.is_regex),
-                    discord.RadioGroupOption(label="Regex", value="regex", default=parent.state.is_regex),
+                    discord.RadioGroupOption(
+                        label=parent.text("discord.pattern_ui.summary.mode_ping"),
+                        value="ping",
+                        default=not parent.state.is_regex,
+                    ),
+                    discord.RadioGroupOption(
+                        label=parent.text("discord.pattern_ui.summary.mode_regex"),
+                        value="regex",
+                        default=parent.state.is_regex,
+                    ),
                 ]
             ),
         )
         self.case_sensitive = discord.ui.Label(
-            text="Extra options",
-            description="Turn this on only when upper/lowercase should matter.",
+            text=parent.text("discord.pattern_ui.basics.extra_options_label"),
+            description=parent.text("discord.pattern_ui.basics.extra_options_description"),
             component=discord.ui.CheckboxGroup(
                 required=False,
                 options=[
                     discord.CheckboxGroupOption(
-                        label="Case sensitive",
+                        label=parent.text("discord.pattern_ui.basics.case_sensitive_option"),
                         value="case_sensitive",
                         default=parent.state.case_sensitive,
                     )
@@ -462,8 +494,8 @@ class PatternBasicsModal(discord.ui.Modal, title="Ping Basics"):
             ),
         )
         self.color = discord.ui.TextInput(
-            label="Color",
-            placeholder="e.g. #9146FF",
+            label=parent.text("discord.pattern_ui.basics.color_label"),
+            placeholder=parent.text("discord.pattern_ui.basics.color_placeholder"),
             default=parent.state.color,
             required=False,
         )
@@ -482,25 +514,37 @@ class PatternBasicsModal(discord.ui.Modal, title="Ping Basics"):
         await self._parent_view.rerender()
 
 
-class PatternChannelsModal(discord.ui.Modal, title="Where Should It Match?"):
+class PatternChannelsModal(discord.ui.Modal):
     """Collect the Twitch-channel scope for one ping."""
 
     def __init__(self, *, parent: PatternHomeView, tracked_channels: list[TrackedChannelPresentation]) -> None:
-        super().__init__(timeout=300)
+        super().__init__(title=parent.text("discord.pattern_ui.channels.title"), timeout=300)
         self._parent_view = parent
         self.scope = discord.ui.Label(
-            text="Channel scope",
+            text=parent.text("discord.pattern_ui.channels.scope_label"),
             component=discord.ui.RadioGroup(
                 options=[
-                    discord.RadioGroupOption(label="Every tracked channel", value="all_tracked", default=parent.state.channel_scope_mode == "all_tracked"),
-                    discord.RadioGroupOption(label="Only these channels", value="only_selected", default=parent.state.channel_scope_mode == "only_selected"),
-                    discord.RadioGroupOption(label="Every channel except these", value="all_except_selected", default=parent.state.channel_scope_mode == "all_except_selected"),
+                    discord.RadioGroupOption(
+                        label=parent.text("discord.pattern_ui.channels.scope_all"),
+                        value="all_tracked",
+                        default=parent.state.channel_scope_mode == "all_tracked",
+                    ),
+                    discord.RadioGroupOption(
+                        label=parent.text("discord.pattern_ui.channels.scope_only"),
+                        value="only_selected",
+                        default=parent.state.channel_scope_mode == "only_selected",
+                    ),
+                    discord.RadioGroupOption(
+                        label=parent.text("discord.pattern_ui.channels.scope_except"),
+                        value="all_except_selected",
+                        default=parent.state.channel_scope_mode == "all_except_selected",
+                    ),
                 ]
             ),
         )
         self.channels = discord.ui.Label(
-            text="Tracked Twitch channels",
-            description="Choose channels only when you use one of the selected-channel scopes.",
+            text=parent.text("discord.pattern_ui.channels.tracked_label"),
+            description=parent.text("discord.pattern_ui.channels.tracked_description"),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
@@ -528,31 +572,47 @@ class PatternChannelsModal(discord.ui.Modal, title="Where Should It Match?"):
         await self._parent_view.rerender()
 
 
-class PatternUsersModal(discord.ui.Modal, title="Who Can Trigger It?"):
+class PatternUsersModal(discord.ui.Modal):
     """Collect one user-scope update for one ping."""
 
     def __init__(self, *, parent: PatternHomeView, tracked_users: list[TrackedUserPresentation]) -> None:
-        super().__init__(timeout=300)
+        super().__init__(title=parent.text("discord.pattern_ui.users.title"), timeout=300)
         self._parent_view = parent
         self.scope = discord.ui.Label(
-            text="Twitch name scope",
+            text=parent.text("discord.pattern_ui.users.scope_label"),
             component=discord.ui.RadioGroup(
                 options=[
-                    discord.RadioGroupOption(label="Everyone", value="all_users", default=parent.state.user_scope_mode == "all_users"),
-                    discord.RadioGroupOption(label="All tracked Twitch users", value="all_tracked", default=parent.state.user_scope_mode == "all_tracked"),
                     discord.RadioGroupOption(
-                        label="All tracked except selected names",
+                        label=parent.text("discord.pattern_ui.users.scope_everyone"),
+                        value="all_users",
+                        default=parent.state.user_scope_mode == "all_users",
+                    ),
+                    discord.RadioGroupOption(
+                        label=parent.text("discord.pattern_ui.users.scope_all_tracked"),
+                        value="all_tracked",
+                        default=parent.state.user_scope_mode == "all_tracked",
+                    ),
+                    discord.RadioGroupOption(
+                        label=parent.text("discord.pattern_ui.users.scope_all_tracked_except"),
                         value="all_tracked_except_selected",
                         default=parent.state.user_scope_mode == "all_tracked_except_selected",
                     ),
-                    discord.RadioGroupOption(label="Only selected names", value="only_selected", default=parent.state.user_scope_mode == "only_selected"),
-                    discord.RadioGroupOption(label="Everyone except selected names", value="all_except_selected", default=parent.state.user_scope_mode == "all_except_selected"),
+                    discord.RadioGroupOption(
+                        label=parent.text("discord.pattern_ui.users.scope_only"),
+                        value="only_selected",
+                        default=parent.state.user_scope_mode == "only_selected",
+                    ),
+                    discord.RadioGroupOption(
+                        label=parent.text("discord.pattern_ui.users.scope_everyone_except"),
+                        value="all_except_selected",
+                        default=parent.state.user_scope_mode == "all_except_selected",
+                    ),
                 ]
             ),
         )
         self.users = discord.ui.Label(
-            text="Tracked Twitch users",
-            description="Choose users only when you use one of the selected-user scopes.",
+            text=parent.text("discord.pattern_ui.users.tracked_label"),
+            description=parent.text("discord.pattern_ui.users.tracked_description"),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
@@ -581,36 +641,36 @@ class PatternUsersModal(discord.ui.Modal, title="Who Can Trigger It?"):
         await self._parent_view.rerender()
 
 
-class PatternOptionsModal(discord.ui.Modal, title="Ping Options"):
+class PatternOptionsModal(discord.ui.Modal):
     """Collect the remaining non-text match options for one ping."""
 
     def __init__(self, *, parent: PatternHomeView) -> None:
-        super().__init__(timeout=300)
+        super().__init__(title=parent.text("discord.pattern_ui.options.title"), timeout=300)
         self._parent_view = parent
         self.sub_state = discord.ui.Label(
-            text="Who should count as a match?",
+            text=parent.text("discord.pattern_ui.options.sub_state_label"),
             component=discord.ui.RadioGroup(
                 options=[
-                    discord.RadioGroupOption(label="Everyone", value="all", default=parent.state.sub_state == "all"),
-                    discord.RadioGroupOption(label="Subscribers only", value="subs", default=parent.state.sub_state == "subs"),
-                    discord.RadioGroupOption(label="Non-subscribers only", value="non_subs", default=parent.state.sub_state == "non_subs"),
+                    discord.RadioGroupOption(label=parent.text("discord.pattern_ui.summary.sub_state_all"), value="all", default=parent.state.sub_state == "all"),
+                    discord.RadioGroupOption(label=parent.text("discord.pattern_ui.summary.sub_state_subs"), value="subs", default=parent.state.sub_state == "subs"),
+                    discord.RadioGroupOption(label=parent.text("discord.pattern_ui.summary.sub_state_non_subs"), value="non_subs", default=parent.state.sub_state == "non_subs"),
                 ]
             ),
         )
         self.offline_state = discord.ui.Label(
-            text="When should it trigger?",
+            text=parent.text("discord.pattern_ui.options.offline_state_label"),
             component=discord.ui.RadioGroup(
                 options=[
-                    discord.RadioGroupOption(label="Online and offline", value="both", default=parent.state.offline_state == "both"),
-                    discord.RadioGroupOption(label="Only while live", value="online", default=parent.state.offline_state == "online"),
-                    discord.RadioGroupOption(label="Only while offline", value="offline", default=parent.state.offline_state == "offline"),
+                    discord.RadioGroupOption(label=parent.text("discord.pattern_ui.summary.offline_state_both"), value="both", default=parent.state.offline_state == "both"),
+                    discord.RadioGroupOption(label=parent.text("discord.pattern_ui.summary.offline_state_online"), value="online", default=parent.state.offline_state == "online"),
+                    discord.RadioGroupOption(label=parent.text("discord.pattern_ui.summary.offline_state_offline"), value="offline", default=parent.state.offline_state == "offline"),
                 ]
             ),
         )
         priority_default = "" if parent.state.priority is None else str(parent.state.priority)
         self.priority = discord.ui.TextInput(
-            label="Priority",
-            placeholder="Leave empty to keep the default order",
+            label=parent.text("discord.pattern_ui.options.priority_label"),
+            placeholder=parent.text("discord.pattern_ui.options.priority_placeholder"),
             default=priority_default,
             required=False,
         )
@@ -629,8 +689,8 @@ class PatternOptionsModal(discord.ui.Modal, title="Ping Options"):
                 await self._parent_view.finish_with_interaction(
                     interaction,
                     DiscordCommandResult(
-                        title="Invalid Priority",
-                        message="Priority must be a whole number between `0` and `9`.",
+                        title=self._parent_view.text("discord.pattern_ui.errors.invalid_priority.title"),
+                        message=self._parent_view.text("discord.pattern_ui.errors.invalid_priority.message"),
                         style=DiscordResultStyle.ERROR,
                         ephemeral=True,
                     ),
@@ -640,8 +700,8 @@ class PatternOptionsModal(discord.ui.Modal, title="Ping Options"):
                 await self._parent_view.finish_with_interaction(
                     interaction,
                     DiscordCommandResult(
-                        title="Invalid Priority",
-                        message="Priority must be a whole number between `0` and `9`.",
+                        title=self._parent_view.text("discord.pattern_ui.errors.invalid_priority.title"),
+                        message=self._parent_view.text("discord.pattern_ui.errors.invalid_priority.message"),
                         style=DiscordResultStyle.ERROR,
                         ephemeral=True,
                     ),
@@ -654,20 +714,34 @@ class PatternOptionsModal(discord.ui.Modal, title="Ping Options"):
         await self._parent_view.rerender()
 
 
-class PatternEditSelectionModal(discord.ui.Modal, title="Choose Ping"):
+class PatternEditSelectionModal(discord.ui.Modal):
     """Choose one existing ping and then open the edit wizard."""
 
-    def __init__(self, *, parent: PatternPickerView, patterns: list[PatternPresentation]) -> None:
-        super().__init__(timeout=300)
+    def __init__(
+        self,
+        *,
+        parent: PatternPickerView,
+        patterns: list[PatternPresentation],
+        localizer: Localizer,
+        language: str,
+    ) -> None:
+        super().__init__(title=localizer.text("discord.pattern_ui.selection.choose_title", language=language), timeout=300)
         self._parent_view = parent
         self.pattern = discord.ui.Label(
-            text="Which ping do you want to edit?",
+            text=localizer.text("discord.pattern_ui.selection.edit_label", language=language),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
-                        label=(item.pattern.regex or "Untitled ping")[:100],
+                        label=(item.pattern.regex or localizer.text("discord.pattern_ui.selection.untitled_ping", language=language))[:100],
                         value=str(item.pattern.p_index),
-                        description=("Regex" if item.pattern.is_regex else "Ping"),
+                        description=localizer.text(
+                            "discord.pattern_ui.selection.option_description",
+                            language=language,
+                            TYPE=localizer.text(
+                                "discord.pattern_ui.summary.mode_regex" if item.pattern.is_regex else "discord.pattern_ui.summary.mode_ping",
+                                language=language,
+                            ),
+                        ),
                     )
                     for item in patterns[:25]
                 ],
@@ -684,17 +758,32 @@ class PatternEditSelectionModal(discord.ui.Modal, title="Choose Ping"):
 class PatternActionSelectionModal(discord.ui.Modal):
     """Choose one ping to remove, enable, or disable."""
 
-    def __init__(self, *, title: str, parent: PatternIdActionView, patterns: list[PatternPresentation]) -> None:
+    def __init__(
+        self,
+        *,
+        title: str,
+        parent: PatternIdActionView,
+        patterns: list[PatternPresentation],
+        localizer: Localizer,
+        language: str,
+    ) -> None:
         super().__init__(title=title, timeout=300)
         self._parent_view = parent
         self.pattern = discord.ui.Label(
-            text="Which ping do you want to update?",
+            text=localizer.text("discord.pattern_ui.selection.update_label", language=language),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
-                        label=(item.pattern.regex or "Untitled ping")[:100],
+                        label=(item.pattern.regex or localizer.text("discord.pattern_ui.selection.untitled_ping", language=language))[:100],
                         value=str(item.pattern.p_index),
-                        description=("Regex" if item.pattern.is_regex else "Ping"),
+                        description=localizer.text(
+                            "discord.pattern_ui.selection.option_description",
+                            language=language,
+                            TYPE=localizer.text(
+                                "discord.pattern_ui.summary.mode_regex" if item.pattern.is_regex else "discord.pattern_ui.summary.mode_ping",
+                                language=language,
+                            ),
+                        ),
                     )
                     for item in patterns[:25]
                 ],

@@ -4,6 +4,7 @@ import discord
 
 from src.adapters.discord.ui.show_ui import ShowPaginationView, build_show_pages
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.localization import Localizer
 
 
 def test_build_show_pages_repeats_header_and_keeps_items_together() -> None:
@@ -31,13 +32,14 @@ def test_build_show_pages_splits_oversized_single_item_when_needed() -> None:
 def test_show_pagination_view_sets_footer_and_button_states() -> None:
     detail = "x" * 2100
     result = DiscordCommandResult(
-        title="Configuration Overview",
+        title="Konfigurationsübersicht",
         message=f"**Pings**\n- one\n  {detail}\n- two\n  {detail}\n- three\n  {detail}",
         style=DiscordResultStyle.INFO,
         ephemeral=True,
     )
 
-    view = ShowPaginationView(owner_id=200, result=result)
+    localizer = Localizer.from_directory()
+    view = ShowPaginationView(owner_id=200, result=result, localizer=localizer, language="german")
     view._page_index = 0
     view._sync_button_states()
     embed = view.render_embed()
@@ -47,3 +49,4 @@ def test_show_pagination_view_sets_footer_and_button_states() -> None:
     assert len(buttons) == 2
     assert buttons[0].disabled is True
     assert buttons[1].disabled is False
+    assert embed.footer.text.startswith("Seite ")

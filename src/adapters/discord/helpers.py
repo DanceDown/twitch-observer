@@ -7,15 +7,23 @@ from contextlib import suppress
 import discord
 
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
-from src.localization import Localizer
+from src.localization import Localizer, resolve_deferred_placeholders
 from src.utils.discord_embeds import build_result_embed
 
 
-def _build_public_actor_embed(result: DiscordCommandResult, actor_mention: str) -> discord.Embed:
+def build_public_result_embed(result: DiscordCommandResult, actor_mention: str) -> discord.Embed:
     """Render one public result embed that names the Discord user who triggered it."""
     embed = build_result_embed(result)
-    embed.description = f"{actor_mention} {result.message}"
+    rendered_message = resolve_deferred_placeholders(result.message, USER=actor_mention)
+    if rendered_message == result.message:
+        rendered_message = f"{actor_mention} {result.message}"
+    embed.description = rendered_message
     return embed
+
+
+def _build_public_actor_embed(result: DiscordCommandResult, actor_mention: str) -> discord.Embed:
+    """Backward-compatible alias for public result embed rendering."""
+    return build_public_result_embed(result, actor_mention)
 
 
 async def send_initial_result(interaction: discord.Interaction, result: DiscordCommandResult) -> None:
@@ -31,7 +39,7 @@ async def send_initial_result(interaction: discord.Interaction, result: DiscordC
         await interaction.response.send_message(embed=embed, ephemeral=True)
         return
 
-    public_embed = _build_public_actor_embed(result, interaction.user.mention)
+    public_embed = build_public_result_embed(result, interaction.user.mention)
     if interaction.response.is_done():
         if interaction.channel is not None:
             await interaction.channel.send(embed=public_embed)
@@ -62,14 +70,14 @@ async def complete_bound_result(
                 except discord.HTTPException:
                     pass
             elif interaction.channel is not None:
-                await interaction.channel.send(embed=_build_public_actor_embed(result, interaction.user.mention))
+                await interaction.channel.send(embed=build_public_result_embed(result, interaction.user.mention))
         else:
             if result.ephemeral:
                 await interaction.response.send_message(embed=embed, ephemeral=True)
             else:
                 await interaction.response.defer(ephemeral=True)
                 if interaction.channel is not None:
-                    await interaction.channel.send(embed=_build_public_actor_embed(result, interaction.user.mention))
+                    await interaction.channel.send(embed=build_public_result_embed(result, interaction.user.mention))
                 with suppress(discord.HTTPException):
                     await interaction.delete_original_response()
         return
@@ -86,11 +94,11 @@ async def complete_bound_result(
         await bound_message.edit(view=None)
     if interaction.response.is_done():
         if interaction.channel is not None:
-            await interaction.channel.send(embed=_build_public_actor_embed(result, interaction.user.mention))
+            await interaction.channel.send(embed=build_public_result_embed(result, interaction.user.mention))
     else:
         await interaction.response.defer(ephemeral=True)
         if interaction.channel is not None:
-            await interaction.channel.send(embed=_build_public_actor_embed(result, interaction.user.mention))
+            await interaction.channel.send(embed=build_public_result_embed(result, interaction.user.mention))
     with suppress(discord.HTTPException):
         await interaction.delete_original_response()
     with suppress(discord.HTTPException):

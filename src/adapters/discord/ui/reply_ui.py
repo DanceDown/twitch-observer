@@ -6,6 +6,7 @@ import discord
 
 from src.events.event_bus import EventBus
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.localization import Localizer
 
 from ..dispatch import dispatch_reply_command
 from ..helpers import complete_bound_result, normalize_optional_text
@@ -16,11 +17,12 @@ from ..ui_data import (
     PatternPresentation,
     ReplyPresentation,
 )
-from .shared import BaseFormView, build_form_embed
+from .shared import BaseFormView, resolve_context_language
 
 
-def _pattern_label(pattern: PatternPresentation) -> str:
-    return (pattern.pattern.regex or "Untitled ping")[:100]
+def _pattern_label(pattern: PatternPresentation, *, localizer: Localizer, language: str) -> str:
+    fallback = localizer.text("discord.reply_ui.common.untitled_ping", language=language)
+    return (pattern.pattern.regex or fallback)[:100]
 
 
 def _reply_label(reply: ReplyPresentation) -> str:
@@ -51,14 +53,6 @@ def _decode_target(value: str) -> tuple[str, int]:
 class PatternReplyAddModal(discord.ui.Modal, title="Add Pattern Auto-Reply"):
     """Attach one reply to one existing pattern using a modal."""
 
-    message = discord.ui.TextInput(
-        label="What should it say?",
-        style=discord.TextStyle.paragraph,
-        placeholder="Hello {NAME}!",
-        required=True,
-        max_length=500,
-    )
-
     def __init__(
         self,
         *,
@@ -66,22 +60,39 @@ class PatternReplyAddModal(discord.ui.Modal, title="Add Pattern Auto-Reply"):
         discord_channel_id: int,
         requester_id: int,
         patterns: list[PatternPresentation],
+        localizer: Localizer,
+        language: str,
         bound_message: discord.InteractionMessage | None = None,
     ) -> None:
-        super().__init__(timeout=300)
+        super().__init__(title=localizer.text("discord.reply_ui.pattern_add.title", language=language), timeout=300)
         self._event_bus = event_bus
         self._discord_channel_id = discord_channel_id
         self._requester_id = requester_id
         self._bound_message = bound_message
+        self.message = discord.ui.TextInput(
+            label=localizer.text("discord.reply_ui.pattern_add.message_label", language=language),
+            style=discord.TextStyle.paragraph,
+            placeholder=localizer.text("discord.reply_ui.pattern_add.message_placeholder", language=language),
+            required=True,
+            max_length=500,
+        )
         self.pattern = discord.ui.Label(
-            text="Pattern",
-            description="Choose the ping or regex rule that should send an automatic Twitch message.",
+            text=localizer.text("discord.reply_ui.pattern_add.pattern_label", language=language),
+            description=localizer.text("discord.reply_ui.pattern_add.pattern_description", language=language),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
-                        label=_pattern_label(pattern),
+                        label=_pattern_label(pattern, localizer=localizer, language=language),
                         value=_encode_pattern_target(pattern.pattern.p_index),
-                        description=f"ID {pattern.pattern.p_index} - {'Regex' if pattern.pattern.is_regex else 'Ping'}",
+                        description=localizer.text(
+                            "discord.reply_ui.pattern_add.pattern_option_description",
+                            language=language,
+                            ID=pattern.pattern.p_index,
+                            TYPE=localizer.text(
+                                "discord.reply_ui.common.regex_type" if pattern.pattern.is_regex else "discord.reply_ui.common.ping_type",
+                                language=language,
+                            ),
+                        ),
                     )
                     for pattern in patterns[:25]
                 ],
@@ -90,14 +101,22 @@ class PatternReplyAddModal(discord.ui.Modal, title="Add Pattern Auto-Reply"):
             ),
         )
         self.mode = discord.ui.Label(
-            text="Reply Mode",
+            text=localizer.text("discord.reply_ui.pattern_add.mode_label", language=language),
             component=discord.ui.RadioGroup(
                 options=[
-                    discord.RadioGroupOption(label="Send as normal chat message", value="message", default=True),
-                    discord.RadioGroupOption(label="Reply to the matched message", value="reply"),
+                    discord.RadioGroupOption(
+                        label=localizer.text("discord.reply_ui.pattern_add.mode_message", language=language),
+                        value="message",
+                        default=True,
+                    ),
+                    discord.RadioGroupOption(
+                        label=localizer.text("discord.reply_ui.pattern_add.mode_reply", language=language),
+                        value="reply",
+                    ),
                 ]
             ),
         )
+        self.add_item(self.message)
         self.add_item(self.pattern)
         self.add_item(self.mode)
 
@@ -116,16 +135,8 @@ class PatternReplyAddModal(discord.ui.Modal, title="Add Pattern Auto-Reply"):
         await complete_bound_result(interaction, bound_message=self._bound_message, result=result)
 
 
-class EventReplyAddModal(discord.ui.Modal, title="Add Event Auto-Reply"):
+class EventReplyAddModal(discord.ui.Modal):
     """Attach one auto-reply to one configured external event trigger."""
-
-    message = discord.ui.TextInput(
-        label="What should it say?",
-        style=discord.TextStyle.paragraph,
-        placeholder="YIPPIE {CHANNEL} is now {STATE}!",
-        required=True,
-        max_length=500,
-    )
 
     def __init__(
         self,
@@ -134,22 +145,31 @@ class EventReplyAddModal(discord.ui.Modal, title="Add Event Auto-Reply"):
         discord_channel_id: int,
         requester_id: int,
         adapter_events: list[AdapterEventPresentation],
+        localizer: Localizer,
+        language: str,
         bound_message: discord.InteractionMessage | None = None,
     ) -> None:
-        super().__init__(timeout=300)
+        super().__init__(title=localizer.text("discord.reply_ui.event_add.title", language=language), timeout=300)
         self._event_bus = event_bus
         self._discord_channel_id = discord_channel_id
         self._requester_id = requester_id
         self._bound_message = bound_message
+        self.message = discord.ui.TextInput(
+            label=localizer.text("discord.reply_ui.event_add.message_label", language=language),
+            style=discord.TextStyle.paragraph,
+            placeholder=localizer.text("discord.reply_ui.event_add.message_placeholder", language=language),
+            required=True,
+            max_length=500,
+        )
         self.adapter_event = discord.ui.Label(
-            text="Event Trigger",
-            description="Choose the configured live or offline event that should send a Twitch message.",
+            text=localizer.text("discord.reply_ui.event_add.trigger_label", language=language),
+            description=localizer.text("discord.reply_ui.event_add.trigger_description", language=language),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
                         label=_adapter_event_label(event),
                         value=_encode_adapter_event_target(event.event.event_id),
-                        description=f"{event.channel.login[:80]} - {_event_state_label(event.event.event_key).lower()} notification",
+                            description=f"{event.channel.login[:80]} - {_event_state_label(event.event.event_key).lower()} notification",
                     )
                     for event in adapter_events[:25]
                 ],
@@ -157,6 +177,7 @@ class EventReplyAddModal(discord.ui.Modal, title="Add Event Auto-Reply"):
                 max_values=1,
             ),
         )
+        self.add_item(self.message)
         self.add_item(self.adapter_event)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
@@ -187,6 +208,8 @@ class ReplyActionModal(discord.ui.Modal):
         requester_id: int,
         action: str,
         replies: list[ReplyPresentation | AdapterEventActionPresentation],
+        localizer: Localizer,
+        language: str,
         bound_message: discord.InteractionMessage | None = None,
     ) -> None:
         super().__init__(title=title, timeout=300)
@@ -196,20 +219,31 @@ class ReplyActionModal(discord.ui.Modal):
         self._action = action
         self._bound_message = bound_message
         self.reply = discord.ui.Label(
-            text="Auto-Reply",
-            description="Choose the automatic reply you want to update.",
+            text=localizer.text("discord.reply_ui.action.reply_label", language=language),
+            description=localizer.text("discord.reply_ui.action.reply_description", language=language),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
                         label=_reply_label(reply),
                         value=_encode_pattern_target(reply.reply.p_index),
-                        description=f"Linked to: {_pattern_label(reply.pattern)}",
+                        description=localizer.text(
+                            "discord.reply_ui.action.linked_pattern_description",
+                            language=language,
+                            PATTERN=_pattern_label(reply.pattern, localizer=localizer, language=language),
+                        ),
                     )
                     if isinstance(reply, ReplyPresentation)
                     else discord.SelectOption(
-                        label=(reply.action.message_template or "Untitled event action")[:100],
+                        label=(
+                            reply.action.message_template
+                            or localizer.text("discord.reply_ui.common.untitled_event_action", language=language)
+                        )[:100],
                         value=_encode_adapter_event_target(reply.event.event.event_id),
-                        description=f"Linked to: {_adapter_event_label(reply.event)}",
+                        description=localizer.text(
+                            "discord.reply_ui.action.linked_event_description",
+                            language=language,
+                            EVENT=_adapter_event_label(reply.event),
+                        ),
                     )
                     for reply in replies[:25]
                 ],
@@ -245,17 +279,28 @@ class ReplyMenuView(BaseFormView):
         event_bus: EventBus,
         data_provider: DiscordUIDataProvider,
         discord_channel_id: int,
+        localizer: Localizer,
     ) -> None:
-        super().__init__(owner_id=owner_id)
+        super().__init__(
+            owner_id=owner_id,
+            localizer=localizer,
+            language=resolve_context_language(
+                localizer=localizer,
+                data_provider=data_provider,
+                discord_channel_id=discord_channel_id,
+            ),
+        )
         self._event_bus = event_bus
         self._data_provider = data_provider
         self._discord_channel_id = discord_channel_id
+        self.add_pattern.label = self.text("discord.reply_ui.actions.add_pattern")
+        self.add_event.label = self.text("discord.reply_ui.actions.add_event")
+        self.remove.label = self.text("discord.reply_ui.actions.remove")
+        self.disable.label = self.text("discord.reply_ui.actions.disable")
+        self.enable.label = self.text("discord.reply_ui.actions.enable")
 
     def render_embed(self) -> discord.Embed:
-        return build_form_embed(
-            "Auto-Replies",
-            "Attach automatic Twitch messages either to a ping/regex pattern or to a configured live/offline event trigger.",
-        )
+        return self.form_embed("discord.reply_ui.menu.title", "discord.reply_ui.menu.message")
 
     @discord.ui.button(label="Add Pattern", style=discord.ButtonStyle.primary)
     async def add_pattern(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
@@ -264,8 +309,8 @@ class ReplyMenuView(BaseFormView):
             await self.finish_with_interaction(
                 interaction,
                 DiscordCommandResult(
-                    title="No Patterns Available",
-                    message="Create a ping or regex rule first before attaching a pattern auto-reply.",
+                    title=self.text("discord.reply_ui.errors.no_patterns.title"),
+                    message=self.text("discord.reply_ui.errors.no_patterns.message"),
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 ),
@@ -277,6 +322,8 @@ class ReplyMenuView(BaseFormView):
                 discord_channel_id=self._discord_channel_id,
                 requester_id=interaction.user.id,
                 patterns=patterns,
+                localizer=self._localizer,
+                language=self.language,
                 bound_message=self.bound_message,
             )
         )
@@ -288,8 +335,8 @@ class ReplyMenuView(BaseFormView):
             await self.finish_with_interaction(
                 interaction,
                 DiscordCommandResult(
-                    title="No Event Triggers Available",
-                    message="Configure `/live` or `/offline` first before attaching an event auto-reply.",
+                    title=self.text("discord.reply_ui.errors.no_event_triggers.title"),
+                    message=self.text("discord.reply_ui.errors.no_event_triggers.message"),
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 ),
@@ -301,6 +348,8 @@ class ReplyMenuView(BaseFormView):
                 discord_channel_id=self._discord_channel_id,
                 requester_id=interaction.user.id,
                 adapter_events=adapter_events,
+                localizer=self._localizer,
+                language=self.language,
                 bound_message=self.bound_message,
             )
         )
@@ -324,8 +373,8 @@ class ReplyMenuView(BaseFormView):
             await self.finish_with_interaction(
                 interaction,
                 DiscordCommandResult(
-                    title="No Auto-Replies",
-                    message="There are no auto-replies yet.",
+                    title=self.text("discord.reply_ui.errors.no_replies.title"),
+                    message=self.text("discord.reply_ui.errors.no_replies.message"),
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 ),
@@ -333,12 +382,14 @@ class ReplyMenuView(BaseFormView):
             return
         await interaction.response.send_modal(
             ReplyActionModal(
-                title=f"{action.capitalize()} Auto-Reply",
+                title=self.text(f"discord.reply_ui.action.{action}_title"),
                 event_bus=self._event_bus,
                 discord_channel_id=self._discord_channel_id,
                 requester_id=interaction.user.id,
                 action=action,
                 replies=replies,
+                localizer=self._localizer,
+                language=self.language,
                 bound_message=self.bound_message,
             )
         )

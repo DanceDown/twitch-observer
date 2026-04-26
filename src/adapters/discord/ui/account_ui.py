@@ -5,24 +5,42 @@ from __future__ import annotations
 import discord
 
 from src.events.event_bus import EventBus
+from src.localization import Localizer
 
 from ..dispatch import dispatch_account_command
-from .shared import BaseFormView, build_form_embed
+from ..ui_data import DiscordUIDataProvider
+from .shared import BaseFormView, resolve_context_language
 
 
 class AccountMenuView(BaseFormView):
     """Root `/account` flow with one button per action."""
 
-    def __init__(self, *, owner_id: int, event_bus: EventBus, discord_channel_id: int | None) -> None:
-        super().__init__(owner_id=owner_id)
+    def __init__(
+        self,
+        *,
+        owner_id: int,
+        event_bus: EventBus,
+        discord_channel_id: int | None,
+        data_provider: DiscordUIDataProvider,
+        localizer: Localizer,
+    ) -> None:
+        super().__init__(
+            owner_id=owner_id,
+            localizer=localizer,
+            language=resolve_context_language(
+                localizer=localizer,
+                data_provider=data_provider,
+                discord_channel_id=discord_channel_id,
+            ),
+        )
         self._event_bus = event_bus
         self._discord_channel_id = discord_channel_id
+        self.link.label = self.text("discord.account_ui.actions.connect")
+        self.unlink.label = self.text("discord.account_ui.actions.disconnect")
+        self.show.label = self.text("discord.account_ui.actions.show")
 
     def render_embed(self) -> discord.Embed:
-        return build_form_embed(
-            "Twitch Account",
-            "Choose whether you want to connect or disconnect your Twitch account.",
-        )
+        return self.form_embed("discord.account_ui.menu.title", "discord.account_ui.menu.message")
 
     @discord.ui.button(label="Connect", style=discord.ButtonStyle.primary)
     async def link(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:

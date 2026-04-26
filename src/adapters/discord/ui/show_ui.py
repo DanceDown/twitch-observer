@@ -8,20 +8,28 @@ import discord
 
 from src.events.event_bus import EventBus
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.localization import Localizer
 from src.utils.discord_embeds import build_result_embed
 
 from ..dispatch import dispatch_show_command
 from ..helpers import send_initial_result
+from ..ui_data import DiscordUIDataProvider
+from .shared import resolve_context_language
 
 
 SHOW_EMBED_DESCRIPTION_LIMIT = 4096
 
 
-def build_show_pages(message: str, *, description_limit: int = SHOW_EMBED_DESCRIPTION_LIMIT) -> tuple[str, ...]:
+def build_show_pages(
+    message: str,
+    *,
+    description_limit: int = SHOW_EMBED_DESCRIPTION_LIMIT,
+    empty_message: str = "No configuration entries found.",
+) -> tuple[str, ...]:
     """Split one `/show` result into embed-safe pages while keeping bullet items intact."""
     normalized = message.strip()
     if not normalized:
-        return ("No configuration entries found.",)
+        return (empty_message,)
     if len(normalized) <= description_limit:
         return (normalized,)
 
@@ -107,13 +115,20 @@ def _split_by_characters(text: str, limit: int) -> tuple[str, ...]:
 class ShowPaginationView(discord.ui.View):
     """Ephemeral paginator used by `/show` when the rendered section spans multiple pages."""
 
-    def __init__(self, *, owner_id: int, result: DiscordCommandResult) -> None:
+    def __init__(self, *, owner_id: int, result: DiscordCommandResult, localizer: Localizer, language: str) -> None:
         super().__init__(timeout=840)
         self._owner_id = owner_id
         self._result = result
-        self._pages = build_show_pages(result.message)
+        self._localizer = localizer
+        self._language = language
+        self._pages = build_show_pages(
+            result.message,
+            empty_message=localizer.text("discord.show_ui.pagination.empty_message", language=language),
+        )
         self._page_index = 0
         self.bound_message: discord.InteractionMessage | None = None
+        self.previous_page.label = localizer.text("discord.show_ui.pagination.previous", language=language)
+        self.next_page.label = localizer.text("discord.show_ui.pagination.next", language=language)
         self._sync_button_states()
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -122,9 +137,9 @@ class ShowPaginationView(discord.ui.View):
             return True
         await interaction.response.send_message(
             embed=build_result_embed(
-                DiscordCommandResult(
-                    title="Paginator Locked",
-                    message="Only the user who opened this `/show` result can change pages.",
+                self._localizer.result(
+                    "discord.show_ui.pagination.locked",
+                    language=self._language,
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 )
@@ -144,7 +159,14 @@ class ShowPaginationView(discord.ui.View):
         """Render the current `/show` page using the shared embed styling."""
         embed = build_result_embed(self._result)
         embed.description = self._pages[self._page_index]
-        embed.set_footer(text=f"Page {self._page_index + 1}/{len(self._pages)}")
+        embed.set_footer(
+            text=self._localizer.text(
+                "discord.show_ui.pagination.footer",
+                language=self._language,
+                CURRENT=self._page_index + 1,
+                TOTAL=len(self._pages),
+            )
+        )
         return embed
 
     def _sync_button_states(self, *, disabled: bool = False) -> None:
@@ -166,23 +188,51 @@ class ShowPaginationView(discord.ui.View):
         await interaction.response.edit_message(embed=self.render_embed(), view=self)
 
 
-class ShowSectionModal(discord.ui.Modal, title="Show Configuration"):
+class ShowSectionModal(discord.ui.Modal):
     """Collect the requested `/show` section with a single modal."""
 
-    def __init__(self, *, event_bus: EventBus, discord_channel_id: int, requester_id: int) -> None:
-        super().__init__(timeout=300)
+    def __init__(
+        self,
+        *,
+        event_bus: EventBus,
+        discord_channel_id: int,
+        requester_id: int,
+        ui_data_provider: DiscordUIDataProvider,
+        localizer: Localizer,
+    ) -> None:
+        language = resolve_context_language(
+            localizer=localizer,
+            data_provider=ui_data_provider,
+            discord_channel_id=discord_channel_id,
+        )
+        super().__init__(title=localizer.text("discord.show_ui.modal.title", language=language), timeout=300)
         self._event_bus = event_bus
         self._discord_channel_id = discord_channel_id
         self._requester_id = requester_id
+        self._localizer = localizer
+        self._language = language
         self.section = discord.ui.Label(
-            text="Section",
+            text=localizer.text("discord.show_ui.modal.section_label", language=language),
             component=discord.ui.RadioGroup(
                 options=[
-                    discord.RadioGroupOption(label="Pings", value="pings"),
-                    discord.RadioGroupOption(label="Auto-Replies", value="auto_replies"),
-                    discord.RadioGroupOption(label="Channels", value="channels", default=True),
-                    discord.RadioGroupOption(label="Users", value="users"),
-                    discord.RadioGroupOption(label="Permissions", value="permissions"),
+                    discord.RadioGroupOption(label=localizer.text("show.sections.pings", language=language), value="pings"),
+                    discord.RadioGroupOption(
+                        label=localizer.text("show.sections.auto_replies", language=language),
+                        value="auto_replies",
+                    ),
+                    discord.RadioGroupOption(
+                        label=localizer.text("show.sections.tracked_channels", language=language),
+                        value="channels",
+                        default=True,
+                    ),
+                    discord.RadioGroupOption(
+                        label=localizer.text("show.sections.tracked_users", language=language),
+                        value="users",
+                    ),
+                    discord.RadioGroupOption(
+                        label=localizer.text("show.sections.permissions", language=language),
+                        value="permissions",
+                    ),
                 ]
             ),
         )
@@ -196,11 +246,16 @@ class ShowSectionModal(discord.ui.Modal, title="Show Configuration"):
             requester_id=self._requester_id,
             sections=(self.section.component.value or "channels",),
         )
-        if result.title != "Configuration Overview" or not result.ephemeral:
+        if result.style != DiscordResultStyle.INFO or not result.ephemeral:
             await send_initial_result(interaction, result)
             return
 
-        view = ShowPaginationView(owner_id=self._requester_id, result=result)
+        view = ShowPaginationView(
+            owner_id=self._requester_id,
+            result=result,
+            localizer=self._localizer,
+            language=self._language,
+        )
         await interaction.response.send_message(
             embed=view.render_embed(),
             view=view,

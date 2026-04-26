@@ -22,7 +22,6 @@ from src.database.connection import (
 )
 from src.events.event_bus import EventBus
 from src.events.event_types import (
-    DiscordCommandResult,
     DiscordResultStyle,
     DiscordShowRequestedEvent,
     EventType,

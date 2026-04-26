@@ -7,7 +7,7 @@ from contextlib import suppress
 import discord
 
 from src.events.event_bus import EventBus
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.events.event_types import DiscordResultStyle
 from src.localization import Localizer
 
 from ..dispatch import dispatch_thread_command
@@ -49,7 +49,10 @@ class LeaveConfirmationModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Validate the confirmation phrase and dispatch the destructive leave action."""
-        if self.confirmation.value.strip().upper() != "LEAVE":
+        if self.confirmation.value.strip() != self._localizer.text(
+            "discord.thread_modal.confirm_leave_placeholder",
+            language=self._language,
+        ):
             await send_initial_result(
                 interaction,
                 self._localizer.result(

@@ -7,3 +7,5 @@ __pycache__/
 .venv-1/
 *.pyc
 src/.env
+.ruff_cache
+.vscode

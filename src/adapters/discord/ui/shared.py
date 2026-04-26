@@ -4,11 +4,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from contextlib import suppress
+from typing import TYPE_CHECKING
 
 import discord
 
+from src.adapters.discord.helpers import build_public_result_embed
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.localization import DEFAULT_LANGUAGE, Localizer
 from src.utils.discord_embeds import build_result_embed
+
+if TYPE_CHECKING:
+    from ..ui_data import DiscordUIDataProvider
 
 COLOR_PICKER_URL = "https://htmlcolorcodes.com/color-picker/"
 
@@ -35,11 +41,22 @@ async def start_form(
     view.bound_message = await interaction.original_response()
 
 
+def resolve_context_language(
+    *,
+    localizer: Localizer,
+    data_provider: "DiscordUIDataProvider | None" = None,
+    discord_channel_id: int | None = None,
+) -> str:
+    """Resolve the active UI language for one Discord context."""
+    if data_provider is None or discord_channel_id is None:
+        return localizer.default_language
+    thread = data_provider.get_thread(discord_channel_id)
+    return localizer.language_for_thread(thread)
+
+
 def _build_public_actor_embed(result: DiscordCommandResult, actor_mention: str) -> discord.Embed:
-    """Render one public result embed that names the Discord user who triggered it."""
-    embed = build_result_embed(result)
-    embed.description = f"{actor_mention} {result.message}"
-    return embed
+    """Backward-compatible alias for the centralized public embed renderer."""
+    return build_public_result_embed(result, actor_mention)
 
 
 @dataclass(slots=True)
@@ -63,10 +80,52 @@ class PatternFormState:
 class BaseFormView(discord.ui.View):
     """Base class for owner-bound ephemeral configuration views."""
 
-    def __init__(self, *, owner_id: int, timeout: float = 900) -> None:
+    def __init__(
+        self,
+        *,
+        owner_id: int,
+        localizer: Localizer,
+        language: str = DEFAULT_LANGUAGE,
+        timeout: float = 900,
+    ) -> None:
         super().__init__(timeout=timeout)
         self.owner_id = owner_id
+        self._localizer = localizer
+        self._language = language
         self.bound_message: discord.InteractionMessage | None = None
+
+    @property
+    def language(self) -> str:
+        """Return the resolved UI language for this form."""
+        return self._language
+
+    def text(self, key: str, **placeholders: object) -> str:
+        """Resolve one localized UI string for this view."""
+        return self._localizer.text(key, language=self._language, **placeholders)
+
+    def result(
+        self,
+        key: str,
+        *,
+        style: DiscordResultStyle = DiscordResultStyle.INFO,
+        ephemeral: bool = True,
+        **placeholders: object,
+    ) -> DiscordCommandResult:
+        """Resolve one localized command result for this form."""
+        return self._localizer.result(
+            key,
+            language=self._language,
+            style=style,
+            ephemeral=ephemeral,
+            **placeholders,
+        )
+
+    def form_embed(self, title_key: str, message_key: str, **placeholders: object) -> discord.Embed:
+        """Build one localized configuration embed for the current form state."""
+        return build_form_embed(
+            self.text(title_key, **placeholders),
+            self.text(message_key, **placeholders),
+        )
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """Limit interactive controls to the user who opened the command flow."""
@@ -74,12 +133,7 @@ class BaseFormView(discord.ui.View):
             return True
         await interaction.response.send_message(
             embed=build_result_embed(
-                DiscordCommandResult(
-                    title="Form Locked",
-                    message="Only the user who opened this command form can interact with it.",
-                    style=DiscordResultStyle.ERROR,
-                    ephemeral=True,
-                )
+                self.result("discord.shared.form_locked", style=DiscordResultStyle.ERROR, ephemeral=True)
             ),
             ephemeral=True,
         )
@@ -105,14 +159,14 @@ class BaseFormView(discord.ui.View):
                     except discord.HTTPException:
                         pass
                 elif interaction.channel is not None:
-                    await interaction.channel.send(embed=_build_public_actor_embed(result, interaction.user.mention))
+                    await interaction.channel.send(embed=build_public_result_embed(result, interaction.user.mention))
             else:
                 if result.ephemeral:
                     await interaction.response.send_message(embed=embed, ephemeral=True)
                 else:
                     await interaction.response.defer(ephemeral=True)
                     if interaction.channel is not None:
-                        await interaction.channel.send(embed=_build_public_actor_embed(result, interaction.user.mention))
+                        await interaction.channel.send(embed=build_public_result_embed(result, interaction.user.mention))
                     with suppress(discord.HTTPException):
                         await interaction.delete_original_response()
             return
@@ -129,11 +183,11 @@ class BaseFormView(discord.ui.View):
             await self.bound_message.edit(view=None)
         if interaction.response.is_done():
             if interaction.channel is not None:
-                await interaction.channel.send(embed=_build_public_actor_embed(result, interaction.user.mention))
+                await interaction.channel.send(embed=build_public_result_embed(result, interaction.user.mention))
         else:
             await interaction.response.defer(ephemeral=True)
             if interaction.channel is not None:
-                await interaction.channel.send(embed=_build_public_actor_embed(result, interaction.user.mention))
+                await interaction.channel.send(embed=build_public_result_embed(result, interaction.user.mention))
         with suppress(discord.HTTPException):
             await interaction.delete_original_response()
         with suppress(discord.HTTPException):
