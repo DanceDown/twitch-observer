@@ -146,3 +146,9 @@ def format_twitch_code_link(*, display_name: str, login: str) -> str:
     safe_name = display_name.replace("`", "")
     return f"[`{safe_name}`](https://www.twitch.tv/{login})"
 
+
+def format_twitch_link(*, display_name: str, login: str) -> str:
+    """Render a Twitch profile link without code-style name formatting."""
+    safe_name = display_name.replace("`", "")
+    return f"[{safe_name}](https://www.twitch.tv/{login})"
+

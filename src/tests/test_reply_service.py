@@ -572,7 +572,8 @@ async def test_channel_event_command_manages_live_and_offline_notifications() ->
         adapter_event_repository=adapter_event_repository,
         adapter_event_action_repository=adapter_event_action_repository,
         twitch_api=FakeTwitchAPI(
-            users_by_id={
+            users_by_id={},
+            cached_users_by_id={
                 "42": TwitchUser(user_id="42", login="example", display_name="ExampleChannel"),
             }
         ),  # type: ignore[arg-type]
@@ -887,6 +888,8 @@ class FakeTwitchAPI:
     sent_messages: list[dict[str, str | None]] = field(default_factory=list)
     live_by_user_id: dict[str, bool] = field(default_factory=dict)
     users_by_id: dict[str, TwitchUser] = field(default_factory=dict)
+    cached_users_by_id: dict[str, TwitchUser] = field(default_factory=dict)
+    id_requests: list[str] = field(default_factory=list)
     poll_requests: list[tuple[str, tuple[str, ...]]] = field(default_factory=list)
     refreshed_tokens: list[str] = field(default_factory=list)
 
@@ -937,7 +940,11 @@ class FakeTwitchAPI:
         return "sent-1"
 
     async def get_user_by_id(self, user_id: str) -> TwitchUser:
+        self.id_requests.append(user_id)
         return self.users_by_id[user_id]
+
+    def get_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
+        return self.cached_users_by_id.get(user_id.strip())
 
     async def is_user_live(self, user_id: str) -> bool:
         return self.live_by_user_id.get(user_id, False)

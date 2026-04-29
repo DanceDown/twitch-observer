@@ -100,7 +100,7 @@ class DiscordUIDataProvider:
 
         presentations: list[TrackedChannelPresentation] = []
         for channel in self.channel_repository.list_channels_for_thread(thread.thread_id):
-            twitch_user = await self.twitch_api.get_user_by_id(channel.twitch_channel_id)
+            twitch_user = await self._resolve_channel_by_id(channel.twitch_channel_id)
             presentations.append(
                 TrackedChannelPresentation(
                     user_id=twitch_user.user_id,
@@ -139,7 +139,7 @@ class DiscordUIDataProvider:
 
         presentations: list[TrackedUserPresentation] = []
         for tracked_user in self.tracked_user_repository.list_users_for_thread(thread.thread_id):
-            twitch_user = await self.twitch_api.get_user_by_id(tracked_user.twitch_user_id)
+            twitch_user = await self._resolve_user_by_id(tracked_user.twitch_user_id)
             presentations.append(
                 TrackedUserPresentation(
                     user_id=twitch_user.user_id,
@@ -212,7 +212,7 @@ class DiscordUIDataProvider:
         """Resolve Twitch user IDs to login names for compact Discord displays."""
         logins: list[str] = []
         for user_id in user_ids:
-            twitch_user: TwitchUser = await self.twitch_api.get_user_by_id(user_id)
+            twitch_user: TwitchUser = await self._resolve_user_by_id(user_id)
             logins.append(twitch_user.login)
         return tuple(logins)
 
@@ -220,7 +220,22 @@ class DiscordUIDataProvider:
         """Resolve Twitch user IDs to display names for user-facing Discord text."""
         names: list[str] = []
         for user_id in user_ids:
-            twitch_user: TwitchUser = await self.twitch_api.get_user_by_id(user_id)
+            twitch_user: TwitchUser = await self._resolve_user_by_id(user_id)
             names.append(twitch_user.display_name)
         return tuple(names)
+
+    async def _resolve_channel_by_id(self, user_id: str) -> TwitchUser:
+        get_channel = getattr(self.twitch_api, "get_channel_by_id", None)
+        if callable(get_channel):
+            return await get_channel(user_id)
+        return await self._resolve_user_by_id(user_id)
+
+    async def _resolve_user_by_id(self, user_id: str) -> TwitchUser:
+        cached_lookup = getattr(self.twitch_api, "get_cached_user_by_id", None)
+        normalized_user_id = user_id.strip()
+        if callable(cached_lookup) and normalized_user_id:
+            cached = cached_lookup(normalized_user_id)
+            if cached is not None:
+                return cached
+        return await self.twitch_api.get_user_by_id(user_id)
 

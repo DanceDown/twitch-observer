@@ -235,7 +235,7 @@ class PatternCommandPresenter:
         language: str,
         label_prefix: str,
     ) -> str | None:
-        selected_items = ", ".join(f"`{item}`" for item in selected)
+        selected_items = ", ".join(selected)
         if mode == "all_users":
             return None
         if mode == "all_tracked":

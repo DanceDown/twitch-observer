@@ -33,7 +33,7 @@ from src.localization import Localizer
 from src.services.authz import thread_has_permission
 from src.services.patterns.filters import PatternFilterResolver
 from src.services.patterns.presentation import PatternCommandPresenter
-from src.utils.discord_embeds import escape_discord_text
+from src.utils.discord_embeds import escape_discord_text, format_twitch_link
 from src.utils.permissions import ObserverPermission
 
 logger = logging.getLogger(__name__)
@@ -544,10 +544,10 @@ class PatternCommandService:
             priority=new_priority,
         )
         assert updated is not None
-        old_channel_logins = await self._filter_resolver().resolve_display_names_from_ids(
+        old_channel_logins = await self._filter_resolver().resolve_profile_links_from_ids(
             pattern.channel_scope_ids,
         )
-        old_user_logins = await self._filter_resolver().resolve_display_names_from_ids(
+        old_user_logins = await self._filter_resolver().resolve_profile_links_from_ids(
             pattern.user_scope_ids,
         )
         return DiscordCommandResult(
@@ -556,9 +556,21 @@ class PatternCommandService:
                 before=pattern,
                 after=updated,
                 old_channel_logins=old_channel_logins,
-                new_channel_logins=tuple(channel.display_name for channel in scoped_channels),
+                new_channel_logins=tuple(
+                    format_twitch_link(
+                        display_name=channel.display_name,
+                        login=channel.login,
+                    )
+                    for channel in scoped_channels
+                ),
                 old_user_logins=old_user_logins,
-                new_user_logins=tuple(user.display_name for user in scoped_users),
+                new_user_logins=tuple(
+                    format_twitch_link(
+                        display_name=user.display_name,
+                        login=user.login,
+                    )
+                    for user in scoped_users
+                ),
                 language=thread.language,
             ),
             style=DiscordResultStyle.SUCCESS,

@@ -134,6 +134,7 @@ async def test_directory_uses_persistent_cache_before_hitting_helix() -> None:
         repository=repository,
         memory_cache_size=2048,
         api_refresh_interval_seconds=43200,
+        channel_api_refresh_interval_seconds=43200,
     )
 
     first = await directory.get_user_by_login("example")
@@ -157,6 +158,7 @@ async def test_directory_ingests_chat_metadata_without_any_helix_lookup() -> Non
         repository=repository,
         memory_cache_size=2048,
         api_refresh_interval_seconds=43200,
+        channel_api_refresh_interval_seconds=43200,
     )
     TwitchUserDirectoryIngestService(event_bus=event_bus, directory=directory)
 
@@ -205,6 +207,7 @@ async def test_directory_can_force_a_fresh_login_lookup_when_requested() -> None
         repository=repository,
         memory_cache_size=2048,
         api_refresh_interval_seconds=43200,
+        channel_api_refresh_interval_seconds=43200,
     )
 
     refreshed = await directory.refresh_user_by_login("newname")
@@ -230,6 +233,7 @@ async def test_directory_uses_lru_memory_cache_before_repository() -> None:
         repository=repository,
         memory_cache_size=2,
         api_refresh_interval_seconds=43200,
+        channel_api_refresh_interval_seconds=43200,
     )
 
     await directory.get_user_by_login("alpha")
@@ -251,6 +255,7 @@ async def test_directory_cache_only_lookup_does_not_fall_back_to_helix() -> None
         repository=repository,
         memory_cache_size=2048,
         api_refresh_interval_seconds=43200,
+        channel_api_refresh_interval_seconds=43200,
     )
 
     cached = directory.get_cached_user_by_login("unknown")
@@ -288,6 +293,7 @@ async def test_directory_refreshes_missing_profile_image_from_api() -> None:
         repository=repository,
         memory_cache_size=2048,
         api_refresh_interval_seconds=43200,
+        channel_api_refresh_interval_seconds=43200,
     )
 
     user = await directory.get_user_by_id("42")
@@ -326,9 +332,86 @@ async def test_directory_refreshes_stale_api_cache_based_on_configured_interval(
         repository=repository,
         memory_cache_size=2048,
         api_refresh_interval_seconds=60,
+        channel_api_refresh_interval_seconds=43200,
     )
 
     user = await directory.get_user_by_id("42")
 
     assert user.profile_image_url == "https://cdn.example/new.png"
     assert twitch_api.id_requests == ["42"]
+
+
+@pytest.mark.asyncio
+async def test_directory_uses_separate_channel_refresh_interval() -> None:
+    repository = InMemoryTwitchUserCacheRepository(
+        by_id={
+            "42": TwitchUserCacheRecord(
+                twitch_user_id="42",
+                twitch_login="example",
+                display_name="Example",
+                profile_image_url="https://cdn.example/old.png",
+                updated_at="cached",
+                last_api_refresh_at=(datetime.now(UTC) - timedelta(seconds=120)).isoformat(),
+            )
+        }
+    )
+    twitch_api = FakeTwitchAPI(
+        users_by_id={
+            "42": TwitchUser(
+                user_id="42",
+                login="example",
+                display_name="Example",
+                profile_image_url="https://cdn.example/new.png",
+            )
+        }
+    )
+    directory = TwitchUserDirectoryService(
+        twitch_api=twitch_api,
+        repository=repository,
+        memory_cache_size=2048,
+        api_refresh_interval_seconds=43200,
+        channel_api_refresh_interval_seconds=60,
+    )
+
+    user = await directory.get_channel_by_id("42")
+
+    assert user.profile_image_url == "https://cdn.example/new.png"
+    assert twitch_api.id_requests == ["42"]
+
+
+@pytest.mark.asyncio
+async def test_directory_keeps_fresh_channel_cache_without_refresh() -> None:
+    repository = InMemoryTwitchUserCacheRepository(
+        by_id={
+            "42": TwitchUserCacheRecord(
+                twitch_user_id="42",
+                twitch_login="example",
+                display_name="Example",
+                profile_image_url="https://cdn.example/current.png",
+                updated_at="cached",
+                last_api_refresh_at=(datetime.now(UTC) - timedelta(seconds=30)).isoformat(),
+            )
+        }
+    )
+    twitch_api = FakeTwitchAPI(
+        users_by_id={
+            "42": TwitchUser(
+                user_id="42",
+                login="example",
+                display_name="Example",
+                profile_image_url="https://cdn.example/new.png",
+            )
+        }
+    )
+    directory = TwitchUserDirectoryService(
+        twitch_api=twitch_api,
+        repository=repository,
+        memory_cache_size=2048,
+        api_refresh_interval_seconds=43200,
+        channel_api_refresh_interval_seconds=60,
+    )
+
+    user = await directory.get_channel_by_id("42")
+
+    assert user.profile_image_url == "https://cdn.example/current.png"
+    assert twitch_api.id_requests == []

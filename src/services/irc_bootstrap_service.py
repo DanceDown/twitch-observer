@@ -67,7 +67,21 @@ class IRCBootstrapService:
         logger.debug("Rehydrating %s persisted Twitch IRC channel subscriptions from the database.", len(channel_ids))
         for twitch_channel_id in channel_ids:
             try:
-                user = await self.twitch_api.get_user_by_id(twitch_channel_id)
+                get_channel = getattr(self.twitch_api, "get_channel_by_id", None)
+                if callable(get_channel):
+                    user = await get_channel(twitch_channel_id)
+                else:
+                    cached_lookup = getattr(self.twitch_api, "get_cached_user_by_id", None)
+                    cached = (
+                        None
+                        if not callable(cached_lookup)
+                        else cached_lookup(twitch_channel_id.strip())
+                    )
+                    user = (
+                        cached
+                        if cached is not None
+                        else await self.twitch_api.get_user_by_id(twitch_channel_id)
+                    )
             except TwitchAPIError as error:
                 logger.warning(
                     "Could not resolve stored Twitch channel id=%s during IRC startup sync: %s",

@@ -13,6 +13,7 @@ from src.database.connection import (
 )
 from src.events.event_types import DiscordPatternEditRequestedEvent, DiscordPatternRequestedEvent
 from src.localization import Localizer
+from src.utils.discord_embeds import format_twitch_link
 
 
 @dataclass(slots=True)
@@ -45,7 +46,7 @@ class PatternFilterResolver:
 
         scoped_channels = []
         for channel_login in event.twitch_channel_logins:
-            channel_user = await self.twitch_api.get_user_by_login(channel_login)
+            channel_user = await self._resolve_user_by_login(channel_login)
             existing_channel = self.channel_repository.get_by_thread_and_twitch_channel(
                 thread.thread_id,
                 channel_user.user_id,
@@ -79,7 +80,7 @@ class PatternFilterResolver:
 
         scoped_users = []
         for user_login in event_user_logins:
-            resolved_user = await self.twitch_api.get_user_by_login(user_login)
+            resolved_user = await self._resolve_user_by_login(user_login)
             existing_user = (
                 None
                 if self.tracked_user_repository is None
@@ -155,7 +156,7 @@ class PatternFilterResolver:
     ) -> tuple[str, ...]:
         logins: list[str] = []
         for twitch_channel_id in twitch_channel_ids:
-            user = await self.twitch_api.get_user_by_id(twitch_channel_id)
+            user = await self._resolve_channel_by_id(twitch_channel_id)
             logins.append(user.login)
         return tuple(logins)
 
@@ -165,7 +166,7 @@ class PatternFilterResolver:
     ) -> tuple[str, ...]:
         logins: list[str] = []
         for twitch_user_id in twitch_user_ids:
-            user = await self.twitch_api.get_user_by_id(twitch_user_id)
+            user = await self._resolve_user_by_id(twitch_user_id)
             logins.append(user.login)
         return tuple(logins)
 
@@ -175,9 +176,48 @@ class PatternFilterResolver:
     ) -> tuple[str, ...]:
         names: list[str] = []
         for twitch_user_id in twitch_user_ids:
-            user = await self.twitch_api.get_user_by_id(twitch_user_id)
+            user = await self._resolve_user_by_id(twitch_user_id)
             names.append(user.display_name)
         return tuple(names)
+
+    async def resolve_profile_links_from_ids(
+        self,
+        twitch_user_ids: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        links: list[str] = []
+        for twitch_user_id in twitch_user_ids:
+            user = await self._resolve_user_by_id(twitch_user_id)
+            links.append(
+                format_twitch_link(
+                    display_name=user.display_name,
+                    login=user.login,
+                )
+            )
+        return tuple(links)
+
+    async def _resolve_user_by_login(self, login: str):
+        cached_lookup = getattr(self.twitch_api, "get_cached_user_by_login", None)
+        normalized_login = login.strip().lower()
+        if callable(cached_lookup) and normalized_login:
+            cached = cached_lookup(normalized_login)
+            if cached is not None:
+                return cached
+        return await self.twitch_api.get_user_by_login(login)
+
+    async def _resolve_user_by_id(self, user_id: str):
+        cached_lookup = getattr(self.twitch_api, "get_cached_user_by_id", None)
+        normalized_user_id = user_id.strip()
+        if callable(cached_lookup) and normalized_user_id:
+            cached = cached_lookup(normalized_user_id)
+            if cached is not None:
+                return cached
+        return await self.twitch_api.get_user_by_id(user_id)
+
+    async def _resolve_channel_by_id(self, user_id: str):
+        get_channel = getattr(self.twitch_api, "get_channel_by_id", None)
+        if callable(get_channel):
+            return await get_channel(user_id)
+        return await self._resolve_user_by_id(user_id)
 
     def _text(
         self,

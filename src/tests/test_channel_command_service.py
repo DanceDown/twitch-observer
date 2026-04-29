@@ -126,6 +126,8 @@ class InMemoryChannelRepository(ChannelRepository):
 @dataclass
 class FakeTwitchAPI:
     users_by_login: dict[str, TwitchUser] = field(default_factory=dict)
+    cached_users_by_id: dict[str, TwitchUser] = field(default_factory=dict)
+    id_requests: list[str] = field(default_factory=list)
     error: Exception | None = None
 
     async def get_user_by_login(self, login: str) -> TwitchUser:
@@ -134,12 +136,16 @@ class FakeTwitchAPI:
         return self.users_by_login[login.strip().lower()]
 
     async def get_user_by_id(self, user_id: str) -> TwitchUser:
+        self.id_requests.append(user_id.strip())
         if self.error is not None:
             raise self.error
         for user in self.users_by_login.values():
             if user.user_id == user_id:
                 return user
         raise KeyError(user_id)
+
+    def get_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
+        return self.cached_users_by_id.get(user_id.strip())
 
 
 @dataclass
@@ -477,6 +483,38 @@ async def test_leave_command_deletes_thread_and_parts_last_irc_channels() -> Non
     assert result.style == DiscordResultStyle.SUCCESS
     assert thread_repository.get_by_discord_channel_id(100) is None
     assert irc_manager.left == ["example"]
+
+
+@pytest.mark.asyncio
+async def test_leave_command_prefers_cached_channel_metadata() -> None:
+    event_bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    channel_repository = InMemoryChannelRepository()
+    channel_repository.add_channel(thread.thread_id, "42")
+    twitch_api = FakeTwitchAPI(
+        users_by_login={},
+        cached_users_by_id={"42": TwitchUser(user_id="42", login="example", display_name="Example")},
+    )
+    irc_manager = FakeIRCManager()
+    ThreadLifecycleService(
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        twitch_api=twitch_api,  # type: ignore[arg-type]
+        irc_manager=irc_manager,
+    )
+
+    result = await dispatch_thread_command(
+        event_bus,
+        discord_channel_id=100,
+        requester_id=200,
+        action="leave",
+    )
+
+    assert result.style == DiscordResultStyle.SUCCESS
+    assert irc_manager.left == ["example"]
+    assert twitch_api.id_requests == []
 
 
 @pytest.mark.asyncio

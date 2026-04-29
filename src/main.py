@@ -89,6 +89,7 @@ async def _run() -> None:
         repository=twitch_user_cache_repository,
         memory_cache_size=config.twitch_user_cache_memory_size,
         api_refresh_interval_seconds=config.twitch_user_cache_api_refresh_seconds,
+        channel_api_refresh_interval_seconds=config.twitch_channel_cache_api_refresh_seconds,
     )
 
     database.healthcheck()

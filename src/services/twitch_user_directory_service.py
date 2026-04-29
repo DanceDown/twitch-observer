@@ -36,6 +36,7 @@ class TwitchUserDirectoryService:
     repository: TwitchUserCacheRepository
     memory_cache_size: int
     api_refresh_interval_seconds: int
+    channel_api_refresh_interval_seconds: int
     _users_by_id: OrderedDict[str, TwitchUserCacheRecord] = field(default_factory=OrderedDict, init=False)
     _user_ids_by_login: dict[str, str] = field(default_factory=dict, init=False)
 
@@ -77,7 +78,7 @@ class TwitchUserDirectoryService:
             return await self.refresh_user_by_login(login)
         cached = self._get_or_load_record_by_login(normalized_login)
         if cached is not None:
-            if self._should_refresh_from_api(cached):
+            if self._should_refresh_from_api(cached, refresh_interval_seconds=self.api_refresh_interval_seconds):
                 try:
                     return await self.refresh_user_by_login(normalized_login)
                 except Exception:
@@ -102,7 +103,21 @@ class TwitchUserDirectoryService:
             return await self.refresh_user_by_id(user_id)
         cached = self._get_or_load_record_by_id(normalized_user_id)
         if cached is not None:
-            if self._should_refresh_from_api(cached):
+            if self._should_refresh_from_api(cached, refresh_interval_seconds=self.api_refresh_interval_seconds):
+                try:
+                    return await self.refresh_user_by_id(normalized_user_id)
+                except Exception:
+                    return _record_to_twitch_user(cached)
+            return _record_to_twitch_user(cached)
+        return await self.refresh_user_by_id(user_id)
+
+    async def get_channel_by_id(self, user_id: str) -> TwitchUser:
+        normalized_user_id = user_id.strip()
+        if not normalized_user_id:
+            return await self.refresh_user_by_id(user_id)
+        cached = self._get_or_load_record_by_id(normalized_user_id)
+        if cached is not None:
+            if self._should_refresh_from_api(cached, refresh_interval_seconds=self.channel_api_refresh_interval_seconds):
                 try:
                     return await self.refresh_user_by_id(normalized_user_id)
                 except Exception:
@@ -217,10 +232,15 @@ class TwitchUserDirectoryService:
         self._user_ids_by_login[record.twitch_login] = record.twitch_user_id
         self._trim_memory_cache()
 
-    def _should_refresh_from_api(self, record: TwitchUserCacheRecord) -> bool:
+    def _should_refresh_from_api(
+        self,
+        record: TwitchUserCacheRecord,
+        *,
+        refresh_interval_seconds: int,
+    ) -> bool:
         if not record.profile_image_url:
             return True
-        if self.api_refresh_interval_seconds <= 0:
+        if refresh_interval_seconds <= 0:
             return False
         if not record.last_api_refresh_at:
             return True
@@ -228,7 +248,7 @@ class TwitchUserDirectoryService:
             last_refresh = datetime.fromisoformat(record.last_api_refresh_at)
         except ValueError:
             return True
-        return datetime.now(UTC) >= last_refresh + timedelta(seconds=self.api_refresh_interval_seconds)
+        return datetime.now(UTC) >= last_refresh + timedelta(seconds=refresh_interval_seconds)
 
     def _trim_memory_cache(self) -> None:
         while len(self._users_by_id) > max(1, self.memory_cache_size):

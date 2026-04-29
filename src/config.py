@@ -50,6 +50,9 @@ class AppConfig:
     twitch_irc_nick_prefix: str = field(default_factory=lambda: os.getenv("TWITCH_IRC_NICK_PREFIX", "justinfan"))
     twitch_user_cache_memory_size: int = field(default_factory=lambda: _get_int("TWITCH_USER_CACHE_MEMORY_SIZE", "2048"))
     twitch_user_cache_api_refresh_seconds: int = field(default_factory=lambda: _get_int("TWITCH_USER_CACHE_API_REFRESH_SECONDS", "43200"))
+    twitch_channel_cache_api_refresh_seconds: int = field(
+        default_factory=lambda: _get_int("TWITCH_CHANNEL_CACHE_API_REFRESH_SECONDS", "43200")
+    )
     twitch_live_monitor_poll_interval_seconds: float = field(
         default_factory=lambda: _get_float("TWITCH_LIVE_MONITOR_POLL_INTERVAL_SECONDS", "30")
     )

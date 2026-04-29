@@ -279,9 +279,21 @@ class ReplyCommandService:
         channel_name = adapter_event.subject_id
         if self.twitch_api is not None:
             try:
-                twitch_channel = await self.twitch_api.get_user_by_id(
-                    adapter_event.subject_id,
-                )
+                get_channel = getattr(self.twitch_api, "get_channel_by_id", None)
+                if callable(get_channel):
+                    twitch_channel = await get_channel(adapter_event.subject_id)
+                else:
+                    cached_lookup = getattr(self.twitch_api, "get_cached_user_by_id", None)
+                    cached = (
+                        None
+                        if not callable(cached_lookup)
+                        else cached_lookup(adapter_event.subject_id.strip())
+                    )
+                    twitch_channel = (
+                        cached
+                        if cached is not None
+                        else await self.twitch_api.get_user_by_id(adapter_event.subject_id)
+                    )
                 channel_name = twitch_channel.display_name
             except Exception:
                 pass

@@ -243,6 +243,13 @@ class ChannelEventCommandService:
         if self.twitch_api is None:
             return twitch_channel_id
         try:
+            get_channel = getattr(self.twitch_api, "get_channel_by_id", None)
+            if callable(get_channel):
+                return (await get_channel(twitch_channel_id)).display_name
+            cached_lookup = getattr(self.twitch_api, "get_cached_user_by_id", None)
+            cached = None if not callable(cached_lookup) else cached_lookup(twitch_channel_id.strip())
+            if cached is not None:
+                return cached.display_name
             return (await self.twitch_api.get_user_by_id(twitch_channel_id)).display_name
         except TwitchAPIError:
             return twitch_channel_id

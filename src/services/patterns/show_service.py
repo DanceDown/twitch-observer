@@ -167,7 +167,7 @@ class ShowCommandService:
             if event.adapter_key == TWITCH_ADAPTER_KEY and event.subject_type == CHANNEL_SUBJECT_TYPE
         }
         for channel in channels:
-            twitch_user = await self.twitch_api.get_user_by_id(channel.twitch_channel_id)
+            twitch_user = await self._resolve_channel_by_id(channel.twitch_channel_id)
             line = f"- {format_twitch_code_link(display_name=twitch_user.display_name, login=twitch_user.login)}"
             if channel.color:
                 line += "\n  " + self._localizer.text(
@@ -266,7 +266,7 @@ class ShowCommandService:
             )
         rows: list[str] = []
         for tracked_user in tracked_users:
-            twitch_user = await self.twitch_api.get_user_by_id(tracked_user.twitch_user_id)
+            twitch_user = await self._resolve_user_by_id(tracked_user.twitch_user_id)
             rows.append(f"- {format_twitch_code_link(display_name=twitch_user.display_name, login=twitch_user.login)}")
         return f"**{self._localizer.text('show.sections.tracked_users', language=language)}**\n" + "\n".join(rows)
 
@@ -328,7 +328,7 @@ class ShowCommandService:
         *,
         language: str,
     ) -> str:
-        channel_user = await self.twitch_api.get_user_by_id(event.subject_id)
+        channel_user = await self._resolve_channel_by_id(event.subject_id)
         response = self._format_show_code_unescaped(action.message_template or "")
         state_label = STREAM_EVENT_KEY_TO_STATE.get(event.event_key, event.event_key)
         details = [self._localizer.text("show.event_reply.line", language=language, STATE=state_label)]
@@ -405,7 +405,7 @@ class ShowCommandService:
     ) -> tuple[str, ...]:
         resolved: list[str] = []
         for twitch_id in twitch_ids:
-            user = await self.twitch_api.get_user_by_id(twitch_id)
+            user = await self._resolve_channel_by_id(twitch_id)
             resolved.append(format_twitch_code_link(display_name=user.display_name, login=user.login))
         return tuple(resolved)
 
@@ -415,7 +415,7 @@ class ShowCommandService:
     ) -> tuple[str, ...]:
         resolved: list[str] = []
         for twitch_id in twitch_ids:
-            user = await self.twitch_api.get_user_by_id(twitch_id)
+            user = await self._resolve_user_by_id(twitch_id)
             resolved.append(format_twitch_code_link(display_name=user.display_name, login=user.login))
         return tuple(resolved)
 
@@ -430,7 +430,7 @@ class ShowCommandService:
             else self.account_repository.get_by_account_id(thread.account_id)
         )
         if account is not None:
-            twitch_user = await self.twitch_api.get_user_by_id(account.twitch_user_id)
+            twitch_user = await self._resolve_user_by_id(account.twitch_user_id)
             thumbnail_url = twitch_user.profile_image_url
             rows.append(
                 self._localizer.text(
@@ -485,4 +485,19 @@ class ShowCommandService:
         if "`" in text:
             return text
         return f"`{text}`"
+
+    async def _resolve_channel_by_id(self, user_id: str):
+        get_channel = getattr(self.twitch_api, "get_channel_by_id", None)
+        if callable(get_channel):
+            return await get_channel(user_id)
+        return await self._resolve_user_by_id(user_id)
+
+    async def _resolve_user_by_id(self, user_id: str):
+        cached_lookup = getattr(self.twitch_api, "get_cached_user_by_id", None)
+        normalized_user_id = user_id.strip()
+        if callable(cached_lookup) and normalized_user_id:
+            cached = cached_lookup(normalized_user_id)
+            if cached is not None:
+                return cached
+        return await self.twitch_api.get_user_by_id(user_id)
 
