@@ -1,109 +1,75 @@
 # discord.py UI Overview
 
-This is a compact overview of the most relevant `discord.py` interaction UI
-features for this project. Each entry uses a small example instead of a raw
-parameter list.
+This document summarizes the UI primitives used by this project.
+
+Interaction protocol rules (initial response, defer, follow-up lifecycle) are
+documented in [discord_interaction_flows.md](discord_interaction_flows.md).
+
+## Scope
+
+This document covers component types and usage patterns.
 
 ## Modal
 
-Use a modal when the bot should ask the user for structured input in a dialog.
+Use a modal to collect structured multi-field input.
 
-Example:
+Examples:
 
-- `/ping add ...` exposes focused slash-command parameters instead of requiring a long free-form text command.
+- leave confirmation
+- write-to-Twitch form
+- ping/reply form steps
 
 ## TextInput
 
-Use a text input for free-form values.
+Use `discord.ui.TextInput` for free-form values.
 
-Example:
+Examples:
 
-- `Regex Pattern: ^h[a4]llo$`
-- `Embed Color: #ff9ce5`
+- pattern text or regex text
+- embed color hex value
+- Twitch message body
 
 ## Select
 
-Use a string select when the user should choose one or more predefined textual
-options.
+Use `discord.ui.Select` for predefined choices.
 
-Example:
+Examples:
 
-- `Action: Add / Remove`
-- `Show: Channels / Pings / Regex`
+- choose tracked channel
+- choose existing ping/reply ID
+- choose action mode
 
-In `discord.py`, the constructible string-select class is `discord.ui.Select`.
+## RadioGroup / CheckboxGroup
 
-## RadioGroup
+Use radio groups for exactly-one choices and checkbox groups for independent
+flags.
 
-Use a radio group when exactly one option from a small set should be chosen.
+Examples:
 
-Example:
-
-- `Subscriber Scope: Everyone / Subscribers Only / Non-Subscribers Only`
-- `Live Status: Both / Only Online / Only Offline`
-
-## CheckboxGroup
-
-Use a checkbox group when zero or more flags should be toggled independently.
-
-Example:
-
-- `Treat as Regex`
-- `Case Sensitive`
-- `Start Disabled`
+- stream-state filter (`both`, `online`, `offline`)
+- match mode and case-sensitivity options
 
 ## Label
 
-Use a label to place a heading above a non-text modal component.
-
-Example:
-
-- a `Select` with the heading `Action`
-- a `RadioGroup` with the heading `Subscriber Scope`
-
-## Interaction Response
-
-Use the interaction response for the first reply to a slash command or modal
-submit.
-
-Example:
-
-- open a modal with `interaction.response.send_modal(...)`
-- return the final result embed with `interaction.response.send_message(...)`
-
-## Follow-up Messages
-
-Use a follow-up message only after the original interaction response was already
-used.
-
-Example:
-
-- if a handler already opened a modal or sent a message, later replies can use
-  `interaction.followup.send(...)`
+Use labels to title non-text modal controls so the form remains self-explanatory.
 
 ## CommandTree
 
-Use the command tree to register slash commands.
+Slash commands are registered through `discord.app_commands.CommandTree`.
 
-Example:
+Each command area is registered through the dedicated command modules under:
 
-- register `/channel`, `/ping`, `/regex`, and `/show`
+- `src/adapters/discord/commands/`
 
-## Modal composition
+## UI ownership and safety
 
-Modals can be composed dynamically before they are sent.
+- forms are interaction-owner locked
+- paginators are interaction-owner locked
+- locked interactions return localized lock messages
 
-Example:
+## Modal composition constraints
 
-- create a modal
-- `add_item(...)` for the fields you want
-- optionally `remove_item(...)` or `clear_items()` before sending it
-
-Important limit:
-
-- once a modal is already open on the Discord client, it cannot be changed live
-- a modal submit cannot directly open another modal as its response
-- a modal can only hold up to 5 child items
-
-That is why the current project prefers focused slash-command parameters for
-most v1 flows and would only use modals for tightly scoped follow-up input.
+- one modal supports up to five child items
+- modal submit interactions cannot respond with another modal directly
+- multi-step flows should use:
+  - modal submit -> message with controls -> component interaction -> next modal

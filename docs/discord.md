@@ -1,135 +1,93 @@
 # Discord Setup
 
-This document describes the current Discord bot requirements and the current
-slash-command UX used by the application.
+This document defines Discord platform requirements and runtime behavior.
 
-The canonical list of all currently supported commands and parameters lives in
+Command syntax and parameters are documented in
 [commands_reference.md](commands_reference.md).
 
-## What the bot currently needs
+## Scope
 
-For the current implementation, the application needs:
+This document covers:
 
-- a Discord application
-- the bot user that belongs to that application
-- the bot token
-- installation with the scopes `bot` and `applications.commands`
+- Discord application and bot setup
+- required scopes and permissions
+- context model (channel/thread/DM)
+- response visibility and embed behavior
 
-At the moment, the bot does not need privileged intents such as
-`MESSAGE_CONTENT`. The current feature set is based on slash commands, not on
-free-form message parsing.
+It does not duplicate command parameter details.
 
-## Recommended permissions
+## Required Discord configuration
 
-For the current slash-command setup, the bot should at least be able to:
+- one Discord application
+- the bot user belonging to that application
+- bot token (`DISCORD_BOT_TOKEN`)
+- application ID (`DISCORD_APPLICATION_ID`)
+- installation scopes:
+  - `bot`
+  - `applications.commands`
 
-- view the channel it is used in
-- send messages
-- use application commands
-- embed links
+The bot uses slash commands and does not require privileged message-content
+intents.
 
-If the bot should work in threads, it also needs access to those threads.
+## Recommended channel permissions
 
-## DM and guild usage
+- View Channel
+- Send Messages
+- Use Application Commands
+- Embed Links
 
-The same command flow works in both places:
+Thread usage requires access to those threads.
 
-- DMs with the bot
-- server channels and threads where the bot has access
+## Context model
 
-Internally, every Discord channel is treated as one configuration root. That
-includes:
+Each Discord channel, thread, or DM is a separate configuration root.
 
-- normal guild channels
-- threads
-- DMs
+That mapping is persisted in `thread.discord_channel_id`, which is unique per
+context.
 
-This is why `thread.discord_channel_id` is unique in the database.
+## Adapter and service boundary
 
-## Why the UX is command-first
+The Discord adapter handles transport only:
 
-The current Discord UX uses focused slash commands and subcommands.
+1. receive interaction
+2. normalize request data
+3. dispatch typed event
+4. await `DiscordCommandResult`
+5. render embed response
 
-This gives two concrete UX benefits:
+Business logic stays in services and repository-backed workflows.
 
-- the user sees only the parameters that belong to the chosen action
-- successful results can go back as the direct interaction response
+For event names and payload families, see [events.md](events.md).
 
-Example:
+## Response visibility model
 
-- `/ping add ...` shows add-related options such as filters and scope
-- `/ping remove ...` only asks for the stable `id`
+- successful command results are visible in the active Discord context
+- validation, permission, and lookup failures are normally ephemeral
+- command results and tracking notifications are embeds
 
-## Current commands
+## Embed color model
 
-The full command surface, with parameters and examples, is documented in
-[commands_reference.md](commands_reference.md).
-
-This document intentionally does not duplicate that reference. It focuses on
-Discord platform requirements and adapter behavior.
-
-## Internal event flow
-
-The Discord adapter does not contain business logic.
-
-Instead it:
-
-1. receives a slash command
-2. collects normalized command values
-3. publishes an event
-4. waits for the service result
-5. sends the result embed
-
-Examples:
-
-- `/join`, `/leave`, `/on`, `/off` -> `discord.thread.requested`
-- `/channel add` or `/channel remove` -> `discord.channel.requested`
-- `/live` or `/offline` -> `discord.channel_event.requested`
-- `/ping add`, `/ping remove`, `/ping enable`, `/ping disable` -> `discord.pattern.requested`
-- `/ping edit` -> `discord.pattern.edit.requested`
-- `/account link`, `/account unlink`, `/account show` -> `discord.account.requested`
-- `/reply add`, `/reply remove`, `/reply disable`, `/reply enable` -> `discord.reply.requested`
-- `/write` -> `discord.write.requested`
-- `/permission ...` -> `discord.permission.requested`
-- `/show` -> `discord.show.requested`
-
-## Visibility rules
-
-The current response model is:
-
-- success responses are visible in the current Discord context
-- validation and permission errors are ephemeral
-- all responses are embeds
-
-Tracking notifications are also always embeds.
-
-## Embed styling
-
-Discord responses use a centralized color palette so the whole application stays
-visually consistent.
-
-Current semantic colors:
+Semantic result colors:
 
 - success: green
 - error: red
 - info: blue
 
-The helper currently lives in `src/utils/discord_embeds.py`.
+Tracking embed color inheritance:
 
-## Why Twitch validation needs API credentials
+1. pattern color
+2. tracked channel color
+3. Discord context color
+4. Twitch author color
+5. fallback gray
 
-The Discord flow does not trust raw user input blindly. Before storing Twitch
-channel or user scopes, the service resolves the provided logins through the
-Twitch API.
+## Twitch validation dependencies
 
-That avoids invalid rows such as typos or channels that do not exist.
+User-provided Twitch channel and user logins are validated through Helix.
 
-For this validation, the application currently needs:
+Required credentials:
 
 - `TWITCH_CLIENT_ID`
 - `TWITCH_CLIENT_SECRET`
 
-These are used only for the server-side app-token flow against Twitch.
-
-For auto-replies, the linked user token is validated separately and later used
-with Twitch's official Send Chat Message API.
+Linked user tokens are used for Twitch chat writes and write-adjacent flows.

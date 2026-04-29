@@ -45,7 +45,7 @@ This is the main runtime reference for the Twitch Observer.
 3. First-seen state is stored silently.
 4. Actual transitions publish `TwitchChannelLiveStateChangedEvent`.
 5. `ChannelLiveStatePersistenceService` persists the new state.
-6. `ChannelEventNotificationService` sends Discord notifications for configured `/live` or `/offline` triggers.
+6. `ChannelEventNotificationService` sends Discord notifications for configured live/offline triggers managed through `/live`.
 7. `ChannelEventAutoReplyService` sends Twitch messages for configured live/offline event actions.
 
 ### Command flow
@@ -55,7 +55,7 @@ This is the main runtime reference for the Twitch Observer.
 3. The matching service validates permissions and inputs.
 4. The service updates repositories and returns a `DiscordCommandResult`.
 5. The Discord adapter renders the result using the language stored on the
-   current thread/context.
+   active thread/context.
 
 ## Key design decisions
 
@@ -107,7 +107,7 @@ It uses:
 - Helix fallback only when needed
 
 IRC metadata updates login and display-name information without a Helix call.
-Profile images still require Helix.
+Profile images require Helix.
 
 ### Live state
 
@@ -120,7 +120,7 @@ Profile images still require Helix.
 
 The message hot path never calls `Get Streams`.
 
-## Current Twitch auth model
+## Twitch auth model
 
 - App credentials
   - user lookup validation

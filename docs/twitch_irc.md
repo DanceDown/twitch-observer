@@ -1,7 +1,7 @@
 # Twitch IRC Notes
 
-This document explains the anonymous Twitch IRC path that is currently used as
-the read-only chat adapter.
+This document explains the anonymous Twitch IRC path used as the read-only chat
+adapter.
 
 ## Why IRC exists here
 
@@ -11,11 +11,11 @@ because EventSub chat subscriptions require authenticated access.
 
 Important:
 
-- IRC is still the chat-message intake path
+- IRC is the chat-message intake path
 - live/offline state is tracked separately through batched Helix `Get Streams`
   polling with the application's Twitch client credentials
 
-The application architecture still keeps this in an adapter so that the read
+The application architecture keeps this in an adapter so that the read
 path can be replaced or extended later.
 
 ## Raw Twitch IRC Message Example
@@ -122,7 +122,7 @@ and answers server `PING` messages with `PONG`.
 
 ## Connection handshake
 
-Right after the TCP/TLS connection is opened, the adapter currently sends these lines:
+After the TCP/TLS connection opens, the adapter sends:
 
 ```text
 PASS SCHMOOPIIE
@@ -136,7 +136,7 @@ USER justinfan482193 8 * :justinfan482193
 This is the traditional anonymous Twitch IRC password used for guest-style
 read-only connections.
 
-Even though this is not a real secret for our anonymous mode, Twitch IRC still
+Even though this is not a real secret for anonymous mode, Twitch IRC
 expects the client to send a `PASS` line as part of the registration handshake.
 Without it, channel joins and message delivery can fail even if the socket
 itself was opened successfully.
@@ -154,7 +154,7 @@ Without tags, the observer would lose a lot of useful structured metadata.
 
 This sets the IRC nickname used for the anonymous session.
 
-In the current implementation the nick follows the traditional anonymous Twitch IRC style:
+The nick follows the traditional anonymous Twitch IRC style:
 
 ```text
 justinfan<random_number>

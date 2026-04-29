@@ -12,6 +12,7 @@ as:
 
 - `discord.thread.requested`
 - `discord.channel.requested`
+- `discord.user.requested`
 - `discord.channel_event.requested`
 - `discord.pattern.requested`
 - `discord.pattern.edit.requested`
@@ -20,6 +21,7 @@ as:
 - `discord.write.requested`
 - `discord.permission.requested`
 - `discord.show.requested`
+- `discord.ui_flow.requested`
 
 Each command event carries:
 
@@ -76,4 +78,4 @@ This event fans out to:
 
 - adapters only translate I/O into domain events
 - services stay testable and reusable
-- new sources can publish existing event shapes without rewriting business logic
+- additional sources can publish existing event shapes without rewriting business logic

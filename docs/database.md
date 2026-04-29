@@ -132,7 +132,7 @@ There is at most one pattern reply per pattern.
 
 Stores a configured external trigger inside one Discord context.
 
-Current use:
+Use:
 
 - Twitch channel `stream.online`
 - Twitch channel `stream.offline`
@@ -149,7 +149,7 @@ The shape is intentionally generic:
 
 Stores follow-up actions for one configured `adapter_event`.
 
-Current action types:
+Action types:
 
 - Discord notification
 - Twitch send-message auto-reply

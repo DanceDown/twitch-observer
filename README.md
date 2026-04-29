@@ -8,7 +8,7 @@ IRC, polls Twitch live state through the Helix API, forwards matching messages
 to Discord, and can optionally send Twitch auto-replies through a linked Twitch
 account.
 
-## Current v1 scope
+## Feature Scope
 
 - track multiple Twitch channels per Discord context
 - add ping and regex rules through Discord commands
@@ -44,7 +44,7 @@ The runtime has four main parts:
 
 ### Minimal environment
 
-At minimum the application currently needs:
+At minimum the application needs:
 
 - PostgreSQL connection settings
 - `DISCORD_BOT_TOKEN`
@@ -59,7 +59,7 @@ At minimum the application currently needs:
 3. fill `.env`
 4. start the app through `src/main.py` or Docker Compose
 
-## Current feature notes
+## Feature Notes
 
 - pings are matched as whole-word searches
 - regexes use Python regular expressions
@@ -77,14 +77,9 @@ At minimum the application currently needs:
   - Twitch author color
   - gray fallback
 
-## Not in v1 yet
-
-- convenience stalk commands
-- advanced UI and UX polish
-- AI-based features
-
 ## Key docs
 
+- [docs/README.md](docs/README.md)
 - [docs/architecture.md](docs/architecture.md)
 - [docs/database.md](docs/database.md)
 - [docs/commands_reference.md](docs/commands_reference.md)
@@ -94,3 +89,4 @@ At minimum the application currently needs:
 - [docs/twitch_irc.md](docs/twitch_irc.md)
 - [docs/adding_commands.md](docs/adding_commands.md)
 - [docs/development.md](docs/development.md)
+- [docs/testing_playbook.md](docs/testing_playbook.md)

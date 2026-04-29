@@ -45,7 +45,7 @@ Interaction tokens remain valid for 15 minutes. During that time you can:
 
 ## Interaction Sources
 
-In practice this bot currently cares about four interaction sources:
+This bot uses four interaction sources:
 
 - application commands
 - message components
@@ -57,9 +57,9 @@ In practice this bot currently cares about four interaction sources:
 Examples:
 
 - `/join`
-- `/channel add ...`
-- `/ping add ...`
-- `/account link`
+- `/channel`
+- `/ping`
+- `/account`
 
 ### Valid initial responses
 
@@ -83,10 +83,10 @@ await interaction.response.launch_activity()
 
 - `send_message`
   - use when the command already has all required parameters
-  - example: `/ping remove id:4`
+  - example: `/on`
 - `defer`
   - use when work takes longer than a moment
-  - example: `/account link`
+  - example: account-link initiation through `/account`
 - `send_modal`
   - use when the command should collect more freeform data
   - example: `/leave` confirmation modal
@@ -215,19 +215,16 @@ await interaction.response.edit_message(embed=updated_embed, view=None)
 
 A modal submit cannot directly respond with another modal.
 
-That is the important Discord rule that caused the earlier errors in this
-project:
-
 - `command -> modal` is valid
 - `component -> modal` is valid
 - `modal submit -> another modal` is not valid
 
-If you need a multi-step flow after a modal, the usual workaround is:
+If you need a multi-step flow after a modal, use:
 
 1. modal submit
 2. send a message with buttons/selects
 3. user clicks a button/select
-4. that new component interaction opens the next modal
+4. the new component interaction opens the next modal
 
 ### Good use cases
 
@@ -243,8 +240,8 @@ If you need a multi-step flow after a modal, the usual workaround is:
 
 Examples:
 
-- suggesting IDs while typing `/reply remove id:`
-- suggesting tracked Twitch channels while typing `/write channel_name:`
+- suggesting existing pattern IDs while composing form choices
+- suggesting tracked Twitch channels while composing write targets
 
 ### Valid initial response
 
@@ -266,7 +263,7 @@ send messages or modals.
 
 ## Follow-Ups and Original Responses
 
-After the initial response you still have a lot of control.
+After the initial response, additional actions remain available.
 
 ### Send a follow-up message
 
@@ -310,7 +307,7 @@ Use a direct command result.
 Example:
 
 ```text
-/reply remove id:5
+/off
 ```
 
 This should usually become:
@@ -338,7 +335,7 @@ Use command -> message with controls -> modal.
 
 Example:
 
-1. `/show patterns`
+1. `/show`
 2. show paginated embed with a select menu
 3. user selects one pattern
 4. click `Edit`
@@ -361,9 +358,9 @@ await interaction.followup.send(embed=result_embed, ephemeral=True)
 
 ## Modal Structure Notes
 
-Discord modals currently allow 1 to 5 top-level components.
+Discord modals allow 1 to 5 top-level components.
 
-The current Discord docs also show that select menus in modals must be wrapped
+Discord documentation shows that select menus in modals must be wrapped
 inside `Label` components.
 
 That matters because:
@@ -383,23 +380,20 @@ In short:
 
 ### Good candidates for direct command responses
 
-- `/ping remove id:4`
-- `/ping disable id:2`
-- `/reply enable id:7`
 - `/on`
 - `/off`
 
 ### Good candidates for command -> modal
 
-- `/join`
 - `/leave`
-- `/account link` only if you later want to collect optional preferences
+- `/color`
+- command flows that need structured follow-up input
 
 ### Good candidates for command -> component -> modal
 
-- `/show patterns`
-- `/show replies`
-- `/show permissions`
+- `/show`
+- `/ping`
+- `/reply`
 
 Reason:
 
