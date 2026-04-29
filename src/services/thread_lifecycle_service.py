@@ -140,19 +140,12 @@ class ThreadLifecycleService:
         removed_channel_ids = sorted(
             {channel.twitch_channel_id for channel in self.channel_repository.list_channels_for_thread(thread.thread_id)}
         )
+        part_candidate_channel_ids: list[str] = []
         for twitch_channel_id in removed_channel_ids:
-            self.channel_repository.remove_channel(thread.thread_id, twitch_channel_id)
-            if self.channel_repository.count_threads_by_twitch_channel_id(twitch_channel_id) == 0:
-                try:
-                    twitch_user = await self.twitch_api.get_user_by_id(twitch_channel_id)
-                except TwitchAPIError:
-                    logger.warning(
-                        "Could not resolve Twitch channel id=%s while leaving discord_channel_id=%s; skipping IRC PART.",
-                        twitch_channel_id,
-                        event.discord_channel_id,
-                    )
-                else:
-                    await self.irc_manager.leave_channel(twitch_user.login)
+            remaining_thread_ids = set(self.channel_repository.list_thread_ids_by_twitch_channel_id(twitch_channel_id))
+            remaining_thread_ids.discard(thread.thread_id)
+            if not remaining_thread_ids:
+                part_candidate_channel_ids.append(twitch_channel_id)
 
         deleted = self.thread_repository.delete_by_discord_channel_id(event.discord_channel_id)
         if deleted is None:
@@ -162,6 +155,18 @@ class ThreadLifecycleService:
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
+
+        for twitch_channel_id in part_candidate_channel_ids:
+            try:
+                twitch_user = await self.twitch_api.get_user_by_id(twitch_channel_id)
+            except TwitchAPIError:
+                logger.warning(
+                    "Could not resolve Twitch channel id=%s while leaving discord_channel_id=%s; skipping IRC PART.",
+                    twitch_channel_id,
+                    event.discord_channel_id,
+                )
+            else:
+                await self.irc_manager.leave_channel(twitch_user.login)
 
         logger.debug(
             "Left Discord context discord_channel_id=%s owner_id=%s removed_twitch_channels=%s",

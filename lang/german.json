@@ -62,6 +62,10 @@
         "title": "Beigetreten",
         "message": "Heyy <a:hey:1497685102204031067> Danke dir {USER}, dass du mich eingeladen hast <:_33:1490384461290803430>"
       },
+      "missing_channel_access": {
+        "title": "Kein Kanalzugriff",
+        "message": "Ich kann leider nicht auf diesen Kanal zugreifen <a:sadcat:1497721262645051392>\nWenn es ein privater Thread ist, kannst du mich mit `@` erwähnen und es noch einmal probieren <a:yes:1497686393369919559>"
+      },
       "leave_denied": {
         "title": "Keine Berechtigung",
         "message": "Du hast keine Berechtigung, mich gehen zu lassen <a:Tssk:1497685026945630208>\nWarum willst du, dass ich gehe? <a:sadcat:1497721262645051392>"

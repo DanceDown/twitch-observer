@@ -93,6 +93,36 @@ class PostgresDatabase:
             )
             cursor.execute(
                 """
+                ALTER TABLE pattern_channel_scope
+                DROP CONSTRAINT IF EXISTS fk_pattern_channel_scope_channel
+                """
+            )
+            cursor.execute(
+                """
+                ALTER TABLE pattern_channel_scope
+                ADD CONSTRAINT fk_pattern_channel_scope_channel
+                FOREIGN KEY (thread_id, twitch_channel_id)
+                REFERENCES channel(thread_id, twitch_channel_id)
+                ON DELETE CASCADE
+                """
+            )
+            cursor.execute(
+                """
+                ALTER TABLE pattern_user_scope
+                DROP CONSTRAINT IF EXISTS fk_pattern_user_scope_tracked_user
+                """
+            )
+            cursor.execute(
+                """
+                ALTER TABLE pattern_user_scope
+                ADD CONSTRAINT fk_pattern_user_scope_tracked_user
+                FOREIGN KEY (thread_id, twitch_user_id)
+                REFERENCES tracked_user(thread_id, twitch_user_id)
+                ON DELETE CASCADE
+                """
+            )
+            cursor.execute(
+                """
                 DO $$
                 BEGIN
                     IF NOT EXISTS (

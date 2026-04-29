@@ -62,6 +62,10 @@
         "title": "Joined",
         "message": "Heyy <a:hey:1497685102204031067> Thank you {USER} for inviting me <:_33:1490384461290803430>"
       },
+      "missing_channel_access": {
+        "title": "Missing Channel Access",
+        "message": "I can't access this channel right now <a:sadcat:1497721262645051392>\nIf this is a private thread, mention me with `@` and try again <a:yes:1497686393369919559>"
+      },
       "leave_denied": {
         "title": "Permission Denied",
         "message": "You do not have permission to make me leave <a:Tssk:1497685026945630208>\nWhy do you want me to leave? <a:sadcat:1497721262645051392>"

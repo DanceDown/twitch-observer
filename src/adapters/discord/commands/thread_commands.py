@@ -8,7 +8,7 @@ from contextlib import suppress
 import discord
 
 from src.events.event_bus import EventBus
-from src.events.event_types import DiscordResultStyle
+from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 
 from ..dispatch import dispatch_thread_command
@@ -31,6 +31,9 @@ def register_thread_commands(
     async def join(interaction: discord.Interaction) -> None:
         if interaction.channel_id is None:
             await send_initial_result(interaction, command_unavailable_result())
+            return
+        if not _can_send_public_result(interaction):
+            await send_initial_result(interaction, _missing_channel_access_result(localizer, interaction))
             return
 
         logger.debug(
@@ -146,3 +149,38 @@ async def _handle_state_command(
         clear_color=clear,
     )
     await send_initial_result(interaction, result)
+
+
+def _can_send_public_result(interaction: discord.Interaction) -> bool:
+    """Return whether the bot can post a public embed in the interaction context."""
+    if interaction.guild is None:
+        return True
+    permissions = interaction.app_permissions
+    if permissions is None:
+        return True
+    if not permissions.view_channel or not permissions.embed_links:
+        return False
+    if isinstance(interaction.channel, discord.Thread):
+        return permissions.send_messages_in_threads
+    return permissions.send_messages
+
+
+def _missing_channel_access_result(localizer: Localizer, interaction: discord.Interaction) -> DiscordCommandResult:
+    """Build the localized ephemeral result used when the bot cannot post in the target channel."""
+    language = _interaction_language(localizer, interaction)
+    return localizer.result(
+        "results.thread.missing_channel_access",
+        language=language,
+        style=DiscordResultStyle.ERROR,
+        ephemeral=True,
+    )
+
+
+def _interaction_language(localizer: Localizer, interaction: discord.Interaction) -> str:
+    """Best-effort language selection before a thread-specific language exists."""
+    locale_value = str(interaction.locale).lower()
+    if locale_value.startswith("de"):
+        return "german"
+    if locale_value.startswith("en"):
+        return "english"
+    return localizer.default_language
