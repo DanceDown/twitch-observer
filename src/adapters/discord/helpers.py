@@ -43,14 +43,26 @@ async def send_initial_result(interaction: discord.Interaction, result: DiscordC
     public_embed = build_public_result_embed(result, interaction.user.mention)
     if interaction.response.is_done():
         if interaction.channel is not None:
-            await interaction.channel.send(embed=public_embed)
+            try:
+                await interaction.channel.send(embed=public_embed)
+            except discord.Forbidden:
+                fallback_embed = build_result_embed(_missing_channel_access_result(interaction))
+                with suppress(discord.HTTPException):
+                    await interaction.edit_original_response(embed=fallback_embed)
+                return
         with suppress(discord.HTTPException):
             await interaction.delete_original_response()
         return
 
     await interaction.response.defer(ephemeral=True)
     if interaction.channel is not None:
-        await interaction.channel.send(embed=public_embed)
+        try:
+            await interaction.channel.send(embed=public_embed)
+        except discord.Forbidden:
+            fallback_embed = build_result_embed(_missing_channel_access_result(interaction))
+            with suppress(discord.HTTPException):
+                await interaction.edit_original_response(embed=fallback_embed)
+            return
     with suppress(discord.HTTPException):
         await interaction.delete_original_response()
 
@@ -156,4 +168,22 @@ def split_csv_values(value: str | None) -> tuple[str, ...]:
         if cleaned and cleaned not in unique_values:
             unique_values.append(cleaned)
     return tuple(unique_values)
+
+
+def _missing_channel_access_result(interaction: discord.Interaction) -> DiscordCommandResult:
+    """Build one localized channel-access error result for public-send failures."""
+    localizer = Localizer.from_directory()
+    locale_value = str(interaction.locale).lower()
+    if locale_value.startswith("de"):
+        language = "german"
+    elif locale_value.startswith("en"):
+        language = "english"
+    else:
+        language = localizer.default_language
+    return localizer.result(
+        "results.thread.missing_channel_access",
+        language=language,
+        style=DiscordResultStyle.ERROR,
+        ephemeral=True,
+    )
 

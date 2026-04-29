@@ -6,6 +6,7 @@ import logging
 from contextlib import suppress
 
 import discord
+from discord import ChannelType
 
 from src.events.event_bus import EventBus
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
@@ -31,6 +32,8 @@ def register_thread_commands(
     async def join(interaction: discord.Interaction) -> None:
         if interaction.channel_id is None:
             await send_initial_result(interaction, command_unavailable_result())
+            return
+        if not await _ensure_thread_membership_for_join(interaction, localizer):
             return
         if not _can_send_public_result(interaction):
             await send_initial_result(interaction, _missing_channel_access_result(localizer, interaction))
@@ -160,7 +163,9 @@ def _can_send_public_result(interaction: discord.Interaction) -> bool:
         return True
     if not permissions.view_channel or not permissions.embed_links:
         return False
-    if isinstance(interaction.channel, discord.Thread):
+    thread_channel_types = {ChannelType.public_thread, ChannelType.private_thread, ChannelType.news_thread}
+    channel_type = interaction.channel.type if interaction.channel is not None else None
+    if channel_type in thread_channel_types:
         return permissions.send_messages_in_threads
     return permissions.send_messages
 
@@ -184,3 +189,33 @@ def _interaction_language(localizer: Localizer, interaction: discord.Interaction
     if locale_value.startswith("en"):
         return "english"
     return localizer.default_language
+
+
+async def _ensure_thread_membership_for_join(interaction: discord.Interaction, localizer: Localizer) -> bool:
+    """Ensure the bot can join thread contexts before creating any persisted thread state."""
+    channel = interaction.channel
+    if channel is None:
+        await send_initial_result(interaction, command_unavailable_result())
+        return False
+    thread_channel_types = {ChannelType.public_thread, ChannelType.private_thread, ChannelType.news_thread}
+    if channel.type not in thread_channel_types:
+        return True
+
+    thread: discord.Thread | None = channel if isinstance(channel, discord.Thread) else None
+    if thread is None:
+        try:
+            fetched_channel = await interaction.client.fetch_channel(interaction.channel_id)
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+            await send_initial_result(interaction, _missing_channel_access_result(localizer, interaction))
+            return False
+        if not isinstance(fetched_channel, discord.Thread):
+            await send_initial_result(interaction, _missing_channel_access_result(localizer, interaction))
+            return False
+        thread = fetched_channel
+
+    try:
+        await thread.join()
+    except (discord.Forbidden, discord.HTTPException):
+        await send_initial_result(interaction, _missing_channel_access_result(localizer, interaction))
+        return False
+    return True
