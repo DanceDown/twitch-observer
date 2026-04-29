@@ -83,11 +83,13 @@ def build_chat_message_event(message: IRCMessage) -> TwitchChatMessageEvent | No
     if timestamp_ms and timestamp_ms.isdigit():
         sent_at = datetime.fromtimestamp(int(timestamp_ms) / 1000, tz=UTC)
 
+    normalized_content = _normalize_irc_chat_content(message.trailing)
+
     return TwitchChatMessageEvent(
         channel_login=channel_login,
         author_login=author_login,
         author_display_name=display_name,
-        content=message.trailing,
+        content=normalized_content,
         message_id=message.tags.get("id"),
         broadcaster_id=message.tags.get("room-id"),
         author_id=message.tags.get("user-id"),
@@ -269,4 +271,11 @@ def _parse_prefix_nick(prefix: str | None) -> str:
     if not prefix:
         return ""
     return prefix.split("!", 1)[0]
+
+
+def _normalize_irc_chat_content(content: str) -> str:
+    """Normalize IRC chat payloads such as CTCP ACTION into plain chat text."""
+    if content.startswith("\x01ACTION ") and content.endswith("\x01"):
+        return content[8:-1]
+    return content
 

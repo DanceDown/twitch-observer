@@ -45,6 +45,18 @@ def test_build_chat_message_event_maps_irc_privmsg_to_domain_event() -> None:
     assert event.author_id == "777"
 
 
+def test_build_chat_message_event_normalizes_ctcp_action_payload() -> None:
+    raw_line = (
+        "@display-name=TestUser;color=#1E90FF;id=abc123;room-id=999;user-id=777;tmi-sent-ts=1710000000000 "
+        ":testuser!testuser@testuser.tmi.twitch.tv PRIVMSG #example :\x01ACTION waves hello\x01"
+    )
+
+    event = build_chat_message_event(parse_irc_message(raw_line))
+
+    assert event is not None
+    assert event.content == "waves hello"
+
+
 @pytest.mark.asyncio
 async def test_anonymous_adapter_emits_bus_event_for_privmsg() -> None:
     bus = EventBus()
