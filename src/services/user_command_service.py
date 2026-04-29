@@ -158,5 +158,6 @@ class UserCommandService:
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
             DISPLAY_NAME=twitch_user.display_name,
+            LOGIN=twitch_user.login,
         )
 

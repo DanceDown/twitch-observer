@@ -122,11 +122,11 @@
       },
       "already_added": {
         "title": "Bereits hinzugefügt",
-        "message": "Ich beobachte den Twitch-Kanal von `{DISPLAY_NAME}` bereits <:Binoculars:1497727665283662077>"
+        "message": "Ich beobachte den Twitch-Kanal von [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) bereits <:Binoculars:1497727665283662077>"
       },
       "added": {
         "title": "Kanal hinzugefügt",
-        "message": "{USER} hat mir gesagt, ich soll [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) beobachten <:Binoculars:1497727665283662077>"
+        "message": "{USER} hat mir gesagt, ich soll den Twitch-Kanal von [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) beobachten <:Binoculars:1497727665283662077>"
       },
       "not_found": {
         "title": "Nicht gefunden",
@@ -146,11 +146,11 @@
       },
       "in_use": {
         "title": "Kanal wird verwendet",
-        "message": "Der Twitch-Kanal von `{DISPLAY_NAME}` wird noch von einem oder mehreren Pings referenziert <:oopsie:1497720439810687006>"
+        "message": "Der Twitch-Kanal von [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) wird noch von einem oder mehreren Pings referenziert <:oopsie:1497720439810687006>"
       },
       "removed": {
         "title": "Kanal entfernt",
-        "message": "{USER} hat mir gesagt, ich soll den Twitch-Kanal von `{DISPLAY_NAME}` nicht mehr beobachten <:ApuApproved:1497724288256446465>"
+        "message": "{USER} hat mir gesagt, ich soll den Twitch-Kanal von [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) nicht mehr beobachten <:ApuApproved:1497724288256446465>"
       }
     },
     "user": {
@@ -180,7 +180,7 @@
       },
       "removed": {
         "title": "Nutzer entfernt",
-        "message": "{USER} hat mir gesagt, ich soll {DISPLAY_NAME} vergessen <:ApuApproved:1497724288256446465>"
+        "message": "{USER} hat mir gesagt, ich soll [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) vergessen <:ApuApproved:1497724288256446465>"
       }
     },
     "show": {
