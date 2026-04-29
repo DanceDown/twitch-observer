@@ -126,7 +126,7 @@
       },
       "added": {
         "title": "Channel Added",
-        "message": "{USER} told me to observe `{DISPLAY_NAME}`s Twitch channel <:Binoculars:1497727665283662077>"
+        "message": "{USER} told me to observe [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN})s Twitch channel <:Binoculars:1497727665283662077>"
       },
       "not_found": {
         "title": "Not Found",
