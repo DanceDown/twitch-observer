@@ -190,6 +190,10 @@ class TwitchUserDirectoryService:
             reply_parent_message_id=reply_parent_message_id,
         )
 
+    async def get_live_user_ids(self, user_ids: list[str]) -> set[str]:
+        """Pass through live-state stream lookups used by the background monitor."""
+        return await self.twitch_api.get_live_user_ids(user_ids)
+
     def _get_or_load_record_by_login(self, login: str) -> TwitchUserCacheRecord | None:
         cached = self._get_record_from_memory_by_login(login)
         if cached is not None:

@@ -61,7 +61,10 @@ class TwitchLiveMonitorService:
 
     async def _run_loop(self) -> None:
         if self.refresh_on_startup:
-            await self.sync_once(notify_transitions=False)
+            try:
+                await self.sync_once(notify_transitions=False)
+            except Exception:
+                logger.exception("Live monitor startup sync failed.")
 
         while not self._stop_event.is_set():
             try:
@@ -73,7 +76,10 @@ class TwitchLiveMonitorService:
             if self._stop_event.is_set():
                 break
 
-            await self.sync_once(notify_transitions=True)
+            try:
+                await self.sync_once(notify_transitions=True)
+            except Exception:
+                logger.exception("Live monitor periodic sync failed.")
 
     async def sync_once(self, *, notify_transitions: bool) -> None:
         """Refresh the live state for all tracked channels."""

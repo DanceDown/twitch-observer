@@ -70,8 +70,10 @@ class InMemoryTwitchUserCacheRepository(TwitchUserCacheRepository):
 class FakeTwitchAPI:
     users_by_login: dict[str, TwitchUser] = field(default_factory=dict)
     users_by_id: dict[str, TwitchUser] = field(default_factory=dict)
+    live_user_ids: set[str] = field(default_factory=set)
     login_requests: list[str] = field(default_factory=list)
     id_requests: list[str] = field(default_factory=list)
+    live_requests: list[list[str]] = field(default_factory=list)
 
     async def start(self) -> None:
         return None
@@ -89,8 +91,9 @@ class FakeTwitchAPI:
         self.id_requests.append(normalized)
         return self.users_by_id[normalized]
 
-    async def is_user_live(self, user_id: str) -> bool:
-        return False
+    async def get_live_user_ids(self, user_ids: list[str]) -> set[str]:
+        self.live_requests.append(list(user_ids))
+        return {user_id for user_id in user_ids if user_id in self.live_user_ids}
 
     async def validate_user_access_token(self, access_token: str):
         raise NotImplementedError
@@ -146,6 +149,24 @@ async def test_directory_uses_persistent_cache_before_hitting_helix() -> None:
     assert by_id.login == "example"
     assert twitch_api.login_requests == ["example"]
     assert twitch_api.id_requests == []
+
+
+@pytest.mark.asyncio
+async def test_directory_proxies_live_user_id_lookup_for_live_monitor() -> None:
+    repository = InMemoryTwitchUserCacheRepository()
+    twitch_api = FakeTwitchAPI(live_user_ids={"42"})
+    directory = TwitchUserDirectoryService(
+        twitch_api=twitch_api,
+        repository=repository,
+        memory_cache_size=2048,
+        api_refresh_interval_seconds=43200,
+        channel_api_refresh_interval_seconds=43200,
+    )
+
+    result = await directory.get_live_user_ids(["42", "7"])
+
+    assert result == {"42"}
+    assert twitch_api.live_requests == [["42", "7"]]
 
 
 @pytest.mark.asyncio
