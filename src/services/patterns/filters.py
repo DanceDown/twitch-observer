@@ -13,7 +13,7 @@ from src.database.connection import (
 )
 from src.events.event_types import DiscordPatternEditRequestedEvent, DiscordPatternRequestedEvent
 from src.localization import Localizer
-from src.utils.discord_embeds import format_twitch_link
+from src.utils.discord_embeds import format_twitch_code_link
 
 
 @dataclass(slots=True)
@@ -188,7 +188,7 @@ class PatternFilterResolver:
         for twitch_user_id in twitch_user_ids:
             user = await self._resolve_user_by_id(twitch_user_id)
             links.append(
-                format_twitch_link(
+                format_twitch_code_link(
                     display_name=user.display_name,
                     login=user.login,
                 )
