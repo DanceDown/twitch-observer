@@ -170,20 +170,20 @@ class ShowCommandService:
             twitch_user = await self._resolve_channel_by_id(channel.twitch_channel_id)
             line = f"- {format_twitch_code_link(display_name=twitch_user.display_name, login=twitch_user.login)}"
             if channel.color:
-                line += "\n  " + self._localizer.text(
+                line += "\n  - " + self._localizer.text(
                     "show.channel.custom_color",
                     language=language,
                     COLOR=channel.color,
                 )
             if channel.is_live is not None:
-                line += "\n  " + self._localizer.text(
+                line += "\n  - " + self._localizer.text(
                     "show.channel.live_state",
                     language=language,
                     STATE="online" if channel.is_live else "offline",
                 )
             configured_states = event_state_by_channel_id.get(channel.twitch_channel_id, [])
             if configured_states:
-                line += "\n  " + self._localizer.text(
+                line += "\n  - " + self._localizer.text(
                     "show.channel.notifications",
                     language=language,
                     STATES=", ".join(configured_states),
@@ -272,7 +272,7 @@ class ShowCommandService:
 
     def _render_permissions_section(self, thread: ThreadRecord) -> str:
         language = self._localizer.language_for_thread(thread)
-        rows = [f"- <@{thread.owner_id}>\n  {self._localizer.text('show.permission.owner', language=language)}"]
+        rows = [f"- <@{thread.owner_id}>\n  - {self._localizer.text('show.permission.owner', language=language)}"]
         if self.permission_repository is None:
             return f"**{self._localizer.text('show.sections.permissions', language=language)}**\n" + "\n".join(rows)
         grants = self.permission_repository.list_for_thread(thread_id=thread.thread_id)
@@ -295,7 +295,7 @@ class ShowCommandService:
                 TYPE="Regex" if pattern.is_regex else "Ping",
                 ID=pattern.p_index,
             ),
-            "  "
+            "  - "
             + self._localizer.text(
                 "show.pattern.text",
                 language=language,
@@ -303,7 +303,7 @@ class ShowCommandService:
             ),
         ]
         details = await self._describe_pattern_details(pattern, language=language)
-        parts.extend(f"  {detail}" for detail in details)
+        parts.extend(f"  - {detail}" for detail in details)
         return "\n".join(parts)
 
     async def _format_auto_reply_row(
@@ -317,8 +317,8 @@ class ShowCommandService:
         details = [self._localizer.text("show.reply.line", language=language, ID=pattern.p_index)]
         trigger = self._format_show_code_unescaped(pattern.regex)
         response = self._format_show_code_unescaped(reply.reply_message)
-        details.append("  " + self._localizer.text("show.reply.trigger", language=language, TEXT=trigger))
-        details.append("  " + self._localizer.text("show.reply.reply", language=language, TEXT=response))
+        details.append("  - " + self._localizer.text("show.reply.trigger", language=language, TEXT=trigger))
+        details.append("  - " + self._localizer.text("show.reply.reply", language=language, TEXT=response))
         return "\n".join(details)
 
     async def _format_adapter_event_action_row(
@@ -333,7 +333,7 @@ class ShowCommandService:
         state_label = STREAM_EVENT_KEY_TO_STATE.get(event.event_key, event.event_key)
         details = [self._localizer.text("show.event_reply.line", language=language, STATE=state_label)]
         details.append(
-            "  "
+            "  - "
             + self._localizer.text(
                 "show.event_reply.channel",
                 language=language,
@@ -341,9 +341,9 @@ class ShowCommandService:
                 LOGIN=channel_user.login,
             )
         )
-        details.append("  " + self._localizer.text("show.event_reply.reply", language=language, TEXT=response))
+        details.append("  - " + self._localizer.text("show.event_reply.reply", language=language, TEXT=response))
         if action.disabled:
-            details.append("  " + self._localizer.text("show.event_reply.disabled", language=language))
+            details.append("  - " + self._localizer.text("show.event_reply.disabled", language=language))
         return "\n".join(details)
 
     async def _describe_pattern_details(self, pattern: PatternRecord, *, language: str) -> list[str]:
