@@ -132,6 +132,12 @@ class ChannelCommandService:
                     DISPLAY_NAME=twitch_user.display_name,
                     LOGIN=twitch_user.login,
                 )
+            is_first_subscription = self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id) == 0
+            if is_first_subscription:
+                ensure_connected = getattr(self.irc_manager, "ensure_connected", None)
+                if callable(ensure_connected):
+                    await ensure_connected()
+                await self.irc_manager.join_channel(twitch_user.login)
             self.channel_repository.add_channel(thread.thread_id, twitch_user.user_id)
             logger.debug(
                 "Added tracked channel thread_id=%s twitch_channel_id=%s twitch_login=%s",
@@ -139,8 +145,6 @@ class ChannelCommandService:
                 twitch_user.user_id,
                 twitch_user.login,
             )
-            if self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id) == 1:
-                await self.irc_manager.join_channel(twitch_user.login)
             await self.event_bus.publish(
                 EventType.TWITCH_TRACKED_CHANNELS_CHANGED,
                 TwitchTrackedChannelsChangedEvent(reason="channel_added"),
@@ -237,6 +241,12 @@ class ChannelCommandService:
                 LOGIN=twitch_user.login,
             )
 
+        is_last_subscription = self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id) == 1
+        if is_last_subscription:
+            ensure_connected = getattr(self.irc_manager, "ensure_connected", None)
+            if callable(ensure_connected):
+                await ensure_connected()
+            await self.irc_manager.leave_channel(twitch_user.login)
         self.channel_repository.remove_channel(thread.thread_id, twitch_user.user_id)
         logger.debug(
             "Removed tracked channel thread_id=%s twitch_channel_id=%s twitch_login=%s",
@@ -244,8 +254,6 @@ class ChannelCommandService:
             twitch_user.user_id,
             twitch_user.login,
         )
-        if self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id) == 0:
-            await self.irc_manager.leave_channel(twitch_user.login)
         await self.event_bus.publish(
             EventType.TWITCH_TRACKED_CHANNELS_CHANGED,
             TwitchTrackedChannelsChangedEvent(reason="channel_removed"),

@@ -152,12 +152,32 @@ class FakeTwitchAPI:
 class FakeIRCManager(IRCChannelManager):
     joined: list[str] = field(default_factory=list)
     left: list[str] = field(default_factory=list)
+    ensure_connected_calls: int = 0
+
+    async def ensure_connected(self) -> None:
+        self.ensure_connected_calls += 1
 
     async def join_channel(self, channel_login: str) -> None:
         self.joined.append(channel_login)
 
     async def leave_channel(self, channel_login: str) -> None:
         self.left.append(channel_login)
+
+
+@dataclass
+class FailingIRCManager(FakeIRCManager):
+    fail_on_join: bool = False
+    fail_on_leave: bool = False
+
+    async def join_channel(self, channel_login: str) -> None:
+        if self.fail_on_join:
+            raise ConnectionError("Connection Lost")
+        await super().join_channel(channel_login)
+
+    async def leave_channel(self, channel_login: str) -> None:
+        if self.fail_on_leave:
+            raise ConnectionError("Connection Lost")
+        await super().leave_channel(channel_login)
 
 
 @dataclass
@@ -269,6 +289,7 @@ async def test_channel_command_removes_existing_channel_and_parts_last_irc_subsc
     assert result.ephemeral is False
     assert result.style == DiscordResultStyle.SUCCESS
     assert irc_manager.left == ["example"]
+    assert irc_manager.ensure_connected_calls == 1
 
 
 @pytest.mark.asyncio
@@ -427,6 +448,65 @@ async def test_channel_command_rejects_remove_when_scope_still_references_channe
     assert result.style == DiscordResultStyle.ERROR
     assert channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, "42") is not None
     assert irc_manager.left == []
+
+
+@pytest.mark.asyncio
+async def test_channel_command_does_not_persist_add_when_irc_join_fails() -> None:
+    event_bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread_repository.create(owner_id=200, discord_channel_id=100)
+    channel_repository = InMemoryChannelRepository()
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
+    irc_manager = FailingIRCManager(fail_on_join=True)
+    ChannelCommandService(
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        pattern_repository=FakePatternRepository(),
+        twitch_api=twitch_api,  # type: ignore[arg-type]
+        irc_manager=irc_manager,
+    )
+
+    result = await dispatch_channel_command(
+        event_bus,
+        discord_channel_id=100,
+        requester_id=200,
+        action="add",
+        twitch_channel_login="example",
+    )
+
+    assert result.style == DiscordResultStyle.ERROR
+    assert channel_repository.get_by_thread_and_twitch_channel(1, "42") is None
+
+
+@pytest.mark.asyncio
+async def test_channel_command_does_not_remove_last_channel_when_irc_part_fails() -> None:
+    event_bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    channel_repository = InMemoryChannelRepository()
+    channel_repository.add_channel(thread.thread_id, "42")
+    twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
+    irc_manager = FailingIRCManager(fail_on_leave=True)
+    ChannelCommandService(
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        pattern_repository=FakePatternRepository(),
+        twitch_api=twitch_api,  # type: ignore[arg-type]
+        irc_manager=irc_manager,
+    )
+
+    result = await dispatch_channel_command(
+        event_bus,
+        discord_channel_id=100,
+        requester_id=200,
+        action="remove",
+        twitch_channel_login="example",
+    )
+
+    assert result.style == DiscordResultStyle.ERROR
+    assert channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, "42") is not None
 
 
 @pytest.mark.asyncio

@@ -35,7 +35,7 @@
     },
     "regex_error": {
       "title": "Regex-Fehler",
-      "message": "Ungültige Regex: {DETAIL} <a:OhNo:1497685055948980306>\n\nVielleicht helfen vorgefertigte Patterns weiter (z. B. von [howtoregex.com](https://howtoregex.com/patterns/python))"
+      "message": "{DETAIL} <a:OhNo:1497685055948980306>\n\nVielleicht helfen vorgefertigte Patterns weiter (z. B. von [howtoregex.com](https://howtoregex.com/patterns/python))"
     },
     "not_joined": {
       "title": "Nicht beigetreten",
@@ -68,7 +68,7 @@
       },
       "leave_denied": {
         "title": "Keine Berechtigung",
-        "message": "Du hast keine Berechtigung, mich gehen zu lassen <a:Tssk:1497685026945630208>\nWarum willst du, dass ich gehe? <a:sadcat:1497721262645051392>"
+        "message": "Du hast keine Berechtigung, mich zu kicken <a:Tssk:1497685026945630208>\nWarum willst du, dass ich gehe? <a:sadcat:1497721262645051392>"
       },
       "left": {
         "title": "Verlassen",
@@ -130,15 +130,15 @@
       },
       "not_found": {
         "title": "Nicht gefunden",
-        "message": "Ich beobachte `{DISPLAY_NAME}` im Moment nicht <:oopsie:1497720439810687006>"
+        "message": "Ich beobachte [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) im Moment nicht <:oopsie:1497720439810687006>"
       },
       "color_cleared": {
         "title": "Kanalfarbe entfernt",
-        "message": "{USER} hat die Farbe für den Twitch-Kanal von `{DISPLAY_NAME}` entfernt <:ApuApproved:1497724288256446465>"
+        "message": "{USER} hat die Farbe für den Twitch-Kanal von [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) entfernt <:ApuApproved:1497724288256446465>"
       },
       "color_updated": {
         "title": "Kanalfarbe aktualisiert",
-        "message": "{USER} hat die Farbe für den Twitch-Kanal von `{DISPLAY_NAME}` auf `{COLOR}` geändert <:WOWERS:1497724770848997406>"
+        "message": "{USER} hat die Farbe für den Twitch-Kanal von [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) auf `{COLOR}` geändert <:WOWERS:1497724770848997406>"
       },
       "unsupported_action": {
         "title": "Validierungsfehler",
@@ -160,7 +160,7 @@
       },
       "already_added": {
         "title": "Bereits hinzugefügt",
-        "message": "Ich kenne {DISPLAY_NAME} bereits <:oopsie:1497720439810687006>"
+        "message": "Ich kenne [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) bereits <:oopsie:1497720439810687006>"
       },
       "added": {
         "title": "Nutzer hinzugefügt",
@@ -172,11 +172,11 @@
       },
       "not_found": {
         "title": "Nicht gefunden",
-        "message": "Ich weiß nicht, wer {DISPLAY_NAME} ist <:oopsie:1497720439810687006>"
+        "message": "Ich weiß nicht, wer [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) ist <:oopsie:1497720439810687006>"
       },
       "in_use": {
         "title": "Nutzer wird verwendet",
-        "message": "{DISPLAY_NAME} wird noch von einem oder mehreren Pings referenziert <:oopsie:1497720439810687006>"
+        "message": "[`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) wird noch von einem oder mehreren Pings referenziert <:oopsie:1497720439810687006>"
       },
       "removed": {
         "title": "Nutzer entfernt",
@@ -209,7 +209,7 @@
       },
       "already_linked": {
         "title": "Konto bereits verknüpft",
-        "message": "`{DISPLAY_NAME}` ist hier schon verbunden. Trenne es zuerst, bevor du ein neues Twitch-Konto verbindest <:oopsie:1497720439810687006>"
+        "message": "[`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) ist hier schon verbunden. Trenne es zuerst, bevor du ein neues Twitch-Konto verbindest <:oopsie:1497720439810687006>"
       },
       "login_pending": {
         "title": "Login wartet schon",
@@ -225,7 +225,7 @@
       },
       "unlinked": {
         "title": "Twitch-Konto getrennt",
-        "message": "{USER} hat `{DISPLAY_NAME}` getrennt. Auto-Antworten bleiben gespeichert und funktionieren wieder, sobald ein Konto verbunden ist <:ApuApproved:1497724288256446465>"
+        "message": "{USER} hat [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) getrennt. Auto-Antworten bleiben gespeichert und funktionieren wieder, sobald ein Konto verbunden ist <:ApuApproved:1497724288256446465>"
       },
       "show_moved": {
         "title": "Anzeige verschoben",
@@ -245,7 +245,7 @@
       },
       "linked": {
         "title": "Twitch-Konto verbunden",
-        "message": "{USER} hat `{DISPLAY_NAME}` verbunden. Auto-Antworten können jetzt als dieses Konto schreiben <a:yo:1497686448717959369>"
+        "message": "{USER} hat [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) verbunden. Auto-Antworten können jetzt als dieses Konto schreiben <a:yo:1497686448717959369>"
       }
     },
     "permission": {
@@ -260,24 +260,24 @@
       },
       "cleared": {
         "title": "Berechtigungen gelöscht",
-        "message": "{USER} hat alle extra Berechtigungen von {TARGET} entfernt <:ApuApproved:1497724288256446465>"
+        "message": "{USER} hat alle Berechtigungen von {TARGET} entfernt <:ApuApproved:1497724288256446465>"
       },
       "none_found": {
         "title": "Keine Berechtigungen gefunden",
-        "message": "{TARGET} hat hier keine extra Berechtigungen <:ShrugMan:1497685241962430717>"
+        "message": "{TARGET} hat hier keine Berechtigungen <:ShrugMan:1497685241962430717>"
       },
       "empty_selection": "Wähle zuerst mindestens eine Berechtigung aus <:oopsie:1497720439810687006>",
       "granted": {
         "title": "Berechtigungen vergeben",
-        "message": "{USER} hat {TARGET} diese Berechtigungen gegeben:\n{PERMISSIONS} <a:yes:1497686393369919559>"
+        "message": "{USER} hat {TARGET} diese Berechtigungen gegeben <a:yes:1497686393369919559>\n{PERMISSIONS}"
       },
       "not_granted": {
         "title": "Nicht vergeben",
-        "message": "{TARGET} hat diese Berechtigungen hier nicht explizit:\n{PERMISSIONS} <:ShrugMan:1497685241962430717>"
+        "message": "{TARGET} hat diese Berechtigungen hier nicht explizit <:ShrugMan:1497685241962430717>\n{PERMISSIONS}"
       },
       "revoked": {
         "title": "Berechtigungen entzogen",
-        "message": "{USER} hat {TARGET} diese Berechtigungen entzogen:\n{PERMISSIONS} <a:yes:1497686393369919559>"
+        "message": "{USER} hat {TARGET} diese Berechtigungen entzogen <a:yes:1497686393369919559>\n{PERMISSIONS}"
       },
       "unsupported_action": "Diese Berechtigungs-Aktion kenne ich nicht <a:peepoConfused:1497729266266275840>"
     },
@@ -310,7 +310,7 @@
       },
       "added_pattern": {
         "title": "Auto-Antwort hinzugefügt",
-        "message": "{USER} hat eine Auto-Antwort an Ping `{ID}` gehängt.\nModus: `{MODE}`\nNachricht: {MESSAGE} <a:yo:1497686448717959369>"
+        "message": "{USER} hat eine Auto-Antwort an Ping `{ID}` gehängt <a:yo:1497686448717959369>\nModus: `{MODE}`\nNachricht: {MESSAGE} "
       },
       "none_configured": {
         "title": "Keine Auto-Antwort",
@@ -322,11 +322,11 @@
       },
       "already_disabled": {
         "title": "Schon deaktiviert",
-        "message": "Diese Auto-Antwort schläft bereits <:oopsie:1497720439810687006>"
+        "message": "Diese Auto-Antwort ist bereits deaktiviert <:oopsie:1497720439810687006>"
       },
       "already_enabled": {
         "title": "Schon aktiv",
-        "message": "Diese Auto-Antwort ist bereits wach <:oopsie:1497720439810687006>"
+        "message": "Diese Auto-Antwort ist bereits aktiv <:oopsie:1497720439810687006>"
       },
       "disabled_pattern": {
         "title": "Auto-Antwort deaktiviert",
@@ -345,7 +345,7 @@
       "unsupported_event": "Nur Live- und Offline-Events von beobachteten Twitch-Kanälen passen hier <:oopsie:1497720439810687006>",
       "added_event": {
         "title": "Auto-Antwort hinzugefügt",
-        "message": "{USER} hat eine Auto-Antwort für `{CHANNEL}` bei `{STATE}` hinzugefügt.\nNachricht: {MESSAGE} <a:yo:1497686448717959369>"
+        "message": "{USER} hat eine Auto-Antwort für `{CHANNEL}` bei `{STATE}` hinzugefügt <a:yo:1497686448717959369>\nNachricht: {MESSAGE} "
       },
       "none_configured_event": {
         "title": "Keine Auto-Antwort",
@@ -382,35 +382,35 @@
       },
       "notification_added": {
         "title": "Benachrichtigung hinzugefügt",
-        "message": "{USER} hat den `{STATE}`-Ping für `{CHANNEL}` hinzugefügt <:Binoculars:1497727665283662077>"
+        "message": "{USER} hat den `{STATE}`-Ping für [`{CHANNEL}`](https://www.twitch.tv/{LOGIN}) hinzugefügt <:Binoculars:1497727665283662077>"
       },
       "notification_removed": {
         "title": "Benachrichtigung entfernt",
-        "message": "{USER} hat den `{STATE}`-Ping für `{CHANNEL}` entfernt <:ApuApproved:1497724288256446465>"
+        "message": "{USER} hat den `{STATE}`-Ping für [`{CHANNEL}`](https://www.twitch.tv/{LOGIN}) entfernt <:ApuApproved:1497724288256446465>"
       },
       "notification_disabled": {
         "title": "Benachrichtigung deaktiviert",
-        "message": "{USER} hat den `{STATE}`-Ping für `{CHANNEL}` deaktiviert <:ApuApproved:1497724288256446465>"
+        "message": "{USER} hat den `{STATE}`-Ping für [`{CHANNEL}`](https://www.twitch.tv/{LOGIN}) deaktiviert <:ApuApproved:1497724288256446465>"
       },
       "notification_enabled": {
         "title": "Benachrichtigung aktiviert",
-        "message": "{USER} hat den `{STATE}`-Ping für `{CHANNEL}` aktiviert <a:yes:1497686393369919559>"
+        "message": "{USER} hat den `{STATE}`-Ping für [`{CHANNEL}`](https://www.twitch.tv/{LOGIN}) aktiviert <a:yes:1497686393369919559>"
       },
       "already_configured": {
         "title": "Schon eingerichtet",
-        "message": "Der `{STATE}`-Ping für `{CHANNEL}` ist schon eingerichtet <:oopsie:1497720439810687006>"
+        "message": "Der `{STATE}`-Ping für [`{CHANNEL}`](https://www.twitch.tv/{LOGIN}) ist schon eingerichtet <:oopsie:1497720439810687006>"
       },
       "none_configured": {
         "title": "Nicht eingerichtet",
-        "message": "Für `{CHANNEL}` gibt es noch keinen `{STATE}`-Ping <:oopsie:1497720439810687006>"
+        "message": "Für [`{CHANNEL}`](https://www.twitch.tv/{LOGIN}) gibt es noch keinen `{STATE}`-Ping <:oopsie:1497720439810687006>"
       },
       "already_disabled": {
         "title": "Bereits deaktiviert",
-        "message": "Der `{STATE}`-Ping für `{CHANNEL}` ist schon deaktiviert <a:Lurk:1497684902135463986>"
+        "message": "Der `{STATE}`-Ping für [`{CHANNEL}`](https://www.twitch.tv/{LOGIN}) ist schon deaktiviert <a:Lurk:1497684902135463986>"
       },
       "already_enabled": {
         "title": "Bereits aktiviert",
-        "message": "Der `{STATE}`-Ping für `{CHANNEL}` ist schon aktiv <a:yes:1497686393369919559>"
+        "message": "Der `{STATE}`-Ping für [`{CHANNEL}`](https://www.twitch.tv/{LOGIN}) ist schon aktiv <a:yes:1497686393369919559>"
       },
       "went_live": {
         "title": "Kanal ist live",
@@ -430,7 +430,7 @@
       "message_too_long": "Die Nachricht ist zu lang für Twitch. Bitte bleib bei höchstens 500 Zeichen <a:OhNo:1497685055948980306>",
       "channel_not_tracked": {
         "title": "Kanal nicht beobachtet",
-        "message": "Ich beobachte `{DISPLAY_NAME}` noch nicht. Füge den Kanal zuerst mit `/channel add` hinzu <:Binoculars:1497727665283662077>"
+        "message": "Ich beobachte [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) noch nicht. Füge den Kanal zuerst mit `/channel add` hinzu <:Binoculars:1497727665283662077>"
       },
       "no_linked_account": {
         "title": "Kein verknüpftes Konto",
@@ -442,11 +442,11 @@
       },
       "reply_sent": {
         "title": "Twitch-Antwort gesendet",
-        "message": "Ich habe im Chat von `{DISPLAY_NAME}` geantwortet <a:yo:1497686448717959369>\nAntwort-Ziel: `{REPLY_TARGET}`\nNachricht: `{MESSAGE}`"
+        "message": "Ich habe im Chat von [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) geantwortet <a:yo:1497686448717959369>\nAntwort-Ziel: `{REPLY_TARGET}`\nNachricht: `{MESSAGE}`"
       },
       "message_sent": {
         "title": "Twitch-Nachricht gesendet",
-        "message": "Ich habe das in den Chat von `{DISPLAY_NAME}` geschickt <a:yo:1497686448717959369>\nNachricht: `{MESSAGE}`"
+        "message": "Ich habe das in den Chat von [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) geschickt <a:yo:1497686448717959369>\nNachricht: `{MESSAGE}`"
       }
     },
     "pattern": {
@@ -474,10 +474,10 @@
       "unsupported_channel_scope": "Dieser Kanalbereich verwirrt mich <a:peepoConfused:1497729266266275840>",
       "unexpected_selected_channels": "Bei allen beobachteten Kanälen brauche ich keine extra Auswahl <:ShrugMan:1497685241962430717>",
       "missing_selected_channels": "Wähle für diesen Bereich zuerst mindestens einen Kanal aus <:Binoculars:1497727665283662077>",
-      "channel_not_tracked": "Ich beobachte `{DISPLAY_NAME}` noch nicht. Füge den Kanal zuerst mit `/channel` hinzu <:Binoculars:1497727665283662077>",
+      "channel_not_tracked": "Ich beobachte [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) noch nicht. Füge den Kanal zuerst mit `/channel` hinzu <:Binoculars:1497727665283662077>",
       "unsupported_user_scope": "Dieser Nutzerbereich verwirrt mich <a:peepoConfused:1497729266266275840>",
       "missing_selected_users": "Wähle für diesen Bereich zuerst mindestens einen Twitch-Nutzer aus <a:peepoSmart:1497731090704498781>",
-      "user_not_tracked": "Ich erinnere mich noch nicht an `{DISPLAY_NAME}`. Füge den Nutzer zuerst mit `/user` hinzu <a:peepoSmart:1497731090704498781>",
+      "user_not_tracked": "Ich erinnere mich noch nicht an [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}). Füge den Nutzer zuerst mit `/user` hinzu <a:peepoSmart:1497731090704498781>",
       "missing_stable_id": "Nutze die ID aus `/show`, damit ich genau weiß, welchen Ping du meinst <a:peepoSmart:1497731090704498781>",
       "already_exists": {
         "title": "Bereits vorhanden",
@@ -1033,7 +1033,7 @@
         "message_placeholder": "Hallo {NAME}!",
         "pattern_label": "Pattern",
         "pattern_description": "Wähle den Ping oder die Regex-Regel aus, die automatisch eine Twitch-Nachricht senden soll.",
-        "pattern_option_description": "ID `{ID}` - {TYPE}",
+        "pattern_option_description": "ID {ID} - {TYPE}",
         "mode_label": "Antwortmodus",
         "mode_message": "Als normale Chat-Nachricht senden",
         "mode_reply": "Auf die gematchte Nachricht antworten"

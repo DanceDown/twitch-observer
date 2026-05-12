@@ -48,6 +48,9 @@ class AppConfig:
     twitch_irc_use_ssl: bool = field(default_factory=lambda: os.getenv("TWITCH_IRC_USE_SSL", "true").lower() in {"1", "true", "yes", "on"})
     twitch_irc_channels: list[str] = field(default_factory=lambda: _split_csv(os.getenv("TWITCH_IRC_CHANNELS", "")))
     twitch_irc_nick_prefix: str = field(default_factory=lambda: os.getenv("TWITCH_IRC_NICK_PREFIX", "justinfan"))
+    twitch_irc_connection_check_interval_seconds: float = field(
+        default_factory=lambda: _get_float("TWITCH_IRC_CONNECTION_CHECK_INTERVAL_SECONDS", "10")
+    )
     twitch_user_cache_memory_size: int = field(default_factory=lambda: _get_int("TWITCH_USER_CACHE_MEMORY_SIZE", "2048"))
     twitch_user_cache_api_refresh_seconds: int = field(default_factory=lambda: _get_int("TWITCH_USER_CACHE_API_REFRESH_SECONDS", "43200"))
     twitch_channel_cache_api_refresh_seconds: int = field(

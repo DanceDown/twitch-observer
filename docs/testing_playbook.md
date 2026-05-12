@@ -188,7 +188,6 @@ Expected message families:
 4. In `/channel`, choose **Color**, set color for `channel_a`.
 5. Clear color for `channel_a`.
 6. Remove `channel_b`.
-7. Remove `channel_b` again.
 
 Expected message families:
 
@@ -197,7 +196,6 @@ Expected message families:
 - `results.channel.color_updated.*`
 - `results.channel.color_cleared.*`
 - `results.channel.removed.*`
-- `results.channel.not_found.*`
 
 Also verify UI-empty states by trying actions in empty configurations:
 
@@ -209,14 +207,12 @@ Also verify UI-empty states by trying actions in empty configurations:
 2. Add `user_a` again.
 3. Add `user_b`.
 4. Remove `user_b`.
-5. Remove `user_b` again.
 
 Expected message families:
 
 - `results.user.added.*`
 - `results.user.already_added.*`
 - `results.user.removed.*`
-- `results.user.not_found.*`
 
 And UI empty state:
 

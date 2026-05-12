@@ -35,7 +35,7 @@
     },
     "regex_error": {
       "title": "Regex Error",
-      "message": "Invalid regex: {DETAIL} <a:OhNo:1497685055948980306>\n\nConsider using prebuilt patterns (e.g. from [howtoregex.com](https://howtoregex.com/patterns/python))"
+      "message": "{DETAIL} <a:OhNo:1497685055948980306>\n\nConsider using prebuilt patterns (e.g. from [howtoregex.com](https://howtoregex.com/patterns/python))"
     },
     "not_joined": {
       "title": "Not Joined",
@@ -68,7 +68,7 @@
       },
       "leave_denied": {
         "title": "Permission Denied",
-        "message": "You do not have permission to make me leave <a:Tssk:1497685026945630208>\nWhy do you want me to leave? <a:sadcat:1497721262645051392>"
+        "message": "You do not have permission to kick me <a:Tssk:1497685026945630208>\nWhy do you want me to leave? <a:sadcat:1497721262645051392>"
       },
       "left": {
         "title": "Left",
@@ -134,11 +134,11 @@
       },
       "color_cleared": {
         "title": "Channel Color Cleared",
-        "message": "{USER} cleared the color for `{DISPLAY_NAME}`s Twitch channel <:ApuApproved:1497724288256446465>"
+        "message": "{USER} cleared the color for [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN})'s Twitch channel <:ApuApproved:1497724288256446465>"
       },
       "color_updated": {
         "title": "Channel Color Updated",
-        "message": "{USER} updated the color for `{DISPLAY_NAME}`s Twitch channel to `{COLOR}` <:WOWERS:1497724770848997406>"
+        "message": "{USER} updated the color for [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN})'s Twitch channel to `{COLOR}` <:WOWERS:1497724770848997406>"
       },
       "unsupported_action": {
         "title": "Validation Error",
@@ -160,7 +160,7 @@
       },
       "already_added": {
         "title": "Already Added",
-        "message": "I already know {DISPLAY_NAME} <:oopsie:1497720439810687006>"
+        "message": "I already know [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) <:oopsie:1497720439810687006>"
       },
       "added": {
         "title": "User Added",
@@ -172,11 +172,11 @@
       },
       "not_found": {
         "title": "Not Found",
-        "message": "I don't know who {DISPLAY_NAME} is <:oopsie:1497720439810687006>"
+        "message": "I don't know who [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) is <:oopsie:1497720439810687006>"
       },
       "in_use": {
         "title": "User In Use",
-        "message": "{DISPLAY_NAME} is still referenced by one or more pings <:oopsie:1497720439810687006>"
+        "message": "[`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) is still referenced by one or more pings <:oopsie:1497720439810687006>"
       },
       "removed": {
         "title": "User Removed",
@@ -209,7 +209,7 @@
       },
       "already_linked": {
         "title": "Account Already Linked",
-        "message": "`{DISPLAY_NAME}` is already connected here. Disconnect it before linking another Twitch account <:oopsie:1497720439810687006>"
+        "message": "[`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) is already connected here. Disconnect it before linking another Twitch account <:oopsie:1497720439810687006>"
       },
       "login_pending": {
         "title": "Login Already Pending",
@@ -225,7 +225,7 @@
       },
       "unlinked": {
         "title": "Twitch Account Unlinked",
-        "message": "{USER} disconnected `{DISPLAY_NAME}`. Auto-replies stay saved and will work again once an account is linked <:ApuApproved:1497724288256446465>"
+        "message": "{USER} disconnected [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}). Auto-replies stay saved and will work again once an account is linked <:ApuApproved:1497724288256446465>"
       },
       "show_moved": {
         "title": "Display Moved",
@@ -245,7 +245,7 @@
       },
       "linked": {
         "title": "Twitch Account Linked",
-        "message": "{USER} connected `{DISPLAY_NAME}`. Auto-replies can now write as this account <a:yo:1497686448717959369>"
+        "message": "{USER} connected [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}). Auto-replies can now write as this account <a:yo:1497686448717959369>"
       }
     },
     "permission": {
@@ -260,24 +260,24 @@
       },
       "cleared": {
         "title": "Permissions Cleared",
-        "message": "{USER} removed all extra permissions from {TARGET} <:ApuApproved:1497724288256446465>"
+        "message": "{USER} removed all permissions from {TARGET} <:ApuApproved:1497724288256446465>"
       },
       "none_found": {
         "title": "No Permissions Found",
-        "message": "{TARGET} has no extra permissions here <:ShrugMan:1497685241962430717>"
+        "message": "{TARGET} has no permissions here <:ShrugMan:1497685241962430717>"
       },
       "empty_selection": "Choose at least one permission first <:oopsie:1497720439810687006>",
       "granted": {
         "title": "Permissions Granted",
-        "message": "{USER} gave {TARGET} these permissions:\n{PERMISSIONS} <a:yes:1497686393369919559>"
+        "message": "{USER} gave {TARGET} these permissions <a:yes:1497686393369919559>\n{PERMISSIONS}"
       },
       "not_granted": {
         "title": "Not Granted",
-        "message": "{TARGET} does not explicitly have these permissions here:\n{PERMISSIONS} <:ShrugMan:1497685241962430717>"
+        "message": "{TARGET} does not explicitly have these permissions here <:ShrugMan:1497685241962430717>\n{PERMISSIONS}"
       },
       "revoked": {
         "title": "Permissions Revoked",
-        "message": "{USER} removed these permissions from {TARGET}:\n{PERMISSIONS} <a:yes:1497686393369919559>"
+        "message": "{USER} removed these permissions from {TARGET} <a:yes:1497686393369919559>\n{PERMISSIONS}"
       },
       "unsupported_action": "I don't know that permission action <a:peepoConfused:1497729266266275840>"
     },
@@ -310,7 +310,7 @@
       },
       "added_pattern": {
         "title": "Auto-Reply Added",
-        "message": "{USER} attached an auto-reply to ping `{ID}`.\nMode: `{MODE}`\nMessage: {MESSAGE} <a:yo:1497686448717959369>"
+        "message": "{USER} attached an auto-reply to ping `{ID}` <a:yo:1497686448717959369>\nMode: `{MODE}`\nMessage: {MESSAGE}"
       },
       "none_configured": {
         "title": "No Auto-Reply",
@@ -322,11 +322,11 @@
       },
       "already_disabled": {
         "title": "Already Disabled",
-        "message": "This auto-reply is already asleep <:oopsie:1497720439810687006>"
+        "message": "This auto-reply is already disabled <:oopsie:1497720439810687006>"
       },
       "already_enabled": {
         "title": "Already Enabled",
-        "message": "This auto-reply is already awake <:oopsie:1497720439810687006>"
+        "message": "This auto-reply is already enabled <:oopsie:1497720439810687006>"
       },
       "disabled_pattern": {
         "title": "Auto-Reply Disabled",
@@ -345,7 +345,7 @@
       "unsupported_event": "Only live and offline events from watched Twitch channels fit here <:oopsie:1497720439810687006>",
       "added_event": {
         "title": "Auto-Reply Added",
-        "message": "{USER} added an auto-reply for `{CHANNEL}` on `{STATE}`.\nMessage: {MESSAGE} <a:yo:1497686448717959369>"
+        "message": "{USER} added an auto-reply for `{CHANNEL}` on `{STATE}` <a:yo:1497686448717959369>\nMessage: {MESSAGE}"
       },
       "none_configured_event": {
         "title": "No Auto-Reply",
@@ -625,7 +625,7 @@
     },
     "permission": {
       "owner": "Owner (all permissions)",
-      "none": "No extra permissions",
+      "none": "No permissions",
       "view": "View configuration",
       "manage_channels": "Add and remove channels",
       "toggle_patterns": "Enable and disable pings",
@@ -639,7 +639,7 @@
       "admin": "Administrator"
     },
     "account": {
-      "linked": "{USER} is connected with {TWITCH}",
+      "linked": "This channel is connected with {TWITCH}",
       "token_status": "Token status: `{STATUS}`",
       "token_available": "ready",
       "token_missing": "missing",
@@ -1033,7 +1033,7 @@
         "message_placeholder": "Hello {NAME}!",
         "pattern_label": "Pattern",
         "pattern_description": "Choose the ping or regex rule that should send an automatic Twitch message.",
-        "pattern_option_description": "ID `{ID}` - {TYPE}",
+        "pattern_option_description": "ID {ID} - {TYPE}",
         "mode_label": "Reply Mode",
         "mode_message": "Send as normal chat message",
         "mode_reply": "Reply to the matched message"

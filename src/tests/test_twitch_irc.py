@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -99,7 +100,8 @@ async def test_anonymous_adapter_can_join_channels_later() -> None:
     async def fake_send_line(line: str) -> None:
         sent_lines.append(line)
 
-    adapter._writer = SimpleNamespace()  # type: ignore[assignment]
+    adapter._reader = SimpleNamespace(at_eof=lambda: False)  # type: ignore[assignment]
+    adapter._writer = SimpleNamespace(is_closing=lambda: False)  # type: ignore[assignment]
     adapter._send_line = fake_send_line  # type: ignore[method-assign]
 
     await adapter.join_channel("Example")
@@ -110,7 +112,7 @@ async def test_anonymous_adapter_can_join_channels_later() -> None:
 
 
 @pytest.mark.asyncio
-async def test_anonymous_adapter_queues_channel_joins_until_connected() -> None:
+async def test_anonymous_adapter_rejoins_pending_channels_after_connect() -> None:
     bus = EventBus()
     config = AppConfig()
     adapter = AnonymousTwitchIRCAdapter(config=config, event_bus=bus)
@@ -119,13 +121,42 @@ async def test_anonymous_adapter_queues_channel_joins_until_connected() -> None:
     async def fake_send_line(line: str) -> None:
         sent_lines.append(line)
 
-    await adapter.join_channel("Example")
-    adapter._writer = SimpleNamespace()  # type: ignore[assignment]
+    adapter._pending_channels.add("example")
+    adapter._pending_channels.add("second")
     adapter._send_line = fake_send_line  # type: ignore[method-assign]
 
-    await adapter.join_channels(["example", "second"])
+    await adapter._join_initial_channels()
 
     assert sent_lines == ["JOIN #example", "JOIN #second"]
+
+
+@pytest.mark.asyncio
+async def test_anonymous_adapter_reconnects_before_join_when_read_loop_stopped() -> None:
+    bus = EventBus()
+    config = AppConfig()
+    adapter = AnonymousTwitchIRCAdapter(config=config, event_bus=bus)
+    sent_lines: list[str] = []
+    reconnects: list[str] = []
+
+    async def fake_send_line(line: str) -> None:
+        sent_lines.append(line)
+
+    async def fake_ensure_connected() -> None:
+        reconnects.append("reconnected")
+        adapter._read_task = None
+
+    loop = asyncio.get_running_loop()
+    adapter._reader = SimpleNamespace(at_eof=lambda: False)  # type: ignore[assignment]
+    adapter._writer = SimpleNamespace(is_closing=lambda: False)  # type: ignore[assignment]
+    adapter._read_task = loop.create_future()  # type: ignore[assignment]
+    adapter._read_task.set_result(None)
+    adapter._send_line_with_reconnect = fake_send_line  # type: ignore[method-assign]
+    adapter.ensure_connected = fake_ensure_connected  # type: ignore[method-assign]
+
+    await adapter.join_channel("Example")
+
+    assert reconnects == ["reconnected"]
+    assert sent_lines == ["JOIN #example"]
 
 
 @pytest.mark.asyncio
@@ -160,7 +191,7 @@ async def test_anonymous_adapter_sends_pass_during_handshake(monkeypatch: pytest
 
     monkeypatch.setattr("src.adapters.twitch_irc.asyncio.open_connection", fake_open_connection)
 
-    await adapter.start()
+    await adapter._open_connection()
 
     assert sent_lines[0] == "PASS SCHMOOPIIE"
     assert sent_lines[1].startswith("CAP REQ :twitch.tv/tags twitch.tv/commands")
