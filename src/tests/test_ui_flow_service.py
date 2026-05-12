@@ -116,3 +116,86 @@ async def test_ui_flow_guard_prioritizes_permission_over_empty_ping_state() -> N
     assert decision.open_ui is False
     assert decision.result is not None
     assert "permission" in decision.result.title.lower()
+
+
+@pytest.mark.asyncio
+async def test_ui_flow_guard_allows_owner_to_open_leave_modal() -> None:
+    bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread_repository.create(owner_id=200, discord_channel_id=100)
+    DiscordUIFlowGuardService(
+        event_bus=bus,
+        thread_repository=thread_repository,
+        channel_repository=InMemoryChannelRepository(),
+        pattern_repository=EmptyPatternRepository(),
+        reply_repository=EmptyReplyRepository(),
+        account_repository=EmptyAccountRepository(),
+        permission_repository=EmptyPermissionRepository(),
+    )
+
+    decision = await dispatch_ui_flow_decision(
+        bus,
+        discord_channel_id=100,
+        requester_id=200,
+        flow="thread",
+        step="leave",
+    )
+
+    assert decision.open_ui is True
+    assert decision.result is None
+
+
+@pytest.mark.asyncio
+async def test_ui_flow_guard_blocks_thread_color_modal_without_permission() -> None:
+    bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread_repository.create(owner_id=200, discord_channel_id=100)
+    DiscordUIFlowGuardService(
+        event_bus=bus,
+        thread_repository=thread_repository,
+        channel_repository=InMemoryChannelRepository(),
+        pattern_repository=EmptyPatternRepository(),
+        reply_repository=EmptyReplyRepository(),
+        account_repository=EmptyAccountRepository(),
+        permission_repository=EmptyPermissionRepository(),
+    )
+
+    decision = await dispatch_ui_flow_decision(
+        bus,
+        discord_channel_id=100,
+        requester_id=201,
+        flow="thread",
+        step="color",
+    )
+
+    assert decision.open_ui is False
+    assert decision.result is not None
+    assert "permission" in decision.result.title.lower()
+
+
+@pytest.mark.asyncio
+async def test_ui_flow_guard_blocks_show_modal_without_view_permission() -> None:
+    bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread_repository.create(owner_id=200, discord_channel_id=100)
+    DiscordUIFlowGuardService(
+        event_bus=bus,
+        thread_repository=thread_repository,
+        channel_repository=InMemoryChannelRepository(),
+        pattern_repository=EmptyPatternRepository(),
+        reply_repository=EmptyReplyRepository(),
+        account_repository=EmptyAccountRepository(),
+        permission_repository=EmptyPermissionRepository(),
+    )
+
+    decision = await dispatch_ui_flow_decision(
+        bus,
+        discord_channel_id=100,
+        requester_id=201,
+        flow="show",
+        step="root",
+    )
+
+    assert decision.open_ui is False
+    assert decision.result is not None
+    assert "permission" in decision.result.title.lower()

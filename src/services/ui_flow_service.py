@@ -93,10 +93,18 @@ class DiscordUIFlowGuardService:
         return DiscordUIFlowDecision(flow=event.flow, step=event.step, open_ui=True)
 
     def _required_permission(self, flow: str, step: str) -> tuple[ObserverPermission, ...]:
+        if flow == "thread":
+            if step == "leave":
+                return (ObserverPermission.LEAVE_CONTEXT,)
+            if step == "color":
+                return (ObserverPermission.CONTROL_OBSERVER,)
+            return ()
         if flow == "channel":
             return (ObserverPermission.MANAGE_CHANNELS,)
         if flow == "user":
             return (ObserverPermission.MANAGE_PATTERNS,)
+        if flow == "show":
+            return (ObserverPermission.VIEW,)
         if flow == "permission":
             return (ObserverPermission.MANAGE_PERMISSIONS,)
         if flow == "account":
@@ -121,8 +129,14 @@ class DiscordUIFlowGuardService:
 
     def _permission_result(self, thread: ThreadRecord, flow: str, step: str) -> DiscordCommandResult:
         key = {
+            "thread": (
+                "results.thread.leave_denied"
+                if step == "leave"
+                else "results.thread.color_denied" if step == "color" else None
+            ),
             "channel": "results.channel.permission_denied",
             "user": "results.user.permission_denied",
+            "show": "results.show.permission_denied",
             "write": "results.write.permission_denied",
             "permission": "results.permission.permission_denied",
             "account": "results.account.permission_denied",

@@ -13,7 +13,7 @@ from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 
 from ..dispatch import dispatch_thread_command
-from ..helpers import command_unavailable_result, send_initial_result
+from ..helpers import command_unavailable_result, ensure_ui_flow_allowed, send_initial_result
 from ..ui.thread_ui import LeaveConfirmationModal, ThreadColorModal
 from ..ui_data import DiscordUIDataProvider
 
@@ -60,6 +60,8 @@ def register_thread_commands(
         if interaction.channel_id is None:
             await send_initial_result(interaction, command_unavailable_result())
             return
+        if not await ensure_ui_flow_allowed(interaction, event_bus, flow="thread", step="leave"):
+            return
 
         logger.debug(
             "Discord leave command discord_channel_id=%s requester_id=%s",
@@ -88,6 +90,8 @@ def register_thread_commands(
     async def color(interaction: discord.Interaction) -> None:
         if interaction.channel_id is None:
             await send_initial_result(interaction, command_unavailable_result())
+            return
+        if not await ensure_ui_flow_allowed(interaction, event_bus, flow="thread", step="color"):
             return
         await interaction.response.send_modal(
             ThreadColorModal(

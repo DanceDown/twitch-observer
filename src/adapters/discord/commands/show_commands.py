@@ -7,7 +7,7 @@ import discord
 from src.events.event_bus import EventBus
 from src.localization import Localizer
 
-from ..helpers import command_unavailable_result, send_initial_result
+from ..helpers import command_unavailable_result, ensure_ui_flow_allowed, send_initial_result
 from ..ui.show_ui import ShowSectionModal
 from ..ui_data import DiscordUIDataProvider
 
@@ -24,6 +24,8 @@ def register_show_commands(
     async def show(interaction: discord.Interaction) -> None:
         if interaction.channel_id is None:
             await send_initial_result(interaction, command_unavailable_result())
+            return
+        if not await ensure_ui_flow_allowed(interaction, event_bus, flow="show", step="root"):
             return
         await interaction.response.send_modal(
             ShowSectionModal(
