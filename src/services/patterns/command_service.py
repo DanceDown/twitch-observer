@@ -33,7 +33,7 @@ from src.localization import Localizer
 from src.services.authz import thread_has_permission
 from src.services.patterns.filters import PatternFilterResolver
 from src.services.patterns.presentation import PatternCommandPresenter
-from src.utils.discord_embeds import escape_discord_text, format_twitch_code_link
+from src.utils.discord_embeds import format_twitch_code_link
 from src.utils.permissions import ObserverPermission
 
 logger = logging.getLogger(__name__)
@@ -303,6 +303,8 @@ class PatternCommandService:
                 pattern=created,
                 channel_logins=tuple(
                     format_twitch_code_link(
+                        localizer=self.localizer,
+                        language=thread.language,
                         display_name=channel.display_name,
                         login=channel.login,
                     )
@@ -310,6 +312,8 @@ class PatternCommandService:
                 ),
                 user_logins=tuple(
                     format_twitch_code_link(
+                        localizer=self.localizer,
+                        language=thread.language,
                         display_name=user.display_name,
                         login=user.login,
                     )
@@ -359,7 +363,7 @@ class PatternCommandService:
                 language=thread.language,
                 TYPE=self._pattern_type(pattern.is_regex, language=thread.language),
                 ID=pattern.p_index,
-                TEXT=escape_discord_text(pattern.regex),
+                TEXT=pattern.regex,
             ),
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
@@ -408,7 +412,7 @@ class PatternCommandService:
                 language=thread.language,
                 TYPE=self._pattern_type(updated.is_regex, language=thread.language),
                 ID=updated.p_index,
-                TEXT=escape_discord_text(updated.regex),
+                TEXT=updated.regex,
             ),
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
@@ -457,7 +461,7 @@ class PatternCommandService:
                 language=thread.language,
                 TYPE=self._pattern_type(updated.is_regex, language=thread.language),
                 ID=updated.p_index,
-                TEXT=escape_discord_text(updated.regex),
+                TEXT=updated.regex,
             ),
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
@@ -558,9 +562,11 @@ class PatternCommandService:
         assert updated is not None
         old_channel_logins = await self._filter_resolver().resolve_profile_links_from_ids(
             pattern.channel_scope_ids,
+            language=thread.language,
         )
         old_user_logins = await self._filter_resolver().resolve_profile_links_from_ids(
             pattern.user_scope_ids,
+            language=thread.language,
         )
         return DiscordCommandResult(
             title=self.localizer.text("results.pattern.updated_title", language=thread.language),
@@ -570,6 +576,8 @@ class PatternCommandService:
                 old_channel_logins=old_channel_logins,
                 new_channel_logins=tuple(
                     format_twitch_code_link(
+                        localizer=self.localizer,
+                        language=thread.language,
                         display_name=channel.display_name,
                         login=channel.login,
                     )
@@ -578,6 +586,8 @@ class PatternCommandService:
                 old_user_logins=old_user_logins,
                 new_user_logins=tuple(
                     format_twitch_code_link(
+                        localizer=self.localizer,
+                        language=thread.language,
                         display_name=user.display_name,
                         login=user.login,
                     )

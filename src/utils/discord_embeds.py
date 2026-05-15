@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import re
-
 import discord
 
 from src.database.connection import ChannelRecord, PatternRecord, ReplyRecord, ThreadRecord
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle, TwitchChatMessageEvent
 from src.localization import Localizer
+from src.utils.discord_text import escape_discord_preserving_links, escape_discord_text
 
 EMBED_COLORS: dict[DiscordResultStyle, int] = {
     DiscordResultStyle.SUCCESS: 0x2ECC71,
@@ -117,43 +116,22 @@ def _parse_hex_color(value: str) -> int:
     return int(normalized, 16)
 
 
-_URL_PATTERN = re.compile(r"https?://[^\s]+")
-_DISCORD_MARKDOWN_PATTERN = re.compile(r"([\\*_`~|>\[\]()])")
-_DISCORD_MENTION_PATTERN = re.compile(r"@(everyone|here|[!&]?\d{15,20})")
+def format_twitch_code_link(*, localizer: Localizer, language: str, display_name: str, login: str) -> str:
+    """Render one localized Twitch profile link with code-style display text."""
+    return localizer.text(
+        "common.fragments.twitch_code_link",
+        language=language,
+        DISPLAY_NAME=display_name,
+        LOGIN=login,
+    )
 
 
-def escape_discord_code_literal(text: str) -> str:
-    """Escape backticks inside one Discord inline code literal."""
-    return text.replace("`", "`\\``")
-
-
-def escape_discord_text(text: str) -> str:
-    """Escape Discord markdown and mentions for display-only text fragments."""
-    escaped_markdown = _DISCORD_MARKDOWN_PATTERN.sub(r"\\\1", text)
-    return _DISCORD_MENTION_PATTERN.sub(lambda match: f"@\u200b{match.group(1)}", escaped_markdown)
-
-
-def escape_discord_preserving_links(text: str) -> str:
-    """Escape Discord formatting while keeping raw URLs clickable."""
-    rendered = []
-    last_end = 0
-    for match in _URL_PATTERN.finditer(text):
-        start, end = match.span()
-        rendered.append(escape_discord_text(text[last_end:start]))
-        rendered.append(match.group(0))
-        last_end = end
-    rendered.append(escape_discord_text(text[last_end:]))
-    return "".join(rendered)
-
-
-def format_twitch_code_link(*, display_name: str, login: str) -> str:
-    """Render a Twitch profile link whose visible name is safe from markdown."""
-    safe_name = escape_discord_code_literal(display_name)
-    return f"[`{safe_name}`](https://www.twitch.tv/{login})"
-
-
-def format_twitch_link(*, display_name: str, login: str) -> str:
-    """Render a Twitch profile link without code-style name formatting."""
-    safe_name = display_name.replace("`", "")
-    return f"[{safe_name}](https://www.twitch.tv/{login})"
+def format_twitch_link(*, localizer: Localizer, language: str, display_name: str, login: str) -> str:
+    """Render one localized Twitch profile link without code-style display text."""
+    return localizer.text(
+        "common.fragments.twitch_link",
+        language=language,
+        DISPLAY_NAME=display_name,
+        LOGIN=login,
+    )
 

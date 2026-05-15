@@ -11,8 +11,8 @@ def test_localizer_interpolates_placeholders_and_supports_backslash_escaping() -
     rendered = localizer.text(
         "results.thread.language_updated.message",
         language="english",
+        USER="<@123456789012345678>",
         LANGUAGE_NAME="German",
-        LANGUAGE_CODE="german",
     )
     escaped = localizer._interpolate(r"Literal \{NAME\} and \\ and {VALUE}", {"VALUE": "ok"})  # type: ignore[attr-defined]
 
@@ -26,18 +26,45 @@ def test_localizer_supports_deferred_user_placeholder_for_public_messages() -> N
     localizer = Localizer.from_directory()
 
     rendered = localizer._interpolate(r"\{USER\} then {USER} then {VALUE}", {"VALUE": "ok"})  # type: ignore[attr-defined]
-    resolved = resolve_deferred_placeholders(rendered, USER="@Tester")
+    resolved = resolve_deferred_placeholders(rendered, USER="<@123456789012345678>")
 
-    assert resolved.startswith("{USER} then @Tester")
+    assert resolved.startswith("{USER} then <@123456789012345678>")
     assert resolved.endswith("then ok")
 
 
-def test_localizer_escapes_placeholder_values_inside_inline_code_spans() -> None:
+def test_localizer_supports_explicit_placeholder_modes() -> None:
     localizer = Localizer.from_directory()
 
-    rendered = localizer._interpolate("Reply: `{MESSAGE}`", {"MESSAGE": "Hallo` Du`"})  # type: ignore[attr-defined]
+    rendered = localizer._interpolate(  # type: ignore[attr-defined]
+        "Escaped={VALUE} Raw={RAW:VALUE} Code=`{CODE:VALUE}`",
+        {"VALUE": "Hello` @everyone [x]"},
+    )
 
-    assert rendered == "Reply: `Hallo`\\`` Du`\\```"
+    assert rendered == r"Escaped=Hello\` @​everyone \[x\] Raw=Hello` @everyone [x] Code=`Hello´ @everyone [x]`"
+
+
+def test_localizer_formats_localized_lists() -> None:
+    localizer = Localizer(
+        catalogs={
+            "english": {
+                "example": {
+                    "items": {
+                        "item_format": "<{RAW:ITEM}>",
+                        "separator": ", ",
+                        "prefix": "[",
+                        "suffix": "]",
+                        "empty": "(empty)",
+                    }
+                }
+            }
+        }
+    )
+
+    rendered = localizer.format_list("example.items", ["one", "two"], language="english")
+    empty_rendered = localizer.format_list("example.items", [], language="english")
+
+    assert rendered == "[<one>, <two>]"
+    assert empty_rendered == "(empty)"
 
 
 def test_german_catalog_uses_utf8_umlauts() -> None:

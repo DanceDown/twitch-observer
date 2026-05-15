@@ -31,7 +31,7 @@ from src.services.twitch_runtime import (
     TWITCH_ADAPTER_KEY,
     TWITCH_SEND_MESSAGE_ACTION,
 )
-from src.utils.discord_embeds import escape_discord_preserving_links
+from src.utils.discord_text import escape_discord_preserving_links
 from src.utils.permissions import ObserverPermission
 
 

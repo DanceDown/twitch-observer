@@ -9,12 +9,14 @@ from typing import Any
 
 from src.database.records import ThreadRecord
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.utils.discord_text import escape_discord_text, normalize_discord_code_value
 
 DEFAULT_LANGUAGE = "english"
 _LANG_DIRECTORY = Path(__file__).resolve().parent.parent / "lang"
 DEFERRED_PLACEHOLDER_TOKENS: dict[str, str] = {
     "USER": "\u0000LOCALIZER_USER\u0000",
 }
+DEFAULT_LIST_ITEM_PLACEHOLDER = "ITEM"
 
 
 class LocalizationError(ValueError):
@@ -28,11 +30,6 @@ def resolve_deferred_placeholders(template: str, **placeholders: object) -> str:
         if name in placeholders:
             rendered = rendered.replace(token, str(placeholders[name]))
     return rendered
-
-
-def _escape_for_inline_code(value: object) -> str:
-    """Render one placeholder value safely inside a Discord inline code span."""
-    return str(value).replace("`", "`\\``")
 
 
 @dataclass(slots=True, frozen=True)
@@ -125,6 +122,52 @@ class Localizer:
             thumbnail_url=thumbnail_url,
         )
 
+    def format_list(
+        self,
+        key: str,
+        items: list[dict[str, object] | object] | tuple[dict[str, object] | object, ...],
+        *,
+        language: str | None = None,
+        **shared_placeholders: object,
+    ) -> str:
+        """Render one reusable localized list/wrapper object from the catalog."""
+        catalog_language = self.normalize_language(language)
+        catalog = self.catalogs.get(catalog_language)
+        if catalog is None:
+            raise LocalizationError(f"Unsupported language: {catalog_language}")
+        value = self._lookup(catalog, key)
+        if not isinstance(value, dict):
+            raise LocalizationError(f"Translation key {key!r} in {catalog_language} is not an object.")
+
+        item_format = value.get("item_format")
+        separator = value.get("separator")
+        prefix = value.get("prefix", "")
+        suffix = value.get("suffix", "")
+        empty = value.get("empty")
+        if not isinstance(item_format, str) or not isinstance(separator, str):
+            raise LocalizationError(f"List format {key!r} in {catalog_language} must contain string item_format/separator.")
+        if not isinstance(prefix, str) or not isinstance(suffix, str):
+            raise LocalizationError(f"List format {key!r} in {catalog_language} must contain string prefix/suffix.")
+        if empty is not None and not isinstance(empty, str):
+            raise LocalizationError(f"List format {key!r} in {catalog_language} must contain string empty when provided.")
+
+        rendered_items: list[str] = []
+        for item in items:
+            placeholders = dict(shared_placeholders)
+            if isinstance(item, dict):
+                placeholders.update(item)
+            else:
+                placeholders[DEFAULT_LIST_ITEM_PLACEHOLDER] = item
+            rendered_items.append(self._interpolate(item_format, placeholders))
+
+        if not rendered_items:
+            if empty is not None:
+                return self._interpolate(empty, shared_placeholders)
+            return self._interpolate(prefix + suffix, shared_placeholders)
+
+        body = separator.join(rendered_items)
+        return self._interpolate(prefix, shared_placeholders) + body + self._interpolate(suffix, shared_placeholders)
+
     def thread_result(
         self,
         key: str,
@@ -180,9 +223,10 @@ class Localizer:
                 end_index += 1
             if end_index >= length:
                 raise LocalizationError(f"Unclosed placeholder in template: {template!r}")
-            name = template[index + 1 : end_index]
-            if not name:
+            raw_name = template[index + 1 : end_index]
+            if not raw_name:
                 raise LocalizationError("Empty placeholder names are not allowed.")
+            mode, name = Localizer._parse_placeholder(raw_name)
             if name not in placeholders:
                 if name in DEFERRED_PLACEHOLDER_TOKENS:
                     parts.append(DEFERRED_PLACEHOLDER_TOKENS[name])
@@ -190,10 +234,29 @@ class Localizer:
                     continue
                 raise LocalizationError(f"Missing placeholder value for {name!r}.")
             value = placeholders[name]
-            if index > 0 and end_index + 1 < length and template[index - 1] == "`" and template[end_index + 1] == "`":
-                parts.append(_escape_for_inline_code(value))
-            else:
-                parts.append(str(value))
+            parts.append(Localizer._render_placeholder_value(mode, value))
             index = end_index + 1
         return "".join(parts)
+
+    @staticmethod
+    def _parse_placeholder(raw_name: str) -> tuple[str, str]:
+        if ":" not in raw_name:
+            return "escaped", raw_name
+        mode, name = raw_name.split(":", 1)
+        normalized_mode = mode.strip().lower()
+        normalized_name = name.strip()
+        if normalized_mode not in {"escaped", "raw", "code"}:
+            raise LocalizationError(f"Unsupported placeholder mode {mode!r}.")
+        if not normalized_name:
+            raise LocalizationError("Empty placeholder names are not allowed.")
+        return normalized_mode, normalized_name
+
+    @staticmethod
+    def _render_placeholder_value(mode: str, value: object) -> str:
+        rendered = str(value)
+        if mode == "raw":
+            return rendered
+        if mode == "code":
+            return normalize_discord_code_value(rendered)
+        return escape_discord_text(rendered)
 

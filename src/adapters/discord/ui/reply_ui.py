@@ -30,12 +30,20 @@ def _reply_label(reply: ReplyPresentation) -> str:
     return reply.reply.reply_message[:100]
 
 
-def _event_state_label(event_key: str) -> str:
-    return "Live" if event_key == "stream.online" else "Offline"
+def _event_state_label(event_key: str, *, localizer: Localizer, language: str) -> str:
+    return localizer.text(
+        "discord.reply_ui.common.state_live" if event_key == "stream.online" else "discord.reply_ui.common.state_offline",
+        language=language,
+    )
 
 
-def _adapter_event_label(event: AdapterEventPresentation) -> str:
-    return f"{event.channel.display_name} {_event_state_label(event.event.event_key)}"[:100]
+def _adapter_event_label(event: AdapterEventPresentation, *, localizer: Localizer, language: str) -> str:
+    return localizer.text(
+        "discord.reply_ui.common.event_label",
+        language=language,
+        CHANNEL=event.channel.display_name,
+        STATE=_event_state_label(event.event.event_key, localizer=localizer, language=language),
+    )[:100]
 
 
 def _encode_pattern_target(pattern_id: int) -> str:
@@ -51,7 +59,7 @@ def _decode_target(value: str) -> tuple[str, int]:
     return target_type, int(raw_id)
 
 
-class PatternReplyAddModal(discord.ui.Modal, title="Add Pattern Auto-Reply"):
+class PatternReplyAddModal(discord.ui.Modal):
     """Attach one reply to one existing pattern using a modal."""
 
     def __init__(
@@ -177,9 +185,18 @@ class EventReplyAddModal(discord.ui.Modal):
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
-                        label=_adapter_event_label(event),
+                        label=_adapter_event_label(event, localizer=localizer, language=language),
                         value=_encode_adapter_event_target(event.event.event_id),
-                        description=f"{event.channel.login[:80]} - {_event_state_label(event.event.event_key).lower()} notification",
+                        description=localizer.text(
+                            "discord.reply_ui.event_add.trigger_option_description",
+                            language=language,
+                            LOGIN=event.channel.login[:80],
+                            STATE=_event_state_label(
+                                event.event.event_key,
+                                localizer=localizer,
+                                language=language,
+                            ).lower(),
+                        ),
                     )
                     for event in adapter_events[:25]
                 ],
@@ -252,7 +269,7 @@ class ReplyActionModal(discord.ui.Modal):
                         description=localizer.text(
                             "discord.reply_ui.action.linked_event_description",
                             language=language,
-                            EVENT=_adapter_event_label(reply.event),
+                            EVENT=_adapter_event_label(reply.event, localizer=localizer, language=language),
                         ),
                     )
                     for reply in replies[:25]
@@ -312,7 +329,7 @@ class ReplyMenuView(BaseFormView):
     def render_embed(self) -> discord.Embed:
         return self.form_embed("discord.reply_ui.menu.title", "discord.reply_ui.menu.message")
 
-    @discord.ui.button(label="Add Pattern", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def add_pattern(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         if not await self.ensure_step_allowed(
             interaction,
@@ -346,7 +363,7 @@ class ReplyMenuView(BaseFormView):
             )
         )
 
-    @discord.ui.button(label="Add Event", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def add_event(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         if not await self.ensure_step_allowed(
             interaction,
@@ -380,15 +397,15 @@ class ReplyMenuView(BaseFormView):
             )
         )
 
-    @discord.ui.button(label="Remove", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def remove(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._open_action_modal(interaction, "remove")
 
-    @discord.ui.button(label="Disable", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def disable(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._open_action_modal(interaction, "disable")
 
-    @discord.ui.button(label="Enable", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def enable(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._open_action_modal(interaction, "enable")
 

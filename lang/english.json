@@ -5,15 +5,45 @@
       "all_tracked_channels": "Every watched channel",
       "all_tracked_users": "All known Twitch users",
       "everyone": "Everyone",
-      "only_in": "Only in {ITEMS}",
-      "everyone_except": "Everyone except {ITEMS}",
-      "all_tracked_channels_except": "Every watched channel except {ITEMS}",
-      "only_from": "Only from {ITEMS}",
-      "all_tracked_users_except": "All known Twitch users except {ITEMS}"
+      "only_in": "`Only in` {RAW:ITEMS}",
+      "everyone_except": "`Everyone except` {RAW:ITEMS}",
+      "all_tracked_channels_except": "`Every watched channel except` {RAW:ITEMS}",
+      "only_from": "`Only from` {RAW:ITEMS}",
+      "all_tracked_users_except": "`All known Twitch users except` {RAW:ITEMS}"
     },
     "boolean": {
       "yes": "Yes",
       "no": "No"
+    },
+    "fragments": {
+      "twitch_code_link": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
+      "twitch_link": "[{DISPLAY_NAME}](https://www.twitch.tv/{RAW:LOGIN})",
+      "section": "**{TITLE}**\n{RAW:BODY}",
+      "inline_code": "`{CODE:TEXT}`",
+      "discord_user_mention": "<@{RAW:USER_ID}>",
+      "bullet_prefix": "- "
+    },
+    "lists": {
+      "raw_lines": {
+        "item_format": "{RAW:ITEM}",
+        "separator": "\n"
+      },
+      "bullets": {
+        "item_format": "- {RAW:ITEM}",
+        "separator": "\n"
+      },
+      "indented_bullets": {
+        "item_format": "  - {RAW:ITEM}",
+        "separator": "\n"
+      },
+      "comma_raw": {
+        "item_format": "{RAW:ITEM}",
+        "separator": ", "
+      },
+      "section_breaks": {
+        "item_format": "{RAW:ITEM}",
+        "separator": "\n\n"
+      }
     }
   },
   "results": {
@@ -60,7 +90,7 @@
       },
       "joined": {
         "title": "Joined",
-        "message": "Heyy <a:hey:1497685102204031067> Thank you {USER} for inviting me <:_33:1490384461290803430>"
+        "message": "Heyy <a:hey:1497685102204031067> Thank you {RAW:USER} for inviting me <:_33:1490384461290803430>"
       },
       "missing_channel_access": {
         "title": "Missing Channel Access",
@@ -72,7 +102,7 @@
       },
       "left": {
         "title": "Left",
-        "message": "{USER} kicked me out <a:sadcat:1497721262645051392>\nAll saved configuration has been deleted <a:ppPoof:1497721964259967068>"
+        "message": "{RAW:USER} kicked me out <a:sadcat:1497721262645051392>\nAll saved configuration has been deleted <a:ppPoof:1497721964259967068>"
       },
       "enable_denied": {
         "title": "Permission Denied",
@@ -88,11 +118,11 @@
       },
       "enabled": {
         "title": "Enabled",
-        "message": "{USER} woke me up <a:Lurk:1497684902135463986>"
+        "message": "{RAW:USER} woke me up <a:Lurk:1497684902135463986>"
       },
       "disabled": {
         "title": "Disabled",
-        "message": "{USER} said, it's time to take a nap <:Bedge:1497723609517658223>"
+        "message": "{RAW:USER} said, it's time to take a nap <:Bedge:1497723609517658223>"
       },
       "color_denied": {
         "title": "Permission Denied",
@@ -100,11 +130,11 @@
       },
       "color_cleared": {
         "title": "Color Cleared",
-        "message": "{USER} cleared my color <:ApuApproved:1497724288256446465>"
+        "message": "{RAW:USER} cleared my color <:ApuApproved:1497724288256446465>"
       },
       "color_updated": {
         "title": "Color Updated",
-        "message": "{USER} updated my color to `{COLOR}` <:WOWERS:1497724770848997406>"
+        "message": "{RAW:USER} updated my color to {CODE:COLOR} <:WOWERS:1497724770848997406>"
       },
       "language_denied": {
         "title": "Permission Denied",
@@ -112,15 +142,15 @@
       },
       "language_updated": {
         "title": "Language Updated",
-        "message": "{USER} taught me `{LANGUAGE_NAME}` <a:yo:1497686448717959369>"
+        "message": "{RAW:USER} taught me {CODE:LANGUAGE_NAME} <a:yo:1497686448717959369>"
       },
       "already_color": {
         "title": "Already This Color",
-        "message": "I'm already wearing `{COLOR}` <:oopsie:1497720439810687006>"
+        "message": "I'm already wearing {CODE:COLOR} <:oopsie:1497720439810687006>"
       },
       "already_language": {
         "title": "Already This Language",
-        "message": "I'm already speaking `{LANGUAGE_NAME}` <:oopsie:1497720439810687006>"
+        "message": "I'm already speaking {CODE:LANGUAGE_NAME} <:oopsie:1497720439810687006>"
       }
     },
     "channel": {
@@ -130,23 +160,23 @@
       },
       "already_added": {
         "title": "Already Added",
-        "message": "I'm already watching the Twitch channel of [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) <:Binoculars:1497727665283662077>"
+        "message": "I'm already watching the Twitch channel of [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:Binoculars:1497727665283662077>"
       },
       "added": {
         "title": "Channel Added",
-        "message": "{USER} told me to observe the Twitch channel of [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) <:Binoculars:1497727665283662077>"
+        "message": "{RAW:USER} told me to observe the Twitch channel of [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:Binoculars:1497727665283662077>"
       },
       "not_found": {
         "title": "Not Found",
-        "message": "I'm not watching [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) at the moment <:oopsie:1497720439810687006>"
+        "message": "I'm not watching [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) at the moment <:oopsie:1497720439810687006>"
       },
       "color_cleared": {
         "title": "Channel Color Cleared",
-        "message": "{USER} cleared the color for [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN})'s Twitch channel <:ApuApproved:1497724288256446465>"
+        "message": "{RAW:USER} cleared the color for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})'s Twitch channel <:ApuApproved:1497724288256446465>"
       },
       "color_updated": {
         "title": "Channel Color Updated",
-        "message": "{USER} updated the color for [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN})'s Twitch channel to `{COLOR}` <:WOWERS:1497724770848997406>"
+        "message": "{RAW:USER} updated the color for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})'s Twitch channel to {CODE:COLOR} <:WOWERS:1497724770848997406>"
       },
       "unsupported_action": {
         "title": "Validation Error",
@@ -154,11 +184,11 @@
       },
       "in_use": {
         "title": "Channel In Use",
-        "message": "The Twitch channel of [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) is still referenced by one or more pings <:oopsie:1497720439810687006>"
+        "message": "The Twitch channel of [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is still referenced by one or more pings <:oopsie:1497720439810687006>"
       },
       "removed": {
         "title": "Channel Removed",
-        "message": "{USER} told me to stop watching the Twitch channel of [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) <:ApuApproved:1497724288256446465>"
+        "message": "{RAW:USER} told me to stop watching the Twitch channel of [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:ApuApproved:1497724288256446465>"
       }
     },
     "user": {
@@ -168,11 +198,11 @@
       },
       "already_added": {
         "title": "Already Added",
-        "message": "I already know [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) <:oopsie:1497720439810687006>"
+        "message": "I already know [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:oopsie:1497720439810687006>"
       },
       "added": {
         "title": "User Added",
-        "message": "{USER} told me to remember [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) <a:peepoSmart:1497731090704498781>"
+        "message": "{RAW:USER} told me to remember [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <a:peepoSmart:1497731090704498781>"
       },
       "unsupported_action": {
         "title": "Validation Error",
@@ -180,15 +210,15 @@
       },
       "not_found": {
         "title": "Not Found",
-        "message": "I don't know who [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) is <:oopsie:1497720439810687006>"
+        "message": "I don't know who [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is <:oopsie:1497720439810687006>"
       },
       "in_use": {
         "title": "User In Use",
-        "message": "[`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) is still referenced by one or more pings <:oopsie:1497720439810687006>"
+        "message": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is still referenced by one or more pings <:oopsie:1497720439810687006>"
       },
       "removed": {
         "title": "User Removed",
-        "message": "{USER} told me to forget [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) <:ApuApproved:1497724288256446465>"
+        "message": "{RAW:USER} told me to forget [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:ApuApproved:1497724288256446465>"
       }
     },
     "show": {
@@ -198,7 +228,7 @@
       },
       "overview": {
         "title": "Configuration Overview",
-        "message": "{CONTENT}"
+        "message": "{RAW:CONTENT}"
       }
     },
     "account": {
@@ -217,15 +247,15 @@
       },
       "already_linked": {
         "title": "Account Already Linked",
-        "message": "[`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) is already connected here. Disconnect it before linking another Twitch account <:oopsie:1497720439810687006>"
+        "message": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is already connected here. Disconnect it before linking another Twitch account <:oopsie:1497720439810687006>"
       },
       "login_pending": {
         "title": "Login Already Pending",
-        "message": "Open the Twitch login here: [Connect Twitch]({VERIFICATION_URI})\n\nCode: `{USER_CODE}`\nValid until: `{EXPIRES_AT}` <a:peepoSmart:1497731090704498781>"
+        "message": "Open the Twitch login here: [Connect Twitch]({RAW:VERIFICATION_URI})\n\nCode: {CODE:USER_CODE}\nValid until: {CODE:EXPIRES_AT} <a:peepoSmart:1497731090704498781>"
       },
       "finish_login": {
         "title": "Finish Twitch Login",
-        "message": "Open the Twitch login here: [Connect Twitch]({VERIFICATION_URI})\n\nCode: `{USER_CODE}`\nValid until: `{EXPIRES_AT}` <a:peepoSmart:1497731090704498781>"
+        "message": "Open the Twitch login here: [Connect Twitch]({RAW:VERIFICATION_URI})\n\nCode: {CODE:USER_CODE}\nValid until: {CODE:EXPIRES_AT} <a:peepoSmart:1497731090704498781>"
       },
       "no_linked_account": {
         "title": "No Twitch Account",
@@ -233,7 +263,7 @@
       },
       "unlinked": {
         "title": "Twitch Account Unlinked",
-        "message": "{USER} disconnected [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}). Auto-replies stay saved and will work again once an account is linked <:ApuApproved:1497724288256446465>"
+        "message": "{RAW:USER} disconnected [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}). Auto-replies stay saved and will work again once an account is linked <:ApuApproved:1497724288256446465>"
       },
       "show_moved": {
         "title": "Display Moved",
@@ -253,7 +283,7 @@
       },
       "linked": {
         "title": "Twitch Account Linked",
-        "message": "{USER} connected [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}). Auto-replies can now write as this account <a:yo:1497686448717959369>"
+        "message": "{RAW:USER} connected [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}). Auto-replies can now write as this account <a:yo:1497686448717959369>"
       }
     },
     "permission": {
@@ -268,24 +298,24 @@
       },
       "cleared": {
         "title": "Permissions Cleared",
-        "message": "{USER} removed all permissions from {TARGET} <:ApuApproved:1497724288256446465>"
+        "message": "{RAW:USER} removed all permissions from {RAW:TARGET} <:ApuApproved:1497724288256446465>"
       },
       "none_found": {
         "title": "No Permissions Found",
-        "message": "{TARGET} has no permissions here <:ShrugMan:1497685241962430717>"
+        "message": "{RAW:TARGET} has no permissions here <:ShrugMan:1497685241962430717>"
       },
       "empty_selection": "Choose at least one permission first <:oopsie:1497720439810687006>",
       "granted": {
         "title": "Permissions Granted",
-        "message": "{USER} gave {TARGET} these permissions <a:yes:1497686393369919559>\n{PERMISSIONS}"
+        "message": "{RAW:USER} gave {RAW:TARGET} these permissions <a:yes:1497686393369919559>\n{RAW:PERMISSIONS}"
       },
       "not_granted": {
         "title": "Not Granted",
-        "message": "{TARGET} does not explicitly have these permissions here <:ShrugMan:1497685241962430717>\n{PERMISSIONS}"
+        "message": "{RAW:TARGET} does not explicitly have these permissions here <:ShrugMan:1497685241962430717>\n{RAW:PERMISSIONS}"
       },
       "revoked": {
         "title": "Permissions Revoked",
-        "message": "{USER} removed these permissions from {TARGET} <a:yes:1497686393369919559>\n{PERMISSIONS}"
+        "message": "{RAW:USER} removed these permissions from {RAW:TARGET} <a:yes:1497686393369919559>\n{RAW:PERMISSIONS}"
       },
       "unsupported_action": "I don't know that permission action <a:peepoConfused:1497729266266275840>"
     },
@@ -318,7 +348,7 @@
       },
       "added_pattern": {
         "title": "Auto-Reply Added",
-        "message": "{USER} attached an auto-reply to ping `{ID}` <a:yo:1497686448717959369>\nMode: `{MODE}`\nMessage: {MESSAGE}"
+        "message": "{RAW:USER} attached an auto-reply to ping {CODE:ID} <a:yo:1497686448717959369>\nMode: {CODE:MODE}\nMessage: {RAW:MESSAGE}"
       },
       "none_configured": {
         "title": "No Auto-Reply",
@@ -326,7 +356,7 @@
       },
       "removed_pattern": {
         "title": "Auto-Reply Removed",
-        "message": "{USER} removed the auto-reply from ping `{ID}` <:ApuApproved:1497724288256446465>\nMessage: {MESSAGE}"
+        "message": "{RAW:USER} removed the auto-reply from ping {CODE:ID} <:ApuApproved:1497724288256446465>\nMessage: {RAW:MESSAGE}"
       },
       "already_disabled": {
         "title": "Already Disabled",
@@ -338,11 +368,11 @@
       },
       "disabled_pattern": {
         "title": "Auto-Reply Disabled",
-        "message": "{USER} disabled the auto-reply from ping `{ID}` <a:yes:1497686393369919559>\nMessage: {MESSAGE}"
+        "message": "{RAW:USER} disabled the auto-reply from ping {CODE:ID} <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}"
       },
       "enabled_pattern": {
         "title": "Auto-Reply Enabled",
-        "message": "{USER} enabled the auto-reply from ping `{ID}` <a:yes:1497686393369919559>\nMessage: {MESSAGE}"
+        "message": "{RAW:USER} enabled the auto-reply from ping {CODE:ID} <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}"
       },
       "event_unavailable": "Event auto-replies are not available here right now <a:peepoConfused:1497729266266275840>",
       "missing_event": "Choose a live or offline event first <:oopsie:1497720439810687006>",
@@ -353,7 +383,7 @@
       "unsupported_event": "Only live and offline events from watched Twitch channels fit here <:oopsie:1497720439810687006>",
       "added_event": {
         "title": "Auto-Reply Added",
-        "message": "{USER} added an auto-reply for `{CHANNEL}` on `{STATE}` <a:yo:1497686448717959369>\nMessage: {MESSAGE}"
+        "message": "{RAW:USER} added an auto-reply for {CODE:CHANNEL} on {CODE:STATE} <a:yo:1497686448717959369>\nMessage: {RAW:MESSAGE}"
       },
       "none_configured_event": {
         "title": "No Auto-Reply",
@@ -361,15 +391,15 @@
       },
       "removed_event": {
         "title": "Auto-Reply Removed",
-        "message": "{USER} removed the `{STATE}` auto-reply for `{CHANNEL}` <:ApuApproved:1497724288256446465>\nMessage: {MESSAGE}"
+        "message": "{RAW:USER} removed the {CODE:STATE} auto-reply for {CODE:CHANNEL} <:ApuApproved:1497724288256446465>\nMessage: {RAW:MESSAGE}"
       },
       "disabled_event": {
         "title": "Auto-Reply Disabled",
-        "message": "{USER} disabled the `{STATE}` auto-reply for `{CHANNEL}` <a:yes:1497686393369919559>\nMessage: {MESSAGE}"
+        "message": "{RAW:USER} disabled the {CODE:STATE} auto-reply for {CODE:CHANNEL} <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}"
       },
       "enabled_event": {
         "title": "Auto-Reply Enabled",
-        "message": "{USER} enabled the `{STATE}` auto-reply for `{CHANNEL}` <a:yes:1497686393369919559>\nMessage: {MESSAGE}"
+        "message": "{RAW:USER} enabled the {CODE:STATE} auto-reply for {CODE:CHANNEL} <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}"
       },
       "unsupported_action": "I don't know that auto-reply action <a:peepoConfused:1497729266266275840>"
     },
@@ -390,43 +420,43 @@
       },
       "notification_added": {
         "title": "Notification Added",
-        "message": "{USER} added the `{STATE}` ping for `{CHANNEL}` <:Binoculars:1497727665283662077>"
+        "message": "{RAW:USER} added the {CODE:STATE} ping for {CODE:CHANNEL} <:Binoculars:1497727665283662077>"
       },
       "notification_removed": {
         "title": "Notification Removed",
-        "message": "{USER} removed the `{STATE}` ping for `{CHANNEL}` <:ApuApproved:1497724288256446465>"
+        "message": "{RAW:USER} removed the {CODE:STATE} ping for {CODE:CHANNEL} <:ApuApproved:1497724288256446465>"
       },
       "notification_disabled": {
         "title": "Notification Disabled",
-        "message": "{USER} disabled the `{STATE}` ping for `{CHANNEL}` <:ApuApproved:1497724288256446465>"
+        "message": "{RAW:USER} disabled the {CODE:STATE} ping for {CODE:CHANNEL} <:ApuApproved:1497724288256446465>"
       },
       "notification_enabled": {
         "title": "Notification Enabled",
-        "message": "{USER} enabled the `{STATE}` ping for `{CHANNEL}` <a:yes:1497686393369919559>"
+        "message": "{RAW:USER} enabled the {CODE:STATE} ping for {CODE:CHANNEL} <a:yes:1497686393369919559>"
       },
       "already_configured": {
         "title": "Already Configured",
-        "message": "The `{STATE}` ping for `{CHANNEL}` is already configured <:oopsie:1497720439810687006>"
+        "message": "The {CODE:STATE} ping for {CODE:CHANNEL} is already configured <:oopsie:1497720439810687006>"
       },
       "none_configured": {
         "title": "Not Configured",
-        "message": "There is no `{STATE}` ping for `{CHANNEL}` yet <:oopsie:1497720439810687006>"
+        "message": "There is no {CODE:STATE} ping for {CODE:CHANNEL} yet <:oopsie:1497720439810687006>"
       },
       "already_disabled": {
         "title": "Already Disabled",
-        "message": "The `{STATE}` ping for `{CHANNEL}` is already disabled <a:Lurk:1497684902135463986>"
+        "message": "The {CODE:STATE} ping for {CODE:CHANNEL} is already disabled <a:Lurk:1497684902135463986>"
       },
       "already_enabled": {
         "title": "Already Enabled",
-        "message": "The `{STATE}` ping for `{CHANNEL}` is already active <a:yes:1497686393369919559>"
+        "message": "The {CODE:STATE} ping for {CODE:CHANNEL} is already active <a:yes:1497686393369919559>"
       },
       "went_live": {
         "title": "Channel Is Live",
-        "message": "`{CHANNEL}` is now live <:Binoculars:1497727665283662077>"
+        "message": "{CODE:CHANNEL} is now live <:Binoculars:1497727665283662077>"
       },
       "went_offline": {
         "title": "Channel Is Offline",
-        "message": "`{CHANNEL}` is now offline <a:Lurk:1497684902135463986>"
+        "message": "{CODE:CHANNEL} is now offline <a:Lurk:1497684902135463986>"
       }
     },
     "write": {
@@ -438,7 +468,7 @@
       "message_too_long": "That message is too long for Twitch. Please keep it at 500 characters or less <a:OhNo:1497685055948980306>",
       "channel_not_tracked": {
         "title": "Channel Not Watched",
-        "message": "I'm not watching [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) yet. Add the channel first with `/channel add` <:Binoculars:1497727665283662077>"
+        "message": "I'm not watching [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) yet. Add the channel first with `/channel add` <:Binoculars:1497727665283662077>"
       },
       "no_linked_account": {
         "title": "No Linked Account",
@@ -450,11 +480,11 @@
       },
       "reply_sent": {
         "title": "Twitch Reply Sent",
-        "message": "I replied in [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN})'s chat <a:yo:1497686448717959369>\nReply target: `{REPLY_TARGET}`\nMessage: `{MESSAGE}`"
+        "message": "I replied in [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})'s chat <a:yo:1497686448717959369>\nReply target: {CODE:REPLY_TARGET}\nMessage: {CODE:MESSAGE}"
       },
       "message_sent": {
         "title": "Twitch Message Sent",
-        "message": "I sent that to [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN})'s chat <a:yo:1497686448717959369>\nMessage: `{MESSAGE}`"
+        "message": "I sent that to [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})'s chat <a:yo:1497686448717959369>\nMessage: {CODE:MESSAGE}"
       }
     },
     "pattern": {
@@ -482,18 +512,18 @@
       "unsupported_channel_scope": "That channel scope confused me <a:peepoConfused:1497729266266275840>",
       "unexpected_selected_channels": "For every watched channel, I don't need selected channels too <:ShrugMan:1497685241962430717>",
       "missing_selected_channels": "Pick at least one channel for this scope first <:Binoculars:1497727665283662077>",
-      "channel_not_tracked": "I'm not watching [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) yet. Add the channel first with `/channel` <:Binoculars:1497727665283662077>",
+      "channel_not_tracked": "I'm not watching [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) yet. Add the channel first with `/channel` <:Binoculars:1497727665283662077>",
       "unsupported_user_scope": "That user scope confused me <a:peepoConfused:1497729266266275840>",
       "missing_selected_users": "Pick at least one Twitch user for this scope first <a:peepoSmart:1497731090704498781>",
-      "user_not_tracked": "I don't remember [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) yet. Add the user first with `/user` <a:peepoSmart:1497731090704498781>",
+      "user_not_tracked": "I don't remember [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) yet. Add the user first with `/user` <a:peepoSmart:1497731090704498781>",
       "missing_stable_id": "Use the ID from `/show` so I know exactly which ping you mean <a:peepoSmart:1497731090704498781>",
       "already_exists": {
         "title": "Already Exists",
-        "message": "I already know this {TYPE} as ID `{ID}` <:oopsie:1497720439810687006>"
+        "message": "I already know this {TYPE} as ID {CODE:ID} <:oopsie:1497720439810687006>"
       },
       "already_exists_other": {
         "title": "Already Exists",
-        "message": "Another ping already uses those settings as ID `{ID}` <:oopsie:1497720439810687006>"
+        "message": "Another ping already uses those settings as ID {CODE:ID} <:oopsie:1497720439810687006>"
       },
       "not_found_remove": {
         "title": "Not Found",
@@ -524,9 +554,9 @@
       "disabled_title": "{TYPE} Disabled",
       "enabled_title": "{TYPE} Enabled",
       "updated_title": "Pattern Updated",
-      "removed": "removed {TYPE} `{ID}` <:ApuApproved:1497724288256446465>\n{TYPE}: `{TEXT}`",
-      "disabled": "disabled {TYPE} `{ID}` <:ApuApproved:1497724288256446465>\n{TYPE}: `{TEXT}`",
-      "enabled": "enabled {TYPE} `{ID}` <a:yes:1497686393369919559>\n{TYPE}: `{TEXT}`",
+      "removed": "removed {TYPE} {CODE:ID} <:ApuApproved:1497724288256446465>\n{TYPE}: {CODE:TEXT}",
+      "disabled": "disabled {TYPE} {CODE:ID} <:ApuApproved:1497724288256446465>\n{TYPE}: {CODE:TEXT}",
+      "enabled": "enabled {TYPE} {CODE:ID} <a:yes:1497686393369919559>\n{TYPE}: {CODE:TEXT}",
       "actions": {
         "added": "added"
       },
@@ -554,37 +584,37 @@
       },
       "scope": {
         "channel_all": "Every watched channel",
-        "channel_only": "Only in {ITEMS}",
-        "channel_except": "Every watched channel except {ITEMS}",
-        "channel_tracked_except": "Every watched channel except {ITEMS}",
+        "channel_only": "`Only in` {RAW:ITEMS}",
+        "channel_except": "`Every watched channel except` {RAW:ITEMS}",
+        "channel_tracked_except": "`Every watched channel except` {RAW:ITEMS}",
         "user_all": "All known Twitch users",
-        "user_only": "Only from {ITEMS}",
-        "user_except": "Everyone except {ITEMS}",
-        "user_tracked_except": "All known Twitch users except {ITEMS}"
+        "user_only": "`Only from` {RAW:ITEMS}",
+        "user_except": "`Everyone except` {RAW:ITEMS}",
+        "user_tracked_except": "`All known Twitch users except` {RAW:ITEMS}"
       },
       "summary": {
-        "action": "{ACTION} {TYPE} `{ID}`:",
-        "text": "Text: `{TEXT}`",
+        "action": "{ACTION} {TYPE} {CODE:ID}:",
+        "text": "Text: {CODE:TEXT}",
         "subscribers_only": "Subscribers only",
         "non_subscribers_only": "Non-subscribers only",
         "only_while_live": "Only while live",
         "only_while_offline": "Only while offline",
-        "case_sensitive": "Case-Sensitive: `{VALUE}`",
-        "custom_color": "Custom color: `{COLOR}`",
+        "case_sensitive": "Case-Sensitive: {CODE:VALUE}",
+        "custom_color": "Custom color: {CODE:COLOR}",
         "color_inherited": "Inherited automatically",
-        "priority": "Priority: `{PRIORITY}`"
+        "priority": "Priority: {CODE:PRIORITY}"
       },
       "changes": {
-        "updated": "Updated {TYPE} `{ID}`.",
-        "text": "Text: From `{BEFORE}` to `{AFTER}`",
-        "mode": "Mode: From `{BEFORE}` to `{AFTER}`",
-        "where": "Where: From {BEFORE} to {AFTER}",
-        "who": "Who: From {BEFORE} to {AFTER}",
-        "subscribers": "Subscribers: From `{BEFORE}` to `{AFTER}`",
-        "stream_state": "Stream state: From `{BEFORE}` to `{AFTER}`",
-        "case_sensitive": "Case-Sensitive: From `{BEFORE}` to `{AFTER}`",
-        "color": "Color: From `{BEFORE}` to `{AFTER}`",
-        "priority": "Priority: From `{BEFORE}` to `{AFTER}`"
+        "updated": "Updated {TYPE} {CODE:ID}.",
+        "text": "Text: From {CODE:BEFORE} to {CODE:AFTER}",
+        "mode": "Mode: From {CODE:BEFORE} to {CODE:AFTER}",
+        "where": "Where: From {RAW:BEFORE} to {RAW:AFTER}",
+        "who": "Who: From {RAW:BEFORE} to {RAW:AFTER}",
+        "subscribers": "Subscribers: From {CODE:BEFORE} to {CODE:AFTER}",
+        "stream_state": "Stream state: From {CODE:BEFORE} to {CODE:AFTER}",
+        "case_sensitive": "Case-Sensitive: From {CODE:BEFORE} to {CODE:AFTER}",
+        "color": "Color: From {CODE:BEFORE} to {CODE:AFTER}",
+        "priority": "Priority: From {CODE:BEFORE} to {CODE:AFTER}"
       }
     }
   },
@@ -604,34 +634,34 @@
       "tracked_users": "There are no Twitch users that I know <a:nope:1497686414328860713>"
     },
     "channel": {
-      "custom_color": "Custom color: `{COLOR}`",
-      "live_state": "Live state: `{STATE}`",
-      "notifications": "Notifications: `{STATES}`"
+      "custom_color": "Custom color: {CODE:COLOR}",
+      "live_state": "Live state: {CODE:STATE}",
+      "notifications": "Notifications: {RAW:STATES}"
     },
     "pattern": {
-      "line": "- {TYPE} `{ID}`",
-      "text": "- Text: `{TEXT}`",
-      "priority": "- Priority: `{PRIORITY}`",
-      "custom_color": "- Custom color: `{COLOR}`",
-      "case_sensitive": "- Case-Sensitive",
-      "disabled": "- Disabled",
-      "subscribers_only": "- Subscribers only",
-      "non_subscribers_only": "- Non-subscribers only",
-      "only_while_live": "- Only while live",
-      "only_while_offline": "- Only while offline",
-      "where": "- Where: {VALUE}",
-      "who": "- Who: {VALUE}"
+      "line": "{TYPE} {CODE:ID}",
+      "text": "Text: {CODE:TEXT}",
+      "priority": "Priority: {CODE:PRIORITY}",
+      "custom_color": "Custom color: {CODE:COLOR}",
+      "case_sensitive": "Case-Sensitive",
+      "disabled": "Disabled",
+      "subscribers_only": "Subscribers only",
+      "non_subscribers_only": "Non-subscribers only",
+      "only_while_live": "Only while live",
+      "only_while_offline": "Only while offline",
+      "where": "Where: {RAW:VALUE}",
+      "who": "Who: {RAW:VALUE}"
     },
     "reply": {
-      "line": "- `{ID}`",
-      "trigger": "- Trigger: `{TEXT}`",
-      "reply": "- Reply: `{TEXT}`"
+      "line": "{CODE:ID}",
+      "trigger": "Trigger: {CODE:TEXT}",
+      "reply": "Reply: {CODE:TEXT}"
     },
     "event_reply": {
-      "line": "- Event `{STATE}`",
-      "channel": "- Channel: [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN})",
-      "reply": "- Reply: `{TEXT}`",
-      "disabled": "- Disabled"
+      "line": "Event {CODE:STATE}",
+      "channel": "Channel: [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
+      "reply": "Reply: {CODE:TEXT}",
+      "disabled": "Disabled"
     },
     "permission": {
       "owner": "Owner (all permissions)",
@@ -649,11 +679,11 @@
       "admin": "Administrator"
     },
     "account": {
-      "linked": "This channel is connected with {TWITCH}",
-      "token_status": "Token status: `{STATUS}`",
+      "linked": "This channel is connected with {RAW:TWITCH}",
+      "token_status": "Token status: {CODE:STATUS}",
       "token_available": "ready",
       "token_missing": "missing",
-      "pending": "{USER} has a `{STATUS}` login code `{USER_CODE}`",
+      "pending": "{RAW:USER} has a {CODE:STATUS} login code {CODE:USER_CODE}",
       "empty": "No Twitch account is connected here <:oopsie:1497720439810687006>"
     }
   },
@@ -868,7 +898,8 @@
         "locked": {
           "title": "Paginator Locked",
           "message": "You can't turn those pages <a:Tssk:1497685026945630208>"
-        }
+        },
+        "item_prefix": "- "
       }
     },
     "pattern_ui": {
@@ -905,33 +936,33 @@
         "message": "Choose the ping you want to change."
       },
       "summary": {
-        "text": "Text: `{TEXT}`",
-        "mode": "Mode: `{MODE}`",
+        "text": "Text: {CODE:TEXT}",
+        "mode": "Mode: {CODE:MODE}",
         "mode_regex": "Regex",
         "mode_ping": "Normal ping",
-        "where": "Where: `{VALUE}`",
-        "who": "Who: `{VALUE}`",
-        "subscribers": "Subscribers: `{VALUE}`",
-        "stream_state": "Stream state: `{VALUE}`",
-        "case_sensitive": "Case sensitive: `{VALUE}`",
-        "color": "Color: `{VALUE}`",
+        "where": "Where: {RAW:VALUE}",
+        "who": "Who: {RAW:VALUE}",
+        "subscribers": "Subscribers: {CODE:VALUE}",
+        "stream_state": "Stream state: {CODE:VALUE}",
+        "case_sensitive": "Case sensitive: {CODE:VALUE}",
+        "color": "Color: {CODE:VALUE}",
         "color_inherited": "Inherited automatically",
-        "priority": "Priority: `{VALUE}`",
+        "priority": "Priority: {CODE:VALUE}",
         "priority_auto": "Automatic",
         "not_set": "not set yet",
-        "embed_message": "{CONTENT}\n\nUse the buttons below to fill out each section.\nNeed a hex color? [Open color picker]({COLOR_PICKER_URL})",
+        "embed_message": "{RAW:CONTENT}\n\nUse the buttons below to fill out each section.\nNeed a hex color? [Open color picker]({RAW:COLOR_PICKER_URL})",
         "channel_scope_all": "All watched Twitch channels",
-        "channel_scope_only": "Only: {ITEMS}",
+        "channel_scope_only": "Only: {RAW:ITEMS}",
         "channel_scope_only_fallback": "Only selected channels",
-        "channel_scope_except": "All except: {ITEMS}",
+        "channel_scope_except": "All except: {RAW:ITEMS}",
         "channel_scope_except_fallback": "All except selected channels",
         "user_scope_everyone": "Everyone",
         "user_scope_all_tracked": "All known Twitch users",
-        "user_scope_all_tracked_except": "All known except: {ITEMS}",
+        "user_scope_all_tracked_except": "All known except: {RAW:ITEMS}",
         "user_scope_all_tracked_except_fallback": "All known except selected Twitch names",
-        "user_scope_only": "Only: {ITEMS}",
+        "user_scope_only": "Only: {RAW:ITEMS}",
         "user_scope_only_fallback": "Only selected Twitch names",
-        "user_scope_except": "Everyone except: {ITEMS}",
+        "user_scope_except": "Everyone except: {RAW:ITEMS}",
         "user_scope_except_fallback": "Everyone except selected Twitch names",
         "sub_state_all": "Everyone",
         "sub_state_subs": "Subscribers only",
@@ -1024,7 +1055,10 @@
         "ping_type": "Ping",
         "example_name": "Name",
         "example_channel": "Channel",
-        "example_state": "live"
+        "example_state": "live",
+        "state_live": "Live",
+        "state_offline": "Offline",
+        "event_label": "{CHANNEL} {STATE}"
       },
       "menu": {
         "title": "Auto-Replies",
@@ -1053,7 +1087,8 @@
         "message_label": "What should it say?",
         "message_placeholder": "YIPPIE {CHANNEL} is now {STATE}!",
         "trigger_label": "Event Trigger",
-        "trigger_description": "Choose the configured live or offline event that should send a Twitch message."
+        "trigger_description": "Choose the configured live or offline event that should send a Twitch message.",
+        "trigger_option_description": "{LOGIN} - {STATE} notification"
       },
       "action": {
         "remove_title": "Remove Auto-Reply",

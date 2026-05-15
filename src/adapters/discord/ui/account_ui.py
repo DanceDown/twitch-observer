@@ -41,11 +41,11 @@ class AccountMenuView(BaseFormView):
     def render_embed(self) -> discord.Embed:
         return self.form_embed("discord.account_ui.menu.title", "discord.account_ui.menu.message")
 
-    @discord.ui.button(label="Connect", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def link(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._run(interaction, "link")
 
-    @discord.ui.button(label="Disconnect", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def unlink(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._run(interaction, "unlink")
 

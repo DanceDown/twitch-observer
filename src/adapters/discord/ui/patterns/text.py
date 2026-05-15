@@ -7,17 +7,18 @@ from src.localization import Localizer
 
 def channel_scope_text(localizer: Localizer, language: str, mode: str, selected: list[str]) -> str:
     """Render one human-friendly summary for the channel scope."""
+    selected_items = localizer.format_list("common.lists.comma_raw", selected, language=language)
     if mode == "all_tracked":
         return localizer.text("discord.pattern_ui.summary.channel_scope_all", language=language)
     if mode == "only_selected":
         return (
-            localizer.text("discord.pattern_ui.summary.channel_scope_only", language=language, ITEMS=", ".join(selected))
+            localizer.text("discord.pattern_ui.summary.channel_scope_only", language=language, ITEMS=selected_items)
             if selected
             else localizer.text("discord.pattern_ui.summary.channel_scope_only_fallback", language=language)
         )
     if mode == "all_except_selected":
         return (
-            localizer.text("discord.pattern_ui.summary.channel_scope_except", language=language, ITEMS=", ".join(selected))
+            localizer.text("discord.pattern_ui.summary.channel_scope_except", language=language, ITEMS=selected_items)
             if selected
             else localizer.text("discord.pattern_ui.summary.channel_scope_except_fallback", language=language)
         )
@@ -26,25 +27,26 @@ def channel_scope_text(localizer: Localizer, language: str, mode: str, selected:
 
 def user_scope_text(localizer: Localizer, language: str, mode: str, selected: list[str]) -> str:
     """Render one human-friendly summary for the user scope."""
+    selected_items = localizer.format_list("common.lists.comma_raw", selected, language=language)
     if mode == "all_users":
         return localizer.text("discord.pattern_ui.summary.user_scope_everyone", language=language)
     if mode == "all_tracked":
         return localizer.text("discord.pattern_ui.summary.user_scope_all_tracked", language=language)
     if mode == "all_tracked_except_selected":
         return (
-            localizer.text("discord.pattern_ui.summary.user_scope_all_tracked_except", language=language, ITEMS=", ".join(selected))
+            localizer.text("discord.pattern_ui.summary.user_scope_all_tracked_except", language=language, ITEMS=selected_items)
             if selected
             else localizer.text("discord.pattern_ui.summary.user_scope_all_tracked_except_fallback", language=language)
         )
     if mode == "only_selected":
         return (
-            localizer.text("discord.pattern_ui.summary.user_scope_only", language=language, ITEMS=", ".join(selected))
+            localizer.text("discord.pattern_ui.summary.user_scope_only", language=language, ITEMS=selected_items)
             if selected
             else localizer.text("discord.pattern_ui.summary.user_scope_only_fallback", language=language)
         )
     if mode == "all_except_selected":
         return (
-            localizer.text("discord.pattern_ui.summary.user_scope_except", language=language, ITEMS=", ".join(selected))
+            localizer.text("discord.pattern_ui.summary.user_scope_except", language=language, ITEMS=selected_items)
             if selected
             else localizer.text("discord.pattern_ui.summary.user_scope_except_fallback", language=language)
         )

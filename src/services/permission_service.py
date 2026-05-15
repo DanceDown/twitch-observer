@@ -116,7 +116,11 @@ class PermissionCommandService:
                 thread_id=thread.thread_id,
                 permissions=new_mask,
             )
-            rendered = "\n".join(f"- {self._permission_label(value, language=thread.language)}" for value in requested_permissions)
+            rendered = self.localizer.format_list(
+                "common.lists.bullets",
+                [self._permission_label(value, language=thread.language) for value in requested_permissions],
+                language=thread.language,
+            )
             return self.localizer.thread_result(
                 "results.permission.granted",
                 thread=thread,
@@ -129,7 +133,11 @@ class PermissionCommandService:
         if event.action == "revoke":
             matched_mask = current_mask & permission_mask
             if not matched_mask:
-                rendered = "\n".join(f"- {self._permission_label(value, language=thread.language)}" for value in requested_permissions)
+                rendered = self.localizer.format_list(
+                    "common.lists.bullets",
+                    [self._permission_label(value, language=thread.language) for value in requested_permissions],
+                    language=thread.language,
+                )
                 return self.localizer.thread_result(
                     "results.permission.not_granted",
                     thread=thread,
@@ -150,7 +158,11 @@ class PermissionCommandService:
                     thread_id=thread.thread_id,
                     permissions=new_mask,
                 )
-            rendered = "\n".join(f"- {self._permission_label(value, language=thread.language)}" for value in requested_permissions)
+            rendered = self.localizer.format_list(
+                "common.lists.bullets",
+                [self._permission_label(value, language=thread.language) for value in requested_permissions],
+                language=thread.language,
+            )
             return self.localizer.thread_result(
                 "results.permission.revoked",
                 thread=thread,

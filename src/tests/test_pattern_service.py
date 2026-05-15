@@ -1278,8 +1278,8 @@ async def test_show_command_renders_where_and_who_as_bullets() -> None:
         sections=("pings",),
     )
 
-    assert "- Where: Only in [`Example`](https://www.twitch.tv/example)" in result.message
-    assert "- Who: Only from [`Alice`](https://www.twitch.tv/alice)" in result.message
+    assert "- Where: `Only in` [`Example`](https://www.twitch.tv/example)" in result.message
+    assert "- Who: `Only from` [`Alice`](https://www.twitch.tv/alice)" in result.message
 
 
 @pytest.mark.asyncio

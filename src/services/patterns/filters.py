@@ -185,12 +185,16 @@ class PatternFilterResolver:
     async def resolve_profile_links_from_ids(
         self,
         twitch_user_ids: tuple[str, ...],
+        *,
+        language: str,
     ) -> tuple[str, ...]:
         links: list[str] = []
         for twitch_user_id in twitch_user_ids:
             user = await self._resolve_user_by_id(twitch_user_id)
             links.append(
                 format_twitch_code_link(
+                    localizer=self.localizer,
+                    language=language,
                     display_name=user.display_name,
                     login=user.login,
                 )

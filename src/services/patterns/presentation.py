@@ -97,7 +97,7 @@ class PatternCommandPresenter:
                 PRIORITY=pattern.priority,
             )
         )
-        return "\n- ".join(parts)
+        return self.localizer.format_list("common.lists.bullets", parts, language=language)
 
     def format_pattern_changes(
         self,
@@ -225,7 +225,7 @@ class PatternCommandPresenter:
                     AFTER=after.priority,
                 )
             )
-        return "\n- ".join(changes)
+        return self.localizer.format_list("common.lists.bullets", changes, language=language)
 
     def scope_text(
         self,
@@ -284,18 +284,6 @@ class PatternCommandPresenter:
         items: tuple[str, ...],
         language: str,
     ) -> str:
-        marker = "\u0000ITEMS\u0000"
-        template = self.localizer.text(key, language=language, ITEMS=marker)
-        if marker not in template:
-            return template
-        before, after = template.split(marker, 1)
-        rendered_items = ", ".join(items)
-        parts: list[str] = []
-        if before.strip():
-            parts.append(f"`{before.strip()}`")
-        if rendered_items:
-            parts.append(rendered_items)
-        if after.strip():
-            parts.append(f"`{after.strip()}`")
-        return " ".join(parts)
+        rendered_items = self.localizer.format_list("common.lists.comma_raw", items, language=language)
+        return self.localizer.text(key, language=language, ITEMS=rendered_items)
 

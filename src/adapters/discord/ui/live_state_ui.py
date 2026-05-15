@@ -48,23 +48,23 @@ class LiveStateMenuView(BaseFormView):
     def render_embed(self) -> discord.Embed:
         return self.form_embed("discord.live_state_ui.menu.title", "discord.live_state_ui.menu.message")
 
-    @discord.ui.button(label="Add Live", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def add_live(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._open_add_modal(interaction, STREAM_ONLINE_EVENT_KEY)
 
-    @discord.ui.button(label="Add Offline", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def add_offline(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._open_add_modal(interaction, STREAM_OFFLINE_EVENT_KEY)
 
-    @discord.ui.button(label="Remove", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def remove(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._open_action_modal(interaction, "remove")
 
-    @discord.ui.button(label="Disable", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def disable(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._open_action_modal(interaction, "disable")
 
-    @discord.ui.button(label="Enable", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def enable(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._open_action_modal(interaction, "enable")
 

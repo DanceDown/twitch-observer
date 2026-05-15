@@ -48,7 +48,7 @@ class PingMenuView(BaseFormView):
     def render_embed(self) -> discord.Embed:
         return self.form_embed("discord.pattern_ui.menu.title", "discord.pattern_ui.menu.message")
 
-    @discord.ui.button(label="Add", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def add(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         if not await self.ensure_step_allowed(
             interaction,
@@ -69,7 +69,7 @@ class PingMenuView(BaseFormView):
         view.bound_message = self.bound_message
         await interaction.response.edit_message(embed=view.render_embed(), view=view)
 
-    @discord.ui.button(label="Edit", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def edit(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         if not await self.ensure_step_allowed(
             interaction,
@@ -100,15 +100,15 @@ class PingMenuView(BaseFormView):
             )
         )
 
-    @discord.ui.button(label="Remove", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def remove(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._open_id_action(interaction, "remove")
 
-    @discord.ui.button(label="Disable", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def disable(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._open_id_action(interaction, "disable")
 
-    @discord.ui.button(label="Enable", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def enable(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._open_id_action(interaction, "enable")
 
@@ -409,7 +409,7 @@ class PatternHomeView(BaseFormView):
             COLOR_PICKER_URL=COLOR_PICKER_URL,
         )
 
-    @discord.ui.button(label="Basics", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def basics(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         if not await self.ensure_step_allowed(
             interaction,
@@ -421,7 +421,7 @@ class PatternHomeView(BaseFormView):
             return
         await interaction.response.send_modal(PatternBasicsModal(parent=self))
 
-    @discord.ui.button(label="Channels", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def channels(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         if not await self.ensure_step_allowed(
             interaction,
@@ -445,7 +445,7 @@ class PatternHomeView(BaseFormView):
             return
         await interaction.response.send_modal(PatternChannelsModal(parent=self, tracked_channels=tracked_channels))
 
-    @discord.ui.button(label="Users", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def users(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         if not await self.ensure_step_allowed(
             interaction,
@@ -469,7 +469,7 @@ class PatternHomeView(BaseFormView):
             return
         await interaction.response.send_modal(PatternUsersModal(parent=self, tracked_users=tracked_users))
 
-    @discord.ui.button(label="Options", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def options(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         if not await self.ensure_step_allowed(
             interaction,
@@ -481,7 +481,7 @@ class PatternHomeView(BaseFormView):
             return
         await interaction.response.send_modal(PatternOptionsModal(parent=self))
 
-    @discord.ui.button(label="Save", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.success)
     async def save(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         if not await self.ensure_step_allowed(
             interaction,

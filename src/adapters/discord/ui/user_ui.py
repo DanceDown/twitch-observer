@@ -129,7 +129,7 @@ class UserMenuView(BaseFormView):
     def render_embed(self) -> discord.Embed:
         return self.form_embed("discord.user_ui.menu.title", "discord.user_ui.menu.message")
 
-    @discord.ui.button(label="Add", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def add(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         if not await self.ensure_step_allowed(
             interaction,
@@ -151,7 +151,7 @@ class UserMenuView(BaseFormView):
             )
         )
 
-    @discord.ui.button(label="Remove", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def remove(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         if not await self.ensure_step_allowed(
             interaction,

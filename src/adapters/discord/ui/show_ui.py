@@ -23,7 +23,8 @@ def build_show_pages(
     message: str,
     *,
     description_limit: int = SHOW_EMBED_DESCRIPTION_LIMIT,
-    empty_message: str = "No configuration entries found.",
+    empty_message: str = "",
+    item_prefix: str = "- ",
 ) -> tuple[str, ...]:
     """Split one `/show` result into embed-safe pages while keeping bullet items intact."""
     normalized = message.strip()
@@ -32,7 +33,7 @@ def build_show_pages(
     if len(normalized) <= description_limit:
         return (normalized,)
 
-    header, items = _extract_show_header_and_items(normalized)
+    header, items = _extract_show_header_and_items(normalized, item_prefix=item_prefix)
     if not items:
         return _split_plain_text(normalized, description_limit)
 
@@ -60,10 +61,10 @@ def build_show_pages(
     return tuple(pages)
 
 
-def _extract_show_header_and_items(message: str) -> tuple[str, tuple[str, ...]]:
+def _extract_show_header_and_items(message: str, *, item_prefix: str) -> tuple[str, tuple[str, ...]]:
     """Return the section heading and grouped bullet blocks from a rendered `/show` message."""
     lines = message.splitlines()
-    first_item_index = next((index for index, line in enumerate(lines) if line.startswith("- ")), None)
+    first_item_index = next((index for index, line in enumerate(lines) if line.startswith(item_prefix)), None)
     if first_item_index is None:
         return message, ()
 
@@ -71,7 +72,7 @@ def _extract_show_header_and_items(message: str) -> tuple[str, tuple[str, ...]]:
     items: list[str] = []
     current_item: list[str] = []
     for line in lines[first_item_index:]:
-        if line.startswith("- "):
+        if line.startswith(item_prefix):
             if current_item:
                 items.append("\n".join(current_item))
             current_item = [line]
@@ -123,6 +124,7 @@ class ShowPaginationView(discord.ui.View):
         self._pages = build_show_pages(
             result.message,
             empty_message=localizer.text("discord.show_ui.pagination.empty_message", language=language),
+            item_prefix=localizer.text("discord.show_ui.pagination.item_prefix", language=language),
         )
         self._page_index = 0
         self.bound_message: discord.InteractionMessage | None = None
@@ -172,14 +174,14 @@ class ShowPaginationView(discord.ui.View):
         self.previous_page.disabled = disabled or self._page_index <= 0
         self.next_page.disabled = disabled or self._page_index >= len(self._pages) - 1
 
-    @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def previous_page(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         """Show the previous `/show` page in the same ephemeral message."""
         self._page_index = max(0, self._page_index - 1)
         self._sync_button_states()
         await interaction.response.edit_message(embed=self.render_embed(), view=self)
 
-    @discord.ui.button(label="Next", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def next_page(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         """Show the next `/show` page in the same ephemeral message."""
         self._page_index = min(len(self._pages) - 1, self._page_index + 1)

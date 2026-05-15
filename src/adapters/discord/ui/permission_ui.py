@@ -14,6 +14,13 @@ from ..ui_data import DiscordUIDataProvider
 from .shared import BaseFormView, resolve_context_language
 
 
+def _permission_option_label(*, localizer: Localizer, language: str, value: str) -> str:
+    try:
+        return localizer.text(f"show.permission.{value}", language=language)
+    except ValueError:
+        return value.replace("_", " ").capitalize()
+
+
 class PermissionModal(discord.ui.Modal):
     """Manage one permission grant, revoke, or clear action from a modal."""
 
@@ -44,7 +51,13 @@ class PermissionModal(discord.ui.Modal):
             self.permission = discord.ui.Label(
                 text=localizer.text("discord.permission_ui.modal.permissions_label", language=language),
                 component=discord.ui.Select(
-                    options=[discord.SelectOption(label=value[:100], value=value) for value, _ in PERMISSION_CHOICES[:25]],
+                    options=[
+                        discord.SelectOption(
+                            label=_permission_option_label(localizer=localizer, language=language, value=value)[:100],
+                            value=value,
+                        )
+                        for value, _ in PERMISSION_CHOICES[:25]
+                    ],
                     min_values=1,
                     max_values=min(len(PERMISSION_CHOICES), 25),
                 ),
@@ -97,15 +110,15 @@ class PermissionMenuView(BaseFormView):
     def render_embed(self) -> discord.Embed:
         return self.form_embed("discord.permission_ui.menu.title", "discord.permission_ui.menu.message")
 
-    @discord.ui.button(label="Grant", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def grant(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._open_modal(interaction, "grant")
 
-    @discord.ui.button(label="Revoke", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def revoke(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._open_modal(interaction, "revoke")
 
-    @discord.ui.button(label="Clear", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def clear(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self._open_modal(interaction, "clear")
 
