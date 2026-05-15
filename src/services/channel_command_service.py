@@ -189,7 +189,7 @@ class ChannelCommandService:
                     thread=thread,
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
-                    DETAIL="Color must use the format `#RRGGBB` or be empty.",
+                    DETAIL=self.localizer.text("results.validation_detail.color_hex_or_empty", language=thread.language),
                 )
             updated = self.channel_repository.set_color(
                 thread_id=thread.thread_id,

@@ -273,7 +273,7 @@ class ThreadLifecycleService:
                 thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
-                DETAIL="Color must use the format `#RRGGBB` or set `clear:true`.",
+                DETAIL=self.localizer.text("results.validation_detail.color_hex_or_clear", language=thread.language),
             )
         normalized_color = event.color.strip()
         if thread.color == normalized_color:
@@ -325,9 +325,10 @@ class ThreadLifecycleService:
                 thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
-                DETAIL=(
-                    "Unsupported language. Available languages: "
-                    + ", ".join(f"`{language}`" for language in self.localizer.available_languages())
+                DETAIL=self.localizer.text(
+                    "results.validation_detail.unsupported_language",
+                    language=thread.language,
+                    LANGUAGES=", ".join(f"`{language}`" for language in self.localizer.available_languages()),
                 ),
             )
         if thread.language == requested_language:

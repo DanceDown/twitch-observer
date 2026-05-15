@@ -616,6 +616,11 @@
         "color": "Color: From {CODE:BEFORE} to {CODE:AFTER}",
         "priority": "Priority: From {CODE:BEFORE} to {CODE:AFTER}"
       }
+    },
+    "validation_detail": {
+      "color_hex_or_empty": "Die Farbe muss das Format `#RRGGBB` haben oder leer sein.",
+      "color_hex_or_clear": "Die Farbe muss das Format `#RRGGBB` haben oder `clear:true` setzen.",
+      "unsupported_language": "Nicht unterst?tzte Sprache. Verf?gbare Sprachen: {RAW:LANGUAGES}"
     }
   },
   "show": {
