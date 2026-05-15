@@ -32,6 +32,14 @@ def test_localizer_supports_deferred_user_placeholder_for_public_messages() -> N
     assert resolved.endswith("then ok")
 
 
+def test_localizer_escapes_placeholder_values_inside_inline_code_spans() -> None:
+    localizer = Localizer.from_directory()
+
+    rendered = localizer._interpolate("Reply: `{MESSAGE}`", {"MESSAGE": "Hallo` Du`"})  # type: ignore[attr-defined]
+
+    assert rendered == "Reply: `Hallo`\\`` Du`\\```"
+
+
 def test_german_catalog_uses_utf8_umlauts() -> None:
     localizer = Localizer.from_directory()
 

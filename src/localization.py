@@ -30,6 +30,11 @@ def resolve_deferred_placeholders(template: str, **placeholders: object) -> str:
     return rendered
 
 
+def _escape_for_inline_code(value: object) -> str:
+    """Render one placeholder value safely inside a Discord inline code span."""
+    return str(value).replace("`", "`\\``")
+
+
 @dataclass(slots=True, frozen=True)
 class Localizer:
     """Resolve localized strings and command results from cached JSON catalogs."""
@@ -184,7 +189,11 @@ class Localizer:
                     index = end_index + 1
                     continue
                 raise LocalizationError(f"Missing placeholder value for {name!r}.")
-            parts.append(str(placeholders[name]))
+            value = placeholders[name]
+            if index > 0 and end_index + 1 < length and template[index - 1] == "`" and template[end_index + 1] == "`":
+                parts.append(_escape_for_inline_code(value))
+            else:
+                parts.append(str(value))
             index = end_index + 1
         return "".join(parts)
 

@@ -108,6 +108,7 @@ class UserCommandService:
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                     DISPLAY_NAME=twitch_user.display_name,
+                    LOGIN=twitch_user.login,
                 )
             self.tracked_user_repository.add_user(thread.thread_id, twitch_user.user_id)
             return self.localizer.thread_result(
@@ -134,6 +135,7 @@ class UserCommandService:
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
                 DISPLAY_NAME=twitch_user.display_name,
+                LOGIN=twitch_user.login,
             )
 
         if (
@@ -149,6 +151,7 @@ class UserCommandService:
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
                 DISPLAY_NAME=twitch_user.display_name,
+                LOGIN=twitch_user.login,
             )
 
         self.tracked_user_repository.remove_user(thread.thread_id, twitch_user.user_id)

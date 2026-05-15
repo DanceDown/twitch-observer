@@ -77,6 +77,19 @@ class DiscordUIFlowGuardService:
                 self.localizer.thread_result(key, thread=thread, style=DiscordResultStyle.ERROR, ephemeral=True),
             )
 
+        if event.flow == "reply" and event.step in {"add_pattern", "add_event"}:
+            account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
+            if account is None or not account.access_token:
+                return self._blocked(
+                    event,
+                    self.localizer.thread_result(
+                        "results.reply.no_linked_account",
+                        thread=thread,
+                        style=DiscordResultStyle.ERROR,
+                        ephemeral=True,
+                    ),
+                )
+
         if event.flow == "write":
             account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
             if account is None or not account.access_token:

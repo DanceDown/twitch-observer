@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 
 import discord
 
 from src.config import AppConfig
 from src.events.event_bus import EventBus
-from src.localization import Localizer
+from src.localization import Localizer, resolve_deferred_placeholders
 from src.utils.discord_embeds import build_result_embed
 
 from .commands import (
@@ -95,19 +96,28 @@ class ObserverDiscordClient(discord.Client):
             activity=discord.CustomActivity(name=text),
         )
 
-    async def send_user_result(self, discord_user_id: int, result) -> None:
+    async def send_user_result(self, discord_user_id: int, result, *, actor_mention: str | None = None) -> None:
         """Send a result embed to a Discord user via DM when possible."""
         user = self.get_user(discord_user_id)
         if user is None:
             user = await self.fetch_user(discord_user_id)
         channel = user.dm_channel or await user.create_dm()
-        await channel.send(embed=build_result_embed(result))
+        await channel.send(embed=build_result_embed(self._resolve_actor_result(result, actor_mention)))
 
-    async def send_channel_result(self, discord_channel_id: int, result) -> None:
+    async def send_channel_result(self, discord_channel_id: int, result, *, actor_mention: str | None = None) -> None:
         """Send a result embed to the originating Discord channel when possible."""
         channel = self.get_channel(discord_channel_id)
         if channel is None:
             channel = await self.fetch_channel(discord_channel_id)
         if isinstance(channel, discord.TextChannel | discord.Thread | discord.DMChannel):
-            await channel.send(embed=build_result_embed(result))
+            await channel.send(embed=build_result_embed(self._resolve_actor_result(result, actor_mention)))
+
+    @staticmethod
+    def _resolve_actor_result(result, actor_mention: str | None):
+        if actor_mention is None:
+            return result
+        return replace(
+            result,
+            message=resolve_deferred_placeholders(result.message, USER=actor_mention),
+        )
 

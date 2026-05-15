@@ -351,29 +351,61 @@ class ShowCommandService:
         if pattern.channel_scope_mode != "all_tracked":
             channel_names = await self._resolve_twitch_links(pattern.channel_scope_ids)
             if pattern.channel_scope_mode == "only_selected":
-                details.append(self._localizer.text("common.scope.only_in", language=language, ITEMS=", ".join(channel_names)))
+                details.append(
+                    self._localizer.text(
+                        "show.pattern.where",
+                        language=language,
+                        VALUE=self._localizer.text("common.scope.only_in", language=language, ITEMS=", ".join(channel_names)),
+                    )
+                )
             elif pattern.channel_scope_mode == "all_except_selected":
                 details.append(
                     self._localizer.text(
-                        "common.scope.all_tracked_channels_except",
+                        "show.pattern.where",
                         language=language,
-                        ITEMS=", ".join(channel_names),
+                        VALUE=self._localizer.text(
+                            "common.scope.all_tracked_channels_except",
+                            language=language,
+                            ITEMS=", ".join(channel_names),
+                        ),
                     )
                 )
         if pattern.user_scope_mode != "all_users":
             user_names = await self._resolve_twitch_names(pattern.user_scope_ids)
             if pattern.user_scope_mode == "only_selected":
-                details.append(self._localizer.text("common.scope.only_from", language=language, ITEMS=", ".join(user_names)))
+                details.append(
+                    self._localizer.text(
+                        "show.pattern.who",
+                        language=language,
+                        VALUE=self._localizer.text("common.scope.only_from", language=language, ITEMS=", ".join(user_names)),
+                    )
+                )
             elif pattern.user_scope_mode == "all_except_selected":
-                details.append(self._localizer.text("common.scope.everyone_except", language=language, ITEMS=", ".join(user_names)))
+                details.append(
+                    self._localizer.text(
+                        "show.pattern.who",
+                        language=language,
+                        VALUE=self._localizer.text("common.scope.everyone_except", language=language, ITEMS=", ".join(user_names)),
+                    )
+                )
             elif pattern.user_scope_mode == "all_tracked":
-                details.append(self._localizer.text("common.scope.all_tracked_users", language=language))
+                details.append(
+                    self._localizer.text(
+                        "show.pattern.who",
+                        language=language,
+                        VALUE=self._localizer.text("common.scope.all_tracked_users", language=language),
+                    )
+                )
             elif pattern.user_scope_mode == "all_tracked_except_selected":
                 details.append(
                     self._localizer.text(
-                        "common.scope.all_tracked_users_except",
+                        "show.pattern.who",
                         language=language,
-                        ITEMS=", ".join(user_names),
+                        VALUE=self._localizer.text(
+                            "common.scope.all_tracked_users_except",
+                            language=language,
+                            ITEMS=", ".join(user_names),
+                        ),
                     )
                 )
         if pattern.sub_state != "all":

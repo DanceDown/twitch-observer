@@ -1482,6 +1482,7 @@ async def test_reply_disable_marks_reply_as_disabled() -> None:
     )
 
     assert result.style == DiscordResultStyle.SUCCESS
+    assert "Hi there" in result.message
     reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, p_index=1)
     assert reply is not None
     assert reply.disabled is True
@@ -1548,6 +1549,7 @@ async def test_reply_enable_marks_reply_as_enabled() -> None:
     )
 
     assert result.style == DiscordResultStyle.SUCCESS
+    assert "Hi there" in result.message
     reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, p_index=1)
     assert reply is not None
     assert reply.disabled is False

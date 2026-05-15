@@ -403,10 +403,14 @@ class ReplyMenuView(BaseFormView):
             return
         replies = list(await self._data_provider.list_replies(self._discord_channel_id))
         replies.extend(
-            action
-            for action in await self._data_provider.list_adapter_event_actions(self._discord_channel_id)
-            if action.action.action_type == TWITCH_SEND_MESSAGE_ACTION
+            item
+            for item in await self._data_provider.list_adapter_event_actions(self._discord_channel_id)
+            if item.action.action_type == TWITCH_SEND_MESSAGE_ACTION
         )
+        if action == "disable":
+            replies = [item for item in replies if not _is_reply_target_disabled(item)]
+        elif action == "enable":
+            replies = [item for item in replies if _is_reply_target_disabled(item)]
         if not replies:
             await self.finish_with_interaction(
                 interaction,
@@ -431,4 +435,10 @@ class ReplyMenuView(BaseFormView):
                 bound_message=self.bound_message,
             )
         )
+
+
+def _is_reply_target_disabled(reply: ReplyPresentation | AdapterEventActionPresentation) -> bool:
+    if isinstance(reply, ReplyPresentation):
+        return reply.reply.disabled
+    return reply.action.disabled
 

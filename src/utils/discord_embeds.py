@@ -122,6 +122,11 @@ _DISCORD_MARKDOWN_PATTERN = re.compile(r"([\\*_`~|>\[\]()])")
 _DISCORD_MENTION_PATTERN = re.compile(r"@(everyone|here|[!&]?\d{15,20})")
 
 
+def escape_discord_code_literal(text: str) -> str:
+    """Escape backticks inside one Discord inline code literal."""
+    return text.replace("`", "`\\``")
+
+
 def escape_discord_text(text: str) -> str:
     """Escape Discord markdown and mentions for display-only text fragments."""
     escaped_markdown = _DISCORD_MARKDOWN_PATTERN.sub(r"\\\1", text)
@@ -143,7 +148,7 @@ def escape_discord_preserving_links(text: str) -> str:
 
 def format_twitch_code_link(*, display_name: str, login: str) -> str:
     """Render a Twitch profile link whose visible name is safe from markdown."""
-    safe_name = display_name.replace("`", "")
+    safe_name = escape_discord_code_literal(display_name)
     return f"[`{safe_name}`](https://www.twitch.tv/{login})"
 
 

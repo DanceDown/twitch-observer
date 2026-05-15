@@ -171,6 +171,7 @@ class ReplyCommandService:
                 "results.reply.removed_pattern",
                 thread=thread,
                 ID=pattern.p_index,
+                MESSAGE=escape_discord_preserving_links(existing_reply.reply_message),
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )
@@ -204,6 +205,7 @@ class ReplyCommandService:
                 "results.reply.disabled_pattern",
                 thread=thread,
                 ID=pattern.p_index,
+                MESSAGE=escape_discord_preserving_links(disabled_reply.reply_message),
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )
@@ -237,6 +239,7 @@ class ReplyCommandService:
                 "results.reply.enabled_pattern",
                 thread=thread,
                 ID=pattern.p_index,
+                MESSAGE=escape_discord_preserving_links(enabled_reply.reply_message),
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )
@@ -352,6 +355,7 @@ class ReplyCommandService:
                 thread=thread,
                 CHANNEL=channel_name,
                 STATE=state_label,
+                MESSAGE=escape_discord_preserving_links(existing_reply.message_template or ""),
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )
@@ -375,6 +379,7 @@ class ReplyCommandService:
                 thread=thread,
                 CHANNEL=channel_name,
                 STATE=state_label,
+                MESSAGE=escape_discord_preserving_links(disabled_reply.message_template or ""),
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )
@@ -398,6 +403,7 @@ class ReplyCommandService:
                 thread=thread,
                 CHANNEL=channel_name,
                 STATE=state_label,
+                MESSAGE=escape_discord_preserving_links(enabled_reply.message_template or ""),
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
             )

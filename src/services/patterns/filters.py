@@ -57,6 +57,7 @@ class PatternFilterResolver:
                         thread,
                         "results.pattern.channel_not_tracked",
                         DISPLAY_NAME=channel_user.display_name,
+                        LOGIN=channel_user.login,
                     )
                 )
             scoped_channels.append(channel_user)
@@ -95,6 +96,7 @@ class PatternFilterResolver:
                         thread,
                         "results.pattern.user_not_tracked",
                         DISPLAY_NAME=resolved_user.display_name,
+                        LOGIN=resolved_user.login,
                     )
                 )
             scoped_users.append(resolved_user)

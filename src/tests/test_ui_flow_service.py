@@ -199,3 +199,31 @@ async def test_ui_flow_guard_blocks_show_modal_without_view_permission() -> None
     assert decision.open_ui is False
     assert decision.result is not None
     assert "permission" in decision.result.title.lower()
+
+
+@pytest.mark.asyncio
+async def test_ui_flow_guard_blocks_reply_add_modal_without_linked_account() -> None:
+    bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread_repository.create(owner_id=200, discord_channel_id=100)
+    DiscordUIFlowGuardService(
+        event_bus=bus,
+        thread_repository=thread_repository,
+        channel_repository=InMemoryChannelRepository(),
+        pattern_repository=EmptyPatternRepository(),
+        reply_repository=EmptyReplyRepository(),
+        account_repository=EmptyAccountRepository(),
+        permission_repository=EmptyPermissionRepository(),
+    )
+
+    decision = await dispatch_ui_flow_decision(
+        bus,
+        discord_channel_id=100,
+        requester_id=200,
+        flow="reply",
+        step="add_pattern",
+    )
+
+    assert decision.open_ui is False
+    assert decision.result is not None
+    assert "account" in decision.result.title.lower()

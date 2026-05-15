@@ -25,12 +25,14 @@ from src.database.connection import (
 )
 from src.events.event_bus import EventBus
 from src.events.event_types import DiscordResultStyle, TwitchChatMessageEvent
+from src.localization import Localizer
 from src.services.pattern_service import (
     PatternCommandService,
     PatternTrackingService,
     ShowCommandService,
     TrackingNotificationSender,
 )
+from src.services.patterns.presentation import PatternCommandPresenter
 
 
 @dataclass
@@ -442,6 +444,89 @@ class FakeNotifier(TrackingNotificationSender):
 
     async def send_tracking_embed(self, discord_channel_id: int, embed, *, channel_login: str | None = None) -> None:
         self.sent.append((discord_channel_id, embed))
+
+
+def test_pattern_presenter_keeps_scope_links_clickable_in_added_summary() -> None:
+    presenter = PatternCommandPresenter(localizer=Localizer.from_directory())
+    pattern = PatternRecord(
+        thread_id=1,
+        p_index=7,
+        regex="hello",
+        channel_scope_mode="only_selected",
+        channel_scope_ids=("42",),
+        user_scope_mode="only_selected",
+        user_scope_ids=("7",),
+        sub_state="all",
+        offline_state="both",
+        is_regex=False,
+        case_sensitive=False,
+        color=None,
+        disabled=False,
+        notify=True,
+        priority=0,
+    )
+
+    rendered = presenter.format_pattern_summary(
+        action="added",
+        pattern=pattern,
+        channel_logins=("[`DanceDown`](https://www.twitch.tv/dancedown)",),
+        user_logins=("[`Alice`](https://www.twitch.tv/alice)",),
+        language="english",
+    )
+
+    assert "`Only in` [`DanceDown`](https://www.twitch.tv/dancedown)" in rendered
+    assert "`Only from` [`Alice`](https://www.twitch.tv/alice)" in rendered
+
+
+def test_pattern_presenter_formats_updated_scope_change_without_wrapping_links_in_code() -> None:
+    presenter = PatternCommandPresenter(localizer=Localizer.from_directory())
+    before = PatternRecord(
+        thread_id=1,
+        p_index=7,
+        regex="hello",
+        channel_scope_mode="all_tracked",
+        channel_scope_ids=(),
+        user_scope_mode="all_users",
+        user_scope_ids=(),
+        sub_state="all",
+        offline_state="both",
+        is_regex=False,
+        case_sensitive=False,
+        color=None,
+        disabled=False,
+        notify=True,
+        priority=0,
+    )
+    after = PatternRecord(
+        thread_id=1,
+        p_index=7,
+        regex="hello",
+        channel_scope_mode="only_selected",
+        channel_scope_ids=("42",),
+        user_scope_mode="only_selected",
+        user_scope_ids=("7",),
+        sub_state="all",
+        offline_state="both",
+        is_regex=False,
+        case_sensitive=False,
+        color=None,
+        disabled=False,
+        notify=True,
+        priority=0,
+    )
+
+    rendered = presenter.format_pattern_changes(
+        before=before,
+        after=after,
+        old_channel_logins=(),
+        new_channel_logins=("[`DanceDown`](https://www.twitch.tv/dancedown)",),
+        old_user_logins=(),
+        new_user_logins=("[`Alice`](https://www.twitch.tv/alice)",),
+        language="english",
+    )
+
+    assert "Where: From Every watched channel to `Only in` [`DanceDown`](https://www.twitch.tv/dancedown)" in rendered
+    assert "Who: From Everyone to `Only from` [`Alice`](https://www.twitch.tv/alice)" in rendered
 
 
 @pytest.mark.asyncio
@@ -1139,6 +1224,62 @@ async def test_show_command_lists_tracked_users_with_links() -> None:
     assert result.style == DiscordResultStyle.INFO
     assert result.ephemeral is True
     assert result.message
+
+
+@pytest.mark.asyncio
+async def test_show_command_renders_where_and_who_as_bullets() -> None:
+    event_bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    channel_repository = InMemoryChannelRepository()
+    channel_repository.add_channel(thread.thread_id, "42")
+    tracked_user_repository = InMemoryTrackedUserRepository()
+    tracked_user_repository.add_user(thread_id=thread.thread_id, twitch_user_id="7")
+    pattern_repository = InMemoryPatternRepository(
+        patterns=[
+            PatternRecord(
+                thread_id=thread.thread_id,
+                p_index=1,
+                regex="hello",
+                channel_scope_mode="only_selected",
+                channel_scope_ids=("42",),
+                user_scope_mode="only_selected",
+                user_scope_ids=("7",),
+                sub_state="all",
+                offline_state="both",
+                is_regex=False,
+                case_sensitive=False,
+                color=None,
+                disabled=False,
+                notify=True,
+                priority=0,
+            )
+        ]
+    )
+    ShowCommandService(
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        pattern_repository=pattern_repository,
+        reply_repository=InMemoryReplyRepository(),
+        twitch_api=FakeTwitchAPI(
+            users_by_login={
+                "example": TwitchUser(user_id="42", login="example", display_name="Example"),
+                "alice": TwitchUser(user_id="7", login="alice", display_name="Alice"),
+            }
+        ),  # type: ignore[arg-type]
+        tracked_user_repository=tracked_user_repository,
+    )
+
+    result = await dispatch_show_command(
+        event_bus,
+        discord_channel_id=100,
+        requester_id=200,
+        sections=("pings",),
+    )
+
+    assert "- Where: Only in [`Example`](https://www.twitch.tv/example)" in result.message
+    assert "- Who: Only from [`Alice`](https://www.twitch.tv/alice)" in result.message
 
 
 @pytest.mark.asyncio

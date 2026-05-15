@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from src.adapters.discord.client import ObserverDiscordClient
 from src.adapters.discord.helpers import _build_public_actor_embed as build_command_public_actor_embed
 from src.adapters.discord.ui.shared import _build_public_actor_embed as build_form_public_actor_embed
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
@@ -39,3 +40,17 @@ def test_public_actor_embed_keeps_legacy_prefix_when_no_user_placeholder_exists(
         assert embed.description is not None
         assert embed.description.startswith("@Tester ")
         assert "Added a ping." in embed.description
+
+
+def test_discord_client_resolves_deferred_user_placeholder_for_channel_notifications() -> None:
+    localizer = Localizer.from_directory()
+    result = DiscordCommandResult(
+        title="Twitch Account Linked",
+        message=localizer._interpolate("{USER} connected {VALUE}", {"VALUE": "account"}),  # type: ignore[attr-defined]
+        style=DiscordResultStyle.SUCCESS,
+        ephemeral=False,
+    )
+
+    resolved = ObserverDiscordClient._resolve_actor_result(result, "<@200>")
+
+    assert resolved.message == "<@200> connected account"

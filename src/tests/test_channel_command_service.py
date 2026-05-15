@@ -712,6 +712,34 @@ async def test_context_color_command_sets_thread_color() -> None:
 
 
 @pytest.mark.asyncio
+async def test_context_color_command_reports_same_color_as_info() -> None:
+    event_bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread_repository.set_color(discord_channel_id=100, color="#abcdef")
+    ThreadLifecycleService(
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        channel_repository=InMemoryChannelRepository(),
+        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        irc_manager=FakeIRCManager(),
+    )
+
+    result = await dispatch_thread_command(
+        event_bus,
+        discord_channel_id=100,
+        requester_id=200,
+        action="color",
+        color="#abcdef",
+        clear_color=False,
+    )
+
+    assert result.style == DiscordResultStyle.INFO
+    assert result.ephemeral is True
+    assert "#abcdef" in result.message
+
+
+@pytest.mark.asyncio
 async def test_language_command_updates_thread_language_and_returns_localized_result() -> None:
     event_bus = EventBus()
     thread_repository = InMemoryThreadRepository()
@@ -737,3 +765,30 @@ async def test_language_command_updates_thread_language_and_returns_localized_re
     assert thread.language == "german"
     assert result.style == DiscordResultStyle.SUCCESS
     assert result.ephemeral is False
+
+
+@pytest.mark.asyncio
+async def test_language_command_reports_same_language_as_info() -> None:
+    event_bus = EventBus()
+    thread_repository = InMemoryThreadRepository()
+    thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread_repository.set_language(discord_channel_id=100, language="german")
+    ThreadLifecycleService(
+        event_bus=event_bus,
+        thread_repository=thread_repository,
+        channel_repository=InMemoryChannelRepository(),
+        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        irc_manager=FakeIRCManager(),
+    )
+
+    result = await dispatch_thread_command(
+        event_bus,
+        discord_channel_id=100,
+        requester_id=200,
+        action="language",
+        language="german",
+    )
+
+    assert result.style == DiscordResultStyle.INFO
+    assert result.ephemeral is True
+    assert "Deutsch" in result.message or "German" in result.message

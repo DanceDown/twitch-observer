@@ -235,28 +235,27 @@ class PatternCommandPresenter:
         language: str,
         label_prefix: str,
     ) -> str | None:
-        selected_items = ", ".join(selected)
         if mode == "all_users":
             return None
         if mode == "all_tracked":
             return self.localizer.text(f"results.pattern.scope.{label_prefix}_all", language=language)
         if mode == "only_selected":
-            return self.localizer.text(
-                f"results.pattern.scope.{label_prefix}_only",
+            return self._scope_text_with_items(
+                key=f"results.pattern.scope.{label_prefix}_only",
+                items=selected,
                 language=language,
-                ITEMS=selected_items,
             )
         if mode == "all_except_selected":
-            return self.localizer.text(
-                f"results.pattern.scope.{label_prefix}_except",
+            return self._scope_text_with_items(
+                key=f"results.pattern.scope.{label_prefix}_except",
+                items=selected,
                 language=language,
-                ITEMS=selected_items,
             )
         if mode == "all_tracked_except_selected":
-            return self.localizer.text(
-                f"results.pattern.scope.{label_prefix}_tracked_except",
+            return self._scope_text_with_items(
+                key=f"results.pattern.scope.{label_prefix}_tracked_except",
+                items=selected,
                 language=language,
-                ITEMS=selected_items,
             )
         return None
 
@@ -277,4 +276,26 @@ class PatternCommandPresenter:
 
     def offline_state(self, value: str, *, language: str) -> str:
         return self.localizer.text(f"results.pattern.offline_state.{value}", language=language)
+
+    def _scope_text_with_items(
+        self,
+        *,
+        key: str,
+        items: tuple[str, ...],
+        language: str,
+    ) -> str:
+        marker = "\u0000ITEMS\u0000"
+        template = self.localizer.text(key, language=language, ITEMS=marker)
+        if marker not in template:
+            return template
+        before, after = template.split(marker, 1)
+        rendered_items = ", ".join(items)
+        parts: list[str] = []
+        if before.strip():
+            parts.append(f"`{before.strip()}`")
+        if rendered_items:
+            parts.append(rendered_items)
+        if after.strip():
+            parts.append(f"`{after.strip()}`")
+        return " ".join(parts)
 

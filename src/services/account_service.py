@@ -120,6 +120,7 @@ class AccountCommandService:
                 "results.account.already_linked",
                 thread=thread,
                 DISPLAY_NAME=account_name or self.localizer.text("results.account.existing_account", language=thread.language),
+                LOGIN=account.twitch_login if account is not None else "",
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -180,6 +181,7 @@ class AccountCommandService:
             "results.account.unlinked",
             thread=thread,
             DISPLAY_NAME=account_name or self.localizer.text("results.account.existing_account", language=thread.language),
+            LOGIN=account.twitch_login if account is not None else "",
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
         )
@@ -411,6 +413,7 @@ class DeviceFlowPollingService:
                         thread,
                         "results.account.linked",
                         DISPLAY_NAME=await self._display_name_for_user_id(stored.twitch_user_id, stored.twitch_login),
+                        LOGIN=stored.twitch_login,
                         style=DiscordResultStyle.SUCCESS,
                         ephemeral=True,
                     ),

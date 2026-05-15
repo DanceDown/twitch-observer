@@ -275,9 +275,18 @@ class ThreadLifecycleService:
                 ephemeral=True,
                 DETAIL="Color must use the format `#RRGGBB` or set `clear:true`.",
             )
+        normalized_color = event.color.strip()
+        if thread.color == normalized_color:
+            return self.localizer.thread_result(
+                "results.thread.already_color",
+                thread=thread,
+                style=DiscordResultStyle.INFO,
+                ephemeral=True,
+                COLOR=normalized_color,
+            )
         updated = self.thread_repository.set_color(
             discord_channel_id=event.discord_channel_id,
-            color=event.color.strip(),
+            color=normalized_color,
         )
         assert updated is not None
         return self.localizer.thread_result(
@@ -320,6 +329,19 @@ class ThreadLifecycleService:
                     "Unsupported language. Available languages: "
                     + ", ".join(f"`{language}`" for language in self.localizer.available_languages())
                 ),
+            )
+        if thread.language == requested_language:
+            language_name = self.localizer.text(
+                "common.language_name",
+                language=requested_language,
+            )
+            return self.localizer.thread_result(
+                "results.thread.already_language",
+                thread=thread,
+                style=DiscordResultStyle.INFO,
+                ephemeral=True,
+                LANGUAGE_NAME=language_name,
+                LANGUAGE_CODE=requested_language,
             )
         updated = self.thread_repository.set_language(
             discord_channel_id=event.discord_channel_id,

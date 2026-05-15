@@ -113,6 +113,14 @@
       "language_updated": {
         "title": "Language Updated",
         "message": "{USER} taught me `{LANGUAGE_NAME}` <a:yo:1497686448717959369>"
+      },
+      "already_color": {
+        "title": "Already This Color",
+        "message": "I'm already wearing `{COLOR}` <:oopsie:1497720439810687006>"
+      },
+      "already_language": {
+        "title": "Already This Language",
+        "message": "I'm already speaking `{LANGUAGE_NAME}` <:oopsie:1497720439810687006>"
       }
     },
     "channel": {
@@ -130,7 +138,7 @@
       },
       "not_found": {
         "title": "Not Found",
-        "message": "I'm not watching `{DISPLAY_NAME}` at the moment <:oopsie:1497720439810687006>"
+        "message": "I'm not watching [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) at the moment <:oopsie:1497720439810687006>"
       },
       "color_cleared": {
         "title": "Channel Color Cleared",
@@ -318,7 +326,7 @@
       },
       "removed_pattern": {
         "title": "Auto-Reply Removed",
-        "message": "{USER} removed the auto-reply from ping `{ID}` <:ApuApproved:1497724288256446465>"
+        "message": "{USER} removed the auto-reply from ping `{ID}` <:ApuApproved:1497724288256446465>\nMessage: {MESSAGE}"
       },
       "already_disabled": {
         "title": "Already Disabled",
@@ -330,11 +338,11 @@
       },
       "disabled_pattern": {
         "title": "Auto-Reply Disabled",
-        "message": "{USER} disabled the auto-reply from ping `{ID}` <a:yes:1497686393369919559>"
+        "message": "{USER} disabled the auto-reply from ping `{ID}` <a:yes:1497686393369919559>\nMessage: {MESSAGE}"
       },
       "enabled_pattern": {
         "title": "Auto-Reply Enabled",
-        "message": "{USER} enabled the auto-reply from ping `{ID}` <a:yes:1497686393369919559>"
+        "message": "{USER} enabled the auto-reply from ping `{ID}` <a:yes:1497686393369919559>\nMessage: {MESSAGE}"
       },
       "event_unavailable": "Event auto-replies are not available here right now <a:peepoConfused:1497729266266275840>",
       "missing_event": "Choose a live or offline event first <:oopsie:1497720439810687006>",
@@ -353,15 +361,15 @@
       },
       "removed_event": {
         "title": "Auto-Reply Removed",
-        "message": "{USER} removed the `{STATE}` auto-reply for `{CHANNEL}` <:ApuApproved:1497724288256446465>"
+        "message": "{USER} removed the `{STATE}` auto-reply for `{CHANNEL}` <:ApuApproved:1497724288256446465>\nMessage: {MESSAGE}"
       },
       "disabled_event": {
         "title": "Auto-Reply Disabled",
-        "message": "{USER} disabled the `{STATE}` auto-reply for `{CHANNEL}` <a:yes:1497686393369919559>"
+        "message": "{USER} disabled the `{STATE}` auto-reply for `{CHANNEL}` <a:yes:1497686393369919559>\nMessage: {MESSAGE}"
       },
       "enabled_event": {
         "title": "Auto-Reply Enabled",
-        "message": "{USER} enabled the `{STATE}` auto-reply for `{CHANNEL}` <a:yes:1497686393369919559>"
+        "message": "{USER} enabled the `{STATE}` auto-reply for `{CHANNEL}` <a:yes:1497686393369919559>\nMessage: {MESSAGE}"
       },
       "unsupported_action": "I don't know that auto-reply action <a:peepoConfused:1497729266266275840>"
     },
@@ -430,7 +438,7 @@
       "message_too_long": "That message is too long for Twitch. Please keep it at 500 characters or less <a:OhNo:1497685055948980306>",
       "channel_not_tracked": {
         "title": "Channel Not Watched",
-        "message": "I'm not watching `{DISPLAY_NAME}` yet. Add the channel first with `/channel add` <:Binoculars:1497727665283662077>"
+        "message": "I'm not watching [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) yet. Add the channel first with `/channel add` <:Binoculars:1497727665283662077>"
       },
       "no_linked_account": {
         "title": "No Linked Account",
@@ -442,11 +450,11 @@
       },
       "reply_sent": {
         "title": "Twitch Reply Sent",
-        "message": "I replied in `{DISPLAY_NAME}`'s chat <a:yo:1497686448717959369>\nReply target: `{REPLY_TARGET}`\nMessage: `{MESSAGE}`"
+        "message": "I replied in [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN})'s chat <a:yo:1497686448717959369>\nReply target: `{REPLY_TARGET}`\nMessage: `{MESSAGE}`"
       },
       "message_sent": {
         "title": "Twitch Message Sent",
-        "message": "I sent that to `{DISPLAY_NAME}`'s chat <a:yo:1497686448717959369>\nMessage: `{MESSAGE}`"
+        "message": "I sent that to [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN})'s chat <a:yo:1497686448717959369>\nMessage: `{MESSAGE}`"
       }
     },
     "pattern": {
@@ -474,10 +482,10 @@
       "unsupported_channel_scope": "That channel scope confused me <a:peepoConfused:1497729266266275840>",
       "unexpected_selected_channels": "For every watched channel, I don't need selected channels too <:ShrugMan:1497685241962430717>",
       "missing_selected_channels": "Pick at least one channel for this scope first <:Binoculars:1497727665283662077>",
-      "channel_not_tracked": "I'm not watching `{DISPLAY_NAME}` yet. Add the channel first with `/channel` <:Binoculars:1497727665283662077>",
+      "channel_not_tracked": "I'm not watching [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) yet. Add the channel first with `/channel` <:Binoculars:1497727665283662077>",
       "unsupported_user_scope": "That user scope confused me <a:peepoConfused:1497729266266275840>",
       "missing_selected_users": "Pick at least one Twitch user for this scope first <a:peepoSmart:1497731090704498781>",
-      "user_not_tracked": "I don't remember `{DISPLAY_NAME}` yet. Add the user first with `/user` <a:peepoSmart:1497731090704498781>",
+      "user_not_tracked": "I don't remember [`{DISPLAY_NAME}`](https://www.twitch.tv/{LOGIN}) yet. Add the user first with `/user` <a:peepoSmart:1497731090704498781>",
       "missing_stable_id": "Use the ID from `/show` so I know exactly which ping you mean <a:peepoSmart:1497731090704498781>",
       "already_exists": {
         "title": "Already Exists",
@@ -610,7 +618,9 @@
       "subscribers_only": "- Subscribers only",
       "non_subscribers_only": "- Non-subscribers only",
       "only_while_live": "- Only while live",
-      "only_while_offline": "- Only while offline"
+      "only_while_offline": "- Only while offline",
+      "where": "- Where: {VALUE}",
+      "who": "- Who: {VALUE}"
     },
     "reply": {
       "line": "- `{ID}`",

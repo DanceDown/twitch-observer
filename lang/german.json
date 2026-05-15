@@ -113,6 +113,14 @@
       "language_updated": {
         "title": "Sprache aktualisiert",
         "message": "{USER} hat mir `{LANGUAGE_NAME}` beigebracht <a:yo:1497686448717959369>"
+      },
+      "already_color": {
+        "title": "Diese Farbe habe ich schon",
+        "message": "Ich trage schon `{COLOR}` <:oopsie:1497720439810687006>"
+      },
+      "already_language": {
+        "title": "Diese Sprache spreche ich schon",
+        "message": "Ich spreche schon `{LANGUAGE_NAME}` <:oopsie:1497720439810687006>"
       }
     },
     "channel": {
@@ -318,7 +326,7 @@
       },
       "removed_pattern": {
         "title": "Auto-Antwort entfernt",
-        "message": "{USER} hat die Auto-Antwort von Ping `{ID}` entfernt <:ApuApproved:1497724288256446465>"
+        "message": "{USER} hat die Auto-Antwort von Ping `{ID}` entfernt <:ApuApproved:1497724288256446465>\nNachricht: {MESSAGE}"
       },
       "already_disabled": {
         "title": "Schon deaktiviert",
@@ -330,11 +338,11 @@
       },
       "disabled_pattern": {
         "title": "Auto-Antwort deaktiviert",
-        "message": "{USER} hat die Auto-Antwort von Ping `{ID}` deaktiviert <a:yes:1497686393369919559>"
+        "message": "{USER} hat die Auto-Antwort von Ping `{ID}` deaktiviert <a:yes:1497686393369919559>\nNachricht: {MESSAGE}"
       },
       "enabled_pattern": {
         "title": "Auto-Antwort aktiviert",
-        "message": "{USER} hat die Auto-Antwort von Ping `{ID}` aktiviert <a:yes:1497686393369919559>"
+        "message": "{USER} hat die Auto-Antwort von Ping `{ID}` aktiviert <a:yes:1497686393369919559>\nNachricht: {MESSAGE}"
       },
       "event_unavailable": "Event-Auto-Antworten sind hier gerade nicht verfügbar <a:peepoConfused:1497729266266275840>",
       "missing_event": "Wähle zuerst ein Live- oder Offline-Event aus <:oopsie:1497720439810687006>",
@@ -353,15 +361,15 @@
       },
       "removed_event": {
         "title": "Auto-Antwort entfernt",
-        "message": "{USER} hat die `{STATE}`-Auto-Antwort für `{CHANNEL}` entfernt <:ApuApproved:1497724288256446465>"
+        "message": "{USER} hat die `{STATE}`-Auto-Antwort f?r `{CHANNEL}` entfernt <:ApuApproved:1497724288256446465>\nNachricht: {MESSAGE}"
       },
       "disabled_event": {
         "title": "Auto-Antwort deaktiviert",
-        "message": "{USER} hat die `{STATE}`-Auto-Antwort für `{CHANNEL}` deaktiviert <a:yes:1497686393369919559>"
+        "message": "{USER} hat die `{STATE}`-Auto-Antwort f?r `{CHANNEL}` deaktiviert <a:yes:1497686393369919559>\nNachricht: {MESSAGE}"
       },
       "enabled_event": {
         "title": "Auto-Antwort aktiviert",
-        "message": "{USER} hat die `{STATE}`-Auto-Antwort für `{CHANNEL}` aktiviert <a:yes:1497686393369919559>"
+        "message": "{USER} hat die `{STATE}`-Auto-Antwort f?r `{CHANNEL}` aktiviert <a:yes:1497686393369919559>\nNachricht: {MESSAGE}"
       },
       "unsupported_action": "Diese Auto-Antwort-Aktion kenne ich nicht <a:peepoConfused:1497729266266275840>"
     },
@@ -610,7 +618,9 @@
       "subscribers_only": "- Nur für Abonnenten",
       "non_subscribers_only": "- Nur für Nicht-Abonnenten",
       "only_while_live": "- Nur während live",
-      "only_while_offline": "- Nur während offline"
+      "only_while_offline": "- Nur während offline",
+      "where": "- Wo: {VALUE}",
+      "who": "- Wer: {VALUE}"
     },
     "reply": {
       "line": "- `{ID}`",
