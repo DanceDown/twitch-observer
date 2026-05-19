@@ -60,7 +60,7 @@ def test_localizer_formats_localized_lists() -> None:
         }
     )
 
-    rendered = localizer.format_list("example.items", ["one", "two"], language="english")
+    rendered = localizer.format_list("<{RAW:LIST_ITEM}>", ", ", ["one", "two"])
 
     assert rendered == "<one>, <two>"
 

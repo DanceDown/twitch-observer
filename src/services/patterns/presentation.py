@@ -98,7 +98,7 @@ class PatternCommandPresenter:
                 PRIORITY=pattern.priority,
             )
         )
-        return self.localizer.text("common.lists.bullets", language=language, ITEMS=parts)
+        return self.localizer.text("results.pattern.lists.bullets", language=language, ITEMS=parts)
 
     def format_pattern_changes(
         self,
@@ -227,7 +227,7 @@ class PatternCommandPresenter:
                     AFTER=after.priority,
                 )
             )
-        return self.localizer.text("common.lists.bullets", language=language, ITEMS=changes)
+        return self.localizer.text("results.pattern.lists.bullets", language=language, ITEMS=changes)
 
     def scope_text(
         self,

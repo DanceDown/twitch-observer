@@ -110,7 +110,7 @@ CREATE INDEX idx_tracked_user_twitch_user_id
 -- Pattern rules
 ----------------------------
 CREATE TABLE pattern (
-    pattern_id              SERIAL PRIMARY KEY,
+    pattern_id           SERIAL PRIMARY KEY,
     thread_id            INTEGER NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,
     regex                TEXT NOT NULL,
     channel_scope_mode   CHANNEL_SCOPE_MODE_ENUM NOT NULL DEFAULT 'all_tracked',

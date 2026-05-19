@@ -96,22 +96,12 @@ class Localizer:
 
     def format_list(
         self,
-        key: str,
+        item_format: str,
+        separator: str,
         items: list[dict[str, object] | object] | tuple[dict[str, object] | object, ...],
-        *,
-        language: str | None = None,
         **shared_placeholders: object,
     ) -> str:
         """Render one localized list by formatting each item and joining them."""
-        value = self.value(key, language=language)
-        if not isinstance(value, dict):
-            raise LocalizationError(f"Translation key {key!r} is not an object.")
-
-        item_format = value.get("item_format")
-        separator = value.get("separator")
-        if not isinstance(item_format, str) or not isinstance(separator, str):
-            raise LocalizationError(f"List format {key!r} must contain string item_format/separator.")
-
         rendered_items: list[str] = []
         for item in items:
             placeholders = dict(shared_placeholders)
@@ -157,15 +147,19 @@ class Localizer:
                 continue
             if not isinstance(spec, dict):
                 raise LocalizationError(f"Placeholder spec for {name!r} must be an object.")
-            list_key = spec.get("list")
-            if list_key is None:
+            list_spec = spec.get("list")
+            if list_spec is None:
                 continue
-            if not isinstance(list_key, str):
-                raise LocalizationError(f"Placeholder list spec for {name!r} must be a string.")
+            if not isinstance(list_spec, dict):
+                raise LocalizationError(f"Placeholder list spec for {name!r} must be an object.")
+            item_format = list_spec.get("item_format")
+            separator = list_spec.get("separator")
+            if not isinstance(item_format, str) or not isinstance(separator, str):
+                raise LocalizationError(f"Placeholder list spec for {name!r} must define string item_format/separator.")
             value = prepared[name]
             if not isinstance(value, list | tuple):
                 raise LocalizationError(f"Placeholder {name!r} must be a list or tuple for list formatting.")
-            prepared[name] = self.format_list(list_key, value, language=language)
+            prepared[name] = self.format_list(item_format, separator, value)
         return prepared
 
     @staticmethod

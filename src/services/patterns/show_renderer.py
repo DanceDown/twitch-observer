@@ -549,23 +549,23 @@ class ShowSectionRenderer:
 
     def bullets(self, items: list[str], *, language: str) -> str:
         """Render plain bullet items."""
-        return self._localizer.text("common.lists.bullets", language=language, ITEMS=items)
+        return self._localizer.text("show.lists.bullets", language=language, ITEMS=items)
 
     def indented_bullets(self, items: list[str], *, language: str) -> str:
         """Render indented bullet items."""
-        return self._localizer.text("common.lists.indented_bullets", language=language, ITEMS=items)
+        return self._localizer.text("show.lists.indented_bullets", language=language, ITEMS=items)
 
     def raw_lines(self, items: list[str], *, language: str) -> str:
         """Join already-rendered lines without adding prefixes."""
-        return self._localizer.text("common.lists.raw_lines", language=language, ITEMS=items)
+        return self._localizer.text("show.lists.raw_lines", language=language, ITEMS=items)
 
     def section_breaks(self, items: list[str], *, language: str) -> str:
         """Join full sections with the standard section separator."""
-        return self._localizer.text("common.lists.section_breaks", language=language, ITEMS=items)
+        return self._localizer.text("show.lists.section_breaks", language=language, ITEMS=items)
 
     def comma_list(self, items: list[str] | tuple[str, ...], *, language: str) -> str:
         """Render inline comma-separated fragments."""
-        return self._localizer.text("common.lists.comma_raw", language=language, ITEMS=list(items))
+        return self._localizer.text("show.lists.comma_raw", language=language, ITEMS=list(items))
 
     def grouped_bullet(self, head: str, details: list[str], *, language: str) -> str:
         """Render one main bullet with optional indented detail bullets."""

@@ -9,7 +9,7 @@
         "template": "`Only in` {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
-            "list": "common.list_formats.comma_raw"
+            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
           }
         }
       },
@@ -17,7 +17,7 @@
         "template": "`Everyone except` {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
-            "list": "common.list_formats.comma_raw"
+            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
           }
         }
       },
@@ -25,7 +25,7 @@
         "template": "`Every watched channel except` {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
-            "list": "common.list_formats.comma_raw"
+            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
           }
         }
       },
@@ -33,7 +33,7 @@
         "template": "`Only from` {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
-            "list": "common.list_formats.comma_raw"
+            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
           }
         }
       },
@@ -41,7 +41,7 @@
         "template": "`All known Twitch users except` {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
-            "list": "common.list_formats.comma_raw"
+            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
           }
         }
       }
@@ -56,82 +56,6 @@
       "section": "**{TITLE}**\n{RAW:SECTION_BODY}",
       "inline_code": "`{CODE:TEXT}`",
       "discord_user_mention": "<@{RAW:USER_ID}>"
-    },
-    "list_formats": {
-      "raw_lines": {
-        "item_format": "{RAW:LIST_ITEM}",
-        "separator": "\n"
-      },
-      "bullets": {
-        "item_format": "- {RAW:LIST_ITEM}",
-        "separator": "\n"
-      },
-      "indented_bullets": {
-        "item_format": "  - {RAW:LIST_ITEM}",
-        "separator": "\n"
-      },
-      "comma_raw": {
-        "item_format": "{RAW:LIST_ITEM}",
-        "separator": ", "
-      },
-      "comma_code": {
-        "item_format": "`{CODE:LIST_ITEM}`",
-        "separator": ", "
-      },
-      "section_breaks": {
-        "item_format": "{RAW:LIST_ITEM}",
-        "separator": "\n\n"
-      }
-    },
-    "lists": {
-      "raw_lines": {
-        "template": "{RAW:ITEMS}",
-        "placeholders": {
-          "ITEMS": {
-            "list": "common.list_formats.raw_lines"
-          }
-        }
-      },
-      "bullets": {
-        "template": "{RAW:ITEMS}",
-        "placeholders": {
-          "ITEMS": {
-            "list": "common.list_formats.bullets"
-          }
-        }
-      },
-      "indented_bullets": {
-        "template": "{RAW:ITEMS}",
-        "placeholders": {
-          "ITEMS": {
-            "list": "common.list_formats.indented_bullets"
-          }
-        }
-      },
-      "comma_raw": {
-        "template": "{RAW:ITEMS}",
-        "placeholders": {
-          "ITEMS": {
-            "list": "common.list_formats.comma_raw"
-          }
-        }
-      },
-      "comma_code": {
-        "template": "{RAW:ITEMS}",
-        "placeholders": {
-          "ITEMS": {
-            "list": "common.list_formats.comma_code"
-          }
-        }
-      },
-      "section_breaks": {
-        "template": "{RAW:ITEMS}",
-        "placeholders": {
-          "ITEMS": {
-            "list": "common.list_formats.section_breaks"
-          }
-        }
-      }
     }
   },
   "results": {
@@ -319,7 +243,7 @@
         "message": "{RAW:SECTION_LIST}",
         "placeholders": {
           "SECTION_LIST": {
-            "list": "common.list_formats.section_breaks"
+            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": "\n\n"}
           }
         }
       }
@@ -403,7 +327,7 @@
         "message": "{RAW:USER} gave {RAW:TARGET} these permissions <a:yes:1497686393369919559>\n{RAW:PERMISSIONS}",
         "placeholders": {
           "PERMISSIONS": {
-            "list": "common.list_formats.bullets"
+            "list": {"item_format": "- {RAW:LIST_ITEM}", "separator": "\n"}
           }
         }
       },
@@ -412,7 +336,7 @@
         "message": "{RAW:TARGET} does not explicitly have these permissions here <:ShrugMan:1497685241962430717>\n{RAW:PERMISSIONS}",
         "placeholders": {
           "PERMISSIONS": {
-            "list": "common.list_formats.bullets"
+            "list": {"item_format": "- {RAW:LIST_ITEM}", "separator": "\n"}
           }
         }
       },
@@ -421,7 +345,7 @@
         "message": "{RAW:USER} removed these permissions from {RAW:TARGET} <a:yes:1497686393369919559>\n{RAW:PERMISSIONS}",
         "placeholders": {
           "PERMISSIONS": {
-            "list": "common.list_formats.bullets"
+            "list": {"item_format": "- {RAW:LIST_ITEM}", "separator": "\n"}
           }
         }
       },
@@ -627,7 +551,7 @@
       "missing_stable_id": "Use the ID from `/show` so I know exactly which ping you mean <a:peepoSmart:1497731090704498781>",
       "already_exists": {
         "title": "Already Exists",
-        "message": "I already know this {TYPE} as ID {CODE:ID} <:oopsie:1497720439810687006>"
+        "message": "I already know this {ALREADY_EXISTS_TYPE} as ID {CODE:ID} <:oopsie:1497720439810687006>"
       },
       "already_exists_other": {
         "title": "Already Exists",
@@ -651,26 +575,72 @@
       },
       "already_disabled": {
         "title": "Already Disabled",
-        "message": "This {TYPE} is already quietly lurking <a:Lurk:1497684902135463986>"
+        "message": "This {ALREADY_DISABLED_TYPE} is already quietly lurking <a:Lurk:1497684902135463986>"
       },
       "already_enabled": {
         "title": "Already Enabled",
-        "message": "This {TYPE} is already awake <a:yes:1497686393369919559>"
+        "message": "This {ALREADY_ENABLED_TYPE} is already awake <a:yes:1497686393369919559>"
       },
-      "added_title": "{TYPE} Added",
-      "removed_title": "{TYPE} Removed",
-      "disabled_title": "{TYPE} Disabled",
-      "enabled_title": "{TYPE} Enabled",
+      "added_title": "{ADDED_TYPE} Added",
+      "removed_title": "{REMOVED_TYPE} Removed",
+      "disabled_title": "{DISABLED_TYPE} Disabled",
+      "enabled_title": "{ENABLED_TYPE} Enabled",
       "updated_title": "Pattern Updated",
-      "removed": "removed {TYPE} {CODE:ID} <:ApuApproved:1497724288256446465>\n{TYPE}: {CODE:TEXT}",
-      "disabled": "disabled {TYPE} {CODE:ID} <:ApuApproved:1497724288256446465>\n{TYPE}: {CODE:TEXT}",
-      "enabled": "enabled {TYPE} {CODE:ID} <a:yes:1497686393369919559>\n{TYPE}: {CODE:TEXT}",
+      "removed": "removed {REMOVED_BODY_TYPE} {CODE:ID} <:ApuApproved:1497724288256446465>\n{REMOVED_BODY_TYPE}: {CODE:TEXT}",
+      "disabled": "disabled {DISABLED_BODY_TYPE} {CODE:ID} <:ApuApproved:1497724288256446465>\n{DISABLED_BODY_TYPE}: {CODE:TEXT}",
+      "enabled": "enabled {ENABLED_BODY_TYPE} {CODE:ID} <a:yes:1497686393369919559>\n{ENABLED_BODY_TYPE}: {CODE:TEXT}",
       "actions": {
         "added": "added"
       },
       "type": {
         "ping": "ping",
         "regex": "regex"
+      },
+      "type_title": {
+        "ping": "Ping",
+        "regex": "Regex"
+      },
+      "type_for": {
+        "already_exists": {
+          "ping": "ping",
+          "regex": "regex"
+        },
+        "already_disabled": {
+          "ping": "ping",
+          "regex": "regex"
+        },
+        "already_enabled": {
+          "ping": "ping",
+          "regex": "regex"
+        },
+        "added_title": {
+          "ping": "Ping",
+          "regex": "Regex"
+        },
+        "removed_title": {
+          "ping": "Ping",
+          "regex": "Regex"
+        },
+        "disabled_title": {
+          "ping": "Ping",
+          "regex": "Regex"
+        },
+        "enabled_title": {
+          "ping": "Ping",
+          "regex": "Regex"
+        },
+        "removed_body": {
+          "ping": "ping",
+          "regex": "regex"
+        },
+        "disabled_body": {
+          "ping": "ping",
+          "regex": "regex"
+        },
+        "enabled_body": {
+          "ping": "ping",
+          "regex": "regex"
+        }
       },
       "mode": {
         "ping": "Normal ping",
@@ -696,7 +666,7 @@
           "template": "`Only in` {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": "common.list_formats.comma_raw"
+              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
             }
           }
         },
@@ -704,7 +674,7 @@
           "template": "`Every watched channel except` {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": "common.list_formats.comma_raw"
+              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
             }
           }
         },
@@ -712,7 +682,7 @@
           "template": "`Every watched channel except` {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": "common.list_formats.comma_raw"
+              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
             }
           }
         },
@@ -721,7 +691,7 @@
           "template": "`Only from` {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": "common.list_formats.comma_raw"
+              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
             }
           }
         },
@@ -729,7 +699,7 @@
           "template": "`Everyone except` {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": "common.list_formats.comma_raw"
+              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
             }
           }
         },
@@ -737,7 +707,7 @@
           "template": "`All known Twitch users except` {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": "common.list_formats.comma_raw"
+              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
             }
           }
         }
@@ -765,6 +735,16 @@
         "case_sensitive": "Case-Sensitive: From {CODE:BEFORE} to {CODE:AFTER}",
         "color": "Color: From {CODE:BEFORE} to {CODE:AFTER}",
         "priority": "Priority: From {CODE:BEFORE} to {CODE:AFTER}"
+      },
+      "lists": {
+        "bullets": {
+          "template": "{RAW:ITEMS}",
+          "placeholders": {
+            "ITEMS": {
+              "list": {"item_format": "- {RAW:LIST_ITEM}", "separator": "\n"}
+            }
+          }
+        }
       }
     },
     "validation_detail": {
@@ -774,13 +754,55 @@
         "template": "Unsupported language. Available languages: {RAW:LANGUAGES}",
         "placeholders": {
           "LANGUAGES": {
-            "list": "common.list_formats.comma_code"
+            "list": {"item_format": "`{CODE:LIST_ITEM}`", "separator": ", "}
           }
         }
       }
     }
   },
   "show": {
+    "lists": {
+      "raw_lines": {
+        "template": "{RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": "\n"}
+          }
+        }
+      },
+      "bullets": {
+        "template": "{RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": {"item_format": "- {RAW:LIST_ITEM}", "separator": "\n"}
+          }
+        }
+      },
+      "indented_bullets": {
+        "template": "{RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": {"item_format": "  - {RAW:LIST_ITEM}", "separator": "\n"}
+          }
+        }
+      },
+      "comma_raw": {
+        "template": "{RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+          }
+        }
+      },
+      "section_breaks": {
+        "template": "{RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": "\n\n"}
+          }
+        }
+      }
+    },
     "sections": {
       "tracked_channels": "Twitch channels I'm watching",
       "pings": "Pings",
@@ -802,7 +824,7 @@
         "template": "Notifications: {RAW:STATES}",
         "placeholders": {
           "STATES": {
-            "list": "common.list_formats.comma_raw"
+            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
           }
         }
       }
@@ -1123,7 +1145,7 @@
           "template": "{RAW:SUMMARY_LINES}\n\nUse the buttons below to fill out each section.\nNeed a hex color? [Open color picker]({RAW:COLOR_PICKER_URL})",
           "placeholders": {
             "SUMMARY_LINES": {
-              "list": "common.list_formats.raw_lines"
+              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": "\n"}
             }
           }
         },
@@ -1132,7 +1154,7 @@
           "template": "Only: {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": "common.list_formats.comma_raw"
+              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
             }
           }
         },
@@ -1141,7 +1163,7 @@
           "template": "All except: {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": "common.list_formats.comma_raw"
+              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
             }
           }
         },
@@ -1152,7 +1174,7 @@
           "template": "All known except: {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": "common.list_formats.comma_raw"
+              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
             }
           }
         },
@@ -1161,7 +1183,7 @@
           "template": "Only: {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": "common.list_formats.comma_raw"
+              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
             }
           }
         },
@@ -1170,7 +1192,7 @@
           "template": "Everyone except: {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": "common.list_formats.comma_raw"
+              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
             }
           }
         },
@@ -1327,3 +1349,4 @@
     }
   }
 }
+
