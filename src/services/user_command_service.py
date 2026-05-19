@@ -25,6 +25,8 @@ class UserCommandService:
     twitch_user_lookup: TwitchUserLookup
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     permission_repository: UserPermissionRepository | None = None
+    _runner: CommandExecutionRunner = field(init=False, repr=False)
+    _guards: ThreadCommandGuards = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         self._runner = CommandExecutionRunner(localizer=self.localizer, resolve_thread=self._resolve_thread)

@@ -1,6 +1,7 @@
 """Discord entrypoint package exports."""
 
 from .entrypoint import DiscordEntrypoint
+from .service_bundle import DiscordServiceBundle
 from .dispatch import (
     dispatch_add_channel_event,
     dispatch_add_channel_event_reply,
@@ -43,6 +44,7 @@ from .dispatch import (
 
 __all__ = [
     "DiscordEntrypoint",
+    "DiscordServiceBundle",
     "dispatch_add_channel_event",
     "dispatch_add_channel_event_reply",
     "dispatch_add_pattern",
