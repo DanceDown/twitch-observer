@@ -1,12 +1,11 @@
-﻿"""Shared Twitch runtime helpers used across services and adapters."""
+"""Shared Twitch runtime helpers used across services and gateways."""
 
 from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import Protocol
 
-from src.adapters.twitch_api import TwitchAPIClient, TwitchAPIError, TwitchUser
+from src.gateways.twitch_api import TwitchAPIError, TwitchUser
 from src.database.connection import (
     PatternRecord,
     ThreadRecord,
@@ -15,6 +14,7 @@ from src.database.connection import (
     TwitchAccountRecord,
     TwitchAccountRepository,
 )
+from src.services.twitch_gateways import TwitchAuthGateway, TwitchUserLookup
 
 logger = logging.getLogger(__name__)
 
@@ -30,23 +30,11 @@ DISCORD_NOTIFY_ACTION = "discord_notify"
 TWITCH_SEND_MESSAGE_ACTION = "twitch_send_message"
 
 
-class TwitchUserLookupClient(Protocol):
-    """Minimal lookup surface shared by the runtime Twitch services."""
-
-    async def get_user_by_login(self, login: str) -> TwitchUser: ...
-
-    async def get_user_by_id(self, user_id: str) -> TwitchUser: ...
-
-    def get_cached_user_by_login(self, login: str) -> TwitchUser | None: ...
-
-    def get_cached_user_by_id(self, user_id: str) -> TwitchUser | None: ...
-
-
 async def ensure_fresh_linked_account(
     *,
     account: TwitchAccountRecord,
     account_repository: TwitchAccountRepository,
-    twitch_api: TwitchAPIClient,
+    twitch_auth: TwitchAuthGateway,
     token_refresh_skew_seconds: int,
     thread_repository: ThreadRepository | None = None,
     thread: ThreadRecord | None = None,
@@ -64,7 +52,7 @@ async def ensure_fresh_linked_account(
         await refresh_linked_account(
             account=account,
             account_repository=account_repository,
-            twitch_api=twitch_api,
+            twitch_auth=twitch_auth,
             thread_repository=thread_repository,
             thread=thread,
         )
@@ -76,7 +64,7 @@ async def refresh_linked_account(
     *,
     account: TwitchAccountRecord,
     account_repository: TwitchAccountRepository,
-    twitch_api: TwitchAPIClient,
+    twitch_auth: TwitchAuthGateway,
     thread_repository: ThreadRepository | None = None,
     thread: ThreadRecord | None = None,
 ) -> TwitchAccountRecord | None:
@@ -84,8 +72,8 @@ async def refresh_linked_account(
     if not account.refresh_token:
         return None
     try:
-        refreshed = await twitch_api.refresh_user_access_token(account.refresh_token)
-        validated = await twitch_api.validate_user_access_token(refreshed.access_token)
+        refreshed = await twitch_auth.refresh_user_access_token(account.refresh_token)
+        validated = await twitch_auth.validate_user_access_token(refreshed.access_token)
     except TwitchAPIError as error:
         logger.warning("Failed to refresh Twitch account for account_id=%s: %s", account.account_id, error)
         return None
@@ -108,42 +96,32 @@ async def refresh_linked_account(
     return stored
 
 
-async def safe_get_twitch_user_by_login(twitch_api: object, login: str) -> TwitchUser | None:
+async def safe_get_twitch_user_by_login(twitch_lookup: TwitchUserLookup, login: str) -> TwitchUser | None:
     """Look up a Twitch user by login without letting lookup failures break the hot path."""
     normalized_login = login.strip().lower()
     if not normalized_login:
         return None
     try:
-        cached_lookup = getattr(twitch_api, "get_cached_user_by_login", None)
-        if callable(cached_lookup):
-            cached = cached_lookup(normalized_login)
-            if cached is not None and cached.profile_image_url:
-                return cached
-        get_user = getattr(twitch_api, "get_user_by_login", None)
-        if callable(get_user):
-            return await get_user(normalized_login)
-    except Exception:
+        cached = twitch_lookup.get_cached_user_by_login(normalized_login)
+        if cached is not None and cached.profile_image_url:
+            return cached
+        return await twitch_lookup.get_user_by_login(normalized_login)
+    except TwitchAPIError:
         return None
-    return None
 
 
-async def safe_get_twitch_user_by_id(twitch_api: object, user_id: str | None) -> TwitchUser | None:
+async def safe_get_twitch_user_by_id(twitch_lookup: TwitchUserLookup, user_id: str | None) -> TwitchUser | None:
     """Look up a Twitch user by ID without letting lookup failures break the hot path."""
     normalized_user_id = "" if user_id is None else user_id.strip()
     if not normalized_user_id:
         return None
     try:
-        cached_lookup = getattr(twitch_api, "get_cached_user_by_id", None)
-        if callable(cached_lookup):
-            cached = cached_lookup(normalized_user_id)
-            if cached is not None and cached.profile_image_url:
-                return cached
-        get_user = getattr(twitch_api, "get_user_by_id", None)
-        if callable(get_user):
-            return await get_user(normalized_user_id)
-    except Exception:
+        cached = twitch_lookup.get_cached_user_by_id(normalized_user_id)
+        if cached is not None and cached.profile_image_url:
+            return cached
+        return await twitch_lookup.get_user_by_id(normalized_user_id)
+    except TwitchAPIError:
         return None
-    return None
 
 
 def expand_pattern_for_tracked_users(
@@ -166,7 +144,7 @@ def expand_pattern_for_tracked_users(
 
     return PatternRecord(
         thread_id=pattern.thread_id,
-        p_index=pattern.p_index,
+        pattern_id=pattern.pattern_id,
         regex=pattern.regex,
         channel_scope_mode=pattern.channel_scope_mode,
         channel_scope_ids=pattern.channel_scope_ids,
@@ -194,4 +172,3 @@ def offline_state_allows(pattern: PatternRecord, live_status: bool | None) -> bo
     if pattern.offline_state == "offline":
         return not live_status
     return False
-

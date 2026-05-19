@@ -7,8 +7,7 @@ from random import seed
 import pytest
 
 from src.database.connection import MessageRepository, RecentMessageRecord
-from src.events.event_bus import EventBus
-from src.events.event_types import EventType, TwitchChatMessageEvent
+from src.events.event_types import TwitchChatMessageEvent
 from src.services.discord_presence_service import DiscordPresenceService, DiscordPresenceStatusSender
 from src.services.message_ingest_service import MessageIngestService
 
@@ -44,12 +43,11 @@ class FakePresenceNotifier(DiscordPresenceStatusSender):
 
 @pytest.mark.asyncio
 async def test_message_ingest_service_registers_and_persists_messages() -> None:
-    bus = EventBus()
     repository = InMemoryMessageRepository()
-    service = MessageIngestService(event_bus=bus, message_repository=repository)
+    service = MessageIngestService(message_repository=repository)
 
     event = TwitchChatMessageEvent(channel_login="channel", author_login="bob", content="hey")
-    await bus.publish(EventType.TWITCH_CHAT_MESSAGE, event)
+    service.handle_chat_message(event)
 
     assert repository.messages == [event]
     assert service.handled_messages == 1
@@ -57,9 +55,8 @@ async def test_message_ingest_service_registers_and_persists_messages() -> None:
 
 @pytest.mark.asyncio
 async def test_presence_service_uses_recent_message_as_status() -> None:
-    bus = EventBus()
     repository = InMemoryMessageRepository()
-    MessageIngestService(event_bus=bus, message_repository=repository)
+    ingest_service = MessageIngestService(message_repository=repository)
     notifier = FakePresenceNotifier()
     service = DiscordPresenceService(
         message_repository=repository,
@@ -72,7 +69,7 @@ async def test_presence_service_uses_recent_message_as_status() -> None:
 
     event = TwitchChatMessageEvent(channel_login="channel", author_login="bob", author_display_name="Bob", content="A tracked message")
 
-    await bus.publish(EventType.TWITCH_CHAT_MESSAGE, event)
+    ingest_service.handle_chat_message(event)
     seed(1)
     await service.poll_once()
 

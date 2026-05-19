@@ -1,4 +1,4 @@
-﻿"""PostgreSQL repositories for Twitch account and cache state."""
+"""PostgreSQL repositories for Twitch account and cache state."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from psycopg.types.json import Jsonb
 
 from ..records import TwitchAccountRecord, TwitchDeviceFlowRecord, TwitchUserCacheRecord
 from ..repositories import TwitchAccountRepository, TwitchDeviceFlowRepository, TwitchUserCacheRepository
+from ._utils import require_row, require_value
 from .database import PostgresDatabase
 
 
@@ -18,9 +19,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
     database: PostgresDatabase
 
     def get_by_account_id(self, account_id: int) -> TwitchAccountRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT account_id, discord_user_id, twitch_user_id, twitch_login, client_id,
@@ -48,9 +47,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
         scope: tuple[str, ...],
         token_type: str | None,
     ) -> TwitchAccountRecord:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO twitch_account (
@@ -74,7 +71,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
                 ),
             )
             row = cursor.fetchone()
-        assert row is not None
+        row = require_row(row, operation="twitch_account.create_account")
         return self._build_account_record(row)
 
     def update_account(
@@ -90,9 +87,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
         scope: tuple[str, ...],
         token_type: str | None,
     ) -> TwitchAccountRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 UPDATE twitch_account
@@ -127,9 +122,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
         return self._build_account_record(row)
 
     def remove_by_account_id(self, account_id: int) -> bool:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 DELETE FROM twitch_account
@@ -142,9 +135,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
         return row is not None
 
     def get_by_discord_user_id(self, discord_user_id: int) -> TwitchAccountRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT account_id, discord_user_id, twitch_user_id, twitch_login, client_id,
@@ -198,8 +189,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
             scope=scope,
             token_type=token_type,
         )
-        assert updated is not None
-        return updated
+        return require_value(updated, operation="twitch_account.upsert_account")
 
     def remove_by_discord_user_id(self, discord_user_id: int) -> bool:
         existing = self.get_by_discord_user_id(discord_user_id)
@@ -208,9 +198,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
         return self.remove_by_account_id(existing.account_id)
 
     def list_accounts(self) -> list[TwitchAccountRecord]:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT account_id, discord_user_id, twitch_user_id, twitch_login, client_id,
@@ -246,9 +234,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
     database: PostgresDatabase
 
     def get_by_discord_channel_id(self, discord_channel_id: int) -> TwitchDeviceFlowRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT discord_channel_id, discord_user_id, device_code, user_code, verification_uri, interval_seconds,
@@ -275,9 +261,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
         expires_at: str,
         scope: tuple[str, ...],
     ) -> TwitchDeviceFlowRecord:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO twitch_device_flow (
@@ -313,13 +297,11 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
                 ),
             )
             row = cursor.fetchone()
-        assert row is not None
+        row = require_row(row, operation="twitch_device_flow.upsert_pending_flow")
         return self._build_record(row)
 
     def list_pending_flows(self) -> list[TwitchDeviceFlowRecord]:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT discord_channel_id, discord_user_id, device_code, user_code, verification_uri, interval_seconds,
@@ -333,9 +315,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
         return [self._build_record(row) for row in rows]
 
     def mark_failed(self, *, discord_channel_id: int, last_error: str) -> TwitchDeviceFlowRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 UPDATE twitch_device_flow
@@ -354,9 +334,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
         return self._build_record(row)
 
     def touch_polled(self, *, discord_channel_id: int) -> None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 UPDATE twitch_device_flow
@@ -368,9 +346,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
             )
 
     def update_interval(self, *, discord_channel_id: int, interval_seconds: int) -> None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 UPDATE twitch_device_flow
@@ -382,9 +358,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
             )
 
     def remove_by_discord_channel_id(self, discord_channel_id: int) -> bool:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 DELETE FROM twitch_device_flow
@@ -397,9 +371,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
         return row is not None
 
     def get_by_discord_user_id(self, discord_user_id: int) -> TwitchDeviceFlowRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT discord_channel_id, discord_user_id, device_code, user_code, verification_uri, interval_seconds,
@@ -446,9 +418,7 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
     database: PostgresDatabase
 
     def get_by_user_id(self, twitch_user_id: str) -> TwitchUserCacheRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT twitch_user_id, twitch_login, display_name, profile_image_url, updated_at, last_api_refresh_at
@@ -466,9 +436,7 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
         normalized_login = twitch_login.strip().lower()
         if not normalized_login:
             return None
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT twitch_user_id, twitch_login, display_name, profile_image_url, updated_at, last_api_refresh_at
@@ -491,9 +459,7 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
         profile_image_url: str | None,
     ) -> TwitchUserCacheRecord:
         normalized_login = twitch_login.strip().lower()
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 DELETE FROM twitch_user_cache
@@ -535,7 +501,7 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
                 ),
             )
             row = cursor.fetchone()
-        assert row is not None
+        row = require_row(row, operation="twitch_user_cache.upsert_from_api")
         return self._build_record(row)
 
     def observe_from_chat(
@@ -547,9 +513,7 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
     ) -> TwitchUserCacheRecord:
         normalized_login = twitch_login.strip().lower()
         normalized_display_name = (display_name or "").strip() or None
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 DELETE FROM twitch_user_cache
@@ -590,7 +554,7 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
                 ),
             )
             row = cursor.fetchone()
-        assert row is not None
+        row = require_row(row, operation="twitch_user_cache.observe_from_chat")
         return self._build_record(row)
 
     @staticmethod
@@ -603,4 +567,3 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
             updated_at=row[4].isoformat(),
             last_api_refresh_at=row[5].isoformat() if row[5] is not None else None,
         )
-

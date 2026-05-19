@@ -1,4 +1,4 @@
-﻿"""Runtime localization helpers backed by JSON language files."""
+"""Runtime localization helpers backed by JSON language files."""
 
 from __future__ import annotations
 
@@ -8,33 +8,20 @@ from pathlib import Path
 from typing import Any
 
 from src.database.records import ThreadRecord
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 from src.utils.discord_text import escape_discord_text, normalize_discord_code_value
 
 DEFAULT_LANGUAGE = "english"
 _LANG_DIRECTORY = Path(__file__).resolve().parent.parent / "lang"
-DEFERRED_PLACEHOLDER_TOKENS: dict[str, str] = {
-    "USER": "\u0000LOCALIZER_USER\u0000",
-}
-DEFAULT_LIST_ITEM_PLACEHOLDER = "ITEM"
+DEFAULT_LIST_ITEM_PLACEHOLDER = "LIST_ITEM"
 
 
 class LocalizationError(ValueError):
     """Raised when a translation catalog is invalid or a lookup fails."""
 
 
-def resolve_deferred_placeholders(template: str, **placeholders: object) -> str:
-    """Resolve placeholders intentionally deferred until one later rendering step."""
-    rendered = template
-    for name, token in DEFERRED_PLACEHOLDER_TOKENS.items():
-        if name in placeholders:
-            rendered = rendered.replace(token, str(placeholders[name]))
-    return rendered
-
-
 @dataclass(slots=True, frozen=True)
 class Localizer:
-    """Resolve localized strings and command results from cached JSON catalogs."""
+    """Resolve localized strings and raw entries from cached JSON catalogs."""
 
     catalogs: dict[str, dict[str, Any]]
     default_language: str = DEFAULT_LANGUAGE
@@ -75,52 +62,37 @@ class Localizer:
         language = self.normalize_language(thread.language)
         return language if language in self.catalogs else self.default_language
 
-    def text(
-        self,
-        key: str,
-        *,
-        language: str | None = None,
-        **placeholders: object,
-    ) -> str:
+    def text(self, key: str, *, language: str | None = None, **placeholders: object) -> str:
         """Resolve one localized string and interpolate its placeholders."""
+        value = self.value(key, language=language)
+        if isinstance(value, str):
+            return self.render(value, **placeholders)
+        if self._is_template_entry(value):
+            return self._render_template_entry(value, language=language, placeholders=placeholders)
+        raise LocalizationError(f"Translation key {key!r} is not a string.")
+
+    def value(self, key: str, *, language: str | None = None) -> Any:
+        """Resolve one raw localized entry from the active catalog."""
         catalog_language = self.normalize_language(language)
         catalog = self.catalogs.get(catalog_language)
         if catalog is None:
             raise LocalizationError(f"Unsupported language: {catalog_language}")
-        value = self._lookup(catalog, key)
-        if not isinstance(value, str):
-            raise LocalizationError(f"Translation key {key!r} in {catalog_language} is not a string.")
-        return self._interpolate(value, placeholders)
+        return self._lookup(catalog, key)
 
-    def result(
+    def render(self, template: str, **placeholders: object) -> str:
+        """Render one already-resolved template string with placeholders."""
+        return self._interpolate(template, placeholders)
+
+    def render_with_placeholders(
         self,
-        key: str,
+        template: str,
         *,
         language: str | None = None,
-        style: DiscordResultStyle = DiscordResultStyle.INFO,
-        ephemeral: bool = False,
-        thumbnail_url: str | None = None,
-        **placeholders: object,
-    ) -> DiscordCommandResult:
-        """Resolve a localized command result object with `title` and `message`."""
-        catalog_language = self.normalize_language(language)
-        catalog = self.catalogs.get(catalog_language)
-        if catalog is None:
-            raise LocalizationError(f"Unsupported language: {catalog_language}")
-        value = self._lookup(catalog, key)
-        if not isinstance(value, dict):
-            raise LocalizationError(f"Translation key {key!r} in {catalog_language} is not an object.")
-        title = value.get("title")
-        message = value.get("message")
-        if not isinstance(title, str) or not isinstance(message, str):
-            raise LocalizationError(f"Translation result {key!r} in {catalog_language} must contain string title/message.")
-        return DiscordCommandResult(
-            title=self._interpolate(title, placeholders),
-            message=self._interpolate(message, placeholders),
-            style=style,
-            ephemeral=ephemeral,
-            thumbnail_url=thumbnail_url,
-        )
+        placeholders: dict[str, object],
+        placeholder_specs: dict[str, Any] | None = None,
+    ) -> str:
+        """Render one template with optional placeholder-format metadata from the catalog."""
+        return self.render(template, **self._prepare_placeholders(placeholders, language=language, placeholder_specs=placeholder_specs))
 
     def format_list(
         self,
@@ -130,26 +102,15 @@ class Localizer:
         language: str | None = None,
         **shared_placeholders: object,
     ) -> str:
-        """Render one reusable localized list/wrapper object from the catalog."""
-        catalog_language = self.normalize_language(language)
-        catalog = self.catalogs.get(catalog_language)
-        if catalog is None:
-            raise LocalizationError(f"Unsupported language: {catalog_language}")
-        value = self._lookup(catalog, key)
+        """Render one localized list by formatting each item and joining them."""
+        value = self.value(key, language=language)
         if not isinstance(value, dict):
-            raise LocalizationError(f"Translation key {key!r} in {catalog_language} is not an object.")
+            raise LocalizationError(f"Translation key {key!r} is not an object.")
 
         item_format = value.get("item_format")
         separator = value.get("separator")
-        prefix = value.get("prefix", "")
-        suffix = value.get("suffix", "")
-        empty = value.get("empty")
         if not isinstance(item_format, str) or not isinstance(separator, str):
-            raise LocalizationError(f"List format {key!r} in {catalog_language} must contain string item_format/separator.")
-        if not isinstance(prefix, str) or not isinstance(suffix, str):
-            raise LocalizationError(f"List format {key!r} in {catalog_language} must contain string prefix/suffix.")
-        if empty is not None and not isinstance(empty, str):
-            raise LocalizationError(f"List format {key!r} in {catalog_language} must contain string empty when provided.")
+            raise LocalizationError(f"List format {key!r} must contain string item_format/separator.")
 
         rendered_items: list[str] = []
         for item in items:
@@ -159,34 +120,57 @@ class Localizer:
             else:
                 placeholders[DEFAULT_LIST_ITEM_PLACEHOLDER] = item
             rendered_items.append(self._interpolate(item_format, placeholders))
+        return separator.join(rendered_items)
 
-        if not rendered_items:
-            if empty is not None:
-                return self._interpolate(empty, shared_placeholders)
-            return self._interpolate(prefix + suffix, shared_placeholders)
-
-        body = separator.join(rendered_items)
-        return self._interpolate(prefix, shared_placeholders) + body + self._interpolate(suffix, shared_placeholders)
-
-    def thread_result(
+    def _render_template_entry(
         self,
-        key: str,
+        entry: dict[str, Any],
         *,
-        thread: ThreadRecord | None,
-        style: DiscordResultStyle = DiscordResultStyle.INFO,
-        ephemeral: bool = False,
-        thumbnail_url: str | None = None,
-        **placeholders: object,
-    ) -> DiscordCommandResult:
-        """Resolve a localized command result using the language configured on one thread."""
-        return self.result(
-            key,
-            language=self.language_for_thread(thread),
-            style=style,
-            ephemeral=ephemeral,
-            thumbnail_url=thumbnail_url,
-            **placeholders,
+        language: str | None,
+        placeholders: dict[str, object],
+    ) -> str:
+        template = entry.get("template")
+        placeholder_specs = entry.get("placeholders")
+        if not isinstance(template, str):
+            raise LocalizationError("Template entries must contain a string `template` field.")
+        if placeholder_specs is not None and not isinstance(placeholder_specs, dict):
+            raise LocalizationError("Template entry `placeholders` must be an object when provided.")
+        return self.render_with_placeholders(
+            template,
+            language=language,
+            placeholders=placeholders,
+            placeholder_specs=placeholder_specs,
         )
+
+    def _prepare_placeholders(
+        self,
+        placeholders: dict[str, object],
+        *,
+        language: str | None,
+        placeholder_specs: dict[str, Any] | None,
+    ) -> dict[str, object]:
+        prepared = dict(placeholders)
+        if placeholder_specs is None:
+            return prepared
+        for name, spec in placeholder_specs.items():
+            if name not in prepared:
+                continue
+            if not isinstance(spec, dict):
+                raise LocalizationError(f"Placeholder spec for {name!r} must be an object.")
+            list_key = spec.get("list")
+            if list_key is None:
+                continue
+            if not isinstance(list_key, str):
+                raise LocalizationError(f"Placeholder list spec for {name!r} must be a string.")
+            value = prepared[name]
+            if not isinstance(value, list | tuple):
+                raise LocalizationError(f"Placeholder {name!r} must be a list or tuple for list formatting.")
+            prepared[name] = self.format_list(list_key, value, language=language)
+        return prepared
+
+    @staticmethod
+    def _is_template_entry(value: object) -> bool:
+        return isinstance(value, dict) and "template" in value
 
     @staticmethod
     def _lookup(catalog: dict[str, Any], key: str) -> Any:
@@ -228,10 +212,6 @@ class Localizer:
                 raise LocalizationError("Empty placeholder names are not allowed.")
             mode, name = Localizer._parse_placeholder(raw_name)
             if name not in placeholders:
-                if name in DEFERRED_PLACEHOLDER_TOKENS:
-                    parts.append(DEFERRED_PLACEHOLDER_TOKENS[name])
-                    index = end_index + 1
-                    continue
                 raise LocalizationError(f"Missing placeholder value for {name!r}.")
             value = placeholders[name]
             parts.append(Localizer._render_placeholder_value(mode, value))
@@ -259,4 +239,3 @@ class Localizer:
         if mode == "code":
             return normalize_discord_code_value(rendered)
         return escape_discord_text(rendered)
-

@@ -1,11 +1,9 @@
 """Organized PostgreSQL persistence package."""
 
-from .automation import (
-    PostgresAdapterEventActionRepository,
-    PostgresAdapterEventRepository,
-    PostgresPatternRepository,
-    PostgresReplyRepository,
-)
+from .adapter_event_actions import PostgresAdapterEventActionRepository
+from .adapter_events import PostgresAdapterEventRepository
+from .patterns import PostgresPatternRepository
+from .replies import PostgresReplyRepository
 from .database import PostgresDatabase
 from .messaging import PostgresMessageRepository
 from .permissions import PostgresUserPermissionRepository
@@ -23,11 +21,11 @@ from .twitch import (
 __all__ = [
     "PostgresAdapterEventActionRepository",
     "PostgresAdapterEventRepository",
+    "PostgresPatternRepository",
+    "PostgresReplyRepository",
     "PostgresChannelRepository",
     "PostgresDatabase",
     "PostgresMessageRepository",
-    "PostgresPatternRepository",
-    "PostgresReplyRepository",
     "PostgresThreadRepository",
     "PostgresTrackedUserRepository",
     "PostgresTwitchAccountRepository",

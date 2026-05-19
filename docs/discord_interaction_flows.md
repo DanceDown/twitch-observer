@@ -45,12 +45,11 @@ Interaction tokens remain valid for 15 minutes. During that time you can:
 
 ## Interaction Sources
 
-This bot uses four interaction sources:
+This bot mainly uses three interaction sources:
 
 - application commands
 - message components
 - modal submits
-- autocomplete interactions
 
 ## 1. Application Command
 
@@ -61,9 +60,17 @@ Examples:
 - `/ping`
 - `/account`
 
+In the current bot design, application commands are mostly root launchers.
+After the initial command, users usually continue through selects, buttons, and
+modals instead of typing identifiers or action arguments.
+
+Those Discord entrypoints call typed per-domain helpers under
+`src/entrypoints/discord/dispatch/`, which in turn call one direct application
+service each.
+
 ### Valid initial responses
 
-From a slash command you can:
+From an application command you can:
 
 - send a message
 - defer
@@ -88,7 +95,7 @@ await interaction.response.launch_activity()
   - use when work takes longer than a moment
   - example: account-link initiation through `/account`
 - `send_modal`
-  - use when the command should collect more freeform data
+  - use when the root command should collect more freeform data
   - example: `/leave` confirmation modal
 
 ### Typical continuation paths
@@ -99,7 +106,7 @@ await interaction.response.launch_activity()
 await interaction.response.send_message(embed=result_embed)
 ```
 
-Best when the command is simple and complete.
+Best when the root command is simple and complete.
 
 #### Path B: command -> defer -> follow-up
 
@@ -117,7 +124,7 @@ Best when validation or API calls need time.
 await interaction.response.send_modal(ChannelLeaveConfirmModal())
 ```
 
-Best when the command should open a form instead of immediately doing work.
+Best when the root command should open a form instead of immediately doing work.
 
 ## 2. Message Component
 
@@ -238,28 +245,12 @@ If you need a multi-step flow after a modal, use:
 
 ## 4. Autocomplete Interaction
 
-Examples:
+Autocomplete is supported by Discord, but it is not part of the current bot
+runtime flow.
 
-- suggesting existing pattern IDs while composing form choices
-- suggesting tracked Twitch channels while composing write targets
-
-### Valid initial response
-
-Autocomplete interactions only return autocomplete choices.
-
-In `discord.py`:
-
-```python
-await interaction.response.autocomplete(
-    [
-        app_commands.Choice(name="Pattern #4", value="4"),
-        app_commands.Choice(name="Pattern #7", value="7"),
-    ]
-)
-```
-
-This interaction type is only for suggestions while the user types. It cannot
-send messages or modals.
+The bot no longer expects users to type pattern IDs, reply IDs, or tracked
+targets manually. Those choices are presented through components, and the
+underlying interactions carry the stable internal identifiers directly.
 
 ## Follow-Ups and Original Responses
 
@@ -401,12 +392,11 @@ Reason:
 - let the user choose an item
 - then open edit/delete modal from that selection
 
-### Good candidates for autocomplete
+### Why autocomplete is currently unnecessary
 
-- pattern IDs
-- reply IDs
-- tracked Twitch channel names
-- Discord users for permission changes
+- pattern and reply entries are chosen from selects
+- tracked channels are chosen from lists
+- permission targets are selected through Discord components
 
 ## Short Decision Guide
 
@@ -425,3 +415,4 @@ If the user first needs to choose one item from a list:
 If the action needs more than 3 seconds:
 
 - defer first
+

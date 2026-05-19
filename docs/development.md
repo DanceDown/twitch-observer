@@ -20,25 +20,25 @@ docker compose build app
 Run the lint check:
 
 ```powershell
-docker compose run --rm app python -m ruff check src
+docker compose run --rm app ruff check src
 ```
 
 Apply safe auto-fixes:
 
 ```powershell
-docker compose run --rm app python -m ruff check src --fix
+docker compose run --rm app ruff check src --fix
 ```
 
 Check formatting without changing files:
 
 ```powershell
-docker compose run --rm app python -m ruff format src --check
+docker compose run --rm app ruff format src --check
 ```
 
 Apply Ruff formatting only when you intentionally want a formatting-only diff:
 
 ```powershell
-docker compose run --rm app python -m ruff format src
+docker compose run --rm app ruff format src
 ```
 
 ### Run Ruff Locally
@@ -52,12 +52,12 @@ python -m pip install -r requirements-dev.txt
 Then run:
 
 ```powershell
-python -m ruff check src
+ruff check src
 ```
 
 ### Deployment
 
-Ruff is a development dependency only. The default Docker build uses `INSTALL_DEV=false`, which installs only [requirements.txt](../requirements.txt).
+Ruff is a development dependency only. The default Docker build uses `INSTALL_DEV=false`, which selects the runtime dependency stage and installs only [requirements.txt](../requirements.txt).
 
 Before building a deployment image, unset or disable the development flag:
 

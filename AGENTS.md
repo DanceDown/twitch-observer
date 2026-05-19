@@ -47,6 +47,13 @@
 - `docs/architecture.md` is the main runtime overview, `docs/database.md` is the schema guide, and `docs/commands_reference.md` is the user-facing command surface.
 - German user-facing text must always use proper German characters: write `ä`, `ö`, `ü`, and `ß`; never replace them with `ae`, `oe`, `ue`, or `ss`.
 
+## Communication
+
+- use easy language when communicating with the user
+- don't overcomplicate things
+- don't overuse technical terms
+- keep yourself concise
+
 ## Testing
 
 - Prefer targeted tests for the touched flow before broader runs.

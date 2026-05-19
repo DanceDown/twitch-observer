@@ -1,259 +1,133 @@
-﻿"""PostgreSQL database connection helpers."""
+"""PostgreSQL connection pooling helpers."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections import deque
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from threading import Condition, Lock
+from time import monotonic
+from typing import Iterator
 
 import psycopg
 
 from src.config import AppConfig
+from src.errors import DatabasePoolExhaustedError
 
 
 @dataclass(slots=True)
 class PostgresDatabase:
-    """Thin wrapper around a psycopg connection."""
+    """Small synchronous connection pool for repository operations."""
 
     config: AppConfig
-    connection: psycopg.Connection | None = None
+    max_pool_size: int | None = None
+    acquire_timeout_seconds: float | None = None
+    _idle_connections: deque[psycopg.Connection] = field(default_factory=deque, init=False)
+    _lock: Lock = field(default_factory=Lock, init=False)
+    _condition: Condition = field(init=False)
+    _allocated: int = field(default=0, init=False)
 
-    def connect(self) -> None:
-        """Open the PostgreSQL connection lazily."""
-        if self.connection is None or self.connection.closed:
-            self.connection = psycopg.connect(self.config.postgres_dsn, autocommit=True)
+    def __post_init__(self) -> None:
+        if self.max_pool_size is None:
+            self.max_pool_size = max(1, self.config.postgres_pool_size)
+        if self.acquire_timeout_seconds is None:
+            self.acquire_timeout_seconds = max(0.0, self.config.postgres_pool_acquire_timeout_seconds)
+        self._condition = Condition(self._lock)
+
+    @contextmanager
+    def connection(self) -> Iterator[psycopg.Connection]:
+        """Lease one connection for one repository operation."""
+        connection = self._acquire()
+        try:
+            yield connection
+            if not connection.closed:
+                connection.commit()
+        except Exception:
+            if not connection.closed:
+                connection.rollback()
+            raise
+        finally:
+            self._release(connection)
+
+    @contextmanager
+    def transaction(self) -> Iterator[psycopg.Connection]:
+        """Lease one connection for one explicit transactional operation."""
+        with self.connection() as connection:
+            yield connection
+
+    @contextmanager
+    def cursor(self) -> Iterator[psycopg.Cursor]:
+        """Lease one cursor for one repository operation."""
+        with self.connection() as connection:
+            with connection.cursor() as cursor:
+                yield cursor
 
     def close(self) -> None:
-        """Close the PostgreSQL connection if it is open."""
-        if self.connection is not None and not self.connection.closed:
-            self.connection.close()
+        """Close all idle connections in the local pool."""
+        with self._condition:
+            while self._idle_connections:
+                connection = self._idle_connections.popleft()
+                if not connection.closed:
+                    connection.close()
+            self._allocated = 0
+            self._condition.notify_all()
 
     def healthcheck(self) -> None:
         """Validate that PostgreSQL is reachable."""
-        self.connect()
-        assert self.connection is not None
-        with self.connection.cursor() as cursor:
-            cursor.execute("SELECT 1")
-            cursor.fetchone()
+        with self.connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
 
-    def ensure_schema_compatibility(self) -> None:
-        """Apply lightweight compatibility migrations for existing local databases."""
-        self.connect()
-        assert self.connection is not None
-        with self.connection.cursor() as cursor:
-            cursor.execute(
-                """
-                ALTER TABLE thread
-                ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'english'
-                """
-            )
-            cursor.execute(
-                """
-                UPDATE thread
-                SET language = 'english'
-                WHERE language IS NULL OR btrim(language) = ''
-                """
-            )
-            cursor.execute(
-                """
-                ALTER TABLE thread
-                ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE
-                """
-            )
-            cursor.execute(
-                """
-                ALTER TABLE thread
-                ALTER COLUMN color DROP NOT NULL
-                """
-            )
-            cursor.execute(
-                """
-                ALTER TABLE thread
-                ALTER COLUMN color DROP DEFAULT
-                """
-            )
-            cursor.execute(
-                """
-                ALTER TABLE thread
-                DROP COLUMN IF EXISTS use_twitch_colors
-                """
-            )
-            cursor.execute(
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM pg_type t
-                        JOIN pg_enum e ON e.enumtypid = t.oid
-                        WHERE t.typname = 'user_scope_mode_enum' AND e.enumlabel = 'all_tracked'
-                    ) THEN
-                        ALTER TYPE USER_SCOPE_MODE_ENUM ADD VALUE 'all_tracked';
-                    END IF;
-                END $$;
-                """
-            )
-            cursor.execute(
-                """
-                ALTER TABLE pattern_channel_scope
-                DROP CONSTRAINT IF EXISTS fk_pattern_channel_scope_channel
-                """
-            )
-            cursor.execute(
-                """
-                ALTER TABLE pattern_channel_scope
-                ADD CONSTRAINT fk_pattern_channel_scope_channel
-                FOREIGN KEY (thread_id, twitch_channel_id)
-                REFERENCES channel(thread_id, twitch_channel_id)
-                ON DELETE CASCADE
-                """
-            )
-            cursor.execute(
-                """
-                ALTER TABLE pattern_user_scope
-                DROP CONSTRAINT IF EXISTS fk_pattern_user_scope_tracked_user
-                """
-            )
-            cursor.execute(
-                """
-                ALTER TABLE pattern_user_scope
-                ADD CONSTRAINT fk_pattern_user_scope_tracked_user
-                FOREIGN KEY (thread_id, twitch_user_id)
-                REFERENCES tracked_user(thread_id, twitch_user_id)
-                ON DELETE CASCADE
-                """
-            )
-            cursor.execute(
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM pg_type t
-                        JOIN pg_enum e ON e.enumtypid = t.oid
-                        WHERE t.typname = 'user_scope_mode_enum' AND e.enumlabel = 'all_tracked_except_selected'
-                    ) THEN
-                        ALTER TYPE USER_SCOPE_MODE_ENUM ADD VALUE 'all_tracked_except_selected';
-                    END IF;
-                END $$;
-                """
-            )
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS tracked_user (
-                    thread_id INTEGER NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,
-                    twitch_user_id TEXT NOT NULL,
-                    PRIMARY KEY (thread_id, twitch_user_id)
-                )
-                """
-            )
-            cursor.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_tracked_user_twitch_user_id
-                ON tracked_user(twitch_user_id)
-                """
-            )
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS twitch_user_cache (
-                    twitch_user_id TEXT PRIMARY KEY,
-                    twitch_login TEXT NOT NULL,
-                    display_name TEXT NOT NULL,
-                    profile_image_url TEXT,
-                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    last_api_refresh_at TIMESTAMPTZ
-                )
-                """
-            )
-            cursor.execute(
-                """
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_twitch_user_cache_login
-                ON twitch_user_cache(twitch_login)
-                """
-            )
-            cursor.execute(
-                """
-                ALTER TABLE channel
-                ADD COLUMN IF NOT EXISTS is_live BOOLEAN
-                """
-            )
-            cursor.execute(
-                """
-                ALTER TABLE channel
-                ADD COLUMN IF NOT EXISTS last_live_status_at TIMESTAMPTZ
-                """
-            )
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS adapter_event (
-                    event_id SERIAL PRIMARY KEY,
-                    thread_id INTEGER NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,
-                    adapter_key TEXT NOT NULL,
-                    subject_type TEXT NOT NULL,
-                    subject_id TEXT NOT NULL,
-                    event_key TEXT NOT NULL,
-                    disabled BOOLEAN NOT NULL DEFAULT FALSE,
-                    CONSTRAINT uniq_adapter_event
-                        UNIQUE (thread_id, adapter_key, subject_type, subject_id, event_key)
-                )
-                """
-            )
-            cursor.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_adapter_event_lookup
-                ON adapter_event(adapter_key, subject_type, subject_id, event_key, disabled)
-                """
-            )
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS adapter_event_action (
-                    event_id INTEGER NOT NULL REFERENCES adapter_event(event_id) ON DELETE CASCADE,
-                    action_type TEXT NOT NULL,
-                    message_template TEXT,
-                    reply_as_reply BOOLEAN NOT NULL DEFAULT FALSE,
-                    disabled BOOLEAN NOT NULL DEFAULT FALSE,
-                    PRIMARY KEY (event_id, action_type)
-                )
-                """
-            )
-            cursor.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_adapter_event_action_lookup
-                ON adapter_event_action(action_type, disabled)
-                """
-            )
-            cursor.execute(
-                """
-                DO $$
-                BEGIN
-                    IF to_regclass('public.channel_event_reply') IS NOT NULL THEN
-                        INSERT INTO adapter_event (thread_id, adapter_key, subject_type, subject_id, event_key, disabled)
-                        SELECT cer.thread_id,
-                               'twitch',
-                               'channel',
-                               cer.twitch_channel_id,
-                               CASE cer.event_state WHEN 'online' THEN 'stream.online' ELSE 'stream.offline' END,
-                               FALSE
-                        FROM channel_event_reply cer
-                        ON CONFLICT (thread_id, adapter_key, subject_type, subject_id, event_key) DO NOTHING;
+    def _acquire(self) -> psycopg.Connection:
+        deadline = monotonic() + (self.acquire_timeout_seconds or 0.0)
+        with self._condition:
+            while True:
+                while self._idle_connections:
+                    connection = self._idle_connections.popleft()
+                    if not connection.closed:
+                        return connection
+                    self._allocated = max(0, self._allocated - 1)
 
-                        INSERT INTO adapter_event_action (event_id, action_type, message_template, reply_as_reply, disabled)
-                        SELECT ae.event_id,
-                               'twitch_send_message',
-                               cer.reply_message,
-                               FALSE,
-                               cer.disabled
-                        FROM channel_event_reply cer
-                        JOIN adapter_event ae
-                          ON ae.thread_id = cer.thread_id
-                         AND ae.adapter_key = 'twitch'
-                         AND ae.subject_type = 'channel'
-                         AND ae.subject_id = cer.twitch_channel_id
-                         AND ae.event_key = CASE cer.event_state WHEN 'online' THEN 'stream.online' ELSE 'stream.offline' END
-                        ON CONFLICT (event_id, action_type)
-                        DO UPDATE SET
-                            message_template = EXCLUDED.message_template,
-                            disabled = EXCLUDED.disabled;
-                    END IF;
-                END $$;
-                """
-            )
+                if self._allocated < self.max_pool_size:
+                    self._allocated += 1
+                    break
 
+                remaining = deadline - monotonic()
+                if remaining <= 0:
+                    raise DatabasePoolExhaustedError(
+                        f"PostgreSQL pool exhausted after waiting {self.acquire_timeout_seconds:.2f}s (pool_size={self.max_pool_size})."
+                    )
+                self._condition.wait(timeout=remaining)
+
+        try:
+            return psycopg.connect(self.config.postgres_dsn)
+        except Exception:
+            with self._condition:
+                self._allocated = max(0, self._allocated - 1)
+                self._condition.notify()
+            raise
+
+    def _release(self, connection: psycopg.Connection) -> None:
+        if connection.closed:
+            with self._condition:
+                self._allocated = max(0, self._allocated - 1)
+                self._condition.notify()
+            return
+        try:
+            connection.rollback()
+        except Exception:
+            connection.close()
+            with self._condition:
+                self._allocated = max(0, self._allocated - 1)
+                self._condition.notify()
+            return
+
+        with self._condition:
+            if len(self._idle_connections) >= self.max_pool_size:
+                connection.close()
+                self._allocated = max(0, self._allocated - 1)
+                self._condition.notify()
+                return
+            self._idle_connections.append(connection)
+            self._condition.notify()

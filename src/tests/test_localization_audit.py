@@ -7,7 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_runtime_ui_buttons_use_neutral_fallback_labels() -> None:
-    ui_root = REPO_ROOT / "src" / "adapters" / "discord" / "ui"
+    ui_root = REPO_ROOT / "src" / "entrypoints" / "discord" / "ui"
     violations: list[str] = []
     for path in sorted(ui_root.glob("*.py")):
         for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):

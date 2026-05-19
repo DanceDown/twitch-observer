@@ -5,10 +5,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from src.adapters.twitch_api import TwitchUser
+from src.gateways.twitch_api import TwitchUser
 from src.database.connection import TwitchUserCacheRecord, TwitchUserCacheRepository
-from src.events.event_bus import EventBus
-from src.events.event_types import EventType, TwitchChatMessageEvent
+from src.events.event_types import TwitchChatMessageEvent
+from src.services.twitch_live_query_service import TwitchLiveQueryService
 from src.services.twitch_user_directory_service import TwitchUserDirectoryIngestService, TwitchUserDirectoryService
 
 
@@ -152,18 +152,11 @@ async def test_directory_uses_persistent_cache_before_hitting_helix() -> None:
 
 
 @pytest.mark.asyncio
-async def test_directory_proxies_live_user_id_lookup_for_live_monitor() -> None:
-    repository = InMemoryTwitchUserCacheRepository()
+async def test_live_query_service_proxies_live_user_id_lookup_for_live_monitor() -> None:
     twitch_api = FakeTwitchAPI(live_user_ids={"42"})
-    directory = TwitchUserDirectoryService(
-        twitch_api=twitch_api,
-        repository=repository,
-        memory_cache_size=2048,
-        api_refresh_interval_seconds=43200,
-        channel_api_refresh_interval_seconds=43200,
-    )
+    live_query = TwitchLiveQueryService(twitch_api)
 
-    result = await directory.get_live_user_ids(["42", "7"])
+    result = await live_query.get_live_user_ids(["42", "7"])
 
     assert result == {"42"}
     assert twitch_api.live_requests == [["42", "7"]]
@@ -171,7 +164,6 @@ async def test_directory_proxies_live_user_id_lookup_for_live_monitor() -> None:
 
 @pytest.mark.asyncio
 async def test_directory_ingests_chat_metadata_without_any_helix_lookup() -> None:
-    event_bus = EventBus()
     repository = InMemoryTwitchUserCacheRepository()
     twitch_api = FakeTwitchAPI()
     directory = TwitchUserDirectoryService(
@@ -181,10 +173,9 @@ async def test_directory_ingests_chat_metadata_without_any_helix_lookup() -> Non
         api_refresh_interval_seconds=43200,
         channel_api_refresh_interval_seconds=43200,
     )
-    TwitchUserDirectoryIngestService(event_bus=event_bus, directory=directory)
+    ingest = TwitchUserDirectoryIngestService(directory=directory)
 
-    await event_bus.publish(
-        EventType.TWITCH_CHAT_MESSAGE,
+    ingest.handle_chat_message(
         TwitchChatMessageEvent(
             channel_login="broadcaster",
             author_login="alice",
@@ -192,7 +183,7 @@ async def test_directory_ingests_chat_metadata_without_any_helix_lookup() -> Non
             author_id="7",
             broadcaster_id="42",
             content="hello",
-        ),
+        )
     )
 
     author = directory.get_cached_user_by_login("alice")
@@ -221,7 +212,10 @@ async def test_directory_can_force_a_fresh_login_lookup_when_requested() -> None
     twitch_api = FakeTwitchAPI(
         users_by_login={
             "newname": TwitchUser(user_id="42", login="newname", display_name="New Name"),
-        }
+        },
+        users_by_id={
+            "42": TwitchUser(user_id="42", login="newname", display_name="New Name"),
+        },
     )
     directory = TwitchUserDirectoryService(
         twitch_api=twitch_api,

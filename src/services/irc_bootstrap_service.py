@@ -1,4 +1,4 @@
-﻿"""Startup synchronization for persisted Twitch IRC channel subscriptions."""
+"""Startup synchronization for persisted Twitch IRC channel subscriptions."""
 
 from __future__ import annotations
 
@@ -7,20 +7,11 @@ import contextlib
 import logging
 from dataclasses import dataclass, field
 
-from src.adapters.twitch_api import TwitchAPIClient, TwitchAPIError
+from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import ChannelRepository
+from src.services.twitch_gateways import TwitchChannelLookup, TwitchIRCConnectionGateway
 
 logger = logging.getLogger(__name__)
-
-
-class IRCBootstrapManager:
-    """Minimal IRC adapter surface needed during startup sync."""
-
-    async def wait_until_connected(self) -> None:  # pragma: no cover - interface
-        raise NotImplementedError
-
-    async def join_channel(self, channel_login: str) -> None:  # pragma: no cover - interface
-        raise NotImplementedError
 
 
 @dataclass(slots=True)
@@ -28,8 +19,8 @@ class IRCBootstrapService:
     """Re-join persisted Twitch channels when the app starts."""
 
     channel_repository: ChannelRepository
-    twitch_api: TwitchAPIClient
-    irc_manager: IRCBootstrapManager
+    twitch_api: TwitchChannelLookup
+    irc_gateway: TwitchIRCConnectionGateway
     connect_timeout_seconds: float
     resync_interval_seconds: float | None = None
     _task: asyncio.Task[None] | None = field(default=None, init=False)
@@ -59,7 +50,7 @@ class IRCBootstrapService:
             return
 
         try:
-            await asyncio.wait_for(self.irc_manager.wait_until_connected(), timeout=self.connect_timeout_seconds)
+            await asyncio.wait_for(self.irc_gateway.wait_until_connected(), timeout=self.connect_timeout_seconds)
         except TimeoutError:
             logger.warning("Timed out waiting for Twitch IRC to become ready; persisted channels were not re-joined yet.")
             return
@@ -67,21 +58,7 @@ class IRCBootstrapService:
         logger.debug("Rehydrating %s persisted Twitch IRC channel subscriptions from the database.", len(channel_ids))
         for twitch_channel_id in channel_ids:
             try:
-                get_channel = getattr(self.twitch_api, "get_channel_by_id", None)
-                if callable(get_channel):
-                    user = await get_channel(twitch_channel_id)
-                else:
-                    cached_lookup = getattr(self.twitch_api, "get_cached_user_by_id", None)
-                    cached = (
-                        None
-                        if not callable(cached_lookup)
-                        else cached_lookup(twitch_channel_id.strip())
-                    )
-                    user = (
-                        cached
-                        if cached is not None
-                        else await self.twitch_api.get_user_by_id(twitch_channel_id)
-                    )
+                user = await self.twitch_api.get_channel_by_id(twitch_channel_id)
             except TwitchAPIError as error:
                 logger.warning(
                     "Could not resolve stored Twitch channel id=%s during IRC startup sync: %s",
@@ -89,13 +66,13 @@ class IRCBootstrapService:
                     error,
                 )
                 continue
-            await self.irc_manager.join_channel(user.login)
+            await self.irc_gateway.join_channel(user.login)
 
     async def _run_periodic_sync(self) -> None:
-        assert self.resync_interval_seconds is not None
+        if self.resync_interval_seconds is None:
+            return
         while not self._stop_event.is_set():
             try:
                 await asyncio.wait_for(self._stop_event.wait(), timeout=self.resync_interval_seconds)
             except TimeoutError:
                 await self.sync_persisted_channels()
-

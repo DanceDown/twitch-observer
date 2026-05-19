@@ -1,4 +1,4 @@
-﻿"""Centralized Discord embed styling helpers."""
+"""Centralized Discord embed styling helpers."""
 
 from __future__ import annotations
 
@@ -134,4 +134,3 @@ def format_twitch_link(*, localizer: Localizer, language: str, display_name: str
         DISPLAY_NAME=display_name,
         LOGIN=login,
     )
-

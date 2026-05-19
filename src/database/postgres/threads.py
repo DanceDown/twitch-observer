@@ -1,4 +1,4 @@
-﻿"""PostgreSQL repositories for thread-scoped observer state."""
+"""PostgreSQL repositories for thread-scoped observer state."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 from ..records import ChannelRecord, ThreadRecord, TrackedChannelStateRecord, TrackedUserRecord
 from ..repositories import ChannelRepository, ThreadRepository, TrackedUserRepository
+from ._utils import require_row
 from .database import PostgresDatabase
 
 
@@ -17,9 +18,7 @@ class PostgresThreadRepository(ThreadRepository):
     database: PostgresDatabase
 
     def get_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
@@ -42,9 +41,7 @@ class PostgresThreadRepository(ThreadRepository):
         )
 
     def list_by_owner_id(self, owner_id: int) -> list[ThreadRecord]:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
@@ -69,9 +66,7 @@ class PostgresThreadRepository(ThreadRepository):
         ]
 
     def get_by_thread_id(self, thread_id: int) -> ThreadRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
@@ -94,9 +89,7 @@ class PostgresThreadRepository(ThreadRepository):
         )
 
     def create(self, owner_id: int, discord_channel_id: int) -> ThreadRecord:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO thread (owner_id, discord_channel_id)
@@ -106,7 +99,7 @@ class PostgresThreadRepository(ThreadRepository):
                 (owner_id, discord_channel_id),
             )
             row = cursor.fetchone()
-        assert row is not None
+        row = require_row(row, operation="thread.create")
         return ThreadRecord(
             thread_id=row[0],
             owner_id=row[1],
@@ -118,9 +111,7 @@ class PostgresThreadRepository(ThreadRepository):
         )
 
     def delete_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 DELETE FROM thread
@@ -143,9 +134,7 @@ class PostgresThreadRepository(ThreadRepository):
         )
 
     def set_enabled(self, *, discord_channel_id: int, enabled: bool) -> ThreadRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 UPDATE thread
@@ -169,9 +158,7 @@ class PostgresThreadRepository(ThreadRepository):
         )
 
     def set_color(self, *, discord_channel_id: int, color: str | None) -> ThreadRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 UPDATE thread
@@ -195,9 +182,7 @@ class PostgresThreadRepository(ThreadRepository):
         )
 
     def set_account_id(self, *, discord_channel_id: int, account_id: int | None) -> ThreadRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 UPDATE thread
@@ -221,9 +206,7 @@ class PostgresThreadRepository(ThreadRepository):
         )
 
     def set_language(self, *, discord_channel_id: int, language: str) -> ThreadRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 UPDATE thread
@@ -254,9 +237,7 @@ class PostgresChannelRepository(ChannelRepository):
     database: PostgresDatabase
 
     def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT thread_id, twitch_channel_id, color, is_live, last_live_status_at
@@ -277,9 +258,7 @@ class PostgresChannelRepository(ChannelRepository):
         )
 
     def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO channel (thread_id, twitch_channel_id)
@@ -290,9 +269,7 @@ class PostgresChannelRepository(ChannelRepository):
             )
 
     def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 DELETE FROM channel
@@ -302,9 +279,7 @@ class PostgresChannelRepository(ChannelRepository):
             )
 
     def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 UPDATE channel
@@ -333,9 +308,7 @@ class PostgresChannelRepository(ChannelRepository):
         changed_at: str | None,
     ) -> int:
         effective_changed_at = datetime.fromisoformat(changed_at) if changed_at is not None else datetime.now(UTC)
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 UPDATE channel
@@ -348,9 +321,7 @@ class PostgresChannelRepository(ChannelRepository):
             return cursor.rowcount
 
     def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT COUNT(*)
@@ -360,13 +331,11 @@ class PostgresChannelRepository(ChannelRepository):
                 (twitch_channel_id,),
             )
             row = cursor.fetchone()
-        assert row is not None
+        row = require_row(row, operation="channel.count_threads_by_twitch_channel_id")
         return int(row[0])
 
     def list_thread_ids_by_twitch_channel_id(self, twitch_channel_id: str) -> list[int]:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT thread_id
@@ -379,9 +348,7 @@ class PostgresChannelRepository(ChannelRepository):
         return [int(row[0]) for row in rows]
 
     def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT thread_id, twitch_channel_id, color, is_live, last_live_status_at
@@ -404,9 +371,7 @@ class PostgresChannelRepository(ChannelRepository):
         ]
 
     def list_all_twitch_channel_ids(self) -> list[str]:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT DISTINCT twitch_channel_id
@@ -418,9 +383,7 @@ class PostgresChannelRepository(ChannelRepository):
         return [str(row[0]) for row in rows]
 
     def list_distinct_channel_states(self) -> list[TrackedChannelStateRecord]:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT twitch_channel_id,
@@ -449,9 +412,7 @@ class PostgresTrackedUserRepository(TrackedUserRepository):
     database: PostgresDatabase
 
     def get_by_thread_and_twitch_user(self, thread_id: int, twitch_user_id: str) -> TrackedUserRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT thread_id, twitch_user_id
@@ -466,9 +427,7 @@ class PostgresTrackedUserRepository(TrackedUserRepository):
         return TrackedUserRecord(thread_id=row[0], twitch_user_id=row[1])
 
     def add_user(self, thread_id: int, twitch_user_id: str) -> None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO tracked_user (thread_id, twitch_user_id)
@@ -479,9 +438,7 @@ class PostgresTrackedUserRepository(TrackedUserRepository):
             )
 
     def remove_user(self, thread_id: int, twitch_user_id: str) -> None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 DELETE FROM tracked_user
@@ -491,9 +448,7 @@ class PostgresTrackedUserRepository(TrackedUserRepository):
             )
 
     def list_users_for_thread(self, thread_id: int) -> list[TrackedUserRecord]:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT thread_id, twitch_user_id
@@ -507,9 +462,7 @@ class PostgresTrackedUserRepository(TrackedUserRepository):
         return [TrackedUserRecord(thread_id=row[0], twitch_user_id=row[1]) for row in rows]
 
     def count_pattern_scope_references(self, *, thread_id: int, twitch_user_id: str) -> int:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT COUNT(*)
@@ -519,6 +472,5 @@ class PostgresTrackedUserRepository(TrackedUserRepository):
                 (thread_id, twitch_user_id),
             )
             row = cursor.fetchone()
-        assert row is not None
+        row = require_row(row, operation="tracked_user.count_pattern_scope_references")
         return int(row[0])
-

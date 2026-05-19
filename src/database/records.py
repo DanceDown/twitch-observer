@@ -1,4 +1,4 @@
-﻿"""Shared PostgreSQL record dataclasses."""
+"""Shared PostgreSQL record dataclasses."""
 
 from __future__ import annotations
 
@@ -97,7 +97,7 @@ class PatternRecord:
     """Persisted match rule for one thread."""
 
     thread_id: int
-    p_index: int
+    pattern_id: int
     regex: str
     channel_scope_mode: str
     channel_scope_ids: tuple[str, ...]
@@ -120,7 +120,7 @@ class ReplyRecord:
     """Persisted auto-reply attached to one pattern."""
 
     thread_id: int
-    p_index: int
+    pattern_id: int
     reply_message: str
     reply_as_reply: bool
     disabled: bool
@@ -166,4 +166,3 @@ class RecentMessageRecord:
     username: str
     content: str
     timestamp: datetime
-

@@ -1,4 +1,4 @@
-﻿"""Application configuration loaded from environment variables."""
+"""Application configuration loaded from environment variables."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def _get_bool(name: str, default: str) -> bool:
 
 @dataclass(slots=True)
 class AppConfig:
-    """Central runtime configuration for adapters, database and services."""
+    """Central runtime configuration for entrypoints, gateways, database and services."""
 
     discord_bot_token: str = field(default_factory=lambda: os.getenv("DISCORD_BOT_TOKEN", ""))
     discord_application_id: int | None = field(
@@ -39,6 +39,8 @@ class AppConfig:
     postgres_password: str = field(default_factory=lambda: os.getenv("POSTGRES_PASSWORD", "change-me"))
     postgres_host: str = field(default_factory=lambda: os.getenv("POSTGRES_HOST", "localhost"))
     postgres_port: int = field(default_factory=lambda: int(os.getenv("POSTGRES_PORT", "5432")))
+    postgres_pool_size: int = field(default_factory=lambda: _get_int("POSTGRES_POOL_SIZE", "8"))
+    postgres_pool_acquire_timeout_seconds: float = field(default_factory=lambda: _get_float("POSTGRES_POOL_ACQUIRE_TIMEOUT_SECONDS", "5"))
     twitch_api_base_url: str = field(default_factory=lambda: os.getenv("TWITCH_API_BASE_URL", "https://api.twitch.tv/helix"))
     twitch_auth_base_url: str = field(default_factory=lambda: os.getenv("TWITCH_AUTH_BASE_URL", "https://id.twitch.tv/oauth2"))
     twitch_client_id: str = field(default_factory=lambda: os.getenv("TWITCH_CLIENT_ID", ""))
@@ -93,4 +95,3 @@ class AppConfig:
             f"host={self.postgres_host} "
             f"port={self.postgres_port}"
         )
-

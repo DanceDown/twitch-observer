@@ -4,9 +4,10 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from src.adapters.twitch_api import TwitchChannelNotFoundError, TwitchUser
+from src.gateways.twitch_api import TwitchChannelNotFoundError, TwitchUser
 from src.database.connection import ChannelRecord, ChannelRepository
-from src.services.irc_bootstrap_service import IRCBootstrapManager, IRCBootstrapService
+from src.services.irc_bootstrap_service import IRCBootstrapService
+from src.services.twitch_gateways import TwitchIRCConnectionGateway
 
 
 @dataclass
@@ -62,9 +63,15 @@ class FakeTwitchAPI:
             raise TwitchChannelNotFoundError(f"Unknown Twitch channel id: {user_id}")
         return self.users_by_id[user_id]
 
+    async def get_channel_by_id(self, user_id: str) -> TwitchUser:
+        cached = self.get_cached_user_by_id(user_id)
+        if cached is not None:
+            return cached
+        return await self.get_user_by_id(user_id)
+
 
 @dataclass
-class FakeIRCManager(IRCBootstrapManager):
+class FakeIRCGateway(TwitchIRCConnectionGateway):
     joined: list[str] = field(default_factory=list)
     connected: bool = False
 
@@ -87,18 +94,18 @@ async def test_bootstrap_service_joins_all_distinct_persisted_channels() -> None
             "84": TwitchUser(user_id="84", login="second", display_name="Second"),
         }
     )
-    irc_manager = FakeIRCManager()
+    irc_gateway = FakeIRCGateway()
     service = IRCBootstrapService(
         channel_repository=repository,
         twitch_api=twitch_api,
-        irc_manager=irc_manager,
+        irc_gateway=irc_gateway,
         connect_timeout_seconds=15,
     )
 
     await service.sync_persisted_channels()
 
-    assert irc_manager.connected is True
-    assert irc_manager.joined == ["example", "second"]
+    assert irc_gateway.connected is True
+    assert irc_gateway.joined == ["example", "second"]
 
 
 @pytest.mark.asyncio
@@ -107,17 +114,17 @@ async def test_bootstrap_service_skips_channels_that_cannot_be_resolved() -> Non
     repository.add_channel(1, "42")
     repository.add_channel(1, "404")
     twitch_api = FakeTwitchAPI(users_by_id={"42": TwitchUser(user_id="42", login="example", display_name="Example")})
-    irc_manager = FakeIRCManager()
+    irc_gateway = FakeIRCGateway()
     service = IRCBootstrapService(
         channel_repository=repository,
         twitch_api=twitch_api,
-        irc_manager=irc_manager,
+        irc_gateway=irc_gateway,
         connect_timeout_seconds=15,
     )
 
     await service.sync_persisted_channels()
 
-    assert irc_manager.joined == ["example"]
+    assert irc_gateway.joined == ["example"]
 
 
 @pytest.mark.asyncio
@@ -128,15 +135,15 @@ async def test_bootstrap_service_prefers_cached_channel_metadata() -> None:
         users_by_id={},
         cached_users_by_id={"42": TwitchUser(user_id="42", login="example", display_name="Example")},
     )
-    irc_manager = FakeIRCManager()
+    irc_gateway = FakeIRCGateway()
     service = IRCBootstrapService(
         channel_repository=repository,
         twitch_api=twitch_api,
-        irc_manager=irc_manager,
+        irc_gateway=irc_gateway,
         connect_timeout_seconds=15,
     )
 
     await service.sync_persisted_channels()
 
-    assert irc_manager.joined == ["example"]
+    assert irc_gateway.joined == ["example"]
     assert twitch_api.id_requests == []

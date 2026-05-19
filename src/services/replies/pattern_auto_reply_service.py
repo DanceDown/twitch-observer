@@ -1,15 +1,11 @@
-﻿"""Runtime execution of pattern-bound Twitch auto-replies."""
+"""Runtime execution of pattern-bound Twitch auto-replies."""
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
 
-from src.adapters.twitch_api import (
-    TwitchAPIClient,
-    TwitchAPIError,
-    TwitchAuthenticationError,
-)
+from src.gateways.twitch_api import TwitchAPIError, TwitchAuthenticationError
 from src.database.connection import (
     ChannelRepository,
     PatternRecord,
@@ -21,14 +17,15 @@ from src.database.connection import (
     TrackedUserRepository,
     TwitchAccountRepository,
 )
-from src.events.event_bus import EventBus
+from src.discord_results import build_result
 from src.events.event_types import (
-    DiscordCommandResult,
     DiscordResultStyle,
-    EventType,
     TwitchChatMessageEvent,
 )
 from src.localization import Localizer
+from src.services.account_service import AccountNotificationSender
+from src.services.patterns import TrackingNotificationSender
+from src.services.twitch_gateways import TwitchReplyGateway
 from src.services.twitch_runtime import (
     ensure_fresh_linked_account,
     expand_pattern_for_tracked_users,
@@ -47,22 +44,18 @@ logger = logging.getLogger(__name__)
 class AutoReplyService:
     """Send Twitch chat replies for matching patterns that have a reply attached."""
 
-    event_bus: EventBus
     thread_repository: ThreadRepository
     channel_repository: ChannelRepository
     pattern_repository: PatternRepository
     reply_repository: ReplyRepository
     account_repository: TwitchAccountRepository
-    twitch_api: TwitchAPIClient
+    twitch_api: TwitchReplyGateway
     token_refresh_skew_seconds: int
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     tracked_user_repository: TrackedUserRepository | None = None
-    notifier: object | None = None
+    notifier: TrackingNotificationSender | AccountNotificationSender | None = None
     handled_messages: int = field(default=0, init=False)
     sent_replies: int = field(default=0, init=False)
-
-    def __post_init__(self) -> None:
-        self.event_bus.subscribe(EventType.TWITCH_CHAT_MESSAGE, self.handle_chat_message)
 
     async def handle_chat_message(self, event: TwitchChatMessageEvent) -> None:
         self.handled_messages += 1
@@ -141,7 +134,7 @@ class AutoReplyService:
                     await ensure_fresh_linked_account(
                         account=account,
                         account_repository=self.account_repository,
-                        twitch_api=self.twitch_api,
+                        twitch_auth=self.twitch_api,
                         token_refresh_skew_seconds=self.token_refresh_skew_seconds,
                         thread_repository=self.thread_repository,
                         thread=thread,
@@ -160,7 +153,7 @@ class AutoReplyService:
                 logger.debug(
                     "Sent auto-reply thread_id=%s pattern_id=%s broadcaster_id=%s sender_id=%s",
                     thread.thread_id,
-                    matching_pattern.p_index,
+                    matching_pattern.pattern_id,
                     event.broadcaster_id,
                     account.twitch_user_id,
                 )
@@ -181,7 +174,7 @@ class AutoReplyService:
                     channel_login=None if channel_user is None else channel_user.login,
                     reply=ReplyRecord(
                         thread_id=matching_reply.thread_id,
-                        p_index=matching_reply.p_index,
+                        pattern_id=matching_reply.pattern_id,
                         reply_message=rendered_reply_message,
                         reply_as_reply=matching_reply.reply_as_reply,
                         disabled=matching_reply.disabled,
@@ -191,7 +184,7 @@ class AutoReplyService:
                 refreshed = await refresh_linked_account(
                     account=account,
                     account_repository=self.account_repository,
-                    twitch_api=self.twitch_api,
+                    twitch_auth=self.twitch_api,
                     thread_repository=self.thread_repository,
                     thread=thread,
                 )
@@ -209,7 +202,7 @@ class AutoReplyService:
                         logger.debug(
                             "Sent auto-reply after token refresh thread_id=%s pattern_id=%s broadcaster_id=%s sender_id=%s",
                             thread.thread_id,
-                            matching_pattern.p_index,
+                            matching_pattern.pattern_id,
                             event.broadcaster_id,
                             refreshed.twitch_user_id,
                         )
@@ -230,7 +223,7 @@ class AutoReplyService:
                             channel_login=(None if channel_user is None else channel_user.login),
                             reply=ReplyRecord(
                                 thread_id=matching_reply.thread_id,
-                                p_index=matching_reply.p_index,
+                                pattern_id=matching_reply.pattern_id,
                                 reply_message=rendered_reply_message,
                                 reply_as_reply=matching_reply.reply_as_reply,
                                 disabled=matching_reply.disabled,
@@ -241,7 +234,7 @@ class AutoReplyService:
                         logger.warning(
                             "Failed to send auto-reply after refresh thread_id=%s pattern_id=%s: %s",
                             thread.thread_id,
-                            matching_pattern.p_index,
+                            matching_pattern.pattern_id,
                             retry_error,
                         )
                 if thread.account_id is not None:
@@ -260,7 +253,7 @@ class AutoReplyService:
                 logger.warning(
                     "Failed to send auto-reply thread_id=%s pattern_id=%s: %s",
                     thread.thread_id,
-                    matching_pattern.p_index,
+                    matching_pattern.pattern_id,
                     error,
                 )
 
@@ -282,13 +275,13 @@ class AutoReplyService:
             if not matches_pattern(effective_pattern, event):
                 logger.debug(
                     "Pattern %s did not match incoming message for auto-reply evaluation.",
-                    effective_pattern.p_index,
+                    effective_pattern.pattern_id,
                 )
                 continue
             if event.author_id == linked_twitch_user_id and effective_pattern.user_scope_mode != "only_selected":
                 logger.debug(
                     "Skipping self-triggered auto-reply for pattern %s because user_scope_mode=%s is not self-explicit.",
-                    effective_pattern.p_index,
+                    effective_pattern.pattern_id,
                     effective_pattern.user_scope_mode,
                 )
                 continue
@@ -296,19 +289,19 @@ class AutoReplyService:
             if effective_pattern.offline_state != "both" and not offline_state_allows(effective_pattern, current_live_status):
                 logger.debug(
                     "Pattern %s matched text but was filtered by offline_state=%s live_status=%s during auto-reply evaluation.",
-                    effective_pattern.p_index,
+                    effective_pattern.pattern_id,
                     effective_pattern.offline_state,
                     current_live_status,
                 )
                 continue
             reply = self.reply_repository.get_by_pattern(
                 thread_id=thread.thread_id,
-                p_index=effective_pattern.p_index,
+                pattern_id=effective_pattern.pattern_id,
             )
             if reply is None or reply.disabled:
                 logger.debug(
                     "Pattern %s matched first but has no enabled auto-reply attached.",
-                    effective_pattern.p_index,
+                    effective_pattern.pattern_id,
                 )
                 return None
             return effective_pattern, reply
@@ -325,14 +318,13 @@ class AutoReplyService:
         channel_display_name: str | None = None,
         channel_login: str | None = None,
     ) -> None:
-        sender = getattr(self.notifier, "send_tracking_embed", None)
-        if sender is None:
+        if self.notifier is None:
             return
         source_channel = self.channel_repository.get_by_thread_and_twitch_channel(
             thread.thread_id,
             event.broadcaster_id or "",
         )
-        await sender(
+        await self.notifier.send_tracking_embed(
             thread.discord_channel_id,
             build_auto_reply_embed(
                 event=event,
@@ -358,21 +350,16 @@ class AutoReplyService:
         return rendered.replace("{MESSAGE}", event.content)
 
     async def _notify_account_expired(self, discord_channel_id: int) -> None:
-        sender = getattr(self.notifier, "send_account_result", None)
-        if sender is None:
+        if self.notifier is None:
             return
-        await sender(
+        await self.notifier.send_account_result(
             0,
             discord_channel_id,
-            DiscordCommandResult(
-                title="Twitch Account Expired",
-                message=(
-                    "The linked Twitch account is no longer valid and must be linked "
-                    "again with `/account link`. Existing auto-replies were kept and "
-                    "will work again after the account is reconnected."
-                ),
+            build_result(
+                self.localizer,
+                "results.write.account_expired",
+                language=self.localizer.default_language,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=False,
             ),
         )
-

@@ -26,8 +26,8 @@ It does not duplicate command parameter details.
   - `bot`
   - `applications.commands`
 
-The bot uses slash commands and does not require privileged message-content
-intents.
+The bot uses Discord application commands as root launchers and does not
+require privileged message-content intents.
 
 ## Recommended channel permissions
 
@@ -45,14 +45,14 @@ Each Discord channel, thread, or DM is a separate configuration root.
 That mapping is persisted in `thread.discord_channel_id`, which is unique per
 context.
 
-## Adapter and service boundary
+## Entrypoint and service boundary
 
-The Discord adapter handles transport only:
+The Discord entrypoint handles transport only:
 
 1. receive interaction
 2. normalize request data
-3. dispatch typed event
-4. await `DiscordCommandResult`
+3. call one direct service method
+4. receive `DiscordCommandResult`
 5. render embed response
 
 Business logic stays in services and repository-backed workflows.

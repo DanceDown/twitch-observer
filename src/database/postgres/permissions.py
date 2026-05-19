@@ -1,4 +1,4 @@
-﻿"""PostgreSQL permission persistence."""
+"""PostgreSQL permission persistence."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from ..records import UserPermissionRecord
 from ..repositories import UserPermissionRepository
+from ._utils import require_row
 from .database import PostgresDatabase
 
 
@@ -16,9 +17,7 @@ class PostgresUserPermissionRepository(UserPermissionRepository):
     database: PostgresDatabase
 
     def get_by_user_and_thread(self, *, discord_user_id: int, thread_id: int) -> UserPermissionRecord | None:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT discord_user_id, thread_id, permissions
@@ -39,9 +38,7 @@ class PostgresUserPermissionRepository(UserPermissionRepository):
         thread_id: int,
         permissions: int,
     ) -> UserPermissionRecord:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO user_permissions (discord_user_id, thread_id, permissions)
@@ -53,13 +50,11 @@ class PostgresUserPermissionRepository(UserPermissionRepository):
                 (discord_user_id, thread_id, permissions),
             )
             row = cursor.fetchone()
-        assert row is not None
+        row = require_row(row, operation="user_permissions.upsert_permissions")
         return UserPermissionRecord(discord_user_id=int(row[0]), thread_id=int(row[1]), permissions=int(row[2]))
 
     def remove_by_user_and_thread(self, *, discord_user_id: int, thread_id: int) -> bool:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 DELETE FROM user_permissions
@@ -72,9 +67,7 @@ class PostgresUserPermissionRepository(UserPermissionRepository):
         return row is not None
 
     def list_for_thread(self, *, thread_id: int) -> list[UserPermissionRecord]:
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT discord_user_id, thread_id, permissions
@@ -86,4 +79,3 @@ class PostgresUserPermissionRepository(UserPermissionRepository):
             )
             rows = cursor.fetchall()
         return [UserPermissionRecord(discord_user_id=int(row[0]), thread_id=int(row[1]), permissions=int(row[2])) for row in rows]
-

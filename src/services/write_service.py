@@ -1,107 +1,78 @@
-﻿"""Business logic for manually sending Twitch chat messages from Discord."""
+"""Business logic for manually sending Twitch chat messages from Discord."""
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from typing import Protocol
 
-from src.adapters.twitch_api import TwitchAPIClient, TwitchAPIError, TwitchAuthenticationError
+from src.gateways.twitch_api import TwitchAuthenticationError
 from src.database.connection import ChannelRepository, ThreadRepository, TwitchAccountRepository, UserPermissionRepository
-from src.events.event_bus import EventBus
-from src.events.event_types import (
-    DiscordCommandResult,
-    DiscordResultStyle,
-    DiscordWriteRequestedEvent,
-    EventType,
-)
+from src.discord_results import build_thread_result, discord_user_mention
+from src.events.event_types import DiscordCommandResult, DiscordResultStyle, SendTwitchMessageCommand
 from src.localization import Localizer
-from src.services.authz import thread_has_permission
+from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
+from src.services.twitch_gateways import TwitchAuthGateway, TwitchChannelLookup, TwitchChatGateway
 from src.services.twitch_runtime import ensure_fresh_linked_account, refresh_linked_account
 from src.utils.permissions import ObserverPermission
 
 logger = logging.getLogger(__name__)
 
 
+class TwitchWriteGateway(TwitchChannelLookup, TwitchChatGateway, TwitchAuthGateway, Protocol):
+    """Combined protocol for manual Twitch writes."""
+
+    pass
+
+
 @dataclass(slots=True)
 class TwitchWriteCommandService:
     """Handle `/write` requests for manual Twitch chat output."""
 
-    event_bus: EventBus
     thread_repository: ThreadRepository
     channel_repository: ChannelRepository
     account_repository: TwitchAccountRepository
-    twitch_api: TwitchAPIClient
+    twitch_api: TwitchWriteGateway
     token_refresh_skew_seconds: int
     permission_repository: UserPermissionRepository | None = None
     localizer: Localizer = field(default_factory=Localizer.from_directory)
+    _guards: ThreadCommandGuards = field(init=False, repr=False)
+    _runner: CommandExecutionRunner = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self.event_bus.subscribe(EventType.DISCORD_WRITE_REQUESTED, self.handle_request)
-
-    async def handle_request(self, event: DiscordWriteRequestedEvent) -> None:
-        try:
-            result = await self._send_message(event)
-        except ValueError as error:
-            result = self._event_result(
-                event,
-                "results.validation_error",
-                DETAIL=str(error),
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            )
-        except TwitchAPIError as error:
-            result = self._event_result(
-                event,
-                "results.twitch_api_error",
-                DETAIL=str(error),
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            )
-        except Exception as error:
-            logger.exception("Unexpected error while handling Twitch write command.")
-            result = self._event_result(
-                event,
-                "results.unexpected_error",
-                DETAIL=str(error),
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            )
-
-        if not event.result_future.done():
-            event.result_future.set_result(result)
-
-    async def _send_message(self, event: DiscordWriteRequestedEvent) -> DiscordCommandResult:
-        thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
-        if thread is None:
-            return self.localizer.result(
-                "results.not_joined",
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            )
-        if not thread_has_permission(
-            thread=thread,
-            requester_id=event.requester_id,
+        self._guards = ThreadCommandGuards(
+            thread_repository=self.thread_repository,
             permission_repository=self.permission_repository,
-            required_permission=ObserverPermission.SEND_TWITCH_MESSAGES,
-        ):
-            return self.localizer.thread_result(
-                "results.write.permission_denied",
-                thread=thread,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            )
+            account_repository=self.account_repository,
+            localizer=self.localizer,
+        )
+        self._runner = CommandExecutionRunner(
+            localizer=self.localizer,
+            resolve_thread=lambda command: self.thread_repository.get_by_discord_channel_id(command.discord_channel_id),
+        )
 
-        message = event.message.strip()
+    async def handle_request(self, command: SendTwitchMessageCommand) -> DiscordCommandResult:
+        return await self._runner.run(command, lambda: self._send_message(command), logger_=logger)
+
+    async def _send_message(self, command: SendTwitchMessageCommand) -> DiscordCommandResult:
+        thread = self._guards.require_permission(
+            command,
+            permission=ObserverPermission.SEND_TWITCH_MESSAGES,
+            denial_key="results.write.permission_denied",
+        )
+        if isinstance(thread, DiscordCommandResult):
+            return thread
+
+        message = command.message.strip()
         if not message:
             raise ValueError(self.localizer.text("results.write.empty_message", language=thread.language))
         if len(message) > 500:
             raise ValueError(self.localizer.text("results.write.message_too_long", language=thread.language))
-
-        refresh_lookup = getattr(self.twitch_api, "refresh_user_by_login", self.twitch_api.get_user_by_login)
-        twitch_channel = await refresh_lookup(event.twitch_channel_login)
+        twitch_channel = await self.twitch_api.refresh_channel_by_login(command.twitch_channel_login)
         tracked_channel = self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_channel.user_id)
         if tracked_channel is None:
-            return self.localizer.thread_result(
+            return build_thread_result(
+                self.localizer,
                 "results.write.channel_not_tracked",
                 thread=thread,
                 DISPLAY_NAME=twitch_channel.display_name,
@@ -110,20 +81,15 @@ class TwitchWriteCommandService:
                 ephemeral=True,
             )
 
-        account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
-        if account is None or not account.access_token:
-            return self.localizer.thread_result(
-                "results.write.no_linked_account",
-                thread=thread,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            )
+        account = self._guards.require_linked_account(thread, denial_key="results.write.no_linked_account")
+        if isinstance(account, DiscordCommandResult):
+            return account
 
         account = (
             await ensure_fresh_linked_account(
                 account=account,
                 account_repository=self.account_repository,
-                twitch_api=self.twitch_api,
+                twitch_auth=self.twitch_api,
                 token_refresh_skew_seconds=self.token_refresh_skew_seconds,
                 thread_repository=self.thread_repository,
                 thread=thread,
@@ -137,13 +103,13 @@ class TwitchWriteCommandService:
                 sender_id=account.twitch_user_id,
                 broadcaster_id=twitch_channel.user_id,
                 message=message,
-                reply_parent_message_id=event.reply_parent_message_id,
+                reply_parent_message_id=command.reply_parent_message_id,
             )
         except TwitchAuthenticationError:
             refreshed = await refresh_linked_account(
                 account=account,
                 account_repository=self.account_repository,
-                twitch_api=self.twitch_api,
+                twitch_auth=self.twitch_api,
                 thread_repository=self.thread_repository,
                 thread=thread,
             )
@@ -151,7 +117,8 @@ class TwitchWriteCommandService:
                 if thread.account_id is not None:
                     self.account_repository.remove_by_account_id(thread.account_id)
                     self.thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
-                return self.localizer.thread_result(
+                return build_thread_result(
+                    self.localizer,
                     "results.write.account_expired",
                     thread=thread,
                     style=DiscordResultStyle.ERROR,
@@ -163,21 +130,24 @@ class TwitchWriteCommandService:
                 sender_id=refreshed.twitch_user_id,
                 broadcaster_id=twitch_channel.user_id,
                 message=message,
-                reply_parent_message_id=event.reply_parent_message_id,
+                reply_parent_message_id=command.reply_parent_message_id,
             )
 
-        if event.reply_parent_message_id:
-            return self.localizer.thread_result(
+        if command.reply_parent_message_id:
+            return build_thread_result(
+                self.localizer,
                 "results.write.reply_sent",
                 thread=thread,
                 DISPLAY_NAME=twitch_channel.display_name,
                 LOGIN=twitch_channel.login,
-                REPLY_TARGET=event.reply_parent_message_id,
+                REPLY_TARGET=command.reply_parent_message_id,
                 MESSAGE=message,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
+                USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
             )
-        return self.localizer.thread_result(
+        return build_thread_result(
+            self.localizer,
             "results.write.message_sent",
             thread=thread,
             DISPLAY_NAME=twitch_channel.display_name,
@@ -185,23 +155,5 @@ class TwitchWriteCommandService:
             MESSAGE=message,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
+            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
         )
-
-    def _event_result(
-        self,
-        event: DiscordWriteRequestedEvent,
-        key: str,
-        *,
-        style: DiscordResultStyle,
-        ephemeral: bool,
-        **placeholders: object,
-    ) -> DiscordCommandResult:
-        thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
-        return self.localizer.thread_result(
-            key,
-            thread=thread,
-            style=style,
-            ephemeral=ephemeral,
-            **placeholders,
-        )
-

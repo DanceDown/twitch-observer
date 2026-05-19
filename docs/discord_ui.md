@@ -9,6 +9,10 @@ documented in [discord_interaction_flows.md](discord_interaction_flows.md).
 
 This document covers component types and usage patterns.
 
+Command-specific flows are split into focused modules under
+`src/entrypoints/discord/ui/`. The ping flow, for example, lives under
+`src/entrypoints/discord/ui/patterns/` instead of one monolithic file.
+
 ## Modal
 
 Use a modal to collect structured multi-field input.
@@ -36,7 +40,7 @@ Use `discord.ui.Select` for predefined choices.
 Examples:
 
 - choose tracked channel
-- choose existing ping/reply ID
+- choose an existing ping/reply entry
 - choose action mode
 
 ## RadioGroup / CheckboxGroup
@@ -55,11 +59,12 @@ Use labels to title non-text modal controls so the form remains self-explanatory
 
 ## CommandTree
 
-Slash commands are registered through `discord.app_commands.CommandTree`.
+Root Discord entrypoints are registered through `discord.app_commands.CommandTree`.
+Those entrypoints then hand off to component-driven flows.
 
-Each command area is registered through the dedicated command modules under:
+Registration remains split across the dedicated command modules under:
 
-- `src/adapters/discord/commands/`
+- `src/entrypoints/discord/commands/`
 
 ## UI ownership and safety
 
@@ -73,3 +78,4 @@ Each command area is registered through the dedicated command modules under:
 - modal submit interactions cannot respond with another modal directly
 - multi-step flows should use:
   - modal submit -> message with controls -> component interaction -> next modal
+

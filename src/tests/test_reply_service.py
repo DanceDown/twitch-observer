@@ -5,13 +5,14 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from src.adapters.discord import (
+from src.tests.dispatch_helpers import (
     dispatch_account_command,
     dispatch_channel_event_command,
     dispatch_reply_command,
     dispatch_show_command,
 )
-from src.adapters.twitch_api import (
+from src.gateways.twitch_api import (
+    TwitchChannelNotFoundError,
     TwitchDeviceCodeStart,
     TwitchDevicePollResult,
     TwitchUser,
@@ -36,18 +37,17 @@ from src.database.connection import (
     TwitchDeviceFlowRecord,
     TwitchDeviceFlowRepository,
 )
-from src.events.event_bus import EventBus
+from types import SimpleNamespace
 from src.events.event_types import (
     DiscordCommandResult,
     DiscordResultStyle,
-    EventType,
     TwitchChannelLiveStateChangedEvent,
     TwitchChatMessageEvent,
 )
 from src.services.account_service import AccountCommandService, AccountNotificationSender, DeviceFlowPollingService
 from src.services.channel_live_state_service import ChannelEventCommandService
-from src.services.pattern_service import ShowCommandService
-from src.services.reply_service import AutoReplyService, ChannelEventAutoReplyService, ReplyCommandService
+from src.services.patterns import ShowCommandService
+from src.services.replies import AutoReplyService, ChannelEventAutoReplyService, ReplyCommandService
 
 
 @dataclass
@@ -199,15 +199,15 @@ class InMemoryPatternRepository(PatternRepository):
     def add_pattern(self, **kwargs) -> PatternRecord:  # pragma: no cover - unused here
         raise NotImplementedError
 
-    def remove_pattern(self, *, thread_id: int, p_index: int) -> None:
-        self.patterns = [pattern for pattern in self.patterns if not (pattern.thread_id == thread_id and pattern.p_index == p_index)]
+    def remove_pattern(self, *, thread_id: int, pattern_id: int) -> None:
+        self.patterns = [pattern for pattern in self.patterns if not (pattern.thread_id == thread_id and pattern.pattern_id == pattern_id)]
 
-    def set_pattern_disabled(self, *, thread_id: int, p_index: int, disabled: bool) -> PatternRecord | None:
+    def set_pattern_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool) -> PatternRecord | None:
         for index, pattern in enumerate(self.patterns):
-            if pattern.thread_id == thread_id and pattern.p_index == p_index:
+            if pattern.thread_id == thread_id and pattern.pattern_id == pattern_id:
                 updated = PatternRecord(
                     thread_id=pattern.thread_id,
-                    p_index=pattern.p_index,
+                    pattern_id=pattern.pattern_id,
                     regex=pattern.regex,
                     channel_scope_mode=pattern.channel_scope_mode,
                     channel_scope_ids=pattern.channel_scope_ids,
@@ -226,12 +226,12 @@ class InMemoryPatternRepository(PatternRepository):
                 return updated
         return None
 
-    def set_pattern_priority(self, *, thread_id: int, p_index: int, priority: int) -> PatternRecord | None:
+    def set_pattern_priority(self, *, thread_id: int, pattern_id: int, priority: int) -> PatternRecord | None:
         for index, pattern in enumerate(self.patterns):
-            if pattern.thread_id == thread_id and pattern.p_index == p_index:
+            if pattern.thread_id == thread_id and pattern.pattern_id == pattern_id:
                 updated = PatternRecord(
                     thread_id=pattern.thread_id,
-                    p_index=pattern.p_index,
+                    pattern_id=pattern.pattern_id,
                     regex=pattern.regex,
                     channel_scope_mode=pattern.channel_scope_mode,
                     channel_scope_ids=pattern.channel_scope_ids,
@@ -254,7 +254,7 @@ class InMemoryPatternRepository(PatternRepository):
         self,
         *,
         thread_id: int,
-        p_index: int,
+        pattern_id: int,
         regex: str,
         channel_scope_mode: str,
         channel_scope_ids: tuple[str, ...],
@@ -268,10 +268,10 @@ class InMemoryPatternRepository(PatternRepository):
         priority: int,
     ) -> PatternRecord | None:
         for index, pattern in enumerate(self.patterns):
-            if pattern.thread_id == thread_id and pattern.p_index == p_index:
+            if pattern.thread_id == thread_id and pattern.pattern_id == pattern_id:
                 updated = PatternRecord(
                     thread_id=thread_id,
-                    p_index=p_index,
+                    pattern_id=pattern_id,
                     regex=regex,
                     channel_scope_mode=channel_scope_mode,
                     channel_scope_ids=tuple(sorted(channel_scope_ids)),
@@ -292,11 +292,11 @@ class InMemoryPatternRepository(PatternRepository):
 
     def list_active_patterns_for_thread(self, thread_id: int) -> list[PatternRecord]:
         rows = [pattern for pattern in self.patterns if pattern.thread_id == thread_id and not pattern.disabled and pattern.notify]
-        return sorted(rows, key=lambda pattern: (-pattern.priority, pattern.p_index))
+        return sorted(rows, key=lambda pattern: (-pattern.priority, pattern.pattern_id))
 
-    def get_pattern_by_id(self, *, thread_id: int, p_index: int) -> PatternRecord | None:
+    def get_pattern_by_id(self, *, thread_id: int, pattern_id: int) -> PatternRecord | None:
         for pattern in self.patterns:
-            if pattern.thread_id == thread_id and pattern.p_index == p_index:
+            if pattern.thread_id == thread_id and pattern.pattern_id == pattern_id:
                 return pattern
         return None
 
@@ -304,7 +304,7 @@ class InMemoryPatternRepository(PatternRepository):
         rows = [pattern for pattern in self.patterns if pattern.thread_id == thread_id]
         if is_regex is not None:
             rows = [pattern for pattern in rows if pattern.is_regex == is_regex]
-        return sorted(rows, key=lambda pattern: (-pattern.priority, pattern.p_index))
+        return sorted(rows, key=lambda pattern: (-pattern.priority, pattern.pattern_id))
 
     def count_channel_scope_references(self, *, thread_id: int, twitch_channel_id: str) -> int:
         return sum(1 for pattern in self.patterns if pattern.thread_id == thread_id and twitch_channel_id in pattern.channel_scope_ids)
@@ -314,23 +314,23 @@ class InMemoryPatternRepository(PatternRepository):
 class InMemoryReplyRepository(ReplyRepository):
     replies_by_pattern: dict[tuple[int, int], ReplyRecord] = field(default_factory=dict)
 
-    def get_by_pattern(self, *, thread_id: int, p_index: int) -> ReplyRecord | None:
-        return self.replies_by_pattern.get((thread_id, p_index))
+    def get_by_pattern(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:
+        return self.replies_by_pattern.get((thread_id, pattern_id))
 
     def add_reply(
         self,
         *,
         thread_id: int,
-        p_index: int,
+        pattern_id: int,
         reply_message: str,
         reply_as_reply: bool,
     ) -> ReplyRecord | None:
-        key = (thread_id, p_index)
+        key = (thread_id, pattern_id)
         if key in self.replies_by_pattern:
             return None
         reply = ReplyRecord(
             thread_id=thread_id,
-            p_index=p_index,
+            pattern_id=pattern_id,
             reply_message=reply_message,
             reply_as_reply=reply_as_reply,
             disabled=False,
@@ -338,17 +338,17 @@ class InMemoryReplyRepository(ReplyRepository):
         self.replies_by_pattern[key] = reply
         return reply
 
-    def remove_reply(self, *, thread_id: int, p_index: int) -> ReplyRecord | None:
-        return self.replies_by_pattern.pop((thread_id, p_index), None)
+    def remove_reply(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:
+        return self.replies_by_pattern.pop((thread_id, pattern_id), None)
 
-    def set_reply_disabled(self, *, thread_id: int, p_index: int, disabled: bool) -> ReplyRecord | None:
-        key = (thread_id, p_index)
+    def set_reply_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool) -> ReplyRecord | None:
+        key = (thread_id, pattern_id)
         existing = self.replies_by_pattern.get(key)
         if existing is None:
             return None
         updated = ReplyRecord(
             thread_id=existing.thread_id,
-            p_index=existing.p_index,
+            pattern_id=existing.pattern_id,
             reply_message=existing.reply_message,
             reply_as_reply=existing.reply_as_reply,
             disabled=disabled,
@@ -360,7 +360,7 @@ class InMemoryReplyRepository(ReplyRepository):
         rows = [reply for reply in self.replies_by_pattern.values() if reply.thread_id == thread_id]
         if not include_disabled:
             rows = [reply for reply in rows if not reply.disabled]
-        return sorted(rows, key=lambda reply: reply.p_index)
+        return sorted(rows, key=lambda reply: reply.pattern_id)
 
     def disable_replies_for_thread(self, thread_id: int) -> int:
         count = 0
@@ -368,7 +368,7 @@ class InMemoryReplyRepository(ReplyRepository):
             if reply.thread_id == thread_id and not reply.disabled:
                 self.replies_by_pattern[key] = ReplyRecord(
                     thread_id=reply.thread_id,
-                    p_index=reply.p_index,
+                    pattern_id=reply.pattern_id,
                     reply_message=reply.reply_message,
                     reply_as_reply=reply.reply_as_reply,
                     disabled=True,
@@ -382,7 +382,7 @@ class InMemoryReplyRepository(ReplyRepository):
             if reply.thread_id == thread_id and reply.disabled:
                 self.replies_by_pattern[key] = ReplyRecord(
                     thread_id=reply.thread_id,
-                    p_index=reply.p_index,
+                    pattern_id=reply.pattern_id,
                     reply_message=reply.reply_message,
                     reply_as_reply=reply.reply_as_reply,
                     disabled=False,
@@ -558,15 +558,14 @@ class InMemoryAdapterEventActionRepository(AdapterEventActionRepository):
 
 @pytest.mark.asyncio
 async def test_channel_event_command_manages_live_and_offline_notifications() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     channel_repository.add_channel(thread.thread_id, "42")
     adapter_event_repository = InMemoryAdapterEventRepository()
     adapter_event_action_repository = InMemoryAdapterEventActionRepository(event_repository=adapter_event_repository)
-    ChannelEventCommandService(
-        event_bus=bus,
+    bus.channel_event = ChannelEventCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         adapter_event_repository=adapter_event_repository,
@@ -575,7 +574,7 @@ async def test_channel_event_command_manages_live_and_offline_notifications() ->
             users_by_id={},
             cached_users_by_id={
                 "42": TwitchUser(user_id="42", login="example", display_name="ExampleChannel"),
-            }
+            },
         ),  # type: ignore[arg-type]
     )
 
@@ -941,10 +940,32 @@ class FakeTwitchAPI:
 
     async def get_user_by_id(self, user_id: str) -> TwitchUser:
         self.id_requests.append(user_id)
+        if user_id not in self.users_by_id:
+            raise TwitchChannelNotFoundError(f"Unknown Twitch user id: {user_id}")
         return self.users_by_id[user_id]
+
+    async def get_user_by_login(self, login: str) -> TwitchUser:
+        normalized = login.strip().lower()
+        for user in self.users_by_id.values():
+            if user.login == normalized:
+                return user
+        raise TwitchChannelNotFoundError(f"Unknown Twitch login: {normalized}")
 
     def get_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
         return self.cached_users_by_id.get(user_id.strip())
+
+    def get_cached_user_by_login(self, login: str) -> TwitchUser | None:
+        normalized = login.strip().lower()
+        for user in self.cached_users_by_id.values():
+            if user.login == normalized:
+                return user
+        return None
+
+    async def get_channel_by_id(self, user_id: str) -> TwitchUser:
+        return await self.get_user_by_id(user_id)
+
+    async def refresh_channel_by_login(self, login: str) -> TwitchUser:
+        return await self.get_user_by_login(login)
 
     async def is_user_live(self, user_id: str) -> bool:
         return self.live_by_user_id.get(user_id, False)
@@ -969,7 +990,7 @@ class FakeNotifier(AccountNotificationSender):
 
 @pytest.mark.asyncio
 async def test_account_link_command_starts_device_flow() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     account_repository = InMemoryAccountRepository()
     device_flow_repository = InMemoryDeviceFlowRepository()
     thread_repository = InMemoryThreadRepository()
@@ -983,8 +1004,7 @@ async def test_account_link_command_starts_device_flow() -> None:
             interval=5,
         )
     )
-    AccountCommandService(
-        event_bus=bus,
+    bus.account = AccountCommandService(
         account_repository=account_repository,
         device_flow_repository=device_flow_repository,
         thread_repository=thread_repository,
@@ -1009,7 +1029,7 @@ async def test_account_link_command_starts_device_flow() -> None:
 
 @pytest.mark.asyncio
 async def test_account_show_reports_pending_device_flow() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     device_flow_repository = InMemoryDeviceFlowRepository()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
@@ -1023,8 +1043,7 @@ async def test_account_show_reports_pending_device_flow() -> None:
         expires_at=datetime.now(UTC).isoformat(),
         scope=("user:write:chat",),
     )
-    AccountCommandService(
-        event_bus=bus,
+    bus.account = AccountCommandService(
         account_repository=InMemoryAccountRepository(),
         device_flow_repository=device_flow_repository,
         thread_repository=thread_repository,
@@ -1040,7 +1059,7 @@ async def test_account_show_reports_pending_device_flow() -> None:
 
 @pytest.mark.asyncio
 async def test_show_account_lists_linked_account_with_display_name_and_thumbnail() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
     account_repository = InMemoryAccountRepository()
@@ -1056,8 +1075,7 @@ async def test_show_account_lists_linked_account_with_display_name_and_thumbnail
         token_type="bearer",
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
-    ShowCommandService(
-        event_bus=bus,
+    bus.show = ShowCommandService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
         pattern_repository=InMemoryPatternRepository(),
@@ -1182,14 +1200,14 @@ async def test_device_flow_poller_marks_failed_authorizations() -> None:
 
 @pytest.mark.asyncio
 async def test_account_unlink_keeps_attached_auto_replies() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     InMemoryPatternRepository(
         patterns=[
             PatternRecord(
                 thread_id=thread.thread_id,
-                p_index=1,
+                pattern_id=1,
                 regex="hello",
                 channel_scope_mode="all_tracked",
                 channel_scope_ids=(),
@@ -1207,7 +1225,7 @@ async def test_account_unlink_keeps_attached_auto_replies() -> None:
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, p_index=1, reply_message="Hi there", reply_as_reply=True)
+    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
     account_repository = InMemoryAccountRepository()
     account = account_repository.create_account(
         discord_user_id=200,
@@ -1221,8 +1239,7 @@ async def test_account_unlink_keeps_attached_auto_replies() -> None:
         token_type="bearer",
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
-    AccountCommandService(
-        event_bus=bus,
+    bus.account = AccountCommandService(
         account_repository=account_repository,
         device_flow_repository=InMemoryDeviceFlowRepository(),
         thread_repository=thread_repository,
@@ -1233,21 +1250,21 @@ async def test_account_unlink_keeps_attached_auto_replies() -> None:
 
     assert result.style == DiscordResultStyle.SUCCESS
     assert result.ephemeral is False
-    reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, p_index=1)
+    reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=1)
     assert reply is not None
     assert reply.disabled is False
 
 
 @pytest.mark.asyncio
 async def test_reply_add_requires_linked_account() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
                 thread_id=thread.thread_id,
-                p_index=1,
+                pattern_id=1,
                 regex="hello",
                 channel_scope_mode="all_tracked",
                 channel_scope_ids=(),
@@ -1266,8 +1283,7 @@ async def test_reply_add_requires_linked_account() -> None:
             )
         ]
     )
-    ReplyCommandService(
-        event_bus=bus,
+    bus.reply = ReplyCommandService(
         thread_repository=thread_repository,
         pattern_repository=pattern_repository,
         reply_repository=InMemoryReplyRepository(),
@@ -1291,14 +1307,14 @@ async def test_reply_add_requires_linked_account() -> None:
 
 @pytest.mark.asyncio
 async def test_reply_add_updates_pattern_reply_fields() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
                 thread_id=thread.thread_id,
-                p_index=1,
+                pattern_id=1,
                 regex="hello",
                 channel_scope_mode="all_tracked",
                 channel_scope_ids=(),
@@ -1331,8 +1347,7 @@ async def test_reply_add_updates_pattern_reply_fields() -> None:
         token_type="bearer",
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
-    ReplyCommandService(
-        event_bus=bus,
+    bus.reply = ReplyCommandService(
         thread_repository=thread_repository,
         pattern_repository=pattern_repository,
         reply_repository=reply_repository,
@@ -1350,7 +1365,7 @@ async def test_reply_add_updates_pattern_reply_fields() -> None:
     )
 
     assert result.style == DiscordResultStyle.SUCCESS
-    reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, p_index=1)
+    reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=1)
     assert reply is not None
     assert reply.reply_message == "Hi there"
     assert reply.reply_as_reply is True
@@ -1358,14 +1373,14 @@ async def test_reply_add_updates_pattern_reply_fields() -> None:
 
 @pytest.mark.asyncio
 async def test_reply_add_rejects_overwriting_existing_auto_reply() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
                 thread_id=thread.thread_id,
-                p_index=1,
+                pattern_id=1,
                 regex="hello",
                 channel_scope_mode="all_tracked",
                 channel_scope_ids=(),
@@ -1383,7 +1398,7 @@ async def test_reply_add_rejects_overwriting_existing_auto_reply() -> None:
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, p_index=1, reply_message="Existing", reply_as_reply=False)
+    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Existing", reply_as_reply=False)
     account_repository = InMemoryAccountRepository()
     account = account_repository.create_account(
         discord_user_id=200,
@@ -1397,8 +1412,7 @@ async def test_reply_add_rejects_overwriting_existing_auto_reply() -> None:
         token_type="bearer",
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
-    ReplyCommandService(
-        event_bus=bus,
+    bus.reply = ReplyCommandService(
         thread_repository=thread_repository,
         pattern_repository=pattern_repository,
         reply_repository=reply_repository,
@@ -1417,21 +1431,21 @@ async def test_reply_add_rejects_overwriting_existing_auto_reply() -> None:
 
     assert result.style == DiscordResultStyle.ERROR
     assert result.ephemeral is True
-    reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, p_index=1)
+    reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=1)
     assert reply is not None
     assert reply.reply_message == "Existing"
 
 
 @pytest.mark.asyncio
 async def test_reply_disable_marks_reply_as_disabled() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
                 thread_id=thread.thread_id,
-                p_index=1,
+                pattern_id=1,
                 regex="hello",
                 channel_scope_mode="all_tracked",
                 channel_scope_ids=(),
@@ -1449,7 +1463,7 @@ async def test_reply_disable_marks_reply_as_disabled() -> None:
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, p_index=1, reply_message="Hi there", reply_as_reply=True)
+    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
     account_repository = InMemoryAccountRepository()
     account = account_repository.create_account(
         discord_user_id=200,
@@ -1463,8 +1477,7 @@ async def test_reply_disable_marks_reply_as_disabled() -> None:
         token_type="bearer",
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
-    ReplyCommandService(
-        event_bus=bus,
+    bus.reply = ReplyCommandService(
         thread_repository=thread_repository,
         pattern_repository=pattern_repository,
         reply_repository=reply_repository,
@@ -1483,21 +1496,21 @@ async def test_reply_disable_marks_reply_as_disabled() -> None:
 
     assert result.style == DiscordResultStyle.SUCCESS
     assert "Hi there" in result.message
-    reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, p_index=1)
+    reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=1)
     assert reply is not None
     assert reply.disabled is True
 
 
 @pytest.mark.asyncio
 async def test_reply_enable_marks_reply_as_enabled() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
                 thread_id=thread.thread_id,
-                p_index=1,
+                pattern_id=1,
                 regex="hello",
                 channel_scope_mode="all_tracked",
                 channel_scope_ids=(),
@@ -1515,8 +1528,8 @@ async def test_reply_enable_marks_reply_as_enabled() -> None:
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, p_index=1, reply_message="Hi there", reply_as_reply=True)
-    reply_repository.set_reply_disabled(thread_id=thread.thread_id, p_index=1, disabled=True)
+    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
+    reply_repository.set_reply_disabled(thread_id=thread.thread_id, pattern_id=1, disabled=True)
     account_repository = InMemoryAccountRepository()
     account = account_repository.create_account(
         discord_user_id=200,
@@ -1530,8 +1543,7 @@ async def test_reply_enable_marks_reply_as_enabled() -> None:
         token_type="bearer",
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
-    ReplyCommandService(
-        event_bus=bus,
+    bus.reply = ReplyCommandService(
         thread_repository=thread_repository,
         pattern_repository=pattern_repository,
         reply_repository=reply_repository,
@@ -1550,14 +1562,14 @@ async def test_reply_enable_marks_reply_as_enabled() -> None:
 
     assert result.style == DiscordResultStyle.SUCCESS
     assert "Hi there" in result.message
-    reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, p_index=1)
+    reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=1)
     assert reply is not None
     assert reply.disabled is False
 
 
 @pytest.mark.asyncio
 async def test_show_auto_replies_lists_attached_replies() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
@@ -1565,7 +1577,7 @@ async def test_show_auto_replies_lists_attached_replies() -> None:
         patterns=[
             PatternRecord(
                 thread_id=thread.thread_id,
-                p_index=1,
+                pattern_id=1,
                 regex="hello",
                 channel_scope_mode="all_tracked",
                 channel_scope_ids=(),
@@ -1583,9 +1595,8 @@ async def test_show_auto_replies_lists_attached_replies() -> None:
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, p_index=1, reply_message="Hi there", reply_as_reply=True)
-    ShowCommandService(
-        event_bus=bus,
+    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
+    bus.show = ShowCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
@@ -1607,7 +1618,6 @@ async def test_show_auto_replies_lists_attached_replies() -> None:
 
 @pytest.mark.asyncio
 async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
-    bus = EventBus()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
@@ -1616,7 +1626,7 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
         patterns=[
             PatternRecord(
                 thread_id=thread.thread_id,
-                p_index=1,
+                pattern_id=1,
                 regex="hello",
                 channel_scope_mode="all_tracked",
                 channel_scope_ids=(),
@@ -1636,7 +1646,7 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
     reply_repository = InMemoryReplyRepository()
     reply_repository.add_reply(
         thread_id=thread.thread_id,
-        p_index=1,
+        pattern_id=1,
         reply_message="Hi {NAME}, you wrote `{MESSAGE}` in {CHANNEL}",
         reply_as_reply=True,
     )
@@ -1656,7 +1666,6 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
     twitch_api = FakeTwitchAPI()
     notifier = FakeNotifier()
     service = AutoReplyService(
-        event_bus=bus,
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
@@ -1690,7 +1699,6 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
 
 @pytest.mark.asyncio
 async def test_auto_reply_service_skips_self_reply_loops() -> None:
-    bus = EventBus()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
@@ -1699,7 +1707,7 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
         patterns=[
             PatternRecord(
                 thread_id=thread.thread_id,
-                p_index=1,
+                pattern_id=1,
                 regex="hello",
                 channel_scope_mode="all_tracked",
                 channel_scope_ids=(),
@@ -1717,7 +1725,7 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, p_index=1, reply_message="Hi there", reply_as_reply=True)
+    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
     account_repository = InMemoryAccountRepository()
     account = account_repository.create_account(
         discord_user_id=200,
@@ -1733,7 +1741,6 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
     service = AutoReplyService(
-        event_bus=bus,
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
@@ -1764,7 +1771,6 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
 
 @pytest.mark.asyncio
 async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_selected() -> None:
-    bus = EventBus()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
@@ -1773,7 +1779,7 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
         patterns=[
             PatternRecord(
                 thread_id=thread.thread_id,
-                p_index=1,
+                pattern_id=1,
                 regex="hello",
                 channel_scope_mode="all_tracked",
                 channel_scope_ids=(),
@@ -1791,7 +1797,7 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, p_index=1, reply_message="Hi there", reply_as_reply=True)
+    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
     account_repository = InMemoryAccountRepository()
     account = account_repository.create_account(
         discord_user_id=200,
@@ -1807,7 +1813,6 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
     service = AutoReplyService(
-        event_bus=bus,
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
@@ -1838,7 +1843,6 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
 
 @pytest.mark.asyncio
 async def test_auto_reply_service_skips_disabled_thread() -> None:
-    bus = EventBus()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     thread_repository.set_enabled(discord_channel_id=100, enabled=False)
@@ -1848,7 +1852,7 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
         patterns=[
             PatternRecord(
                 thread_id=thread.thread_id,
-                p_index=1,
+                pattern_id=1,
                 regex="hello",
                 channel_scope_mode="all_tracked",
                 channel_scope_ids=(),
@@ -1866,7 +1870,7 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, p_index=1, reply_message="Hi there", reply_as_reply=True)
+    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
     account_repository = InMemoryAccountRepository()
     account = account_repository.create_account(
         discord_user_id=200,
@@ -1882,7 +1886,6 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
     service = AutoReplyService(
-        event_bus=bus,
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
@@ -1913,7 +1916,6 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
 
 @pytest.mark.asyncio
 async def test_auto_reply_service_stops_after_first_matching_pattern_without_reply() -> None:
-    bus = EventBus()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
@@ -1922,7 +1924,7 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
         patterns=[
             PatternRecord(
                 thread_id=thread.thread_id,
-                p_index=1,
+                pattern_id=1,
                 regex="hello there",
                 channel_scope_mode="all_tracked",
                 channel_scope_ids=(),
@@ -1939,7 +1941,7 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
             ),
             PatternRecord(
                 thread_id=thread.thread_id,
-                p_index=2,
+                pattern_id=2,
                 regex="hello",
                 channel_scope_mode="all_tracked",
                 channel_scope_ids=(),
@@ -1957,7 +1959,7 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, p_index=2, reply_message="fallback", reply_as_reply=True)
+    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=2, reply_message="fallback", reply_as_reply=True)
     account_repository = InMemoryAccountRepository()
     account = account_repository.create_account(
         discord_user_id=200,
@@ -1973,7 +1975,6 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
     service = AutoReplyService(
-        event_bus=bus,
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
@@ -2004,7 +2005,6 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
 
 @pytest.mark.asyncio
 async def test_auto_reply_service_uses_persisted_channel_live_state_without_live_api_calls() -> None:
-    bus = EventBus()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
@@ -2014,7 +2014,7 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
         patterns=[
             PatternRecord(
                 thread_id=thread.thread_id,
-                p_index=1,
+                pattern_id=1,
                 regex="hello",
                 channel_scope_mode="all_tracked",
                 channel_scope_ids=(),
@@ -2032,7 +2032,7 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, p_index=1, reply_message="Hi there", reply_as_reply=False)
+    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=False)
     account_repository = InMemoryAccountRepository()
     account = account_repository.create_account(
         discord_user_id=200,
@@ -2048,7 +2048,6 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
     service = AutoReplyService(
-        event_bus=bus,
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
@@ -2079,7 +2078,6 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
 
 @pytest.mark.asyncio
 async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_live() -> None:
-    bus = EventBus()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
@@ -2117,8 +2115,7 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
             "42": TwitchUser(user_id="42", login="example", display_name="ExampleChannel"),
         }
     )
-    ChannelEventAutoReplyService(
-        event_bus=bus,
+    service = ChannelEventAutoReplyService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         adapter_event_repository=adapter_event_repository,
@@ -2128,13 +2125,12 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
         token_refresh_skew_seconds=30,
     )
 
-    await bus.publish(
-        EventType.TWITCH_CHANNEL_LIVE_STATE_CHANGED,
+    await service.handle_channel_live_state_changed(
         TwitchChannelLiveStateChangedEvent(
             twitch_channel_id="42",
             twitch_channel_login="example",
             is_live=True,
-        ),
+        )
     )
 
     assert len(twitch_api.sent_messages) == 1

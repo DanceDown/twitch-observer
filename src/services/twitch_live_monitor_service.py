@@ -1,17 +1,18 @@
-﻿"""Periodic app-token-based Twitch live-state monitor for tracked channels."""
+"""Periodic app-token-based Twitch live-state monitor for tracked channels."""
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from src.adapters.twitch_api import TwitchAPIClient, TwitchAPIError
+from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import ChannelRepository
-from src.events.event_bus import EventBus
-from src.events.event_types import EventType, TwitchChannelLiveStateChangedEvent, TwitchTrackedChannelsChangedEvent
+from src.events.event_types import TwitchChannelLiveStateChangedEvent
+from src.services.twitch_gateways import TwitchLiveMonitorGateway
 from src.services.twitch_runtime import safe_get_twitch_user_by_id
 
 logger = logging.getLogger(__name__)
@@ -26,18 +27,15 @@ def _batched(values: list[str], batch_size: int) -> list[list[str]]:
 class TwitchLiveMonitorService:
     """Poll Twitch Helix for tracked channel live state without needing a linked user account."""
 
-    event_bus: EventBus
     channel_repository: ChannelRepository
-    twitch_api: TwitchAPIClient
+    twitch_api: TwitchLiveMonitorGateway
     poll_interval_seconds: float
     batch_size: int
     refresh_on_startup: bool
+    on_change: Callable[[TwitchChannelLiveStateChangedEvent], Awaitable[None] | None] | None = None
     _stop_event: asyncio.Event = field(default_factory=asyncio.Event, init=False)
     _wake_event: asyncio.Event = field(default_factory=asyncio.Event, init=False)
     _task: asyncio.Task[None] | None = field(default=None, init=False)
-
-    def __post_init__(self) -> None:
-        self.event_bus.subscribe(EventType.TWITCH_TRACKED_CHANNELS_CHANGED, self.handle_tracked_channels_changed)
 
     async def start(self) -> None:
         """Start the live monitor loop once."""
@@ -54,9 +52,9 @@ class TwitchLiveMonitorService:
                 await self._task
             self._task = None
 
-    def handle_tracked_channels_changed(self, event: TwitchTrackedChannelsChangedEvent) -> None:
+    def notify_tracked_channels_changed(self) -> None:
         """Wake the monitor early when tracked channels change."""
-        logger.debug("Received tracked-channel change event for live monitor sync: %s", event.reason)
+        logger.debug("Received tracked-channel change signal for live monitor sync.")
         self._wake_event.set()
 
     async def _run_loop(self) -> None:
@@ -114,13 +112,13 @@ class TwitchLiveMonitorService:
                 continue
 
             twitch_user = await safe_get_twitch_user_by_id(self.twitch_api, twitch_channel_id)
-            await self.event_bus.publish(
-                EventType.TWITCH_CHANNEL_LIVE_STATE_CHANGED,
-                TwitchChannelLiveStateChangedEvent(
-                    twitch_channel_id=twitch_channel_id,
-                    twitch_channel_login=None if twitch_user is None else twitch_user.login,
-                    is_live=current_is_live,
-                    changed_at=changed_at,
-                ),
+            event = TwitchChannelLiveStateChangedEvent(
+                twitch_channel_id=twitch_channel_id,
+                twitch_channel_login=None if twitch_user is None else twitch_user.login,
+                is_live=current_is_live,
+                changed_at=changed_at,
             )
-
+            if self.on_change is not None:
+                outcome = self.on_change(event)
+                if hasattr(outcome, "__await__"):
+                    await outcome

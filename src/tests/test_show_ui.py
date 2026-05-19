@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import discord
 
-from src.adapters.discord.ui.show_ui import ShowPaginationView, build_show_pages
+from src.entrypoints.discord.ui.show_ui import ShowPaginationView, build_show_pages
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 

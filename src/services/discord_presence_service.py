@@ -1,4 +1,4 @@
-﻿"""Background service updating the bot's Discord custom status from recent Twitch messages."""
+"""Background service updating the bot's Discord custom status from recent Twitch messages."""
 
 from __future__ import annotations
 
@@ -70,4 +70,3 @@ class DiscordPresenceService:
         if len(cleaned) > max_content_length:
             cleaned = cleaned[: max_content_length - 1].rstrip() + "..."
         return f'"{cleaned}"{suffix}'
-

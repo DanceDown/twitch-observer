@@ -1,4 +1,4 @@
-"""Compatibility exports for PostgreSQL-backed persistence."""
+"""Shared database exports for records, repository contracts, and PostgreSQL implementations."""
 
 from .postgres import (
     PostgresAdapterEventActionRepository,

@@ -1,39 +1,20 @@
-# Events
+# Runtime DTOs
 
-This project uses an in-process event bus so adapters stay thin and services own
-the actual rules.
+The runtime no longer uses an in-process event bus.
 
-## Main event families
+Instead, it uses typed DTOs at direct call boundaries:
 
-### Discord command requests
+- Discord request DTOs for command and UI-triggered service calls
+- `TwitchChatMessageEvent` as the normalized Twitch IRC chat input object
+- `TwitchChannelLiveStateChangedEvent` as the normalized live-state transition object
 
-The Discord adapter normalizes slash commands into typed internal events such
-as:
+These types live in `src/events/event_types.py`, but they are plain data
+contracts now, not publish/subscribe bus messages.
 
-- `discord.thread.requested`
-- `discord.channel.requested`
-- `discord.user.requested`
-- `discord.channel_event.requested`
-- `discord.pattern.requested`
-- `discord.pattern.edit.requested`
-- `discord.reply.requested`
-- `discord.account.requested`
-- `discord.write.requested`
-- `discord.permission.requested`
-- `discord.show.requested`
-- `discord.ui_flow.requested`
+## `TwitchChatMessageEvent`
 
-Each command event carries:
-
-- the Discord context
-- the requester
-- normalized command parameters
-- a `result_future` completed by the handling service
-
-### Twitch chat input
-
-`twitch.chat.message` is emitted by the anonymous IRC adapter for each incoming
-`PRIVMSG`.
+Produced by the Twitch IRC entrypoint and passed directly into
+`ChatMessageProcessingService`.
 
 Important fields:
 
@@ -47,19 +28,10 @@ Important fields:
 - `reply_parent_message_id`
 - `sent_at`
 
-This is the hot-path event that drives message persistence, user-cache warming,
-pattern matching, Discord notifications, and pattern-bound auto-replies.
+## `TwitchChannelLiveStateChangedEvent`
 
-### Tracked-channel lifecycle
-
-`twitch.tracked_channels.changed` is emitted whenever tracked channels are added
-or removed. It allows background infrastructure such as the live monitor to
-refresh without coupling it to command handlers.
-
-### Channel live-state transitions
-
-`twitch.channel_live_state.changed` is emitted when the app-token live monitor
-observes an actual state change for a tracked channel.
+Produced by `TwitchLiveMonitorService` when a tracked channel changes state and
+passed directly into `LiveStateChangeOrchestrator`.
 
 Important fields:
 
@@ -67,15 +39,3 @@ Important fields:
 - `twitch_channel_login`
 - `is_live`
 - `changed_at`
-
-This event fans out to:
-
-- `ChannelLiveStatePersistenceService`
-- `ChannelEventNotificationService`
-- `ChannelEventAutoReplyService`
-
-## Why this helps
-
-- adapters only translate I/O into domain events
-- services stay testable and reusable
-- additional sources can publish existing event shapes without rewriting business logic

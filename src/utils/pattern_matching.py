@@ -1,4 +1,4 @@
-﻿"""Helpers for evaluating ping and regex patterns against Twitch chat messages."""
+"""Helpers for evaluating ping and regex patterns against Twitch chat messages."""
 
 from __future__ import annotations
 
@@ -71,4 +71,3 @@ def _matches_user_scope(pattern: PatternRecord, event: TwitchChatMessageEvent) -
     if pattern.user_scope_mode == "all_tracked_except_selected":
         return author_id in pattern.user_scope_ids
     return False
-

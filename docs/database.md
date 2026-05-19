@@ -3,6 +3,13 @@
 This document describes the persisted data model at a high level. For exact SQL,
 see [src/database/schema.sql](../src/database/schema.sql).
 
+## Current schema assumption
+
+The project currently treats `schema.sql` as the canonical schema definition.
+During the current test phase, incompatible local schema drift should be solved
+by resetting local persisted database state instead of carrying forward runtime
+schema evolution layers.
+
 ## Design goals
 
 - keep Discord-context configuration isolated per channel, thread, or DM
@@ -91,6 +98,13 @@ Stores Twitch users that may be referenced by pattern user scopes.
 
 Stores the matching rules for Twitch chat messages.
 
+Important modeling detail:
+
+- `pattern_id` is the stable internal pattern identifier used by repositories,
+  replies, and Discord interactions
+- user-facing pattern numbers are rendered densely per thread at presentation
+  time and are not persisted
+
 Important fields:
 
 - `regex`
@@ -154,7 +168,7 @@ Action types:
 - Discord notification
 - Twitch send-message auto-reply
 
-This is the event-driven counterpart to `reply`.
+This is the source-driven counterpart to `reply`.
 
 ## Permissions and message history
 

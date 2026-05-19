@@ -1,4 +1,4 @@
-﻿"""Localized presentation helpers for pattern command results."""
+"""Localized presentation helpers for pattern command results."""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ class PatternCommandPresenter:
         *,
         action: str,
         pattern: PatternRecord,
+        display_id: int,
         channel_logins: tuple[str, ...],
         user_logins: tuple[str, ...],
         language: str,
@@ -29,7 +30,7 @@ class PatternCommandPresenter:
                 language=language,
                 ACTION=action,
                 TYPE=self.pattern_type(pattern.is_regex, language=language),
-                ID=pattern.p_index,
+                ID=display_id,
             ),
             self.localizer.text(
                 "results.pattern.summary.text",
@@ -97,13 +98,14 @@ class PatternCommandPresenter:
                 PRIORITY=pattern.priority,
             )
         )
-        return self.localizer.format_list("common.lists.bullets", parts, language=language)
+        return self.localizer.text("common.lists.bullets", language=language, ITEMS=parts)
 
     def format_pattern_changes(
         self,
         *,
         before: PatternRecord,
         after: PatternRecord,
+        display_id: int,
         old_channel_logins: tuple[str, ...],
         new_channel_logins: tuple[str, ...],
         old_user_logins: tuple[str, ...],
@@ -115,7 +117,7 @@ class PatternCommandPresenter:
                 "results.pattern.changes.updated",
                 language=language,
                 TYPE=self.pattern_type(after.is_regex, language=language),
-                ID=after.p_index,
+                ID=display_id,
             )
         ]
         if before.regex != after.regex:
@@ -225,7 +227,7 @@ class PatternCommandPresenter:
                     AFTER=after.priority,
                 )
             )
-        return self.localizer.format_list("common.lists.bullets", changes, language=language)
+        return self.localizer.text("common.lists.bullets", language=language, ITEMS=changes)
 
     def scope_text(
         self,
@@ -284,6 +286,4 @@ class PatternCommandPresenter:
         items: tuple[str, ...],
         language: str,
     ) -> str:
-        rendered_items = self.localizer.format_list("common.lists.comma_raw", items, language=language)
-        return self.localizer.text(key, language=language, ITEMS=rendered_items)
-
+        return self.localizer.text(key, language=language, ITEMS=items)

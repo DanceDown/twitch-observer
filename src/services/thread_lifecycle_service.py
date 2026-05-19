@@ -1,24 +1,28 @@
-﻿"""Business logic for explicitly joining and leaving Discord contexts."""
+"""Business logic for explicitly joining and leaving Discord contexts."""
 
 from __future__ import annotations
 
 import logging
-import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
-from src.adapters.twitch_api import TwitchAPIClient, TwitchAPIError
+from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import ChannelRepository, ThreadRepository, UserPermissionRepository
-from src.events.event_bus import EventBus
+from src.discord_results import build_result, build_thread_result, discord_user_mention
+from src.errors import ApplicationInvariantError
 from src.events.event_types import (
     DiscordCommandResult,
     DiscordResultStyle,
-    DiscordThreadRequestedEvent,
-    EventType,
-    TwitchTrackedChannelsChangedEvent,
+    JoinThreadCommand,
+    LeaveThreadCommand,
+    SetThreadColorCommand,
+    SetThreadEnabledCommand,
+    SetThreadLanguageCommand,
 )
 from src.localization import Localizer
-from src.services.authz import thread_has_permission
-from src.services.channel_command_service import IRCChannelManager
+from src.normalization import normalize_language, normalize_optional_color
+from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
+from src.services.twitch_gateways import TwitchDirectoryGateway, TwitchIRCChannelGateway
 from src.utils.permissions import ObserverPermission
 
 logger = logging.getLogger(__name__)
@@ -28,114 +32,88 @@ logger = logging.getLogger(__name__)
 class ThreadLifecycleService:
     """Handle `/join` and `/leave` for one Discord channel or DM context."""
 
-    event_bus: EventBus
     thread_repository: ThreadRepository
     channel_repository: ChannelRepository
-    twitch_api: TwitchAPIClient
-    irc_manager: IRCChannelManager
+    twitch_api: TwitchDirectoryGateway
+    irc_gateway: TwitchIRCChannelGateway
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     permission_repository: UserPermissionRepository | None = None
+    tracked_channels_changed: Callable[[], Awaitable[None] | None] | None = None
+    _guards: ThreadCommandGuards = field(init=False, repr=False)
+    _runner: CommandExecutionRunner = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self.event_bus.subscribe(EventType.DISCORD_THREAD_REQUESTED, self.handle_request)
-
-    async def handle_request(self, event: DiscordThreadRequestedEvent) -> None:
-        """Apply the requested lifecycle action and complete the result future."""
-        try:
-            result = await self._handle_action(event)
-        except TwitchAPIError as error:
-            logger.warning("Best-effort Twitch metadata lookup failed during thread lifecycle: %s", error)
-            result = self.localizer.result(
-                "results.twitch_api_error",
-                language=self.localizer.default_language,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-                DETAIL=str(error),
-            )
-        except Exception as error:
-            logger.exception("Unexpected error while handling thread lifecycle command.")
-            result = self.localizer.result(
-                "results.unexpected_error",
-                language=self.localizer.default_language,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-                DETAIL=str(error),
-            )
-
-        if not event.result_future.done():
-            event.result_future.set_result(result)
-
-    async def _handle_action(self, event: DiscordThreadRequestedEvent) -> DiscordCommandResult:
-        if event.action == "join":
-            return await self._join_context(event)
-        if event.action == "leave":
-            return await self._leave_context(event)
-        if event.action == "enable":
-            return self._set_context_enabled(event, enabled=True)
-        if event.action == "disable":
-            return self._set_context_enabled(event, enabled=False)
-        if event.action == "color":
-            return self._set_context_color(event)
-        if event.action == "language":
-            return self._set_context_language(event)
-        return self.localizer.result(
-            "results.thread.unsupported_action",
-            language=self.localizer.default_language,
-            style=DiscordResultStyle.ERROR,
-            ephemeral=True,
+        self._guards = ThreadCommandGuards(
+            thread_repository=self.thread_repository,
+            permission_repository=self.permission_repository,
+            account_repository=None,
+            localizer=self.localizer,
+        )
+        self._runner = CommandExecutionRunner(
+            localizer=self.localizer,
+            resolve_thread=lambda command: self.thread_repository.get_by_discord_channel_id(command.discord_channel_id),
         )
 
-    async def _join_context(self, event: DiscordThreadRequestedEvent) -> DiscordCommandResult:
-        existing = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+    async def handle_join(self, command: JoinThreadCommand) -> DiscordCommandResult:
+        return await self._runner.run(command, lambda: self._join_context(command), logger_=logger)
+
+    async def handle_leave(self, command: LeaveThreadCommand) -> DiscordCommandResult:
+        return await self._runner.run(command, lambda: self._leave_context(command), logger_=logger)
+
+    async def handle_set_enabled(self, command: SetThreadEnabledCommand) -> DiscordCommandResult:
+        return await self._runner.run(command, lambda: self._set_context_enabled(command), logger_=logger)
+
+    async def handle_set_color(self, command: SetThreadColorCommand) -> DiscordCommandResult:
+        return await self._runner.run(command, lambda: self._set_context_color(command), logger_=logger)
+
+    async def handle_set_language(self, command: SetThreadLanguageCommand) -> DiscordCommandResult:
+        return await self._runner.run(command, lambda: self._set_context_language(command), logger_=logger)
+
+    async def _join_context(self, command: JoinThreadCommand) -> DiscordCommandResult:
+        existing = self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
         if existing is not None:
-            if existing.owner_id == event.requester_id:
-                return self.localizer.thread_result(
+            if existing.owner_id == command.requester_id:
+                return build_thread_result(
+                    self.localizer,
                     "results.thread.already_joined",
                     thread=existing,
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
-            return self.localizer.thread_result(
+            return build_thread_result(
+                self.localizer,
                 "results.thread.already_joined_other_owner",
                 thread=existing,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
 
-        created = self.thread_repository.create(owner_id=event.requester_id, discord_channel_id=event.discord_channel_id)
+        created = self.thread_repository.create(
+            owner_id=command.requester_id,
+            discord_channel_id=command.discord_channel_id,
+        )
         logger.debug(
             "Joined Discord context discord_channel_id=%s owner_id=%s",
-            event.discord_channel_id,
-            event.requester_id,
+            command.discord_channel_id,
+            command.requester_id,
         )
-        return self.localizer.thread_result(
+        return build_thread_result(
+            self.localizer,
             "results.thread.joined",
             thread=created,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
+            USER=discord_user_mention(self.localizer, command.requester_id, language=created.language),
         )
 
-    async def _leave_context(self, event: DiscordThreadRequestedEvent) -> DiscordCommandResult:
-        thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
-        if thread is None:
-            return self.localizer.result(
-                "results.not_joined",
-                language=self.localizer.default_language,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            )
-        if not thread_has_permission(
-            thread=thread,
-            requester_id=event.requester_id,
-            permission_repository=self.permission_repository,
-            required_permission=ObserverPermission.LEAVE_CONTEXT,
-        ):
-            return self.localizer.thread_result(
-                "results.thread.leave_denied",
-                thread=thread,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            )
+    async def _leave_context(self, command: LeaveThreadCommand) -> DiscordCommandResult:
+        thread = self._guards.require_permission(
+            command,
+            permission=ObserverPermission.LEAVE_CONTEXT,
+            denial_key="results.thread.leave_denied",
+        )
+        if isinstance(thread, DiscordCommandResult):
+            return thread
 
         removed_channel_ids = sorted(
             {channel.twitch_channel_id for channel in self.channel_repository.list_channels_for_thread(thread.thread_id)}
@@ -147,9 +125,10 @@ class ThreadLifecycleService:
             if not remaining_thread_ids:
                 part_candidate_channel_ids.append(twitch_channel_id)
 
-        deleted = self.thread_repository.delete_by_discord_channel_id(event.discord_channel_id)
+        deleted = self.thread_repository.delete_by_discord_channel_id(command.discord_channel_id)
         if deleted is None:
-            return self.localizer.result(
+            return build_result(
+                self.localizer,
                 "results.not_joined",
                 language=self.localizer.default_language,
                 style=DiscordResultStyle.ERROR,
@@ -158,126 +137,93 @@ class ThreadLifecycleService:
 
         for twitch_channel_id in part_candidate_channel_ids:
             try:
-                get_channel = getattr(self.twitch_api, "get_channel_by_id", None)
-                if callable(get_channel):
-                    twitch_user = await get_channel(twitch_channel_id)
+                cached = self.twitch_api.get_cached_user_by_id(twitch_channel_id.strip())
+                if cached is not None:
+                    twitch_user = cached
                 else:
-                    cached_lookup = getattr(self.twitch_api, "get_cached_user_by_id", None)
-                    cached = (
-                        None
-                        if not callable(cached_lookup)
-                        else cached_lookup(twitch_channel_id.strip())
-                    )
-                    twitch_user = (
-                        cached
-                        if cached is not None
-                        else await self.twitch_api.get_user_by_id(twitch_channel_id)
-                    )
+                    twitch_user = await self.twitch_api.get_channel_by_id(twitch_channel_id)
             except TwitchAPIError:
                 logger.warning(
                     "Could not resolve Twitch channel id=%s while leaving discord_channel_id=%s; skipping IRC PART.",
                     twitch_channel_id,
-                    event.discord_channel_id,
+                    command.discord_channel_id,
                 )
             else:
-                await self.irc_manager.leave_channel(twitch_user.login)
+                await self.irc_gateway.leave_channel(twitch_user.login)
 
         logger.debug(
             "Left Discord context discord_channel_id=%s owner_id=%s removed_twitch_channels=%s",
-            event.discord_channel_id,
-            event.requester_id,
+            command.discord_channel_id,
+            command.requester_id,
             removed_channel_ids,
         )
-        await self.event_bus.publish(
-            EventType.TWITCH_TRACKED_CHANNELS_CHANGED,
-            TwitchTrackedChannelsChangedEvent(reason="thread_left"),
-        )
-        return self.localizer.thread_result(
+        await self._notify_tracked_channels_changed()
+        return build_thread_result(
+            self.localizer,
             "results.thread.left",
             thread=thread,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
+            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
         )
 
-    def _set_context_enabled(self, event: DiscordThreadRequestedEvent, *, enabled: bool) -> DiscordCommandResult:
-        thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
-        if thread is None:
-            return self.localizer.result(
-                "results.not_joined",
-                language=self.localizer.default_language,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            )
-        if not thread_has_permission(
-            thread=thread,
-            requester_id=event.requester_id,
-            permission_repository=self.permission_repository,
-            required_permission=ObserverPermission.CONTROL_OBSERVER,
-        ):
-            return self.localizer.thread_result(
-                "results.thread.enable_denied",
-                thread=thread,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            )
-        if thread.enabled == enabled:
-            return self.localizer.thread_result(
-                "results.thread.already_on" if enabled else "results.thread.already_off",
+    def _set_context_enabled(self, command: SetThreadEnabledCommand) -> DiscordCommandResult:
+        thread = self._guards.require_permission(
+            command,
+            permission=ObserverPermission.CONTROL_OBSERVER,
+            denial_key="results.thread.enable_denied",
+        )
+        if isinstance(thread, DiscordCommandResult):
+            return thread
+        if thread.enabled == command.enabled:
+            return build_thread_result(
+                self.localizer,
+                "results.thread.already_on" if command.enabled else "results.thread.already_off",
                 thread=thread,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
             )
 
-        updated = self.thread_repository.set_enabled(discord_channel_id=event.discord_channel_id, enabled=enabled)
-        assert updated is not None
-        return self.localizer.thread_result(
-            "results.thread.enabled" if enabled else "results.thread.disabled",
+        updated = self.thread_repository.set_enabled(
+            discord_channel_id=command.discord_channel_id,
+            enabled=command.enabled,
+        )
+        if updated is None:
+            raise ApplicationInvariantError("Thread enable state update returned no row.")
+        return build_thread_result(
+            self.localizer,
+            "results.thread.enabled" if command.enabled else "results.thread.disabled",
             thread=updated,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
+            USER=discord_user_mention(self.localizer, command.requester_id, language=updated.language),
         )
 
-    def _set_context_color(self, event: DiscordThreadRequestedEvent) -> DiscordCommandResult:
-        thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
-        if thread is None:
-            return self.localizer.result(
-                "results.not_joined",
-                language=self.localizer.default_language,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            )
-        if not thread_has_permission(
-            thread=thread,
-            requester_id=event.requester_id,
-            permission_repository=self.permission_repository,
-            required_permission=ObserverPermission.CONTROL_OBSERVER,
-        ):
-            return self.localizer.thread_result(
-                "results.thread.color_denied",
-                thread=thread,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            )
-        if event.clear_color:
-            updated = self.thread_repository.set_color(discord_channel_id=event.discord_channel_id, color=None)
-            assert updated is not None
-            return self.localizer.thread_result(
+    def _set_context_color(self, command: SetThreadColorCommand) -> DiscordCommandResult:
+        thread = self._guards.require_permission(
+            command,
+            permission=ObserverPermission.CONTROL_OBSERVER,
+            denial_key="results.thread.color_denied",
+        )
+        if isinstance(thread, DiscordCommandResult):
+            return thread
+
+        normalized_color = normalize_optional_color(command.color)
+        if normalized_color is None:
+            updated = self.thread_repository.set_color(discord_channel_id=command.discord_channel_id, color=None)
+            if updated is None:
+                raise ApplicationInvariantError("Thread color clear returned no row.")
+            return build_thread_result(
+                self.localizer,
                 "results.thread.color_cleared",
                 thread=updated,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
+                USER=discord_user_mention(self.localizer, command.requester_id, language=updated.language),
             )
-        if event.color is None or not re.fullmatch(r"#[0-9A-Fa-f]{6}", event.color.strip()):
-            return self.localizer.thread_result(
-                "results.validation_error",
-                thread=thread,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-                DETAIL=self.localizer.text("results.validation_detail.color_hex_or_clear", language=thread.language),
-            )
-        normalized_color = event.color.strip()
         if thread.color == normalized_color:
-            return self.localizer.thread_result(
+            return build_thread_result(
+                self.localizer,
                 "results.thread.already_color",
                 thread=thread,
                 style=DiscordResultStyle.INFO,
@@ -285,42 +231,34 @@ class ThreadLifecycleService:
                 COLOR=normalized_color,
             )
         updated = self.thread_repository.set_color(
-            discord_channel_id=event.discord_channel_id,
+            discord_channel_id=command.discord_channel_id,
             color=normalized_color,
         )
-        assert updated is not None
-        return self.localizer.thread_result(
+        if updated is None:
+            raise ApplicationInvariantError("Thread color update returned no row.")
+        return build_thread_result(
+            self.localizer,
             "results.thread.color_updated",
             thread=updated,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
             COLOR=updated.color or "",
+            USER=discord_user_mention(self.localizer, command.requester_id, language=updated.language),
         )
 
-    def _set_context_language(self, event: DiscordThreadRequestedEvent) -> DiscordCommandResult:
-        thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
-        if thread is None:
-            return self.localizer.result(
-                "results.not_joined",
-                language=self.localizer.default_language,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            )
-        if not thread_has_permission(
-            thread=thread,
-            requester_id=event.requester_id,
-            permission_repository=self.permission_repository,
-            required_permission=ObserverPermission.CONTROL_OBSERVER,
-        ):
-            return self.localizer.thread_result(
-                "results.thread.language_denied",
-                thread=thread,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            )
-        requested_language = self.localizer.normalize_language(event.language)
+    def _set_context_language(self, command: SetThreadLanguageCommand) -> DiscordCommandResult:
+        thread = self._guards.require_permission(
+            command,
+            permission=ObserverPermission.CONTROL_OBSERVER,
+            denial_key="results.thread.language_denied",
+        )
+        if isinstance(thread, DiscordCommandResult):
+            return thread
+
+        requested_language = normalize_language(command.language)
         if not self.localizer.has_language(requested_language):
-            return self.localizer.thread_result(
+            return build_thread_result(
+                self.localizer,
                 "results.validation_error",
                 thread=thread,
                 style=DiscordResultStyle.ERROR,
@@ -328,15 +266,13 @@ class ThreadLifecycleService:
                 DETAIL=self.localizer.text(
                     "results.validation_detail.unsupported_language",
                     language=thread.language,
-                    LANGUAGES=", ".join(f"`{language}`" for language in self.localizer.available_languages()),
+                    LANGUAGES=self.localizer.available_languages(),
                 ),
             )
         if thread.language == requested_language:
-            language_name = self.localizer.text(
-                "common.language_name",
-                language=requested_language,
-            )
-            return self.localizer.thread_result(
+            language_name = self.localizer.text("common.language_name", language=requested_language)
+            return build_thread_result(
+                self.localizer,
                 "results.thread.already_language",
                 thread=thread,
                 style=DiscordResultStyle.INFO,
@@ -345,20 +281,26 @@ class ThreadLifecycleService:
                 LANGUAGE_CODE=requested_language,
             )
         updated = self.thread_repository.set_language(
-            discord_channel_id=event.discord_channel_id,
+            discord_channel_id=command.discord_channel_id,
             language=requested_language,
         )
-        assert updated is not None
-        language_name = self.localizer.text(
-            "common.language_name",
-            language=requested_language,
-        )
-        return self.localizer.thread_result(
+        if updated is None:
+            raise ApplicationInvariantError("Thread language update returned no row.")
+        language_name = self.localizer.text("common.language_name", language=requested_language)
+        return build_thread_result(
+            self.localizer,
             "results.thread.language_updated",
             thread=updated,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
             LANGUAGE_NAME=language_name,
             LANGUAGE_CODE=requested_language,
+            USER=discord_user_mention(self.localizer, command.requester_id, language=updated.language),
         )
 
+    async def _notify_tracked_channels_changed(self) -> None:
+        if self.tracked_channels_changed is None:
+            return
+        outcome = self.tracked_channels_changed()
+        if hasattr(outcome, "__await__"):
+            await outcome

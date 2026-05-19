@@ -1,9 +1,10 @@
 # Command Reference
 
-This is the authoritative command reference for the Discord command surface.
+This is the authoritative command reference for the Discord control surface.
 
-All commands are slash commands.  
-All command results are embeds.
+Root commands open component-driven flows.  
+Business actions are selected inside Discord views, selects, and modals.  
+All final results are embeds.
 
 ## General rules
 
@@ -17,10 +18,16 @@ Most commands require that the Discord context has been joined first:
 
 Without a joined context, guarded commands return `Not Joined`.
 
-## Stable IDs
+## Displayed IDs
 
-Patterns and replies use stable IDs shown in `/show` output.  
-Use those IDs for edit/enable/disable/remove actions.
+Patterns and replies are shown with dense per-thread display numbers in `/show`
+and selection UIs.
+
+Important detail:
+
+- those numbers are presentation-only
+- interactions carry the stable internal pattern identity behind the scenes
+- removing one pattern can renumber later displayed entries
 
 ## Command list
 
@@ -49,12 +56,12 @@ Open a modal to set or clear the default embed color for the active context.
 
 ### `/language`
 
-Set context language (`english` or `german`).
+Choose the context language (`english` or `german`).
 
 ## Feature commands with form-based actions
 
-The commands below open interactive forms.  
-Actions are selected inside the form UI.
+The commands below open interactive component flows.  
+Actions are selected inside the UI rather than typed manually.
 
 ### `/channel`
 
@@ -190,7 +197,7 @@ Modal inputs:
 
 ### `/show`
 
-Open a modal to choose one or more configuration sections to render.
+Open a UI flow to choose one or more configuration sections to render.
 
 Sections:
 
@@ -204,7 +211,7 @@ Sections:
 Behavior:
 
 - large results paginate with `Previous` / `Next`
-- output includes stable IDs for follow-up actions
+- output includes dense displayed IDs for pattern/reply follow-up choices
 
 ## Visibility model
 

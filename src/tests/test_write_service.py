@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from src.adapters.discord import dispatch_permission_command, dispatch_write_command
-from src.adapters.twitch_api import TwitchUser, TwitchUserTokenBundle, TwitchValidatedToken
+from src.tests.dispatch_helpers import dispatch_permission_command, dispatch_write_command
+from src.gateways.twitch_api import TwitchUser, TwitchUserTokenBundle, TwitchValidatedToken
 from src.database.connection import (
     ChannelRecord,
     ChannelRepository,
@@ -16,7 +16,7 @@ from src.database.connection import (
     UserPermissionRecord,
     UserPermissionRepository,
 )
-from src.events.event_bus import EventBus
+from types import SimpleNamespace
 from src.services.permission_service import PermissionCommandService
 from src.services.write_service import TwitchWriteCommandService
 
@@ -288,6 +288,9 @@ class FakeTwitchAPI:
     async def get_user_by_login(self, login: str) -> TwitchUser:
         return self.users_by_login[login.strip().lower()]
 
+    async def refresh_channel_by_login(self, login: str) -> TwitchUser:
+        return await self.get_user_by_login(login)
+
     async def send_chat_message(
         self,
         *,
@@ -332,7 +335,7 @@ class FakeTwitchAPI:
 
 @pytest.mark.asyncio
 async def test_write_send_posts_plain_twitch_message() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
@@ -351,8 +354,7 @@ async def test_write_send_posts_plain_twitch_message() -> None:
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
-    TwitchWriteCommandService(
-        event_bus=bus,
+    bus.write = TwitchWriteCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         account_repository=account_repository,
@@ -377,7 +379,7 @@ async def test_write_send_posts_plain_twitch_message() -> None:
 
 @pytest.mark.asyncio
 async def test_write_send_can_reply_to_specific_twitch_message() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
@@ -396,8 +398,7 @@ async def test_write_send_can_reply_to_specific_twitch_message() -> None:
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
-    TwitchWriteCommandService(
-        event_bus=bus,
+    bus.write = TwitchWriteCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         account_repository=account_repository,
@@ -421,7 +422,7 @@ async def test_write_send_can_reply_to_specific_twitch_message() -> None:
 
 @pytest.mark.asyncio
 async def test_write_send_respects_granted_permission_for_non_owner() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
@@ -441,13 +442,11 @@ async def test_write_send_respects_granted_permission_for_non_owner() -> None:
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
-    PermissionCommandService(
-        event_bus=bus,
+    bus.permission = PermissionCommandService(
         thread_repository=thread_repository,
         permission_repository=permission_repository,
     )
-    TwitchWriteCommandService(
-        event_bus=bus,
+    bus.write = TwitchWriteCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         account_repository=account_repository,
@@ -479,7 +478,7 @@ async def test_write_send_respects_granted_permission_for_non_owner() -> None:
 
 @pytest.mark.asyncio
 async def test_write_send_reports_missing_owner_account_even_for_permitted_helper() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
@@ -487,13 +486,11 @@ async def test_write_send_reports_missing_owner_account_even_for_permitted_helpe
     permission_repository = InMemoryPermissionRepository()
     account_repository = InMemoryAccountRepository()
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
-    PermissionCommandService(
-        event_bus=bus,
+    bus.permission = PermissionCommandService(
         thread_repository=thread_repository,
         permission_repository=permission_repository,
     )
-    TwitchWriteCommandService(
-        event_bus=bus,
+    bus.write = TwitchWriteCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         account_repository=account_repository,

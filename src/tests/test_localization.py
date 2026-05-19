@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.localization import LocalizationError, Localizer, resolve_deferred_placeholders
+from src.discord_results import build_result
+from src.localization import LocalizationError, Localizer
 
 
 def test_localizer_interpolates_placeholders_and_supports_backslash_escaping() -> None:
@@ -22,14 +23,16 @@ def test_localizer_interpolates_placeholders_and_supports_backslash_escaping() -
     assert escaped.endswith("ok")
 
 
-def test_localizer_supports_deferred_user_placeholder_for_public_messages() -> None:
+def test_localizer_replaces_user_placeholder_directly() -> None:
     localizer = Localizer.from_directory()
 
-    rendered = localizer._interpolate(r"\{USER\} then {USER} then {VALUE}", {"VALUE": "ok"})  # type: ignore[attr-defined]
-    resolved = resolve_deferred_placeholders(rendered, USER="<@123456789012345678>")
+    rendered = localizer._interpolate(  # type: ignore[attr-defined]
+        r"\{USER\} then {RAW:USER} then {VALUE}",
+        {"USER": "<@123456789012345678>", "VALUE": "ok"},
+    )
 
-    assert resolved.startswith("{USER} then <@123456789012345678>")
-    assert resolved.endswith("then ok")
+    assert rendered.startswith("{USER} then <@123456789012345678>")
+    assert rendered.endswith("then ok")
 
 
 def test_localizer_supports_explicit_placeholder_modes() -> None:
@@ -49,11 +52,8 @@ def test_localizer_formats_localized_lists() -> None:
             "english": {
                 "example": {
                     "items": {
-                        "item_format": "<{RAW:ITEM}>",
+                        "item_format": "<{RAW:LIST_ITEM}>",
                         "separator": ", ",
-                        "prefix": "[",
-                        "suffix": "]",
-                        "empty": "(empty)",
                     }
                 }
             }
@@ -61,10 +61,35 @@ def test_localizer_formats_localized_lists() -> None:
     )
 
     rendered = localizer.format_list("example.items", ["one", "two"], language="english")
-    empty_rendered = localizer.format_list("example.items", [], language="english")
 
-    assert rendered == "[<one>, <two>]"
-    assert empty_rendered == "(empty)"
+    assert rendered == "<one>, <two>"
+
+
+def test_localizer_uses_list_metadata_from_template_entries() -> None:
+    localizer = Localizer.from_directory()
+
+    rendered = localizer.text(
+        "results.validation_detail.unsupported_language",
+        language="english",
+        LANGUAGES=["english", "german"],
+    )
+
+    assert rendered == "Unsupported language. Available languages: `english`, `german`"
+
+
+def test_build_result_uses_list_metadata_from_result_entries() -> None:
+    localizer = Localizer.from_directory()
+
+    result = build_result(
+        localizer,
+        "results.permission.granted",
+        language="english",
+        USER="<@1>",
+        TARGET="<@2>",
+        PERMISSIONS=["View", "Edit"],
+    )
+
+    assert result.message.endswith("- View\n- Edit")
 
 
 def test_german_catalog_uses_utf8_umlauts() -> None:

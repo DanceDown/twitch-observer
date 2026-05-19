@@ -15,8 +15,8 @@ Important:
 - live/offline state is tracked separately through batched Helix `Get Streams`
   polling with the application's Twitch client credentials
 
-The application architecture keeps this in an adapter so that the read
-path can be replaced or extended later.
+The application architecture keeps this in a runtime entrypoint so that the
+read path can be replaced or extended later.
 
 ## Raw Twitch IRC Message Example
 
@@ -107,7 +107,8 @@ author_id=777
 reply_parent_message_id=def456
 ```
 
-That normalized event is then published to the internal event bus.
+That normalized event is then passed directly into the chat processing
+pipeline.
 
 ## Anonymous login shape
 

@@ -4,10 +4,9 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from src.adapters.twitch_api import TwitchUser
+from src.gateways.twitch_api import TwitchUser
 from src.database.connection import ChannelRecord, ChannelRepository, TrackedChannelStateRecord
-from src.events.event_bus import EventBus
-from src.events.event_types import EventType, TwitchChannelLiveStateChangedEvent
+from src.events.event_types import TwitchChannelLiveStateChangedEvent
 from src.services.twitch_live_monitor_service import TwitchLiveMonitorService
 
 
@@ -99,18 +98,16 @@ class FakeTwitchAPI:
 
 @pytest.mark.asyncio
 async def test_live_monitor_initial_sync_persists_state_without_emitting_transition() -> None:
-    bus = EventBus()
     repository = InMemoryChannelRepository()
     repository.add_channel(1, "42")
     published: list[TwitchChannelLiveStateChangedEvent] = []
-    bus.subscribe(EventType.TWITCH_CHANNEL_LIVE_STATE_CHANGED, published.append)
     monitor = TwitchLiveMonitorService(
-        event_bus=bus,
         channel_repository=repository,
         twitch_api=FakeTwitchAPI(live_by_user_id={"42": True}),  # type: ignore[arg-type]
         poll_interval_seconds=30,
         batch_size=100,
         refresh_on_startup=True,
+        on_change=published.append,
     )
 
     await monitor.sync_once(notify_transitions=False)
@@ -123,14 +120,11 @@ async def test_live_monitor_initial_sync_persists_state_without_emitting_transit
 
 @pytest.mark.asyncio
 async def test_live_monitor_emits_transition_event_after_known_state_changes() -> None:
-    bus = EventBus()
     repository = InMemoryChannelRepository()
     repository.add_channel(1, "42")
     repository.set_live_state_for_twitch_channel(twitch_channel_id="42", is_live=False, changed_at="before")
     published: list[TwitchChannelLiveStateChangedEvent] = []
-    bus.subscribe(EventType.TWITCH_CHANNEL_LIVE_STATE_CHANGED, published.append)
     monitor = TwitchLiveMonitorService(
-        event_bus=bus,
         channel_repository=repository,
         twitch_api=FakeTwitchAPI(
             live_by_user_id={"42": True},
@@ -139,6 +133,7 @@ async def test_live_monitor_emits_transition_event_after_known_state_changes() -
         poll_interval_seconds=30,
         batch_size=100,
         refresh_on_startup=True,
+        on_change=published.append,
     )
 
     await monitor.sync_once(notify_transitions=True)

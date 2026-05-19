@@ -110,8 +110,8 @@ CREATE INDEX idx_tracked_user_twitch_user_id
 -- Pattern rules
 ----------------------------
 CREATE TABLE pattern (
+    pattern_id              SERIAL PRIMARY KEY,
     thread_id            INTEGER NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,
-    p_index              INTEGER NOT NULL,
     regex                TEXT NOT NULL,
     channel_scope_mode   CHANNEL_SCOPE_MODE_ENUM NOT NULL DEFAULT 'all_tracked',
     user_scope_mode      USER_SCOPE_MODE_ENUM NOT NULL DEFAULT 'all_users',
@@ -123,7 +123,7 @@ CREATE TABLE pattern (
     disabled             BOOLEAN NOT NULL DEFAULT FALSE,
     notify               BOOLEAN NOT NULL DEFAULT TRUE,
     priority             SMALLINT NOT NULL DEFAULT 0,
-    PRIMARY KEY (thread_id, p_index),
+    CONSTRAINT uniq_pattern_thread_internal_id UNIQUE (thread_id, pattern_id),
     CONSTRAINT chk_pattern_color_format CHECK (color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$'),
     CONSTRAINT chk_pattern_priority_range CHECK (priority BETWEEN 0 AND 9)
 );
@@ -136,12 +136,12 @@ CREATE INDEX idx_pattern_notify_active
 
 CREATE TABLE pattern_channel_scope (
     thread_id           INTEGER NOT NULL,
-    p_index             INTEGER NOT NULL,
+    pattern_id             INTEGER NOT NULL,
     twitch_channel_id   TEXT NOT NULL,
-    PRIMARY KEY (thread_id, p_index, twitch_channel_id),
+    PRIMARY KEY (thread_id, pattern_id, twitch_channel_id),
     CONSTRAINT fk_pattern_channel_scope_pattern
-        FOREIGN KEY (thread_id, p_index)
-        REFERENCES pattern(thread_id, p_index)
+        FOREIGN KEY (thread_id, pattern_id)
+        REFERENCES pattern(thread_id, pattern_id)
         ON DELETE CASCADE,
     CONSTRAINT fk_pattern_channel_scope_channel
         FOREIGN KEY (thread_id, twitch_channel_id)
@@ -154,12 +154,12 @@ CREATE INDEX idx_pattern_channel_scope_channel
 
 CREATE TABLE pattern_user_scope (
     thread_id        INTEGER NOT NULL,
-    p_index          INTEGER NOT NULL,
+    pattern_id          INTEGER NOT NULL,
     twitch_user_id   TEXT NOT NULL,
-    PRIMARY KEY (thread_id, p_index, twitch_user_id),
+    PRIMARY KEY (thread_id, pattern_id, twitch_user_id),
     CONSTRAINT fk_pattern_user_scope_pattern
-        FOREIGN KEY (thread_id, p_index)
-        REFERENCES pattern(thread_id, p_index)
+        FOREIGN KEY (thread_id, pattern_id)
+        REFERENCES pattern(thread_id, pattern_id)
         ON DELETE CASCADE,
     CONSTRAINT fk_pattern_user_scope_tracked_user
         FOREIGN KEY (thread_id, twitch_user_id)
@@ -175,14 +175,14 @@ CREATE INDEX idx_pattern_user_scope_user
 ----------------------------
 CREATE TABLE reply (
     thread_id         INTEGER NOT NULL,
-    p_index           INTEGER NOT NULL,
+    pattern_id           INTEGER NOT NULL,
     reply_message     TEXT NOT NULL,
     reply_as_reply    BOOLEAN NOT NULL DEFAULT FALSE,
     disabled          BOOLEAN NOT NULL DEFAULT FALSE,
-    PRIMARY KEY (thread_id, p_index),
+    PRIMARY KEY (thread_id, pattern_id),
     CONSTRAINT fk_reply_pattern
-        FOREIGN KEY (thread_id, p_index)
-        REFERENCES pattern(thread_id, p_index)
+        FOREIGN KEY (thread_id, pattern_id)
+        REFERENCES pattern(thread_id, pattern_id)
         ON DELETE CASCADE
 );
 

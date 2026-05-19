@@ -1,4 +1,4 @@
-﻿"""Repository interfaces for PostgreSQL-backed persistence."""
+"""Repository interfaces for PostgreSQL-backed persistence."""
 
 from __future__ import annotations
 
@@ -134,7 +134,7 @@ class TwitchAccountRepository:
     def get_by_discord_user_id(
         self,
         discord_user_id: int,
-    ) -> TwitchAccountRecord | None:  # pragma: no cover - compatibility
+    ) -> TwitchAccountRecord | None:  # pragma: no cover
         raise NotImplementedError
 
     def upsert_account(
@@ -149,10 +149,10 @@ class TwitchAccountRepository:
         expires_at: str | None,
         scope: tuple[str, ...],
         token_type: str | None,
-    ) -> TwitchAccountRecord:  # pragma: no cover - compatibility
+    ) -> TwitchAccountRecord:  # pragma: no cover
         raise NotImplementedError
 
-    def remove_by_discord_user_id(self, discord_user_id: int) -> bool:  # pragma: no cover - compatibility
+    def remove_by_discord_user_id(self, discord_user_id: int) -> bool:  # pragma: no cover
         raise NotImplementedError
 
     def list_accounts(self) -> list[TwitchAccountRecord]:  # pragma: no cover
@@ -210,10 +210,10 @@ class TwitchDeviceFlowRepository:
     def get_by_discord_user_id(
         self,
         discord_user_id: int,
-    ) -> TwitchDeviceFlowRecord | None:  # pragma: no cover - compatibility
+    ) -> TwitchDeviceFlowRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def remove_by_discord_user_id(self, discord_user_id: int) -> bool:  # pragma: no cover - compatibility
+    def remove_by_discord_user_id(self, discord_user_id: int) -> bool:  # pragma: no cover
         raise NotImplementedError
 
 
@@ -362,14 +362,14 @@ class PatternRepository:
     ) -> PatternRecord:  # pragma: no cover
         raise NotImplementedError
 
-    def remove_pattern(self, *, thread_id: int, p_index: int) -> None:  # pragma: no cover
+    def remove_pattern(self, *, thread_id: int, pattern_id: int) -> None:  # pragma: no cover
         raise NotImplementedError
 
     def set_pattern_disabled(
         self,
         *,
         thread_id: int,
-        p_index: int,
+        pattern_id: int,
         disabled: bool,
     ) -> PatternRecord | None:  # pragma: no cover
         raise NotImplementedError
@@ -378,7 +378,7 @@ class PatternRepository:
         self,
         *,
         thread_id: int,
-        p_index: int,
+        pattern_id: int,
         priority: int,
     ) -> PatternRecord | None:  # pragma: no cover
         raise NotImplementedError
@@ -387,7 +387,7 @@ class PatternRepository:
         self,
         *,
         thread_id: int,
-        p_index: int,
+        pattern_id: int,
         regex: str,
         channel_scope_mode: str,
         channel_scope_ids: tuple[str, ...],
@@ -409,7 +409,7 @@ class PatternRepository:
         self,
         *,
         thread_id: int,
-        p_index: int,
+        pattern_id: int,
     ) -> PatternRecord | None:  # pragma: no cover
         raise NotImplementedError
 
@@ -433,27 +433,27 @@ class PatternRepository:
 class ReplyRepository:
     """Persistence interface for auto-replies attached to patterns."""
 
-    def get_by_pattern(self, *, thread_id: int, p_index: int) -> ReplyRecord | None:  # pragma: no cover
+    def get_by_pattern(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:  # pragma: no cover
         raise NotImplementedError
 
     def add_reply(
         self,
         *,
         thread_id: int,
-        p_index: int,
+        pattern_id: int,
         reply_message: str,
         reply_as_reply: bool,
     ) -> ReplyRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def remove_reply(self, *, thread_id: int, p_index: int) -> ReplyRecord | None:  # pragma: no cover
+    def remove_reply(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:  # pragma: no cover
         raise NotImplementedError
 
     def set_reply_disabled(
         self,
         *,
         thread_id: int,
-        p_index: int,
+        pattern_id: int,
         disabled: bool,
     ) -> ReplyRecord | None:  # pragma: no cover
         raise NotImplementedError
@@ -603,4 +603,3 @@ class UserPermissionRepository:
 
     def list_for_thread(self, *, thread_id: int) -> list[UserPermissionRecord]:  # pragma: no cover
         raise NotImplementedError
-

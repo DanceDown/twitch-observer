@@ -4,13 +4,14 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from src.adapters.discord import dispatch_channel_command, dispatch_thread_command
-from src.adapters.twitch_api import TwitchAPIConfigurationError, TwitchUser
+from src.tests.dispatch_helpers import dispatch_channel_command, dispatch_thread_command
+from src.gateways.twitch_api import TwitchAPIConfigurationError, TwitchUser
 from src.database.connection import ChannelRecord, ChannelRepository, PatternRepository, ThreadRecord, ThreadRepository
-from src.events.event_bus import EventBus
+from types import SimpleNamespace
 from src.events.event_types import DiscordResultStyle
-from src.services.channel_command_service import ChannelCommandService, IRCChannelManager
+from src.services.channel_command_service import ChannelCommandService
 from src.services.thread_lifecycle_service import ThreadLifecycleService
+from src.services.twitch_gateways import TwitchIRCChannelGateway
 
 
 @dataclass
@@ -135,6 +136,9 @@ class FakeTwitchAPI:
             raise self.error
         return self.users_by_login[login.strip().lower()]
 
+    async def refresh_channel_by_login(self, login: str) -> TwitchUser:
+        return await self.get_user_by_login(login)
+
     async def get_user_by_id(self, user_id: str) -> TwitchUser:
         self.id_requests.append(user_id.strip())
         if self.error is not None:
@@ -144,12 +148,15 @@ class FakeTwitchAPI:
                 return user
         raise KeyError(user_id)
 
+    async def get_channel_by_id(self, user_id: str) -> TwitchUser:
+        return await self.get_user_by_id(user_id)
+
     def get_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
         return self.cached_users_by_id.get(user_id.strip())
 
 
 @dataclass
-class FakeIRCManager(IRCChannelManager):
+class FakeIRCGateway(TwitchIRCChannelGateway):
     joined: list[str] = field(default_factory=list)
     left: list[str] = field(default_factory=list)
     ensure_connected_calls: int = 0
@@ -165,7 +172,7 @@ class FakeIRCManager(IRCChannelManager):
 
 
 @dataclass
-class FailingIRCManager(FakeIRCManager):
+class FailingIRCGateway(FakeIRCGateway):
     fail_on_join: bool = False
     fail_on_leave: bool = False
 
@@ -190,19 +197,19 @@ class FakePatternRepository(PatternRepository):
     def add_pattern(self, **kwargs):  # pragma: no cover - unused here
         raise NotImplementedError
 
-    def remove_pattern(self, *, thread_id: int, p_index: int) -> None:  # pragma: no cover - unused here
+    def remove_pattern(self, *, thread_id: int, pattern_id: int) -> None:  # pragma: no cover - unused here
         raise NotImplementedError
 
     def list_active_patterns_for_thread(self, thread_id: int):  # pragma: no cover - unused here
         raise NotImplementedError
 
-    def set_pattern_priority(self, *, thread_id: int, p_index: int, priority: int):  # pragma: no cover - unused here
+    def set_pattern_priority(self, *, thread_id: int, pattern_id: int, priority: int):  # pragma: no cover - unused here
         raise NotImplementedError
 
     def update_pattern(self, **kwargs):  # pragma: no cover - unused here
         raise NotImplementedError
 
-    def get_pattern_by_id(self, *, thread_id: int, p_index: int):  # pragma: no cover - unused here
+    def get_pattern_by_id(self, *, thread_id: int, pattern_id: int):  # pragma: no cover - unused here
         raise NotImplementedError
 
     def list_patterns_for_thread(self, thread_id: int, *, is_regex=None):  # pragma: no cover - unused here
@@ -214,26 +221,24 @@ class FakePatternRepository(PatternRepository):
 
 @pytest.mark.asyncio
 async def test_channel_command_adds_new_channel_and_joins_irc() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     channel_repository = InMemoryChannelRepository()
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
-    irc_manager = FakeIRCManager()
+    irc_gateway = FakeIRCGateway()
     pattern_repository = FakePatternRepository()
-    ChannelCommandService(
-        event_bus=event_bus,
+    event_bus.channel = ChannelCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
-        irc_manager=irc_manager,
+        irc_gateway=irc_gateway,
     )
-    ThreadLifecycleService(
-        event_bus=event_bus,
+    event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
-        irc_manager=irc_manager,
+        irc_gateway=irc_gateway,
     )
 
     join_result = await dispatch_thread_command(
@@ -255,27 +260,26 @@ async def test_channel_command_adds_new_channel_and_joins_irc() -> None:
     assert join_result.ephemeral is False
     assert result.ephemeral is False
     assert result.style == DiscordResultStyle.SUCCESS
-    assert irc_manager.joined == ["example"]
+    assert irc_gateway.joined == ["example"]
     assert thread_repository.get_by_discord_channel_id(100) is not None
 
 
 @pytest.mark.asyncio
 async def test_channel_command_removes_existing_channel_and_parts_last_irc_subscription() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     channel_repository.add_channel(thread.thread_id, "42")
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
-    irc_manager = FakeIRCManager()
+    irc_gateway = FakeIRCGateway()
     pattern_repository = FakePatternRepository()
-    ChannelCommandService(
-        event_bus=event_bus,
+    event_bus.channel = ChannelCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
-        irc_manager=irc_manager,
+        irc_gateway=irc_gateway,
     )
 
     result = await dispatch_channel_command(
@@ -288,26 +292,25 @@ async def test_channel_command_removes_existing_channel_and_parts_last_irc_subsc
 
     assert result.ephemeral is False
     assert result.style == DiscordResultStyle.SUCCESS
-    assert irc_manager.left == ["example"]
-    assert irc_manager.ensure_connected_calls == 1
+    assert irc_gateway.left == ["example"]
+    assert irc_gateway.ensure_connected_calls == 1
 
 
 @pytest.mark.asyncio
 async def test_channel_command_rejects_non_owner_changes() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
-    irc_manager = FakeIRCManager()
+    irc_gateway = FakeIRCGateway()
     pattern_repository = FakePatternRepository()
-    ChannelCommandService(
-        event_bus=event_bus,
+    event_bus.channel = ChannelCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
-        irc_manager=irc_manager,
+        irc_gateway=irc_gateway,
     )
 
     result = await dispatch_channel_command(
@@ -324,19 +327,18 @@ async def test_channel_command_rejects_non_owner_changes() -> None:
 
 @pytest.mark.asyncio
 async def test_channel_command_requires_join_before_adding_channels() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     channel_repository = InMemoryChannelRepository()
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
-    irc_manager = FakeIRCManager()
+    irc_gateway = FakeIRCGateway()
     pattern_repository = FakePatternRepository()
-    ChannelCommandService(
-        event_bus=event_bus,
+    event_bus.channel = ChannelCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
-        irc_manager=irc_manager,
+        irc_gateway=irc_gateway,
     )
 
     result = await dispatch_channel_command(
@@ -350,26 +352,25 @@ async def test_channel_command_requires_join_before_adding_channels() -> None:
     assert result.style == DiscordResultStyle.ERROR
     assert result.ephemeral is True
     assert thread_repository.get_by_discord_channel_id(100) is None
-    assert irc_manager.joined == []
+    assert irc_gateway.joined == []
 
 
 @pytest.mark.asyncio
 async def test_channel_command_reports_already_added_instead_of_toggling() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     channel_repository.add_channel(thread.thread_id, "42")
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
-    irc_manager = FakeIRCManager()
+    irc_gateway = FakeIRCGateway()
     pattern_repository = FakePatternRepository()
-    ChannelCommandService(
-        event_bus=event_bus,
+    event_bus.channel = ChannelCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
-        irc_manager=irc_manager,
+        irc_gateway=irc_gateway,
     )
 
     result = await dispatch_channel_command(
@@ -383,25 +384,24 @@ async def test_channel_command_reports_already_added_instead_of_toggling() -> No
     assert result.ephemeral is True
     assert result.style == DiscordResultStyle.INFO
     assert channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, "42") is not None
-    assert irc_manager.joined == []
+    assert irc_gateway.joined == []
 
 
 @pytest.mark.asyncio
 async def test_channel_command_reports_missing_channel_on_remove() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
-    irc_manager = FakeIRCManager()
+    irc_gateway = FakeIRCGateway()
     pattern_repository = FakePatternRepository()
-    ChannelCommandService(
-        event_bus=event_bus,
+    event_bus.channel = ChannelCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
-        irc_manager=irc_manager,
+        irc_gateway=irc_gateway,
     )
 
     result = await dispatch_channel_command(
@@ -414,26 +414,25 @@ async def test_channel_command_reports_missing_channel_on_remove() -> None:
 
     assert result.ephemeral is True
     assert result.style == DiscordResultStyle.ERROR
-    assert irc_manager.left == []
+    assert irc_gateway.left == []
 
 
 @pytest.mark.asyncio
 async def test_channel_command_rejects_remove_when_scope_still_references_channel() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     channel_repository.add_channel(thread.thread_id, "42")
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
-    irc_manager = FakeIRCManager()
+    irc_gateway = FakeIRCGateway()
     pattern_repository = FakePatternRepository(references_by_channel={(thread.thread_id, "42"): 1})
-    ChannelCommandService(
-        event_bus=event_bus,
+    event_bus.channel = ChannelCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
-        irc_manager=irc_manager,
+        irc_gateway=irc_gateway,
     )
 
     result = await dispatch_channel_command(
@@ -447,24 +446,23 @@ async def test_channel_command_rejects_remove_when_scope_still_references_channe
     assert result.ephemeral is True
     assert result.style == DiscordResultStyle.ERROR
     assert channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, "42") is not None
-    assert irc_manager.left == []
+    assert irc_gateway.left == []
 
 
 @pytest.mark.asyncio
 async def test_channel_command_does_not_persist_add_when_irc_join_fails() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
-    irc_manager = FailingIRCManager(fail_on_join=True)
-    ChannelCommandService(
-        event_bus=event_bus,
+    irc_gateway = FailingIRCGateway(fail_on_join=True)
+    event_bus.channel = ChannelCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=FakePatternRepository(),
         twitch_api=twitch_api,  # type: ignore[arg-type]
-        irc_manager=irc_manager,
+        irc_gateway=irc_gateway,
     )
 
     result = await dispatch_channel_command(
@@ -481,20 +479,19 @@ async def test_channel_command_does_not_persist_add_when_irc_join_fails() -> Non
 
 @pytest.mark.asyncio
 async def test_channel_command_does_not_remove_last_channel_when_irc_part_fails() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     channel_repository.add_channel(thread.thread_id, "42")
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
-    irc_manager = FailingIRCManager(fail_on_leave=True)
-    ChannelCommandService(
-        event_bus=event_bus,
+    irc_gateway = FailingIRCGateway(fail_on_leave=True)
+    event_bus.channel = ChannelCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=FakePatternRepository(),
         twitch_api=twitch_api,  # type: ignore[arg-type]
-        irc_manager=irc_manager,
+        irc_gateway=irc_gateway,
     )
 
     result = await dispatch_channel_command(
@@ -511,17 +508,16 @@ async def test_channel_command_does_not_remove_last_channel_when_irc_part_fails(
 
 @pytest.mark.asyncio
 async def test_channel_command_returns_ephemeral_error_for_missing_twitch_credentials() -> None:
-    event_bus = EventBus()
-    irc_manager = FakeIRCManager()
+    event_bus = SimpleNamespace()
+    irc_gateway = FakeIRCGateway()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
-    ChannelCommandService(
-        event_bus=event_bus,
+    event_bus.channel = ChannelCommandService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
         pattern_repository=FakePatternRepository(),
         twitch_api=FakeTwitchAPI(error=TwitchAPIConfigurationError("Missing Twitch credentials.")),  # type: ignore[arg-type]
-        irc_manager=irc_manager,
+        irc_gateway=irc_gateway,
     )
 
     result = await dispatch_channel_command(
@@ -538,19 +534,18 @@ async def test_channel_command_returns_ephemeral_error_for_missing_twitch_creden
 
 @pytest.mark.asyncio
 async def test_leave_command_deletes_thread_and_parts_last_irc_channels() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     channel_repository.add_channel(thread.thread_id, "42")
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
-    irc_manager = FakeIRCManager()
-    ThreadLifecycleService(
-        event_bus=event_bus,
+    irc_gateway = FakeIRCGateway()
+    event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
-        irc_manager=irc_manager,
+        irc_gateway=irc_gateway,
     )
 
     result = await dispatch_thread_command(
@@ -562,12 +557,12 @@ async def test_leave_command_deletes_thread_and_parts_last_irc_channels() -> Non
 
     assert result.style == DiscordResultStyle.SUCCESS
     assert thread_repository.get_by_discord_channel_id(100) is None
-    assert irc_manager.left == ["example"]
+    assert irc_gateway.left == ["example"]
 
 
 @pytest.mark.asyncio
 async def test_leave_command_prefers_cached_channel_metadata() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
@@ -576,13 +571,12 @@ async def test_leave_command_prefers_cached_channel_metadata() -> None:
         users_by_login={},
         cached_users_by_id={"42": TwitchUser(user_id="42", login="example", display_name="Example")},
     )
-    irc_manager = FakeIRCManager()
-    ThreadLifecycleService(
-        event_bus=event_bus,
+    irc_gateway = FakeIRCGateway()
+    event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
-        irc_manager=irc_manager,
+        irc_gateway=irc_gateway,
     )
 
     result = await dispatch_thread_command(
@@ -593,21 +587,20 @@ async def test_leave_command_prefers_cached_channel_metadata() -> None:
     )
 
     assert result.style == DiscordResultStyle.SUCCESS
-    assert irc_manager.left == ["example"]
+    assert irc_gateway.left == ["example"]
     assert twitch_api.id_requests == []
 
 
 @pytest.mark.asyncio
 async def test_off_command_disables_existing_thread_context() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
-    ThreadLifecycleService(
-        event_bus=event_bus,
+    event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
         twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
-        irc_manager=FakeIRCManager(),
+        irc_gateway=FakeIRCGateway(),
     )
 
     result = await dispatch_thread_command(
@@ -625,16 +618,15 @@ async def test_off_command_disables_existing_thread_context() -> None:
 
 @pytest.mark.asyncio
 async def test_on_command_reenables_existing_thread_context() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
     thread_repository.set_enabled(discord_channel_id=100, enabled=False)
-    ThreadLifecycleService(
-        event_bus=event_bus,
+    event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
         twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
-        irc_manager=FakeIRCManager(),
+        irc_gateway=FakeIRCGateway(),
     )
 
     result = await dispatch_thread_command(
@@ -652,19 +644,18 @@ async def test_on_command_reenables_existing_thread_context() -> None:
 
 @pytest.mark.asyncio
 async def test_channel_color_command_sets_color_for_tracked_channel() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     channel_repository.add_channel(thread.thread_id, "42")
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
-    ChannelCommandService(
-        event_bus=event_bus,
+    event_bus.channel = ChannelCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=FakePatternRepository(),
         twitch_api=twitch_api,  # type: ignore[arg-type]
-        irc_manager=FakeIRCManager(),
+        irc_gateway=FakeIRCGateway(),
     )
 
     result = await dispatch_channel_command(
@@ -685,15 +676,14 @@ async def test_channel_color_command_sets_color_for_tracked_channel() -> None:
 
 @pytest.mark.asyncio
 async def test_context_color_command_sets_thread_color() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
-    ThreadLifecycleService(
-        event_bus=event_bus,
+    event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
         twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
-        irc_manager=FakeIRCManager(),
+        irc_gateway=FakeIRCGateway(),
     )
 
     result = await dispatch_thread_command(
@@ -713,16 +703,15 @@ async def test_context_color_command_sets_thread_color() -> None:
 
 @pytest.mark.asyncio
 async def test_context_color_command_reports_same_color_as_info() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
     thread_repository.set_color(discord_channel_id=100, color="#abcdef")
-    ThreadLifecycleService(
-        event_bus=event_bus,
+    event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
         twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
-        irc_manager=FakeIRCManager(),
+        irc_gateway=FakeIRCGateway(),
     )
 
     result = await dispatch_thread_command(
@@ -741,15 +730,14 @@ async def test_context_color_command_reports_same_color_as_info() -> None:
 
 @pytest.mark.asyncio
 async def test_language_command_updates_thread_language_and_returns_localized_result() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
-    ThreadLifecycleService(
-        event_bus=event_bus,
+    event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
         twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
-        irc_manager=FakeIRCManager(),
+        irc_gateway=FakeIRCGateway(),
     )
 
     result = await dispatch_thread_command(
@@ -769,16 +757,15 @@ async def test_language_command_updates_thread_language_and_returns_localized_re
 
 @pytest.mark.asyncio
 async def test_language_command_reports_same_language_as_info() -> None:
-    event_bus = EventBus()
+    event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
     thread_repository.set_language(discord_channel_id=100, language="german")
-    ThreadLifecycleService(
-        event_bus=event_bus,
+    event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
         twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
-        irc_manager=FakeIRCManager(),
+        irc_gateway=FakeIRCGateway(),
     )
 
     result = await dispatch_thread_command(

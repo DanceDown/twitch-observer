@@ -1,0 +1,145 @@
+"""PostgreSQL repository for external adapter events."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from ..records import AdapterEventRecord
+from ..repositories import AdapterEventRepository
+from ._utils import require_row
+from .database import PostgresDatabase
+
+
+@dataclass(slots=True)
+class PostgresAdapterEventRepository(AdapterEventRepository):
+    """Store and retrieve external adapter event triggers."""
+
+    database: PostgresDatabase
+
+    def upsert_event(
+        self,
+        *,
+        thread_id: int,
+        adapter_key: str,
+        subject_type: str,
+        subject_id: str,
+        event_key: str,
+    ) -> AdapterEventRecord:
+        with self.database.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO adapter_event (thread_id, adapter_key, subject_type, subject_id, event_key, disabled)
+                VALUES (%s, %s, %s, %s, %s, FALSE)
+                ON CONFLICT (thread_id, adapter_key, subject_type, subject_id, event_key)
+                DO UPDATE SET disabled = FALSE
+                RETURNING event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
+                """,
+                (thread_id, adapter_key, subject_type, subject_id, event_key),
+            )
+            row = cursor.fetchone()
+        row = require_row(row, operation="adapter_event.upsert_event")
+        return self._build_record(row)
+
+    def get_event(
+        self,
+        *,
+        thread_id: int,
+        adapter_key: str,
+        subject_type: str,
+        subject_id: str,
+        event_key: str,
+    ) -> AdapterEventRecord | None:
+        with self.database.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
+                FROM adapter_event
+                WHERE thread_id = %s
+                  AND adapter_key = %s
+                  AND subject_type = %s
+                  AND subject_id = %s
+                  AND event_key = %s
+                """,
+                (thread_id, adapter_key, subject_type, subject_id, event_key),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return self._build_record(row)
+
+    def list_events_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[AdapterEventRecord]:
+        with self.database.cursor() as cursor:
+            if include_disabled:
+                cursor.execute(
+                    """
+                    SELECT event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
+                    FROM adapter_event
+                    WHERE thread_id = %s
+                    ORDER BY adapter_key, event_key, subject_id
+                    """,
+                    (thread_id,),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
+                    FROM adapter_event
+                    WHERE thread_id = %s AND disabled = FALSE
+                    ORDER BY adapter_key, event_key, subject_id
+                    """,
+                    (thread_id,),
+                )
+            rows = cursor.fetchall()
+        return [self._build_record(row) for row in rows]
+
+    def list_matching_events(
+        self,
+        *,
+        adapter_key: str,
+        subject_type: str,
+        subject_id: str,
+        event_key: str,
+        include_disabled: bool = False,
+    ) -> list[AdapterEventRecord]:
+        with self.database.cursor() as cursor:
+            if include_disabled:
+                cursor.execute(
+                    """
+                    SELECT event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
+                    FROM adapter_event
+                    WHERE adapter_key = %s
+                      AND subject_type = %s
+                      AND subject_id = %s
+                      AND event_key = %s
+                    ORDER BY thread_id, event_id
+                    """,
+                    (adapter_key, subject_type, subject_id, event_key),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
+                    FROM adapter_event
+                    WHERE adapter_key = %s
+                      AND subject_type = %s
+                      AND subject_id = %s
+                      AND event_key = %s
+                      AND disabled = FALSE
+                    ORDER BY thread_id, event_id
+                    """,
+                    (adapter_key, subject_type, subject_id, event_key),
+                )
+            rows = cursor.fetchall()
+        return [self._build_record(row) for row in rows]
+
+    @staticmethod
+    def _build_record(row: tuple) -> AdapterEventRecord:
+        return AdapterEventRecord(
+            event_id=int(row[0]),
+            thread_id=int(row[1]),
+            adapter_key=str(row[2]),
+            subject_type=str(row[3]),
+            subject_id=str(row[4]),
+            event_key=str(row[5]),
+            disabled=bool(row[6]),
+        )

@@ -1,4 +1,4 @@
-﻿"""Permission bitmask helpers for per-thread Discord authorization."""
+"""Permission bitmask helpers for per-thread Discord authorization."""
 
 from __future__ import annotations
 
@@ -93,4 +93,3 @@ def effective_permissions(mask: int) -> ObserverPermission:
 def has_permission(mask: int, permission: ObserverPermission) -> bool:
     """Return whether the expanded permission set contains one required bit."""
     return bool(effective_permissions(mask) & permission)
-

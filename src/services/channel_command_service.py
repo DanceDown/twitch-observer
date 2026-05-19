@@ -1,222 +1,185 @@
-﻿"""Business logic for Discord channel-management commands."""
+"""Business logic for Discord channel-management commands."""
 
 from __future__ import annotations
 
 import logging
-import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
-from src.adapters.twitch_api import (
-    TwitchAPIClient,
-    TwitchAPIConfigurationError,
-    TwitchAPIError,
-    TwitchChannelNotFoundError,
-)
 from src.database.connection import ChannelRepository, PatternRepository, ThreadRepository, UserPermissionRepository
-from src.events.event_bus import EventBus
+from src.discord_results import build_thread_result, discord_user_mention
+from src.errors import ApplicationInvariantError
 from src.events.event_types import (
-    DiscordChannelRequestedEvent,
+    AddTrackedChannelCommand,
     DiscordCommandResult,
     DiscordResultStyle,
-    EventType,
-    TwitchTrackedChannelsChangedEvent,
+    RemoveTrackedChannelCommand,
+    SetTrackedChannelColorCommand,
 )
 from src.localization import Localizer
-from src.services.authz import thread_has_permission
+from src.normalization import normalize_optional_color
+from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
+from src.services.twitch_gateways import TwitchChannelLookup, TwitchIRCChannelGateway
 from src.utils.permissions import ObserverPermission
 
 logger = logging.getLogger(__name__)
-
-
-class IRCChannelManager:
-    """Interface for the IRC adapter actions used by the service."""
-
-    async def join_channel(self, channel_login: str) -> None:  # pragma: no cover - interface
-        raise NotImplementedError
-
-    async def leave_channel(self, channel_login: str) -> None:  # pragma: no cover - interface
-        raise NotImplementedError
 
 
 @dataclass(slots=True)
 class ChannelCommandService:
     """Handle `/channel` add/remove requests from Discord."""
 
-    event_bus: EventBus
     thread_repository: ThreadRepository
     channel_repository: ChannelRepository
     pattern_repository: PatternRepository
-    twitch_api: TwitchAPIClient
-    irc_manager: IRCChannelManager
+    twitch_api: TwitchChannelLookup
+    irc_gateway: TwitchIRCChannelGateway
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     permission_repository: UserPermissionRepository | None = None
+    tracked_channels_changed: Callable[[], Awaitable[None] | None] | None = None
+    _guards: ThreadCommandGuards = field(init=False, repr=False)
+    _runner: CommandExecutionRunner = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self.event_bus.subscribe(EventType.DISCORD_CHANNEL_REQUESTED, self.handle_request)
-
-    async def handle_request(self, event: DiscordChannelRequestedEvent) -> None:
-        """Apply the requested add/remove action and complete the result future."""
-        try:
-            result = await self._handle_action(event)
-        except (TwitchAPIConfigurationError, TwitchChannelNotFoundError) as error:
-            thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
-            result = self.localizer.thread_result(
-                "results.validation_error",
-                thread=thread,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-                DETAIL=str(error),
-            )
-        except TwitchAPIError as error:
-            thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
-            result = self.localizer.thread_result(
-                "results.twitch_api_error",
-                thread=thread,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-                DETAIL=str(error),
-            )
-        except Exception as error:
-            logger.exception("Unexpected error while handling channel command.")
-            thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
-            result = self.localizer.thread_result(
-                "results.unexpected_error",
-                thread=thread,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-                DETAIL=str(error),
-            )
-
-        if not event.result_future.done():
-            event.result_future.set_result(result)
-
-    async def _handle_action(self, event: DiscordChannelRequestedEvent) -> DiscordCommandResult:
-        logger.debug(
-            "Handling channel action discord_channel_id=%s requester_id=%s action=%s twitch_channel_login=%s",
-            event.discord_channel_id,
-            event.requester_id,
-            event.action,
-            event.twitch_channel_login,
-        )
-        thread = self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
-        if thread is None:
-            return self.localizer.result(
-                "results.not_joined",
-                language=self.localizer.default_language,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            )
-        if not thread_has_permission(
-            thread=thread,
-            requester_id=event.requester_id,
+        self._guards = ThreadCommandGuards(
+            thread_repository=self.thread_repository,
             permission_repository=self.permission_repository,
-            required_permission=ObserverPermission.MANAGE_CHANNELS,
-        ):
-            return self.localizer.thread_result(
-                "results.channel.permission_denied",
+            account_repository=None,
+            localizer=self.localizer,
+        )
+        self._runner = CommandExecutionRunner(
+            localizer=self.localizer,
+            resolve_thread=lambda command: self.thread_repository.get_by_discord_channel_id(command.discord_channel_id),
+        )
+
+    async def handle_add(self, command: AddTrackedChannelCommand) -> DiscordCommandResult:
+        return await self._runner.run(command, lambda: self._add_channel(command), logger_=logger)
+
+    async def handle_remove(self, command: RemoveTrackedChannelCommand) -> DiscordCommandResult:
+        return await self._runner.run(command, lambda: self._remove_channel(command), logger_=logger)
+
+    async def handle_color(self, command: SetTrackedChannelColorCommand) -> DiscordCommandResult:
+        return await self._runner.run(command, lambda: self._set_color(command), logger_=logger)
+
+    def _require_manage_channels(self, command: object) -> tuple[object, DiscordCommandResult | None]:
+        thread = self._guards.require_permission(
+            command,
+            permission=ObserverPermission.MANAGE_CHANNELS,
+            denial_key="results.channel.permission_denied",
+        )
+        if isinstance(thread, DiscordCommandResult):
+            return None, thread
+        return thread, None
+
+    async def _resolve_channel(self, login: str):
+        return await self.twitch_api.refresh_channel_by_login(login)
+
+    async def _add_channel(self, command: AddTrackedChannelCommand) -> DiscordCommandResult:
+        thread, denied = self._require_manage_channels(command)
+        if denied is not None:
+            return denied
+
+        twitch_user = await self._resolve_channel(command.twitch_channel_login)
+        existing = self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_user.user_id)
+        if existing is not None:
+            return build_thread_result(
+                self.localizer,
+                "results.channel.already_added",
+                thread=thread,
+                style=DiscordResultStyle.INFO,
+                ephemeral=True,
+                DISPLAY_NAME=twitch_user.display_name,
+                LOGIN=twitch_user.login,
+            )
+        is_first_subscription = self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id) == 0
+        if is_first_subscription:
+            await self.irc_gateway.ensure_connected()
+            await self.irc_gateway.join_channel(twitch_user.login)
+        self.channel_repository.add_channel(thread.thread_id, twitch_user.user_id)
+        logger.debug(
+            "Added tracked channel thread_id=%s twitch_channel_id=%s twitch_login=%s",
+            thread.thread_id,
+            twitch_user.user_id,
+            twitch_user.login,
+        )
+        await self._notify_tracked_channels_changed()
+        return build_thread_result(
+            self.localizer,
+            "results.channel.added",
+            thread=thread,
+            style=DiscordResultStyle.SUCCESS,
+            ephemeral=False,
+            DISPLAY_NAME=twitch_user.display_name,
+            LOGIN=twitch_user.login,
+            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+        )
+
+    async def _set_color(self, command: SetTrackedChannelColorCommand) -> DiscordCommandResult:
+        thread, denied = self._require_manage_channels(command)
+        if denied is not None:
+            return denied
+
+        twitch_user = await self._resolve_channel(command.twitch_channel_login)
+        existing = self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_user.user_id)
+        if existing is None:
+            return build_thread_result(
+                self.localizer,
+                "results.channel.not_found",
                 thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
-            )
-
-        refresh_lookup = getattr(self.twitch_api, "refresh_user_by_login", self.twitch_api.get_user_by_login)
-        twitch_user = await refresh_lookup(event.twitch_channel_login)
-        existing = self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_user.user_id)
-        if event.action == "add":
-            if existing is not None:
-                return self.localizer.thread_result(
-                    "results.channel.already_added",
-                    thread=thread,
-                    style=DiscordResultStyle.INFO,
-                    ephemeral=True,
-                    DISPLAY_NAME=twitch_user.display_name,
-                    LOGIN=twitch_user.login,
-                )
-            is_first_subscription = self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id) == 0
-            if is_first_subscription:
-                ensure_connected = getattr(self.irc_manager, "ensure_connected", None)
-                if callable(ensure_connected):
-                    await ensure_connected()
-                await self.irc_manager.join_channel(twitch_user.login)
-            self.channel_repository.add_channel(thread.thread_id, twitch_user.user_id)
-            logger.debug(
-                "Added tracked channel thread_id=%s twitch_channel_id=%s twitch_login=%s",
-                thread.thread_id,
-                twitch_user.user_id,
-                twitch_user.login,
-            )
-            await self.event_bus.publish(
-                EventType.TWITCH_TRACKED_CHANNELS_CHANGED,
-                TwitchTrackedChannelsChangedEvent(reason="channel_added"),
-            )
-            return self.localizer.thread_result(
-                "results.channel.added",
-                thread=thread,
-                style=DiscordResultStyle.SUCCESS,
-                ephemeral=False,
                 DISPLAY_NAME=twitch_user.display_name,
                 LOGIN=twitch_user.login,
             )
 
-        if event.action == "color":
-            if existing is None:
-                return self.localizer.thread_result(
-                    "results.channel.not_found",
-                    thread=thread,
-                    style=DiscordResultStyle.ERROR,
-                    ephemeral=True,
-                    DISPLAY_NAME=twitch_user.display_name,
-                    LOGIN=twitch_user.login,
-                )
-            if event.clear_color:
-                updated = self.channel_repository.set_color(
-                    thread_id=thread.thread_id,
-                    twitch_channel_id=twitch_user.user_id,
-                    color=None,
-                )
-                assert updated is not None
-                return self.localizer.thread_result(
-                    "results.channel.color_cleared",
-                    thread=thread,
-                    style=DiscordResultStyle.SUCCESS,
-                    ephemeral=False,
-                    DISPLAY_NAME=twitch_user.display_name,
-                    LOGIN=twitch_user.login,
-                )
-            if event.color is None or not re.fullmatch(r"#[0-9A-Fa-f]{6}", event.color.strip()):
-                return self.localizer.thread_result(
-                    "results.validation_error",
-                    thread=thread,
-                    style=DiscordResultStyle.ERROR,
-                    ephemeral=True,
-                    DETAIL=self.localizer.text("results.validation_detail.color_hex_or_empty", language=thread.language),
-                )
+        normalized_color = normalize_optional_color(command.color)
+        if normalized_color is None:
             updated = self.channel_repository.set_color(
                 thread_id=thread.thread_id,
                 twitch_channel_id=twitch_user.user_id,
-                color=event.color.strip(),
+                color=None,
             )
-            assert updated is not None
-            return self.localizer.thread_result(
-                "results.channel.color_updated",
+            if updated is None:
+                raise ApplicationInvariantError("Tracked channel color clear returned no row.")
+            return build_thread_result(
+                self.localizer,
+                "results.channel.color_cleared",
                 thread=thread,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
                 DISPLAY_NAME=twitch_user.display_name,
                 LOGIN=twitch_user.login,
-                COLOR=updated.color or "",
+                USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
             )
+        updated = self.channel_repository.set_color(
+            thread_id=thread.thread_id,
+            twitch_channel_id=twitch_user.user_id,
+            color=normalized_color,
+        )
+        if updated is None:
+            raise ApplicationInvariantError("Tracked channel color update returned no row.")
+        return build_thread_result(
+            self.localizer,
+            "results.channel.color_updated",
+            thread=thread,
+            style=DiscordResultStyle.SUCCESS,
+            ephemeral=False,
+            DISPLAY_NAME=twitch_user.display_name,
+            LOGIN=twitch_user.login,
+            COLOR=updated.color or "",
+            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+        )
 
-        if event.action != "remove":
-            return self.localizer.thread_result(
-                "results.channel.unsupported_action",
-                thread=thread,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            )
+    async def _remove_channel(self, command: RemoveTrackedChannelCommand) -> DiscordCommandResult:
+        thread, denied = self._require_manage_channels(command)
+        if denied is not None:
+            return denied
 
+        twitch_user = await self._resolve_channel(command.twitch_channel_login)
+        existing = self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_user.user_id)
         if existing is None:
-            return self.localizer.thread_result(
+            return build_thread_result(
+                self.localizer,
                 "results.channel.not_found",
                 thread=thread,
                 style=DiscordResultStyle.ERROR,
@@ -232,7 +195,8 @@ class ChannelCommandService:
             )
             > 0
         ):
-            return self.localizer.thread_result(
+            return build_thread_result(
+                self.localizer,
                 "results.channel.in_use",
                 thread=thread,
                 style=DiscordResultStyle.ERROR,
@@ -243,10 +207,8 @@ class ChannelCommandService:
 
         is_last_subscription = self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id) == 1
         if is_last_subscription:
-            ensure_connected = getattr(self.irc_manager, "ensure_connected", None)
-            if callable(ensure_connected):
-                await ensure_connected()
-            await self.irc_manager.leave_channel(twitch_user.login)
+            await self.irc_gateway.ensure_connected()
+            await self.irc_gateway.leave_channel(twitch_user.login)
         self.channel_repository.remove_channel(thread.thread_id, twitch_user.user_id)
         logger.debug(
             "Removed tracked channel thread_id=%s twitch_channel_id=%s twitch_login=%s",
@@ -254,16 +216,21 @@ class ChannelCommandService:
             twitch_user.user_id,
             twitch_user.login,
         )
-        await self.event_bus.publish(
-            EventType.TWITCH_TRACKED_CHANNELS_CHANGED,
-            TwitchTrackedChannelsChangedEvent(reason="channel_removed"),
-        )
-        return self.localizer.thread_result(
+        await self._notify_tracked_channels_changed()
+        return build_thread_result(
+            self.localizer,
             "results.channel.removed",
             thread=thread,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
             DISPLAY_NAME=twitch_user.display_name,
             LOGIN=twitch_user.login,
+            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
         )
 
+    async def _notify_tracked_channels_changed(self) -> None:
+        if self.tracked_channels_changed is None:
+            return
+        outcome = self.tracked_channels_changed()
+        if hasattr(outcome, "__await__"):
+            await outcome

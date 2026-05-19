@@ -5,7 +5,7 @@ This guide explains how to test the full Twitch Observer feature set from two an
 1. code-level tests (what is covered, how to run),
 2. manual user-facing validation (how to see each feature and each message family in Discord/Twitch).
 
-It is written against the codebase structure (`src/main.py`, `src/services/*`, `src/adapters/discord/*`) and the localized message catalog (`lang/*.json`).
+It is written against the codebase structure (`src/bootstrap/application.py`, `src/services/*`, `src/entrypoints/discord/*`) and the localized message catalog (`lang/*.json`).
 
 ## 1) Test Environment Setup
 
@@ -27,7 +27,7 @@ It is written against the codebase structure (`src/main.py`, `src/services/*`, `
 
 ## 1.3 Build image with dev dependencies
 
-`ruff` lives in `requirements-dev.txt`, so build with `INSTALL_DEV=true`:
+`ruff` lives in `requirements-dev.txt`, so build the dev dependency variant with `INSTALL_DEV=true`:
 
 ```powershell
 $env:INSTALL_DEV = "true"
@@ -65,8 +65,8 @@ docker compose run --rm app pytest src/tests/test_twitch_irc.py -q
 ## 2.3 Lint and formatting checks
 
 ```powershell
-docker compose run --rm app python -m ruff check src
-docker compose run --rm app python -m ruff format src --check
+docker compose run --rm app ruff check src
+docker compose run --rm app ruff format src --check
 ```
 
 ## 2.4 Coverage map (feature -> tests)
@@ -458,7 +458,7 @@ This yields complete practical coverage of all user-reachable message families t
 Before release, require all:
 
 1. `docker compose run --rm app pytest src/tests -q`
-2. `docker compose run --rm app python -m ruff check src`
+2. `docker compose run --rm app ruff check src`
 3. manual playbook sections `3.1` to `3.13`
 
 If any manual step fails, capture:
@@ -468,3 +468,4 @@ If any manual step fails, capture:
 - expected message family key,
 - actual embed title/message,
 - timestamp and context channel ID.
+

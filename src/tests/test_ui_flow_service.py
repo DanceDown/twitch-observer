@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from src.adapters.discord import dispatch_ui_flow_decision
 from src.database.connection import (
     ChannelRecord,
     ChannelRepository,
@@ -15,7 +14,7 @@ from src.database.connection import (
     TwitchAccountRepository,
     UserPermissionRepository,
 )
-from src.events.event_bus import EventBus
+from src.events.event_types import RequestUIFlowCommand, UIFlowKind, UIFlowStep
 from src.services.ui_flow_service import DiscordUIFlowGuardService
 
 
@@ -66,9 +65,7 @@ class EmptyPermissionRepository(UserPermissionRepository):
 
 @pytest.mark.asyncio
 async def test_ui_flow_guard_returns_not_joined_before_opening_ui() -> None:
-    bus = EventBus()
-    DiscordUIFlowGuardService(
-        event_bus=bus,
+    service = DiscordUIFlowGuardService(
         thread_repository=InMemoryThreadRepository(),
         channel_repository=InMemoryChannelRepository(),
         pattern_repository=EmptyPatternRepository(),
@@ -77,12 +74,13 @@ async def test_ui_flow_guard_returns_not_joined_before_opening_ui() -> None:
         permission_repository=EmptyPermissionRepository(),
     )
 
-    decision = await dispatch_ui_flow_decision(
-        bus,
-        discord_channel_id=100,
-        requester_id=200,
-        flow="channel",
-        step="root",
+    decision = service.decide(
+        RequestUIFlowCommand(
+            discord_channel_id=100,
+            requester_id=200,
+            flow=UIFlowKind.CHANNEL,
+            step=UIFlowStep.ROOT,
+        ),
     )
 
     assert decision.open_ui is False
@@ -92,11 +90,9 @@ async def test_ui_flow_guard_returns_not_joined_before_opening_ui() -> None:
 
 @pytest.mark.asyncio
 async def test_ui_flow_guard_prioritizes_permission_over_empty_ping_state() -> None:
-    bus = EventBus()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
-    DiscordUIFlowGuardService(
-        event_bus=bus,
+    service = DiscordUIFlowGuardService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
         pattern_repository=EmptyPatternRepository(),
@@ -105,12 +101,13 @@ async def test_ui_flow_guard_prioritizes_permission_over_empty_ping_state() -> N
         permission_repository=EmptyPermissionRepository(),
     )
 
-    decision = await dispatch_ui_flow_decision(
-        bus,
-        discord_channel_id=100,
-        requester_id=201,
-        flow="ping",
-        step="remove",
+    decision = service.decide(
+        RequestUIFlowCommand(
+            discord_channel_id=100,
+            requester_id=201,
+            flow=UIFlowKind.PATTERN,
+            step=UIFlowStep.REMOVE,
+        ),
     )
 
     assert decision.open_ui is False
@@ -120,11 +117,9 @@ async def test_ui_flow_guard_prioritizes_permission_over_empty_ping_state() -> N
 
 @pytest.mark.asyncio
 async def test_ui_flow_guard_allows_owner_to_open_leave_modal() -> None:
-    bus = EventBus()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
-    DiscordUIFlowGuardService(
-        event_bus=bus,
+    service = DiscordUIFlowGuardService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
         pattern_repository=EmptyPatternRepository(),
@@ -133,12 +128,13 @@ async def test_ui_flow_guard_allows_owner_to_open_leave_modal() -> None:
         permission_repository=EmptyPermissionRepository(),
     )
 
-    decision = await dispatch_ui_flow_decision(
-        bus,
-        discord_channel_id=100,
-        requester_id=200,
-        flow="thread",
-        step="leave",
+    decision = service.decide(
+        RequestUIFlowCommand(
+            discord_channel_id=100,
+            requester_id=200,
+            flow=UIFlowKind.THREAD,
+            step=UIFlowStep.LEAVE,
+        ),
     )
 
     assert decision.open_ui is True
@@ -147,11 +143,9 @@ async def test_ui_flow_guard_allows_owner_to_open_leave_modal() -> None:
 
 @pytest.mark.asyncio
 async def test_ui_flow_guard_blocks_thread_color_modal_without_permission() -> None:
-    bus = EventBus()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
-    DiscordUIFlowGuardService(
-        event_bus=bus,
+    service = DiscordUIFlowGuardService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
         pattern_repository=EmptyPatternRepository(),
@@ -160,12 +154,13 @@ async def test_ui_flow_guard_blocks_thread_color_modal_without_permission() -> N
         permission_repository=EmptyPermissionRepository(),
     )
 
-    decision = await dispatch_ui_flow_decision(
-        bus,
-        discord_channel_id=100,
-        requester_id=201,
-        flow="thread",
-        step="color",
+    decision = service.decide(
+        RequestUIFlowCommand(
+            discord_channel_id=100,
+            requester_id=201,
+            flow=UIFlowKind.THREAD,
+            step=UIFlowStep.COLOR,
+        ),
     )
 
     assert decision.open_ui is False
@@ -175,11 +170,9 @@ async def test_ui_flow_guard_blocks_thread_color_modal_without_permission() -> N
 
 @pytest.mark.asyncio
 async def test_ui_flow_guard_blocks_show_modal_without_view_permission() -> None:
-    bus = EventBus()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
-    DiscordUIFlowGuardService(
-        event_bus=bus,
+    service = DiscordUIFlowGuardService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
         pattern_repository=EmptyPatternRepository(),
@@ -188,12 +181,13 @@ async def test_ui_flow_guard_blocks_show_modal_without_view_permission() -> None
         permission_repository=EmptyPermissionRepository(),
     )
 
-    decision = await dispatch_ui_flow_decision(
-        bus,
-        discord_channel_id=100,
-        requester_id=201,
-        flow="show",
-        step="root",
+    decision = service.decide(
+        RequestUIFlowCommand(
+            discord_channel_id=100,
+            requester_id=201,
+            flow=UIFlowKind.SHOW,
+            step=UIFlowStep.ROOT,
+        ),
     )
 
     assert decision.open_ui is False
@@ -203,11 +197,9 @@ async def test_ui_flow_guard_blocks_show_modal_without_view_permission() -> None
 
 @pytest.mark.asyncio
 async def test_ui_flow_guard_blocks_reply_add_modal_without_linked_account() -> None:
-    bus = EventBus()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
-    DiscordUIFlowGuardService(
-        event_bus=bus,
+    service = DiscordUIFlowGuardService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
         pattern_repository=EmptyPatternRepository(),
@@ -216,12 +208,13 @@ async def test_ui_flow_guard_blocks_reply_add_modal_without_linked_account() -> 
         permission_repository=EmptyPermissionRepository(),
     )
 
-    decision = await dispatch_ui_flow_decision(
-        bus,
-        discord_channel_id=100,
-        requester_id=200,
-        flow="reply",
-        step="add_pattern",
+    decision = service.decide(
+        RequestUIFlowCommand(
+            discord_channel_id=100,
+            requester_id=200,
+            flow=UIFlowKind.REPLY,
+            step=UIFlowStep.ADD_PATTERN,
+        ),
     )
 
     assert decision.open_ui is False

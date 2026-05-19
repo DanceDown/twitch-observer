@@ -1,4 +1,4 @@
-﻿"""PostgreSQL message persistence."""
+"""PostgreSQL message persistence."""
 
 from __future__ import annotations
 
@@ -20,9 +20,7 @@ class PostgresMessageRepository(MessageRepository):
 
     def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
         """Persist one incoming Twitch message if it has not been stored yet."""
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO message (
@@ -51,9 +49,7 @@ class PostgresMessageRepository(MessageRepository):
 
     def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
         """Load recent Twitch messages for presence updates or lightweight recency-based features."""
-        self.database.connect()
-        assert self.database.connection is not None
-        with self.database.connection.cursor() as cursor:
+        with self.database.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT username, content, timestamp
@@ -79,4 +75,3 @@ class PostgresMessageRepository(MessageRepository):
         """Build a deterministic fallback ID when Twitch did not provide one."""
         timestamp = event.sent_at.isoformat()
         return f"{event.channel_login}:{event.author_login}:{timestamp}:{hash(event.content)}"
-

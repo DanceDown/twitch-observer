@@ -1,4 +1,4 @@
-﻿"""Persistent Twitch user metadata cache backed by PostgreSQL."""
+"""Persistent Twitch user metadata lookup cache backed by PostgreSQL."""
 
 from __future__ import annotations
 
@@ -6,17 +6,9 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from src.adapters.twitch_api import (
-    TwitchAPIClient,
-    TwitchDeviceCodeStart,
-    TwitchDevicePollResult,
-    TwitchUser,
-    TwitchUserTokenBundle,
-    TwitchValidatedToken,
-)
+from src.gateways.twitch_api import TwitchAPIClient, TwitchAPIError, TwitchUser
 from src.database.connection import TwitchUserCacheRecord, TwitchUserCacheRepository
-from src.events.event_bus import EventBus
-from src.events.event_types import EventType, TwitchChatMessageEvent
+from src.events.event_types import TwitchChatMessageEvent
 
 
 def _record_to_twitch_user(record: TwitchUserCacheRecord) -> TwitchUser:
@@ -30,7 +22,7 @@ def _record_to_twitch_user(record: TwitchUserCacheRecord) -> TwitchUser:
 
 @dataclass(slots=True)
 class TwitchUserDirectoryService:
-    """Resolve Twitch users through a persistent cache with Helix fallback."""
+    """Resolve Twitch users and broadcasters through a persistent cache."""
 
     twitch_api: TwitchAPIClient
     repository: TwitchUserCacheRepository
@@ -81,7 +73,7 @@ class TwitchUserDirectoryService:
             if self._should_refresh_from_api(cached, refresh_interval_seconds=self.api_refresh_interval_seconds):
                 try:
                     return await self.refresh_user_by_login(normalized_login)
-                except Exception:
+                except TwitchAPIError:
                     return _record_to_twitch_user(cached)
             return _record_to_twitch_user(cached)
         return await self.refresh_user_by_login(login)
@@ -97,6 +89,10 @@ class TwitchUserDirectoryService:
         self._remember_record(record)
         return user
 
+    async def refresh_channel_by_login(self, login: str) -> TwitchUser:
+        """Refresh broadcaster metadata by login for channel-scoped commands."""
+        return await self.refresh_user_by_login(login)
+
     async def get_user_by_id(self, user_id: str) -> TwitchUser:
         normalized_user_id = user_id.strip()
         if not normalized_user_id:
@@ -106,7 +102,7 @@ class TwitchUserDirectoryService:
             if self._should_refresh_from_api(cached, refresh_interval_seconds=self.api_refresh_interval_seconds):
                 try:
                     return await self.refresh_user_by_id(normalized_user_id)
-                except Exception:
+                except TwitchAPIError:
                     return _record_to_twitch_user(cached)
             return _record_to_twitch_user(cached)
         return await self.refresh_user_by_id(user_id)
@@ -120,7 +116,7 @@ class TwitchUserDirectoryService:
             if self._should_refresh_from_api(cached, refresh_interval_seconds=self.channel_api_refresh_interval_seconds):
                 try:
                     return await self.refresh_user_by_id(normalized_user_id)
-                except Exception:
+                except TwitchAPIError:
                     return _record_to_twitch_user(cached)
             return _record_to_twitch_user(cached)
         return await self.refresh_user_by_id(user_id)
@@ -153,46 +149,6 @@ class TwitchUserDirectoryService:
                 display_name=None if existing_broadcaster is None else existing_broadcaster.display_name,
             )
             self._remember_record(record)
-
-    async def validate_user_access_token(self, access_token: str) -> TwitchValidatedToken:
-        return await self.twitch_api.validate_user_access_token(access_token)
-
-    async def start_device_code_flow(self, *, scopes: tuple[str, ...]) -> TwitchDeviceCodeStart:
-        return await self.twitch_api.start_device_code_flow(scopes=scopes)
-
-    async def poll_device_code_flow(
-        self,
-        *,
-        device_code: str,
-        scopes: tuple[str, ...],
-    ) -> TwitchDevicePollResult:
-        return await self.twitch_api.poll_device_code_flow(device_code=device_code, scopes=scopes)
-
-    async def refresh_user_access_token(self, refresh_token: str) -> TwitchUserTokenBundle:
-        return await self.twitch_api.refresh_user_access_token(refresh_token)
-
-    async def send_chat_message(
-        self,
-        *,
-        access_token: str,
-        client_id: str,
-        sender_id: str,
-        broadcaster_id: str,
-        message: str,
-        reply_parent_message_id: str | None = None,
-    ) -> str:
-        return await self.twitch_api.send_chat_message(
-            access_token=access_token,
-            client_id=client_id,
-            sender_id=sender_id,
-            broadcaster_id=broadcaster_id,
-            message=message,
-            reply_parent_message_id=reply_parent_message_id,
-        )
-
-    async def get_live_user_ids(self, user_ids: list[str]) -> set[str]:
-        """Pass through live-state stream lookups used by the background monitor."""
-        return await self.twitch_api.get_live_user_ids(user_ids)
 
     def _get_or_load_record_by_login(self, login: str) -> TwitchUserCacheRecord | None:
         cached = self._get_record_from_memory_by_login(login)
@@ -266,12 +222,7 @@ class TwitchUserDirectoryService:
 class TwitchUserDirectoryIngestService:
     """Feed the persistent Twitch user cache from incoming IRC chat events."""
 
-    event_bus: EventBus
     directory: TwitchUserDirectoryService
-
-    def __post_init__(self) -> None:
-        self.event_bus.subscribe(EventType.TWITCH_CHAT_MESSAGE, self.handle_chat_message)
 
     def handle_chat_message(self, event: TwitchChatMessageEvent) -> None:
         self.directory.observe_chat_message(event)
-

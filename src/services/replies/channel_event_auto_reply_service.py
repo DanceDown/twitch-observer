@@ -1,15 +1,11 @@
-﻿"""Runtime execution of live/offline event auto-replies."""
+"""Runtime execution of live/offline event auto-replies."""
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
 
-from src.adapters.twitch_api import (
-    TwitchAPIClient,
-    TwitchAPIError,
-    TwitchAuthenticationError,
-)
+from src.gateways.twitch_api import TwitchAPIError, TwitchAuthenticationError
 from src.database.connection import (
     AdapterEventActionRepository,
     AdapterEventRepository,
@@ -17,11 +13,10 @@ from src.database.connection import (
     ThreadRepository,
     TwitchAccountRepository,
 )
-from src.events.event_bus import EventBus
 from src.events.event_types import (
-    EventType,
     TwitchChannelLiveStateChangedEvent,
 )
+from src.services.twitch_gateways import TwitchReplyGateway
 from src.services.twitch_runtime import (
     CHANNEL_SUBJECT_TYPE,
     STREAM_EVENT_KEY_TO_STATE,
@@ -41,21 +36,14 @@ logger = logging.getLogger(__name__)
 class ChannelEventAutoReplyService:
     """Send Twitch messages when a tracked channel goes live or offline."""
 
-    event_bus: EventBus
     thread_repository: ThreadRepository
     channel_repository: ChannelRepository
     adapter_event_repository: AdapterEventRepository
     adapter_event_action_repository: AdapterEventActionRepository
     account_repository: TwitchAccountRepository
-    twitch_api: TwitchAPIClient
+    twitch_api: TwitchReplyGateway
     token_refresh_skew_seconds: int
     notifier: object | None = None
-
-    def __post_init__(self) -> None:
-        self.event_bus.subscribe(
-            EventType.TWITCH_CHANNEL_LIVE_STATE_CHANGED,
-            self.handle_channel_live_state_changed,
-        )
 
     async def handle_channel_live_state_changed(
         self,
@@ -96,7 +84,7 @@ class ChannelEventAutoReplyService:
                 await ensure_fresh_linked_account(
                     account=account,
                     account_repository=self.account_repository,
-                    twitch_api=self.twitch_api,
+                    twitch_auth=self.twitch_api,
                     token_refresh_skew_seconds=self.token_refresh_skew_seconds,
                     thread_repository=self.thread_repository,
                     thread=thread,
@@ -120,7 +108,7 @@ class ChannelEventAutoReplyService:
                 refreshed = await refresh_linked_account(
                     account=account,
                     account_repository=self.account_repository,
-                    twitch_api=self.twitch_api,
+                    twitch_auth=self.twitch_api,
                     thread_repository=self.thread_repository,
                     thread=thread,
                 )
@@ -152,4 +140,3 @@ class ChannelEventAutoReplyService:
     ) -> str:
         rendered = template.replace("{CHANNEL}", channel_name)
         return rendered.replace("{STATE}", state)
-

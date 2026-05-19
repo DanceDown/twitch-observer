@@ -53,6 +53,6 @@ Use `Localizer.format_list(...)` instead of building runtime-visible lists with 
 
 ## Guardrails
 
-- Do not add new runtime copy directly in adapters or services when it can live in a language file.
+- Do not add new runtime copy directly in entrypoints or services when it can live in a language file.
 - Prefer composing localized fragments over hand-built Markdown.
 - When a runtime value is intended to stay clickable, pass it through a `{RAW:...}` placeholder into a language-file template that owns the surrounding formatting.

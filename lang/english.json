@@ -5,11 +5,46 @@
       "all_tracked_channels": "Every watched channel",
       "all_tracked_users": "All known Twitch users",
       "everyone": "Everyone",
-      "only_in": "`Only in` {RAW:ITEMS}",
-      "everyone_except": "`Everyone except` {RAW:ITEMS}",
-      "all_tracked_channels_except": "`Every watched channel except` {RAW:ITEMS}",
-      "only_from": "`Only from` {RAW:ITEMS}",
-      "all_tracked_users_except": "`All known Twitch users except` {RAW:ITEMS}"
+      "only_in": {
+        "template": "`Only in` {RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": "common.list_formats.comma_raw"
+          }
+        }
+      },
+      "everyone_except": {
+        "template": "`Everyone except` {RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": "common.list_formats.comma_raw"
+          }
+        }
+      },
+      "all_tracked_channels_except": {
+        "template": "`Every watched channel except` {RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": "common.list_formats.comma_raw"
+          }
+        }
+      },
+      "only_from": {
+        "template": "`Only from` {RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": "common.list_formats.comma_raw"
+          }
+        }
+      },
+      "all_tracked_users_except": {
+        "template": "`All known Twitch users except` {RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": "common.list_formats.comma_raw"
+          }
+        }
+      }
     },
     "boolean": {
       "yes": "Yes",
@@ -18,31 +53,84 @@
     "fragments": {
       "twitch_code_link": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
       "twitch_link": "[{DISPLAY_NAME}](https://www.twitch.tv/{RAW:LOGIN})",
-      "section": "**{TITLE}**\n{RAW:BODY}",
+      "section": "**{TITLE}**\n{RAW:SECTION_BODY}",
       "inline_code": "`{CODE:TEXT}`",
-      "discord_user_mention": "<@{RAW:USER_ID}>",
-      "bullet_prefix": "- "
+      "discord_user_mention": "<@{RAW:USER_ID}>"
     },
-    "lists": {
+    "list_formats": {
       "raw_lines": {
-        "item_format": "{RAW:ITEM}",
+        "item_format": "{RAW:LIST_ITEM}",
         "separator": "\n"
       },
       "bullets": {
-        "item_format": "- {RAW:ITEM}",
+        "item_format": "- {RAW:LIST_ITEM}",
         "separator": "\n"
       },
       "indented_bullets": {
-        "item_format": "  - {RAW:ITEM}",
+        "item_format": "  - {RAW:LIST_ITEM}",
         "separator": "\n"
       },
       "comma_raw": {
-        "item_format": "{RAW:ITEM}",
+        "item_format": "{RAW:LIST_ITEM}",
+        "separator": ", "
+      },
+      "comma_code": {
+        "item_format": "`{CODE:LIST_ITEM}`",
         "separator": ", "
       },
       "section_breaks": {
-        "item_format": "{RAW:ITEM}",
+        "item_format": "{RAW:LIST_ITEM}",
         "separator": "\n\n"
+      }
+    },
+    "lists": {
+      "raw_lines": {
+        "template": "{RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": "common.list_formats.raw_lines"
+          }
+        }
+      },
+      "bullets": {
+        "template": "{RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": "common.list_formats.bullets"
+          }
+        }
+      },
+      "indented_bullets": {
+        "template": "{RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": "common.list_formats.indented_bullets"
+          }
+        }
+      },
+      "comma_raw": {
+        "template": "{RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": "common.list_formats.comma_raw"
+          }
+        }
+      },
+      "comma_code": {
+        "template": "{RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": "common.list_formats.comma_code"
+          }
+        }
+      },
+      "section_breaks": {
+        "template": "{RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": "common.list_formats.section_breaks"
+          }
+        }
       }
     }
   },
@@ -228,7 +316,12 @@
       },
       "overview": {
         "title": "Configuration Overview",
-        "message": "{RAW:CONTENT}"
+        "message": "{RAW:SECTION_LIST}",
+        "placeholders": {
+          "SECTION_LIST": {
+            "list": "common.list_formats.section_breaks"
+          }
+        }
       }
     },
     "account": {
@@ -307,15 +400,30 @@
       "empty_selection": "Choose at least one permission first <:oopsie:1497720439810687006>",
       "granted": {
         "title": "Permissions Granted",
-        "message": "{RAW:USER} gave {RAW:TARGET} these permissions <a:yes:1497686393369919559>\n{RAW:PERMISSIONS}"
+        "message": "{RAW:USER} gave {RAW:TARGET} these permissions <a:yes:1497686393369919559>\n{RAW:PERMISSIONS}",
+        "placeholders": {
+          "PERMISSIONS": {
+            "list": "common.list_formats.bullets"
+          }
+        }
       },
       "not_granted": {
         "title": "Not Granted",
-        "message": "{RAW:TARGET} does not explicitly have these permissions here <:ShrugMan:1497685241962430717>\n{RAW:PERMISSIONS}"
+        "message": "{RAW:TARGET} does not explicitly have these permissions here <:ShrugMan:1497685241962430717>\n{RAW:PERMISSIONS}",
+        "placeholders": {
+          "PERMISSIONS": {
+            "list": "common.list_formats.bullets"
+          }
+        }
       },
       "revoked": {
         "title": "Permissions Revoked",
-        "message": "{RAW:USER} removed these permissions from {RAW:TARGET} <a:yes:1497686393369919559>\n{RAW:PERMISSIONS}"
+        "message": "{RAW:USER} removed these permissions from {RAW:TARGET} <a:yes:1497686393369919559>\n{RAW:PERMISSIONS}",
+        "placeholders": {
+          "PERMISSIONS": {
+            "list": "common.list_formats.bullets"
+          }
+        }
       },
       "unsupported_action": "I don't know that permission action <a:peepoConfused:1497729266266275840>"
     },
@@ -584,13 +692,55 @@
       },
       "scope": {
         "channel_all": "Every watched channel",
-        "channel_only": "`Only in` {RAW:ITEMS}",
-        "channel_except": "`Every watched channel except` {RAW:ITEMS}",
-        "channel_tracked_except": "`Every watched channel except` {RAW:ITEMS}",
+        "channel_only": {
+          "template": "`Only in` {RAW:ITEMS}",
+          "placeholders": {
+            "ITEMS": {
+              "list": "common.list_formats.comma_raw"
+            }
+          }
+        },
+        "channel_except": {
+          "template": "`Every watched channel except` {RAW:ITEMS}",
+          "placeholders": {
+            "ITEMS": {
+              "list": "common.list_formats.comma_raw"
+            }
+          }
+        },
+        "channel_tracked_except": {
+          "template": "`Every watched channel except` {RAW:ITEMS}",
+          "placeholders": {
+            "ITEMS": {
+              "list": "common.list_formats.comma_raw"
+            }
+          }
+        },
         "user_all": "All known Twitch users",
-        "user_only": "`Only from` {RAW:ITEMS}",
-        "user_except": "`Everyone except` {RAW:ITEMS}",
-        "user_tracked_except": "`All known Twitch users except` {RAW:ITEMS}"
+        "user_only": {
+          "template": "`Only from` {RAW:ITEMS}",
+          "placeholders": {
+            "ITEMS": {
+              "list": "common.list_formats.comma_raw"
+            }
+          }
+        },
+        "user_except": {
+          "template": "`Everyone except` {RAW:ITEMS}",
+          "placeholders": {
+            "ITEMS": {
+              "list": "common.list_formats.comma_raw"
+            }
+          }
+        },
+        "user_tracked_except": {
+          "template": "`All known Twitch users except` {RAW:ITEMS}",
+          "placeholders": {
+            "ITEMS": {
+              "list": "common.list_formats.comma_raw"
+            }
+          }
+        }
       },
       "summary": {
         "action": "{ACTION} {TYPE} {CODE:ID}:",
@@ -620,7 +770,14 @@
     "validation_detail": {
       "color_hex_or_empty": "Die Farbe muss das Format `#RRGGBB` haben oder leer sein.",
       "color_hex_or_clear": "Die Farbe muss das Format `#RRGGBB` haben oder `clear:true` setzen.",
-      "unsupported_language": "Nicht unterst?tzte Sprache. Verf?gbare Sprachen: {RAW:LANGUAGES}"
+      "unsupported_language": {
+        "template": "Unsupported language. Available languages: {RAW:LANGUAGES}",
+        "placeholders": {
+          "LANGUAGES": {
+            "list": "common.list_formats.comma_code"
+          }
+        }
+      }
     }
   },
   "show": {
@@ -641,7 +798,14 @@
     "channel": {
       "custom_color": "Custom color: {CODE:COLOR}",
       "live_state": "Live state: {CODE:STATE}",
-      "notifications": "Notifications: {RAW:STATES}"
+      "notifications": {
+        "template": "Notifications: {RAW:STATES}",
+        "placeholders": {
+          "STATES": {
+            "list": "common.list_formats.comma_raw"
+          }
+        }
+      }
     },
     "pattern": {
       "line": "{TYPE} {CODE:ID}",
@@ -955,19 +1119,61 @@
         "priority": "Priority: {CODE:VALUE}",
         "priority_auto": "Automatic",
         "not_set": "not set yet",
-        "embed_message": "{RAW:CONTENT}\n\nUse the buttons below to fill out each section.\nNeed a hex color? [Open color picker]({RAW:COLOR_PICKER_URL})",
+        "embed_message": {
+          "template": "{RAW:SUMMARY_LINES}\n\nUse the buttons below to fill out each section.\nNeed a hex color? [Open color picker]({RAW:COLOR_PICKER_URL})",
+          "placeholders": {
+            "SUMMARY_LINES": {
+              "list": "common.list_formats.raw_lines"
+            }
+          }
+        },
         "channel_scope_all": "All watched Twitch channels",
-        "channel_scope_only": "Only: {RAW:ITEMS}",
+        "channel_scope_only": {
+          "template": "Only: {RAW:ITEMS}",
+          "placeholders": {
+            "ITEMS": {
+              "list": "common.list_formats.comma_raw"
+            }
+          }
+        },
         "channel_scope_only_fallback": "Only selected channels",
-        "channel_scope_except": "All except: {RAW:ITEMS}",
+        "channel_scope_except": {
+          "template": "All except: {RAW:ITEMS}",
+          "placeholders": {
+            "ITEMS": {
+              "list": "common.list_formats.comma_raw"
+            }
+          }
+        },
         "channel_scope_except_fallback": "All except selected channels",
         "user_scope_everyone": "Everyone",
         "user_scope_all_tracked": "All known Twitch users",
-        "user_scope_all_tracked_except": "All known except: {RAW:ITEMS}",
+        "user_scope_all_tracked_except": {
+          "template": "All known except: {RAW:ITEMS}",
+          "placeholders": {
+            "ITEMS": {
+              "list": "common.list_formats.comma_raw"
+            }
+          }
+        },
         "user_scope_all_tracked_except_fallback": "All known except selected Twitch names",
-        "user_scope_only": "Only: {RAW:ITEMS}",
+        "user_scope_only": {
+          "template": "Only: {RAW:ITEMS}",
+          "placeholders": {
+            "ITEMS": {
+              "list": "common.list_formats.comma_raw"
+            }
+          }
+        },
         "user_scope_only_fallback": "Only selected Twitch names",
-        "user_scope_except": "Everyone except: {RAW:ITEMS}",
+        "user_scope_except": {
+          "template": "Everyone except: {RAW:ITEMS}",
+          "placeholders": {
+            "ITEMS": {
+              "list": "common.list_formats.comma_raw"
+            }
+          }
+        },
         "user_scope_except_fallback": "Everyone except selected Twitch names",
         "sub_state_all": "Everyone",
         "sub_state_subs": "Subscribers only",

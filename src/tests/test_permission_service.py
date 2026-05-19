@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from src.adapters.discord import dispatch_pattern_command, dispatch_permission_command, dispatch_show_command
-from src.adapters.twitch_api import TwitchUser
+from src.tests.dispatch_helpers import dispatch_pattern_command, dispatch_permission_command, dispatch_show_command
+from src.gateways.twitch_api import TwitchUser
 from src.database.connection import (
     ChannelRecord,
     ChannelRepository,
@@ -17,8 +17,8 @@ from src.database.connection import (
     UserPermissionRecord,
     UserPermissionRepository,
 )
-from src.events.event_bus import EventBus
-from src.services.pattern_service import PatternCommandService, ShowCommandService
+from types import SimpleNamespace
+from src.services.patterns import PatternCommandService, ShowCommandService
 from src.services.permission_service import PermissionCommandService
 
 
@@ -110,16 +110,16 @@ class InMemoryChannelRepository(ChannelRepository):
 @dataclass
 class InMemoryPatternRepository(PatternRepository):
     patterns: list[PatternRecord] = field(default_factory=list)
+    next_pattern_id: int = 1
 
     def find_exact_pattern(self, **kwargs) -> PatternRecord | None:
         return None
 
     def add_pattern(self, **kwargs) -> PatternRecord:
         thread_id = kwargs["thread_id"]
-        next_index = 1 + max([pattern.p_index for pattern in self.patterns if pattern.thread_id == thread_id], default=0)
         record = PatternRecord(
             thread_id=thread_id,
-            p_index=next_index,
+            pattern_id=self.next_pattern_id,
             regex=kwargs["regex"],
             channel_scope_mode=kwargs["channel_scope_mode"],
             channel_scope_ids=tuple(sorted(kwargs["channel_scope_ids"])),
@@ -135,15 +135,16 @@ class InMemoryPatternRepository(PatternRepository):
             priority=kwargs["priority"],
         )
         self.patterns.append(record)
+        self.next_pattern_id += 1
         return record
 
-    def remove_pattern(self, *, thread_id: int, p_index: int) -> None:
-        self.patterns = [pattern for pattern in self.patterns if not (pattern.thread_id == thread_id and pattern.p_index == p_index)]
+    def remove_pattern(self, *, thread_id: int, pattern_id: int) -> None:
+        self.patterns = [pattern for pattern in self.patterns if not (pattern.thread_id == thread_id and pattern.pattern_id == pattern_id)]
 
-    def set_pattern_disabled(self, *, thread_id: int, p_index: int, disabled: bool) -> PatternRecord | None:
+    def set_pattern_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool) -> PatternRecord | None:
         return None
 
-    def set_pattern_priority(self, *, thread_id: int, p_index: int, priority: int) -> PatternRecord | None:
+    def set_pattern_priority(self, *, thread_id: int, pattern_id: int, priority: int) -> PatternRecord | None:
         return None
 
     def update_pattern(self, **kwargs) -> PatternRecord | None:
@@ -152,9 +153,9 @@ class InMemoryPatternRepository(PatternRepository):
     def list_active_patterns_for_thread(self, thread_id: int) -> list[PatternRecord]:
         return []
 
-    def get_pattern_by_id(self, *, thread_id: int, p_index: int) -> PatternRecord | None:
+    def get_pattern_by_id(self, *, thread_id: int, pattern_id: int) -> PatternRecord | None:
         for pattern in self.patterns:
-            if pattern.thread_id == thread_id and pattern.p_index == p_index:
+            if pattern.thread_id == thread_id and pattern.pattern_id == pattern_id:
                 return pattern
         return None
 
@@ -170,16 +171,16 @@ class InMemoryPatternRepository(PatternRepository):
 
 @dataclass
 class InMemoryReplyRepository(ReplyRepository):
-    def get_by_pattern(self, *, thread_id: int, p_index: int):
+    def get_by_pattern(self, *, thread_id: int, pattern_id: int):
         return None
 
-    def add_reply(self, *, thread_id: int, p_index: int, reply_message: str, reply_as_reply: bool):
+    def add_reply(self, *, thread_id: int, pattern_id: int, reply_message: str, reply_as_reply: bool):
         return None
 
-    def remove_reply(self, *, thread_id: int, p_index: int):
+    def remove_reply(self, *, thread_id: int, pattern_id: int):
         return None
 
-    def set_reply_disabled(self, *, thread_id: int, p_index: int, disabled: bool):
+    def set_reply_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool):
         return None
 
     def list_replies_for_thread(self, thread_id: int, *, include_disabled: bool = True):
@@ -224,26 +225,36 @@ class FakeTwitchAPI:
                 return user
         raise KeyError(user_id)
 
+    async def get_channel_by_id(self, user_id: str) -> TwitchUser:
+        return await self.get_user_by_id(user_id)
+
+    async def refresh_channel_by_login(self, login: str) -> TwitchUser:
+        return await self.get_user_by_login(login)
+
+    def get_cached_user_by_login(self, login: str) -> TwitchUser | None:
+        return None
+
+    def get_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
+        return None
+
     async def is_user_live(self, user_id: str) -> bool:
         return False
 
 
 @pytest.mark.asyncio
 async def test_permission_grant_allows_non_owner_to_add_patterns() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     pattern_repository = InMemoryPatternRepository()
     permission_repository = InMemoryPermissionRepository()
     twitch_api = FakeTwitchAPI()
-    PermissionCommandService(
-        event_bus=bus,
+    bus.permission = PermissionCommandService(
         thread_repository=thread_repository,
         permission_repository=permission_repository,
     )
-    PatternCommandService(
-        event_bus=bus,
+    bus.pattern = PatternCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
@@ -285,7 +296,7 @@ async def test_permission_grant_allows_non_owner_to_add_patterns() -> None:
 
 @pytest.mark.asyncio
 async def test_permission_view_allows_non_owner_to_use_show() -> None:
-    bus = EventBus()
+    bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
@@ -293,7 +304,7 @@ async def test_permission_view_allows_non_owner_to_use_show() -> None:
         patterns=[
             PatternRecord(
                 thread_id=thread.thread_id,
-                p_index=1,
+                pattern_id=1,
                 regex="hello",
                 channel_scope_mode="all_tracked",
                 channel_scope_ids=(),
@@ -311,13 +322,11 @@ async def test_permission_view_allows_non_owner_to_use_show() -> None:
         ]
     )
     permission_repository = InMemoryPermissionRepository()
-    PermissionCommandService(
-        event_bus=bus,
+    bus.permission = PermissionCommandService(
         thread_repository=thread_repository,
         permission_repository=permission_repository,
     )
-    ShowCommandService(
-        event_bus=bus,
+    bus.show = ShowCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,

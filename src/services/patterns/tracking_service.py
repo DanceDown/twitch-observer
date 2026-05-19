@@ -1,4 +1,4 @@
-﻿"""Runtime pattern matching for incoming Twitch chat messages."""
+"""Runtime pattern matching for incoming Twitch chat messages."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 
 import discord
 
-from src.adapters.twitch_api import TwitchAPIClient
 from src.database.connection import (
     ChannelRepository,
     PatternRepository,
@@ -15,9 +14,9 @@ from src.database.connection import (
     ThreadRepository,
     TrackedUserRepository,
 )
-from src.events.event_bus import EventBus
-from src.events.event_types import EventType, TwitchChatMessageEvent
+from src.events.event_types import TwitchChatMessageEvent
 from src.localization import Localizer
+from src.services.twitch_gateways import TwitchUserLookup
 from src.services.twitch_runtime import (
     expand_pattern_for_tracked_users,
     offline_state_allows,
@@ -47,18 +46,14 @@ class TrackingNotificationSender:
 class PatternTrackingService:
     """Evaluate incoming Twitch messages against stored ping/regex definitions."""
 
-    event_bus: EventBus
     thread_repository: ThreadRepository
     channel_repository: ChannelRepository
     pattern_repository: PatternRepository
-    twitch_api: TwitchAPIClient
+    twitch_api: TwitchUserLookup
     notifier: TrackingNotificationSender
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     tracked_user_repository: TrackedUserRepository | None = None
     reply_repository: ReplyRepository | None = None
-
-    def __post_init__(self) -> None:
-        self.event_bus.subscribe(EventType.TWITCH_CHAT_MESSAGE, self.handle_chat_message)
 
     async def handle_chat_message(self, event: TwitchChatMessageEvent) -> None:
         """Check all interested Discord channels for pattern matches."""
@@ -128,7 +123,7 @@ class PatternTrackingService:
                 if not matches_pattern(effective_pattern, event):
                     logger.debug(
                         "Pattern %s did not match message. regex=%r channel_filter=%s user_filter=%s sub=%s offline=%s is_regex=%s",
-                        effective_pattern.p_index,
+                        effective_pattern.pattern_id,
                         effective_pattern.regex,
                         effective_pattern.channel_scope_ids,
                         effective_pattern.user_scope_ids,
@@ -140,16 +135,16 @@ class PatternTrackingService:
                 if not offline_state_allows(effective_pattern, live_status):
                     logger.debug(
                         "Pattern %s matched text but was filtered by offline_state=%s live_status=%s",
-                        effective_pattern.p_index,
+                        effective_pattern.pattern_id,
                         effective_pattern.offline_state,
                         live_status,
                     )
                     continue
 
-                if self._has_enabled_reply(thread.thread_id, effective_pattern.p_index):
+                if self._has_enabled_reply(thread.thread_id, effective_pattern.pattern_id):
                     logger.debug(
                         "Pattern %s matched for thread_id=%s but notification is delegated to auto-reply handling.",
-                        effective_pattern.p_index,
+                        effective_pattern.pattern_id,
                         thread.thread_id,
                     )
                     break
@@ -164,7 +159,7 @@ class PatternTrackingService:
                 )
                 logger.info(
                     "Pattern %s matched. Sending tracking embed to discord_channel_id=%s",
-                    effective_pattern.p_index,
+                    effective_pattern.pattern_id,
                     thread.discord_channel_id,
                 )
                 await self.notifier.send_tracking_embed(
@@ -187,7 +182,6 @@ class PatternTrackingService:
             return False
         reply = self.reply_repository.get_by_pattern(
             thread_id=thread_id,
-            p_index=pattern_id,
+            pattern_id=pattern_id,
         )
         return reply is not None and not reply.disabled
-

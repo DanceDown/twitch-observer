@@ -4,24 +4,28 @@ This is the main runtime reference for the Twitch Observer.
 
 ## Layers
 
-- Adapters
-  - translate external systems into internal events
-  - render results back to Discord or Twitch
+- Entrypoints
+  - start runtime flow from Discord, Twitch IRC, or background workers
+  - normalize external payloads
+  - call one direct service, pipeline, or orchestrator
+  - render transport-specific results
+- Gateways
+  - talk to external systems such as Twitch Helix
+  - expose narrow integration contracts
 - Services
   - own business logic
-  - react to events
-  - coordinate repositories and side effects
+  - coordinate repositories and side effects through direct calls
+- Pipelines and orchestrators
+  - run explicit ordered multi-step flows
 - Repositories
   - persist configuration, cache, and runtime state in PostgreSQL
 - Localization
   - loads `lang/*.json` once at startup and resolves per-thread language keys
-- Event bus
-  - keeps adapters and services decoupled
 
 ## Main inputs
 
 - Discord
-  - slash commands, modals, and buttons
+  - root command launchers, selects, modals, and buttons
 - Twitch IRC
   - public chat intake
 - Twitch Helix
@@ -31,31 +35,39 @@ This is the main runtime reference for the Twitch Observer.
 
 ### Chat message flow
 
-1. `AnonymousTwitchIRCAdapter` receives a Twitch `PRIVMSG`.
-2. It publishes `TwitchChatMessageEvent`.
-3. `MessageIngestService` stores the message.
-4. `TwitchUserDirectoryIngestService` updates `twitch_user_cache` from IRC metadata.
-5. `PatternTrackingService` evaluates message-driven patterns.
-6. `AutoReplyService` evaluates pattern-bound Twitch auto-replies.
+1. `TwitchIRCEntrypoint` receives a Twitch `PRIVMSG`.
+2. It normalizes the line into `TwitchChatMessageEvent`.
+3. It forwards that DTO into `ChatMessageProcessingService`.
+4. The chat pipeline runs, in order:
+   - `MessageIngestService`
+   - `TwitchUserDirectoryIngestService`
+   - `PatternTrackingService`
+   - `AutoReplyService`
 
 ### Live-state flow
 
 1. `TwitchLiveMonitorService` periodically polls Helix `Get Streams` for all tracked channels.
 2. It compares the result with persisted `channel.is_live`.
 3. First-seen state is stored silently.
-4. Actual transitions publish `TwitchChannelLiveStateChangedEvent`.
-5. `ChannelLiveStatePersistenceService` persists the new state.
-6. `ChannelEventNotificationService` sends Discord notifications for configured live/offline triggers managed through `/live`.
-7. `ChannelEventAutoReplyService` sends Twitch messages for configured live/offline event actions.
+4. Actual transitions are forwarded directly to `LiveStateChangeOrchestrator`.
+5. The orchestrator runs, in order:
+   - `ChannelLiveStatePersistenceService`
+   - `ChannelEventNotificationService`
+   - `ChannelEventAutoReplyService`
 
 ### Command flow
 
-1. A Discord command is dispatched from the Discord adapter.
-2. The adapter publishes one typed command event.
-3. The matching service validates permissions and inputs.
-4. The service updates repositories and returns a `DiscordCommandResult`.
-5. The Discord adapter renders the result using the language stored on the
+1. A Discord command is dispatched from the Discord entrypoint.
+2. The Discord entrypoint normalizes interaction data into one typed request DTO.
+3. It calls one direct application service.
+4. The service validates permissions and inputs, updates repositories, and returns a `DiscordCommandResult`.
+5. The Discord entrypoint renders the result using the language stored on the
    active thread/context.
+
+Pattern and reply entries use:
+
+- a stable persisted internal pattern identifier for storage and relations
+- a dense per-thread display number computed only when rendering UI or `/show`
 
 ## Key design decisions
 
@@ -130,23 +142,57 @@ The message hot path never calls `Get Streams`.
   - pattern auto-replies
   - live/offline event auto-replies
 
+## Persistence runtime
+
+`PostgresDatabase` uses a small synchronous connection pool with:
+
+- a hard cap on total active plus idle connections
+- blocking acquire semantics
+- a configurable acquire timeout that raises an internal technical failure when exhausted
+
+This keeps repository access bounded even though the app still uses synchronous
+PostgreSQL drivers.
+
 ## Implementation notes
 
-- `src/main.py`
+- `src/bootstrap/application.py`
   - dependency wiring and lifecycle
+- `src/main.py`
+  - thin process entrypoint
+- `src/entrypoints/`
+  - runtime entrypoint exports for Discord and Twitch IRC
+- `src/gateways/`
+  - external integration exports
 - `src/database/records.py`
   - shared persistence dataclasses
 - `src/database/repositories.py`
   - repository interfaces used by services and tests
-- `src/database/connection.py`
-  - PostgreSQL schema bootstrapping and repository implementations
+- `src/database/postgres/`
+  - PostgreSQL pool and repository implementations split by persistence responsibility
+- `src/entrypoints/discord/dispatch/`
+  - typed per-domain direct call helpers used by Discord entrypoints and UI
+- `src/entrypoints/discord/ui/patterns/`
+  - split guided ping UI flow
+- `src/services/chat_pipeline.py`
+  - ordered Twitch chat processing pipeline
+- `src/services/live_state_orchestrator.py`
+  - ordered live/offline side effects
 - `src/services/patterns/`
   - split pattern command, show, and tracking services
 - `src/services/replies/`
   - split reply command, pattern auto-reply, and channel-event auto-reply services
+- `src/services/account_service.py`
+  - account command handling for link/unlink/show flows
+- `src/services/account_polling_service.py`
+  - background polling and completion of pending Twitch device-code logins
+- `src/services/channel_live_state_service.py`
+  - tracked channel event configuration commands
+- `src/services/channel_event_notification_service.py`
+  - live-state persistence and Discord notification fan-out
 - `src/services/twitch_runtime.py`
   - shared Twitch runtime helpers and constants
 - `src/services/twitch_live_monitor_service.py`
   - app-token-based live-state polling
 - `src/services/twitch_user_directory_service.py`
   - persistent Twitch user cache
+

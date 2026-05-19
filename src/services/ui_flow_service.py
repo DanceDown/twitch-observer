@@ -1,4 +1,4 @@
-﻿"""Service-owned guards for Discord UI flow steps."""
+"""Service-owned guards for Discord UI flow steps."""
 
 from __future__ import annotations
 
@@ -13,13 +13,14 @@ from src.database.connection import (
     TwitchAccountRepository,
     UserPermissionRepository,
 )
-from src.events.event_bus import EventBus
+from src.discord_results import build_result, build_thread_result
 from src.events.event_types import (
     DiscordCommandResult,
     DiscordResultStyle,
     DiscordUIFlowDecision,
-    DiscordUIFlowRequestedEvent,
-    EventType,
+    RequestUIFlowCommand,
+    UIFlowKind,
+    UIFlowStep,
 )
 from src.localization import Localizer
 from src.services.authz import thread_has_permission
@@ -30,7 +31,6 @@ from src.utils.permissions import ObserverPermission
 class DiscordUIFlowGuardService:
     """Decide whether Discord may render a flow step before opening UI."""
 
-    event_bus: EventBus
     thread_repository: ThreadRepository
     channel_repository: ChannelRepository
     pattern_repository: PatternRepository
@@ -39,30 +39,26 @@ class DiscordUIFlowGuardService:
     permission_repository: UserPermissionRepository | None = None
     localizer: Localizer = field(default_factory=Localizer.from_directory)
 
-    def __post_init__(self) -> None:
-        self.event_bus.subscribe(EventType.DISCORD_UI_FLOW_REQUESTED, self.handle_request)
+    def decide(self, event: RequestUIFlowCommand) -> DiscordUIFlowDecision:
+        return self._decide(event)
 
-    def handle_request(self, event: DiscordUIFlowRequestedEvent) -> None:
-        decision = self._decide(event)
-        if not event.result_future.done():
-            event.result_future.set_result(decision)
-
-    def _decide(self, event: DiscordUIFlowRequestedEvent) -> DiscordUIFlowDecision:
+    def _decide(self, event: RequestUIFlowCommand) -> DiscordUIFlowDecision:
         thread = None if event.discord_channel_id is None else self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
         if thread is None:
             return self._blocked(
                 event,
-                self.localizer.result("results.not_joined", style=DiscordResultStyle.ERROR, ephemeral=True),
+                build_result(self.localizer, "results.not_joined", style=DiscordResultStyle.ERROR, ephemeral=True),
             )
 
         required = self._required_permission(event.flow, event.step)
         if required and not self._has_any_permission(thread, event.requester_id, required):
             return self._blocked(event, self._permission_result(thread, event.flow, event.step))
 
-        if event.flow == "account" and event.requester_id != thread.owner_id:
+        if event.flow is UIFlowKind.ACCOUNT and event.requester_id != thread.owner_id:
             return self._blocked(
                 event,
-                self.localizer.thread_result(
+                build_thread_result(
+                    self.localizer,
                     "results.account.owner_denied",
                     thread=thread,
                     style=DiscordResultStyle.ERROR,
@@ -70,19 +66,22 @@ class DiscordUIFlowGuardService:
                 ),
             )
 
-        if event.flow in {"live", "offline", "write"} and not self.channel_repository.list_channels_for_thread(thread.thread_id):
-            key = "discord.write_ui.errors.no_channels" if event.flow == "write" else "discord.live_state_ui.errors.no_channels"
+        if event.flow in {UIFlowKind.LIVE, UIFlowKind.OFFLINE, UIFlowKind.WRITE} and not self.channel_repository.list_channels_for_thread(
+            thread.thread_id
+        ):
+            key = "discord.write_ui.errors.no_channels" if event.flow is UIFlowKind.WRITE else "discord.live_state_ui.errors.no_channels"
             return self._blocked(
                 event,
-                self.localizer.thread_result(key, thread=thread, style=DiscordResultStyle.ERROR, ephemeral=True),
+                build_thread_result(self.localizer, key, thread=thread, style=DiscordResultStyle.ERROR, ephemeral=True),
             )
 
-        if event.flow == "reply" and event.step in {"add_pattern", "add_event"}:
+        if event.flow is UIFlowKind.REPLY and event.step in {UIFlowStep.ADD_PATTERN, UIFlowStep.ADD_EVENT}:
             account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
             if account is None or not account.access_token:
                 return self._blocked(
                     event,
-                    self.localizer.thread_result(
+                    build_thread_result(
+                        self.localizer,
                         "results.reply.no_linked_account",
                         thread=thread,
                         style=DiscordResultStyle.ERROR,
@@ -90,12 +89,13 @@ class DiscordUIFlowGuardService:
                     ),
                 )
 
-        if event.flow == "write":
+        if event.flow is UIFlowKind.WRITE:
             account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
             if account is None or not account.access_token:
                 return self._blocked(
                     event,
-                    self.localizer.thread_result(
+                    build_thread_result(
+                        self.localizer,
                         "results.write.no_linked_account",
                         thread=thread,
                         style=DiscordResultStyle.ERROR,
@@ -105,72 +105,81 @@ class DiscordUIFlowGuardService:
 
         return DiscordUIFlowDecision(flow=event.flow, step=event.step, open_ui=True)
 
-    def _required_permission(self, flow: str, step: str) -> tuple[ObserverPermission, ...]:
-        if flow == "thread":
-            if step == "leave":
+    def _required_permission(self, flow: UIFlowKind, step: UIFlowStep) -> tuple[ObserverPermission, ...]:
+        if flow is UIFlowKind.THREAD:
+            if step is UIFlowStep.LEAVE:
                 return (ObserverPermission.LEAVE_CONTEXT,)
-            if step == "color":
+            if step is UIFlowStep.COLOR:
                 return (ObserverPermission.CONTROL_OBSERVER,)
             return ()
-        if flow == "channel":
+        if flow is UIFlowKind.CHANNEL:
             return (ObserverPermission.MANAGE_CHANNELS,)
-        if flow == "user":
+        if flow is UIFlowKind.USER:
             return (ObserverPermission.MANAGE_PATTERNS,)
-        if flow == "show":
+        if flow is UIFlowKind.SHOW:
             return (ObserverPermission.VIEW,)
-        if flow == "permission":
+        if flow is UIFlowKind.PERMISSION:
             return (ObserverPermission.MANAGE_PERMISSIONS,)
-        if flow == "account":
+        if flow is UIFlowKind.ACCOUNT:
             return (ObserverPermission.CONTROL_OBSERVER,)
-        if flow in {"live", "offline"}:
+        if flow in {UIFlowKind.LIVE, UIFlowKind.OFFLINE}:
             return (ObserverPermission.MANAGE_CHANNELS,)
-        if flow == "write":
+        if flow is UIFlowKind.WRITE:
             return (ObserverPermission.SEND_TWITCH_MESSAGES,)
-        if flow == "ping":
-            if step in {"root"}:
+        if flow is UIFlowKind.PATTERN:
+            if step is UIFlowStep.ROOT:
                 return (ObserverPermission.MANAGE_PATTERNS, ObserverPermission.TOGGLE_PATTERNS)
-            if step in {"disable", "enable"}:
+            if step in {UIFlowStep.DISABLE, UIFlowStep.ENABLE}:
                 return (ObserverPermission.TOGGLE_PATTERNS,)
             return (ObserverPermission.MANAGE_PATTERNS,)
-        if flow == "reply":
-            if step in {"disable", "enable"}:
+        if flow is UIFlowKind.REPLY:
+            if step in {UIFlowStep.DISABLE, UIFlowStep.ENABLE}:
                 return (ObserverPermission.TOGGLE_REPLIES,)
-            if step == "root":
+            if step is UIFlowStep.ROOT:
                 return (ObserverPermission.MANAGE_REPLIES, ObserverPermission.TOGGLE_REPLIES)
             return (ObserverPermission.MANAGE_REPLIES,)
         return ()
 
-    def _permission_result(self, thread: ThreadRecord, flow: str, step: str) -> DiscordCommandResult:
+    def _permission_result(self, thread: ThreadRecord, flow: UIFlowKind, step: UIFlowStep) -> DiscordCommandResult:
         key = {
-            "thread": (
+            UIFlowKind.THREAD: (
                 "results.thread.leave_denied"
-                if step == "leave"
-                else "results.thread.color_denied" if step == "color" else None
+                if step is UIFlowStep.LEAVE
+                else "results.thread.color_denied"
+                if step is UIFlowStep.COLOR
+                else None
             ),
-            "channel": "results.channel.permission_denied",
-            "user": "results.user.permission_denied",
-            "show": "results.show.permission_denied",
-            "write": "results.write.permission_denied",
-            "permission": "results.permission.permission_denied",
-            "account": "results.account.permission_denied",
-            "live": "results.channel_event.permission_denied",
-            "offline": "results.channel_event.permission_denied",
+            UIFlowKind.CHANNEL: "results.channel.permission_denied",
+            UIFlowKind.USER: "results.user.permission_denied",
+            UIFlowKind.SHOW: "results.show.permission_denied",
+            UIFlowKind.WRITE: "results.write.permission_denied",
+            UIFlowKind.PERMISSION: "results.permission.permission_denied",
+            UIFlowKind.ACCOUNT: "results.account.permission_denied",
+            UIFlowKind.LIVE: "results.channel_event.permission_denied",
+            UIFlowKind.OFFLINE: "results.channel_event.permission_denied",
         }.get(flow)
-        if flow == "ping":
+        if flow is UIFlowKind.PATTERN:
             key = (
-                "results.pattern.toggle_permission_denied" if step in {"disable", "enable"} else "results.pattern.manage_permission_denied"
+                "results.pattern.toggle_permission_denied"
+                if step in {UIFlowStep.DISABLE, UIFlowStep.ENABLE}
+                else "results.pattern.manage_permission_denied"
             )
-        if flow == "reply":
-            key = "results.reply.toggle_permission_denied" if step in {"disable", "enable"} else "results.reply.manage_permission_denied"
+        if flow is UIFlowKind.REPLY:
+            key = (
+                "results.reply.toggle_permission_denied"
+                if step in {UIFlowStep.DISABLE, UIFlowStep.ENABLE}
+                else "results.reply.manage_permission_denied"
+            )
         if key is None:
-            return self.localizer.thread_result(
+            return build_thread_result(
+                self.localizer,
                 "results.permission_denied",
                 thread=thread,
                 DETAIL=self.localizer.text("results.permission.generic_denied", language=thread.language),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
-        return self.localizer.thread_result(key, thread=thread, style=DiscordResultStyle.ERROR, ephemeral=True)
+        return build_thread_result(self.localizer, key, thread=thread, style=DiscordResultStyle.ERROR, ephemeral=True)
 
     def _has_any_permission(
         self,
@@ -189,6 +198,5 @@ class DiscordUIFlowGuardService:
         )
 
     @staticmethod
-    def _blocked(event: DiscordUIFlowRequestedEvent, result: DiscordCommandResult) -> DiscordUIFlowDecision:
+    def _blocked(event: RequestUIFlowCommand, result: DiscordCommandResult) -> DiscordUIFlowDecision:
         return DiscordUIFlowDecision(flow=event.flow, step=event.step, open_ui=False, result=result)
-

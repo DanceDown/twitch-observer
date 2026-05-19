@@ -1,7 +1,7 @@
 # Adding Commands
 
 This guide explains how to add a Discord feature as one vertical slice across
-adapter, events, services, persistence, and tests.
+entrypoints, typed request DTOs, services, persistence, and tests.
 
 ## Scope
 
@@ -10,42 +10,41 @@ Command behavior details belong in [commands_reference.md](commands_reference.md
 
 ## Architecture boundaries
 
-- `src/adapters/discord/commands/*`
-  - command registration and interaction entry points
-- `src/adapters/discord/ui/*`
+- `src/entrypoints/discord/commands/*`
+  - root command registration and interaction entry points
+- `src/entrypoints/discord/ui/*`
   - modals, menus, and component-driven forms
-- `src/adapters/discord/dispatch.py`
-  - typed event dispatch helpers
+- `src/entrypoints/discord/dispatch/*`
+  - typed per-domain direct call helpers
 - `src/events/event_types.py`
-  - event names and payload dataclasses
+  - typed request DTOs, runtime DTOs, and enums
 - `src/services/*`
   - business logic and orchestration
 - `src/database/*`
   - schema, repository contracts, and implementations
-- `src/main.py`
-  - dependency wiring
+- `src/bootstrap/application.py`
+  - application assembly and lifecycle wiring
 
 ## Implementation workflow
 
 1. Define domain behavior and data ownership.
 2. Add or extend persisted schema when needed.
 3. Add/extend record and repository contracts.
-4. Add typed event payload and event name.
-5. Add a dispatch helper.
-6. Implement service logic and subscribe in `__post_init__`.
-7. Add command registration and UI interaction entry points.
-8. Wire service/repository in `src/main.py`.
+4. Add a typed request DTO or runtime DTO when useful.
+5. Add or extend a direct dispatch helper.
+6. Implement service logic with a direct method returning `DiscordCommandResult`.
+7. Add root command registration and UI interaction entry points.
+8. Wire service/repository in `src/bootstrap/application.py`.
 9. Add tests for service behavior and affected flows.
 10. Update docs for command surface and operational behavior.
 
-## Step 1: Event contract
+## Step 1: Typed request contract
 
-Add an `EventType` member in `src/events/event_types.py`, then add a dedicated
-event payload dataclass containing:
+Add a dedicated typed request dataclass in `src/events/event_types.py`
+containing:
 
 - context identity (`discord_channel_id`, `requester_id`)
 - normalized command data
-- `result_future`
 
 Rules:
 
@@ -54,11 +53,11 @@ Rules:
 
 ## Step 2: Dispatch helper
 
-Add a helper in `src/adapters/discord/dispatch.py` that:
+Add a helper in the matching module under `src/entrypoints/discord/dispatch/` that:
 
-1. creates a future,
-2. publishes the typed event,
-3. awaits and returns the `DiscordCommandResult`.
+1. creates the typed request DTO,
+2. calls the matching direct service method,
+3. returns the `DiscordCommandResult`.
 
 Rules:
 
@@ -71,7 +70,6 @@ Create or extend a service under `src/services/`.
 
 Service requirements:
 
-- subscribe in `__post_init__`
 - validate permissions and prerequisites
 - call repositories and APIs
 - return `DiscordCommandResult`
@@ -81,27 +79,27 @@ Service requirements:
 
 Add command registration in the matching module under:
 
-- `src/adapters/discord/commands/`
+- `src/entrypoints/discord/commands/`
 
 If the flow is form-based, add or extend UI components under:
 
-- `src/adapters/discord/ui/`
+- `src/entrypoints/discord/ui/`
 
 Rules:
 
 - command layer performs transport-level checks and normalization
 - service layer owns all business decisions
-- UI components dispatch through the same helper path as slash commands
+- UI components call through the same helper path as root commands
 
-## Step 5: Wiring in `src/main.py`
+## Step 5: Wiring in `src/bootstrap/application.py`
 
-Instantiate repositories and services in `src/main.py`.
+Instantiate repositories, services, pipelines/orchestrators, and entrypoints in
+`src/bootstrap/application.py`.
 
 If wiring is missing:
 
 - commands register in Discord,
-- events are published,
-- no service handles the request.
+- the direct service call path is incomplete.
 
 ## Step 6: Testing
 
@@ -115,7 +113,7 @@ Recommended commands:
 
 ```powershell
 docker compose run --rm app pytest src/tests -q
-docker compose run --rm app python -m ruff check src
+docker compose run --rm app ruff check src
 ```
 
 ## Step 7: Documentation updates
@@ -131,8 +129,8 @@ This keeps one authoritative source per topic and prevents duplicated guidance.
 
 ## Common failure points
 
-- command registered but service not wired in `main.py`
-- event type added but dispatch helper not implemented
+- command registered but service not wired in `bootstrap/application.py`
+- typed request added but dispatch helper not implemented
 - service logic placed in adapter/UI instead of service layer
 - schema changed without repository updates
 - missing tests for denial and validation paths
@@ -144,3 +142,4 @@ If code both parses Discord I/O and decides business outcomes, split it:
 - adapter/UI handles interaction transport,
 - service handles business logic,
 - repository handles persistence.
+

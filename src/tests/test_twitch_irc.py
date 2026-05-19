@@ -1,14 +1,23 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass, field
 from types import SimpleNamespace
 
 import pytest
 
-from src.adapters.twitch_irc import AnonymousTwitchIRCAdapter, build_chat_message_event, parse_irc_message
 from src.config import AppConfig
-from src.events.event_bus import EventBus
-from src.events.event_types import EventType
+from src.entrypoints.twitch_irc import TwitchIRCEntrypoint, build_chat_message_event, parse_irc_message
+from src.events.event_types import TwitchChatMessageEvent
+from src.gateways.twitch_irc import AnonymousTwitchIRCGateway
+
+
+@dataclass
+class FakeMessageProcessor:
+    messages: list[TwitchChatMessageEvent] = field(default_factory=list)
+
+    async def process(self, message: TwitchChatMessageEvent) -> None:
+        self.messages.append(message)
 
 
 def test_parse_irc_message_parses_twitch_tags_and_payload() -> None:
@@ -59,82 +68,73 @@ def test_build_chat_message_event_normalizes_ctcp_action_payload() -> None:
 
 
 @pytest.mark.asyncio
-async def test_anonymous_adapter_emits_bus_event_for_privmsg() -> None:
-    bus = EventBus()
-    config = AppConfig(twitch_irc_channels=["example"])
-    adapter = AnonymousTwitchIRCAdapter(config=config, event_bus=bus)
-    captured = []
+async def test_twitch_irc_entrypoint_forwards_privmsg_to_pipeline() -> None:
+    config = AppConfig()
+    processor = FakeMessageProcessor()
+    entrypoint = TwitchIRCEntrypoint(AnonymousTwitchIRCGateway(config=config), message_processor=processor)
 
-    bus.subscribe(EventType.TWITCH_CHAT_MESSAGE, lambda event: captured.append(event))
-
-    await adapter.handle_line(
+    await entrypoint.handle_line(
         "@display-name=TestUser;id=abc123;room-id=999;user-id=777;tmi-sent-ts=1710000000000 "
         ":testuser!testuser@testuser.tmi.twitch.tv PRIVMSG #example :Hello world!"
     )
 
-    assert len(captured) == 1
-    assert captured[0].content == "Hello world!"
+    assert len(processor.messages) == 1
+    assert processor.messages[0].content == "Hello world!"
 
 
 @pytest.mark.asyncio
-async def test_anonymous_adapter_ignores_non_privmsg_lines() -> None:
-    bus = EventBus()
+async def test_twitch_irc_entrypoint_ignores_non_privmsg_lines() -> None:
     config = AppConfig()
-    adapter = AnonymousTwitchIRCAdapter(config=config, event_bus=bus)
-    captured = []
+    processor = FakeMessageProcessor()
+    entrypoint = TwitchIRCEntrypoint(AnonymousTwitchIRCGateway(config=config), message_processor=processor)
 
-    bus.subscribe(EventType.TWITCH_CHAT_MESSAGE, lambda event: captured.append(event))
+    await entrypoint.handle_line(":tmi.twitch.tv NOTICE * :Improperly formatted auth")
 
-    await adapter.handle_line(":tmi.twitch.tv NOTICE * :Improperly formatted auth")
-
-    assert captured == []
+    assert processor.messages == []
 
 
 @pytest.mark.asyncio
-async def test_anonymous_adapter_can_join_channels_later() -> None:
-    bus = EventBus()
+async def test_twitch_irc_gateway_can_join_channels_later() -> None:
     config = AppConfig()
-    adapter = AnonymousTwitchIRCAdapter(config=config, event_bus=bus)
+    gateway = AnonymousTwitchIRCGateway(config=config)
     sent_lines = []
 
     async def fake_send_line(line: str) -> None:
         sent_lines.append(line)
 
-    adapter._reader = SimpleNamespace(at_eof=lambda: False)  # type: ignore[assignment]
-    adapter._writer = SimpleNamespace(is_closing=lambda: False)  # type: ignore[assignment]
-    adapter._send_line = fake_send_line  # type: ignore[method-assign]
+    gateway._reader = SimpleNamespace(at_eof=lambda: False)  # type: ignore[assignment]
+    gateway._writer = SimpleNamespace(is_closing=lambda: False)  # type: ignore[assignment]
+    gateway._send_line = fake_send_line  # type: ignore[method-assign]
 
-    await adapter.join_channel("Example")
-    await adapter.join_channel("#example")
-    await adapter.join_channel("second")
+    await gateway.join_channel("Example")
+    await gateway.join_channel("#example")
+    await gateway.join_channel("second")
 
     assert sent_lines == ["JOIN #example", "JOIN #second"]
 
 
 @pytest.mark.asyncio
-async def test_anonymous_adapter_rejoins_pending_channels_after_connect() -> None:
-    bus = EventBus()
+async def test_twitch_irc_gateway_rejoins_pending_channels_after_connect() -> None:
     config = AppConfig()
-    adapter = AnonymousTwitchIRCAdapter(config=config, event_bus=bus)
+    gateway = AnonymousTwitchIRCGateway(config=config)
     sent_lines = []
 
     async def fake_send_line(line: str) -> None:
         sent_lines.append(line)
 
-    adapter._pending_channels.add("example")
-    adapter._pending_channels.add("second")
-    adapter._send_line = fake_send_line  # type: ignore[method-assign]
+    gateway._pending_channels.add("example")
+    gateway._pending_channels.add("second")
+    gateway._send_line = fake_send_line  # type: ignore[method-assign]
 
-    await adapter._join_initial_channels()
+    await gateway._join_initial_channels()
 
     assert sent_lines == ["JOIN #example", "JOIN #second"]
 
 
 @pytest.mark.asyncio
-async def test_anonymous_adapter_reconnects_before_join_when_read_loop_stopped() -> None:
-    bus = EventBus()
+async def test_twitch_irc_gateway_reconnects_before_join_when_read_loop_stopped() -> None:
     config = AppConfig()
-    adapter = AnonymousTwitchIRCAdapter(config=config, event_bus=bus)
+    gateway = AnonymousTwitchIRCGateway(config=config)
     sent_lines: list[str] = []
     reconnects: list[str] = []
 
@@ -143,27 +143,26 @@ async def test_anonymous_adapter_reconnects_before_join_when_read_loop_stopped()
 
     async def fake_ensure_connected() -> None:
         reconnects.append("reconnected")
-        adapter._read_task = None
+        gateway._read_task = None
 
     loop = asyncio.get_running_loop()
-    adapter._reader = SimpleNamespace(at_eof=lambda: False)  # type: ignore[assignment]
-    adapter._writer = SimpleNamespace(is_closing=lambda: False)  # type: ignore[assignment]
-    adapter._read_task = loop.create_future()  # type: ignore[assignment]
-    adapter._read_task.set_result(None)
-    adapter._send_line_with_reconnect = fake_send_line  # type: ignore[method-assign]
-    adapter.ensure_connected = fake_ensure_connected  # type: ignore[method-assign]
+    gateway._reader = SimpleNamespace(at_eof=lambda: False)  # type: ignore[assignment]
+    gateway._writer = SimpleNamespace(is_closing=lambda: False)  # type: ignore[assignment]
+    gateway._read_task = loop.create_future()  # type: ignore[assignment]
+    gateway._read_task.set_result(None)
+    gateway._send_line_with_reconnect = fake_send_line  # type: ignore[method-assign]
+    gateway.ensure_connected = fake_ensure_connected  # type: ignore[method-assign]
 
-    await adapter.join_channel("Example")
+    await gateway.join_channel("Example")
 
     assert reconnects == ["reconnected"]
     assert sent_lines == ["JOIN #example"]
 
 
 @pytest.mark.asyncio
-async def test_anonymous_adapter_sends_pass_during_handshake(monkeypatch: pytest.MonkeyPatch) -> None:
-    bus = EventBus()
+async def test_twitch_irc_gateway_sends_pass_during_handshake(monkeypatch: pytest.MonkeyPatch) -> None:
     config = AppConfig()
-    adapter = AnonymousTwitchIRCAdapter(config=config, event_bus=bus)
+    gateway = AnonymousTwitchIRCGateway(config=config)
     sent_lines: list[str] = []
 
     class FakeReader:
@@ -189,9 +188,9 @@ async def test_anonymous_adapter_sends_pass_during_handshake(monkeypatch: pytest
     async def fake_open_connection(*args, **kwargs):
         return FakeReader(), FakeWriter()
 
-    monkeypatch.setattr("src.adapters.twitch_irc.asyncio.open_connection", fake_open_connection)
+    monkeypatch.setattr("src.gateways.twitch_irc.asyncio.open_connection", fake_open_connection)
 
-    await adapter._open_connection()
+    await gateway._open_connection()
 
     assert sent_lines[0] == "PASS SCHMOOPIIE"
     assert sent_lines[1].startswith("CAP REQ :twitch.tv/tags twitch.tv/commands")
