@@ -45,15 +45,14 @@ class PatternPickerView(BaseFormView):
         self._patterns = await self._data_provider.list_patterns(self._discord_channel_id)
         if self._patterns:
             return None
-        return DiscordCommandResult(
-            title=self.text("discord.pattern_ui.errors.no_pings.title"),
-            message=self.text("discord.pattern_ui.errors.no_pings.message"),
+        return self.result(
+            "discord.pattern_ui.errors.no_pings",
             style=DiscordResultStyle.ERROR,
             ephemeral=True,
         )
 
     def render_embed(self) -> discord.Embed:
-        return self.form_embed("discord.pattern_ui.edit.title", "discord.pattern_ui.edit.message")
+        return self.form_embed("discord.pattern_ui.edit")
 
     async def submit_selection(self, interaction: discord.Interaction, pattern_id: int) -> None:
         pattern = await self._data_provider.get_pattern(self._discord_channel_id, pattern_id)
@@ -62,9 +61,8 @@ class PatternPickerView(BaseFormView):
             if self.bound_message is not None:
                 await self.bound_message.edit(
                     embed=build_result_embed(
-                        DiscordCommandResult(
-                            title=self.text("discord.pattern_ui.errors.not_found.title"),
-                            message=self.text("discord.pattern_ui.errors.not_found.message"),
+                        self.result(
+                            "discord.pattern_ui.errors.not_found",
                             style=DiscordResultStyle.ERROR,
                             ephemeral=True,
                         )

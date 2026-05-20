@@ -5,7 +5,7 @@ from __future__ import annotations
 import discord
 
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle, UIFlowKind, UIFlowStep
+from src.events.event_types import DiscordResultStyle, UIFlowKind, UIFlowStep
 from src.localization import Localizer
 from src.services.twitch_runtime import TWITCH_SEND_MESSAGE_ACTION
 
@@ -363,7 +363,7 @@ class ReplyMenuView(BaseFormView):
         self.enable.label = self.text("discord.reply_ui.actions.enable")
 
     def render_embed(self) -> discord.Embed:
-        return self.form_embed("discord.reply_ui.menu.title", "discord.reply_ui.menu.message")
+        return self.form_embed("discord.reply_ui.menu")
 
     @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def add_pattern(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
@@ -379,12 +379,7 @@ class ReplyMenuView(BaseFormView):
         if not patterns:
             await self.finish_with_interaction(
                 interaction,
-                DiscordCommandResult(
-                    title=self.text("discord.reply_ui.errors.no_patterns.title"),
-                    message=self.text("discord.reply_ui.errors.no_patterns.message"),
-                    style=DiscordResultStyle.ERROR,
-                    ephemeral=True,
-                ),
+                self.result("discord.reply_ui.errors.no_patterns", style=DiscordResultStyle.ERROR, ephemeral=True),
             )
             return
         await interaction.response.send_modal(
@@ -413,12 +408,7 @@ class ReplyMenuView(BaseFormView):
         if not adapter_events:
             await self.finish_with_interaction(
                 interaction,
-                DiscordCommandResult(
-                    title=self.text("discord.reply_ui.errors.no_event_triggers.title"),
-                    message=self.text("discord.reply_ui.errors.no_event_triggers.message"),
-                    style=DiscordResultStyle.ERROR,
-                    ephemeral=True,
-                ),
+                self.result("discord.reply_ui.errors.no_event_triggers", style=DiscordResultStyle.ERROR, ephemeral=True),
             )
             return
         await interaction.response.send_modal(
@@ -471,12 +461,7 @@ class ReplyMenuView(BaseFormView):
         if not replies:
             await self.finish_with_interaction(
                 interaction,
-                DiscordCommandResult(
-                    title=self.text("discord.reply_ui.errors.no_replies.title"),
-                    message=self.text("discord.reply_ui.errors.no_replies.message"),
-                    style=DiscordResultStyle.ERROR,
-                    ephemeral=True,
-                ),
+                self.result("discord.reply_ui.errors.no_replies", style=DiscordResultStyle.ERROR, ephemeral=True),
             )
             return
         await interaction.response.send_modal(

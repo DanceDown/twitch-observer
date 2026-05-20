@@ -47,7 +47,7 @@ class PingMenuView(BaseFormView):
         self.enable.label = self.text("discord.pattern_ui.actions.enable")
 
     def render_embed(self) -> discord.Embed:
-        return self.form_embed("discord.pattern_ui.menu.title", "discord.pattern_ui.menu.message")
+        return self.form_embed("discord.pattern_ui.menu")
 
     @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def add(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import discord
 
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.events.event_types import DiscordResultStyle
 
 from .state import PatternEditorMode
 
@@ -85,9 +85,8 @@ class PatternOptionsModal(discord.ui.Modal):
             except ValueError:
                 await self._parent_view.finish_with_interaction(
                     interaction,
-                    DiscordCommandResult(
-                        title=self._parent_view.text("discord.pattern_ui.errors.invalid_priority.title"),
-                        message=self._parent_view.text("discord.pattern_ui.errors.invalid_priority.message"),
+                    self._parent_view.result(
+                        "discord.pattern_ui.errors.invalid_priority",
                         style=DiscordResultStyle.ERROR,
                         ephemeral=True,
                     ),
@@ -96,9 +95,8 @@ class PatternOptionsModal(discord.ui.Modal):
             if parsed < 0 or parsed > 9:
                 await self._parent_view.finish_with_interaction(
                     interaction,
-                    DiscordCommandResult(
-                        title=self._parent_view.text("discord.pattern_ui.errors.invalid_priority.title"),
-                        message=self._parent_view.text("discord.pattern_ui.errors.invalid_priority.message"),
+                    self._parent_view.result(
+                        "discord.pattern_ui.errors.invalid_priority",
                         style=DiscordResultStyle.ERROR,
                         ephemeral=True,
                     ),

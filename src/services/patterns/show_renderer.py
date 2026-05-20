@@ -248,19 +248,30 @@ class ShowSectionRenderer:
     def render_permissions_section(self, thread: ThreadRecord) -> str:
         """Render the permission overview for one Discord context."""
         language = self._localizer.language_for_thread(thread)
-        rows = [
-            self.grouped_bullet(
-                self.mention(thread.owner_id, language=language),
-                [self._localizer.text("show.permission.owner", language=language)],
-                language=language,
+        user_entries: list[str] = []
+        permission_msg = self._localizer.value("show.show_permissions", language=language)
+        if not isinstance(permission_msg, dict):
+            raise ValueError("show.show_permissions must be an object.")
+        user_list_item = permission_msg.get("user_list_item")
+        permission_list_item = permission_msg.get("permission_list_item")
+        if not isinstance(user_list_item, str) or not isinstance(permission_list_item, str):
+            raise ValueError("show.show_permissions must define user_list_item and permission_list_item.")
+
+        owner_permissions = self._localizer.render(
+            permission_list_item,
+            PERMISSION=self._localizer.text("show.permission.owner", language=language),
+        )
+        user_entries.append(
+            self._localizer.render(
+                user_list_item,
+                USERNAME=self.mention(thread.owner_id, language=language),
+                PERMISSION_LIST=owner_permissions,
             )
-        ]
+        )
+
         if self.permission_repository is None:
-            return self.section(
-                self._localizer.text("show.sections.permissions", language=language),
-                self.raw_lines(rows, language=language),
-                language=language,
-            )
+            return self._localizer.text("show.show_permissions", language=language, USER_LIST="\n".join(user_entries))
+
         grants = self.permission_repository.list_for_thread(thread_id=thread.thread_id)
         for grant in grants:
             labels = explicit_permission_labels(grant.permissions)
@@ -269,18 +280,18 @@ class ShowSectionRenderer:
                 if labels
                 else [self._localizer.text("show.permission.none", language=language)]
             )
-            rows.append(
-                self.grouped_bullet(
-                    self.mention(grant.discord_user_id, language=language),
-                    rendered,
-                    language=language,
+            permission_lines = "\n".join(
+                self._localizer.render(permission_list_item, PERMISSION=item)
+                for item in rendered
+            )
+            user_entries.append(
+                self._localizer.render(
+                    user_list_item,
+                    USERNAME=self.mention(grant.discord_user_id, language=language),
+                    PERMISSION_LIST=permission_lines,
                 )
             )
-        return self.section(
-            self._localizer.text("show.sections.permissions", language=language),
-            self.raw_lines(rows, language=language),
-            language=language,
-        )
+        return self._localizer.text("show.show_permissions", language=language, USER_LIST="\n".join(user_entries))
 
     async def render_account_section(self, thread: ThreadRecord) -> tuple[str, str | None]:
         """Render linked account and pending device-flow details."""
@@ -549,23 +560,23 @@ class ShowSectionRenderer:
 
     def bullets(self, items: list[str], *, language: str) -> str:
         """Render plain bullet items."""
-        return self._localizer.text("show.lists.bullets", language=language, ITEMS=items)
+        return "\n".join(f"- {item}" for item in items)
 
     def indented_bullets(self, items: list[str], *, language: str) -> str:
         """Render indented bullet items."""
-        return self._localizer.text("show.lists.indented_bullets", language=language, ITEMS=items)
+        return "\n".join(f"  - {item}" for item in items)
 
     def raw_lines(self, items: list[str], *, language: str) -> str:
         """Join already-rendered lines without adding prefixes."""
-        return self._localizer.text("show.lists.raw_lines", language=language, ITEMS=items)
+        return "\n".join(items)
 
     def section_breaks(self, items: list[str], *, language: str) -> str:
         """Join full sections with the standard section separator."""
-        return self._localizer.text("show.lists.section_breaks", language=language, ITEMS=items)
+        return "\n\n".join(items)
 
     def comma_list(self, items: list[str] | tuple[str, ...], *, language: str) -> str:
         """Render inline comma-separated fragments."""
-        return self._localizer.text("show.lists.comma_raw", language=language, ITEMS=list(items))
+        return ", ".join(items)
 
     def grouped_bullet(self, head: str, details: list[str], *, language: str) -> str:
         """Render one main bullet with optional indented detail bullets."""

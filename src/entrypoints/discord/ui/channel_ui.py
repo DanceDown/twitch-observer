@@ -152,7 +152,7 @@ class ChannelMenuView(BaseFormView):
         self.color.label = self.text("discord.channel_ui.actions.color")
 
     def render_embed(self) -> discord.Embed:
-        return self.form_embed("discord.channel_ui.menu.title", "discord.channel_ui.menu.message")
+        return self.form_embed("discord.channel_ui.menu")
 
     @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def add(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:

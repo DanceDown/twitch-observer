@@ -7,7 +7,6 @@ import discord
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.events.event_types import (
     ChannelScopeMode,
-    DiscordCommandResult,
     DiscordResultStyle,
     OfflineScope,
     SubscriptionScope,
@@ -108,13 +107,12 @@ class PatternHomeView(BaseFormView):
                 VALUE=self.state.priority if self.state.priority is not None else self.text("discord.pattern_ui.summary.priority_auto"),
             ),
         ]
-        title_key = "discord.pattern_ui.create.title" if self.mode is PatternEditorMode.ADD else "discord.pattern_ui.edit.title"
-        return self.form_embed(
-            title_key,
-            "discord.pattern_ui.summary.embed_message",
-            SUMMARY_LINES=lines,
-            COLOR_PICKER_URL=COLOR_PICKER_URL,
+        result_key = (
+            "discord.pattern_ui.create_embed"
+            if self.mode is PatternEditorMode.ADD
+            else "discord.pattern_ui.edit_embed"
         )
+        return self.form_embed(result_key, SUMMARY_LINES=lines, COLOR_PICKER_URL=COLOR_PICKER_URL)
 
     @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def basics(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
@@ -142,12 +140,7 @@ class PatternHomeView(BaseFormView):
         if not tracked_channels:
             await self.finish_with_interaction(
                 interaction,
-                DiscordCommandResult(
-                    title=self.text("discord.pattern_ui.errors.no_channels.title"),
-                    message=self.text("discord.pattern_ui.errors.no_channels.message"),
-                    style=DiscordResultStyle.ERROR,
-                    ephemeral=True,
-                ),
+                self.result("discord.pattern_ui.errors.no_channels", style=DiscordResultStyle.ERROR, ephemeral=True),
             )
             return
         await interaction.response.send_modal(PatternChannelsModal(parent=self, tracked_channels=tracked_channels))
@@ -166,12 +159,7 @@ class PatternHomeView(BaseFormView):
         if not tracked_users:
             await self.finish_with_interaction(
                 interaction,
-                DiscordCommandResult(
-                    title=self.text("discord.pattern_ui.errors.no_users.title"),
-                    message=self.text("discord.pattern_ui.errors.no_users.message"),
-                    style=DiscordResultStyle.ERROR,
-                    ephemeral=True,
-                ),
+                self.result("discord.pattern_ui.errors.no_users", style=DiscordResultStyle.ERROR, ephemeral=True),
             )
             return
         await interaction.response.send_modal(PatternUsersModal(parent=self, tracked_users=tracked_users))

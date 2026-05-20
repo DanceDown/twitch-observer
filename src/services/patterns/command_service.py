@@ -236,16 +236,19 @@ class PatternCommandService:
         display_id = self._display_index(thread.thread_id, created.pattern_id) or created.pattern_id
         logger.debug(
             "Added %s pattern thread_id=%s pattern_id=%s regex=%r channel_filter=%s user_filter=%s",
-            mode_name,
+            mode_name_title,
             thread.thread_id,
             created.pattern_id,
             created.regex,
             created.channel_scope_ids,
             created.user_scope_ids,
         )
-        return DiscordCommandResult(
-            title=self.localizer.text("results.pattern.added_title", language=thread.language, ADDED_TYPE=mode_name_title),
-            message=self._presenter().format_pattern_summary(
+        return build_thread_result(
+            self.localizer,
+            "results.pattern.added_result",
+            thread=thread,
+            ADDED_TYPE=mode_name_title,
+            SUMMARY=self._presenter().format_pattern_summary(
                 action=self.localizer.text("results.pattern.actions.added", language=thread.language),
                 pattern=created,
                 display_id=display_id,
@@ -294,15 +297,14 @@ class PatternCommandService:
         logger.debug("Removed pattern thread_id=%s pattern_id=%s regex=%r", pattern.thread_id, pattern.pattern_id, pattern.regex)
         mode_name_title = self._pattern_type_for("removed_title", pattern.is_regex, language=thread.language)
         mode_name_body = self._pattern_type_for("removed_body", pattern.is_regex, language=thread.language)
-        return DiscordCommandResult(
-            title=self.localizer.text("results.pattern.removed_title", language=thread.language, REMOVED_TYPE=mode_name_title),
-            message=self.localizer.text(
-                "results.pattern.removed",
-                language=thread.language,
-                REMOVED_BODY_TYPE=mode_name_body,
-                ID=display_id,
-                TEXT=pattern.regex,
-            ),
+        return build_thread_result(
+            self.localizer,
+            "results.pattern.removed_result",
+            thread=thread,
+            REMOVED_TYPE=mode_name_title,
+            REMOVED_BODY_TYPE=mode_name_body,
+            ID=display_id,
+            TEXT=pattern.regex,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
         )
@@ -348,15 +350,14 @@ class PatternCommandService:
         mode_name_title = self._pattern_type_for("disabled_title", pattern.is_regex, language=thread.language)
         mode_name_body = self._pattern_type_for("disabled_body", updated.is_regex, language=thread.language)
         display_id = self._display_index(thread.thread_id, updated.pattern_id) or updated.pattern_id
-        return DiscordCommandResult(
-            title=self.localizer.text("results.pattern.disabled_title", language=thread.language, DISABLED_TYPE=mode_name_title),
-            message=self.localizer.text(
-                "results.pattern.disabled",
-                language=thread.language,
-                DISABLED_BODY_TYPE=mode_name_body,
-                ID=display_id,
-                TEXT=updated.regex,
-            ),
+        return build_thread_result(
+            self.localizer,
+            "results.pattern.disabled_result",
+            thread=thread,
+            DISABLED_TYPE=mode_name_title,
+            DISABLED_BODY_TYPE=mode_name_body,
+            ID=display_id,
+            TEXT=updated.regex,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
         )
@@ -402,15 +403,14 @@ class PatternCommandService:
         mode_name_title = self._pattern_type_for("enabled_title", pattern.is_regex, language=thread.language)
         mode_name_body = self._pattern_type_for("enabled_body", updated.is_regex, language=thread.language)
         display_id = self._display_index(thread.thread_id, updated.pattern_id) or updated.pattern_id
-        return DiscordCommandResult(
-            title=self.localizer.text("results.pattern.enabled_title", language=thread.language, ENABLED_TYPE=mode_name_title),
-            message=self.localizer.text(
-                "results.pattern.enabled",
-                language=thread.language,
-                ENABLED_BODY_TYPE=mode_name_body,
-                ID=display_id,
-                TEXT=updated.regex,
-            ),
+        return build_thread_result(
+            self.localizer,
+            "results.pattern.enabled_result",
+            thread=thread,
+            ENABLED_TYPE=mode_name_title,
+            ENABLED_BODY_TYPE=mode_name_body,
+            ID=display_id,
+            TEXT=updated.regex,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
         )
@@ -518,9 +518,11 @@ class PatternCommandService:
             pattern.user_scope_ids,
             language=thread.language,
         )
-        return DiscordCommandResult(
-            title=self.localizer.text("results.pattern.updated_title", language=thread.language),
-            message=self._presenter().format_pattern_changes(
+        return build_thread_result(
+            self.localizer,
+            "results.pattern.updated_result",
+            thread=thread,
+            SUMMARY=self._presenter().format_pattern_changes(
                 before=pattern,
                 after=updated,
                 display_id=display_id,

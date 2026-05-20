@@ -125,7 +125,7 @@ class PermissionMenuView(BaseFormView):
         self.clear.label = self.text("discord.permission_ui.actions.clear")
 
     def render_embed(self) -> discord.Embed:
-        return self.form_embed("discord.permission_ui.menu.title", "discord.permission_ui.menu.message")
+        return self.form_embed("discord.permission_ui.menu")
 
     @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def grant(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:

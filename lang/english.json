@@ -9,7 +9,10 @@
         "template": "`Only in` {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
-            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+            "list": {
+              "item_format": "{RAW:LIST_ITEM}",
+              "separator": ", "
+            }
           }
         }
       },
@@ -17,7 +20,10 @@
         "template": "`Everyone except` {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
-            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+            "list": {
+              "item_format": "{RAW:LIST_ITEM}",
+              "separator": ", "
+            }
           }
         }
       },
@@ -25,7 +31,10 @@
         "template": "`Every watched channel except` {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
-            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+            "list": {
+              "item_format": "{RAW:LIST_ITEM}",
+              "separator": ", "
+            }
           }
         }
       },
@@ -33,7 +42,10 @@
         "template": "`Only from` {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
-            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+            "list": {
+              "item_format": "{RAW:LIST_ITEM}",
+              "separator": ", "
+            }
           }
         }
       },
@@ -41,7 +53,10 @@
         "template": "`All known Twitch users except` {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
-            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+            "list": {
+              "item_format": "{RAW:LIST_ITEM}",
+              "separator": ", "
+            }
           }
         }
       }
@@ -61,318 +76,399 @@
   "results": {
     "command_unavailable": {
       "title": "Command Unavailable",
-      "message": "This command can only be used inside a Discord channel or DM <a:Tssk:1497685026945630208>"
+      "body": "This command can only be used inside a Discord channel or DM <a:Tssk:1497685026945630208>",
+      "footer": ""
     },
     "validation_error": {
       "title": "Validation Error",
-      "message": "{DETAIL} <a:OhNo:1497685055948980306>"
+      "body": "{DETAIL} <a:OhNo:1497685055948980306>",
+      "footer": ""
     },
     "twitch_api_error": {
       "title": "Twitch API Error",
-      "message": "{DETAIL} <a:OhNo:1497685055948980306>"
+      "body": "{DETAIL} <a:OhNo:1497685055948980306>",
+      "footer": ""
     },
     "unexpected_error": {
       "title": "Unexpected Error",
-      "message": "{DETAIL} <a:OhNo:1497685055948980306>"
+      "body": "{DETAIL} <a:OhNo:1497685055948980306>",
+      "footer": ""
     },
     "regex_error": {
       "title": "Regex Error",
-      "message": "{DETAIL} <a:OhNo:1497685055948980306>\n\nConsider using prebuilt patterns (e.g. from [howtoregex.com](https://howtoregex.com/patterns/python))"
+      "body": "{DETAIL} <a:OhNo:1497685055948980306>\n\nConsider using prebuilt patterns (e.g. from [howtoregex.com](https://howtoregex.com/patterns/python))",
+      "footer": ""
     },
     "not_joined": {
       "title": "Not Joined",
-      "message": "Please invite me first by using `/join` <a:Lurk:1497684902135463986>"
+      "body": "Please invite me first by using `/join` <a:Lurk:1497684902135463986>",
+      "footer": ""
     },
     "permission_denied": {
       "title": "Permission Denied",
-      "message": "{DETAIL} <a:Tssk:1497685026945630208>"
+      "body": "{DETAIL} <a:Tssk:1497685026945630208>",
+      "footer": ""
     },
     "thread": {
       "unsupported_action": {
         "title": "Validation Error",
-        "message": "Unsupported action. Please take a look at the available commands <a:OhNo:1497685055948980306>"
+        "body": "Unsupported action. Please take a look at the available commands <a:OhNo:1497685055948980306>",
+        "footer": ""
       },
       "already_joined": {
         "title": "Already Joined",
-        "message": "There is no need to invite me again <:ShrugMan:1497685241962430717>"
+        "body": "There is no need to invite me again <:ShrugMan:1497685241962430717>",
+        "footer": ""
       },
       "already_joined_other_owner": {
         "title": "Permission Denied",
-        "message": "Another owner has already invited me <:oopsie:1497720439810687006>"
+        "body": "Another owner has already invited me <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "joined": {
         "title": "Joined",
-        "message": "Heyy <a:hey:1497685102204031067> Thank you {RAW:USER} for inviting me <:_33:1490384461290803430>"
+        "body": "Heyy <a:hey:1497685102204031067> Thank you {RAW:USER} for inviting me <:_33:1490384461290803430>",
+        "footer": ""
       },
       "missing_channel_access": {
         "title": "Missing Channel Access",
-        "message": "I can't access this channel right now <a:sadcat:1497721262645051392>\nIf this is a private thread, mention me with `@` and try again <a:yes:1497686393369919559>"
+        "body": "I can't access this channel right now <a:sadcat:1497721262645051392>\nIf this is a private thread, mention me with `@` and try again <a:yes:1497686393369919559>",
+        "footer": ""
       },
       "leave_denied": {
         "title": "Permission Denied",
-        "message": "You do not have permission to kick me <a:Tssk:1497685026945630208>\nWhy do you want me to leave? <a:sadcat:1497721262645051392>"
+        "body": "You do not have permission to kick me <a:Tssk:1497685026945630208>\nWhy do you want me to leave? <a:sadcat:1497721262645051392>",
+        "footer": ""
       },
       "left": {
         "title": "Left",
-        "message": "{RAW:USER} kicked me out <a:sadcat:1497721262645051392>\nAll saved configuration has been deleted <a:ppPoof:1497721964259967068>"
+        "body": "{RAW:USER} kicked me out <a:sadcat:1497721262645051392>\nAll saved configuration has been deleted <a:ppPoof:1497721964259967068>",
+        "footer": ""
       },
       "enable_denied": {
         "title": "Permission Denied",
-        "message": "I'm not listening to you <:_b:1497722659793014966>"
+        "body": "I'm not listening to you <:_b:1497722659793014966>",
+        "footer": ""
       },
       "already_on": {
         "title": "Already On",
-        "message": "I'm already awake <:oopsie:1497720439810687006>"
+        "body": "I'm already awake <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "already_off": {
         "title": "Already Off",
-        "message": "I'm already taking a nap <:oopsie:1497720439810687006>"
+        "body": "I'm already taking a nap <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "enabled": {
         "title": "Enabled",
-        "message": "{RAW:USER} woke me up <a:Lurk:1497684902135463986>"
+        "body": "{RAW:USER} woke me up <a:Lurk:1497684902135463986>",
+        "footer": ""
       },
       "disabled": {
         "title": "Disabled",
-        "message": "{RAW:USER} said, it's time to take a nap <:Bedge:1497723609517658223>"
+        "body": "{RAW:USER} said, it's time to take a nap <:Bedge:1497723609517658223>",
+        "footer": ""
       },
       "color_denied": {
         "title": "Permission Denied",
-        "message": "Don't you dare change my color <:d_:1497685665960165417>"
+        "body": "Don't you dare change my color <:d_:1497685665960165417>",
+        "footer": ""
       },
       "color_cleared": {
         "title": "Color Cleared",
-        "message": "{RAW:USER} cleared my color <:ApuApproved:1497724288256446465>"
+        "body": "{RAW:USER} cleared my color <:ApuApproved:1497724288256446465>",
+        "footer": ""
       },
       "color_updated": {
         "title": "Color Updated",
-        "message": "{RAW:USER} updated my color to {CODE:COLOR} <:WOWERS:1497724770848997406>"
+        "body": "{RAW:USER} updated my color to {CODE:COLOR} <:WOWERS:1497724770848997406>",
+        "footer": ""
       },
       "language_denied": {
         "title": "Permission Denied",
-        "message": "You can't change my language <a:Tssk:1497685026945630208>"
+        "body": "You can't change my language <a:Tssk:1497685026945630208>",
+        "footer": ""
       },
       "language_updated": {
         "title": "Language Updated",
-        "message": "{RAW:USER} taught me {CODE:LANGUAGE_NAME} <a:yo:1497686448717959369>"
+        "body": "{RAW:USER} taught me {CODE:LANGUAGE_NAME} <a:yo:1497686448717959369>",
+        "footer": ""
       },
       "already_color": {
         "title": "Already This Color",
-        "message": "I'm already wearing {CODE:COLOR} <:oopsie:1497720439810687006>"
+        "body": "I'm already wearing {CODE:COLOR} <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "already_language": {
         "title": "Already This Language",
-        "message": "I'm already speaking {CODE:LANGUAGE_NAME} <:oopsie:1497720439810687006>"
+        "body": "I'm already speaking {CODE:LANGUAGE_NAME} <:oopsie:1497720439810687006>",
+        "footer": ""
       }
     },
     "channel": {
       "permission_denied": {
         "title": "Permission Denied",
-        "message": "You can't change the Twitch channels I'm watching <a:Tssk:1497685026945630208>"
+        "body": "You can't change the Twitch channels I'm watching <a:Tssk:1497685026945630208>",
+        "footer": ""
       },
       "already_added": {
         "title": "Already Added",
-        "message": "I'm already watching the Twitch channel of [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:Binoculars:1497727665283662077>"
+        "body": "I'm already watching the Twitch channel of [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:Binoculars:1497727665283662077>",
+        "footer": ""
       },
       "added": {
         "title": "Channel Added",
-        "message": "{RAW:USER} told me to observe the Twitch channel of [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:Binoculars:1497727665283662077>"
+        "body": "{RAW:USER} told me to observe the Twitch channel of [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:Binoculars:1497727665283662077>",
+        "footer": ""
       },
       "not_found": {
         "title": "Not Found",
-        "message": "I'm not watching [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) at the moment <:oopsie:1497720439810687006>"
+        "body": "I'm not watching [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) at the moment <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "color_cleared": {
         "title": "Channel Color Cleared",
-        "message": "{RAW:USER} cleared the color for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})'s Twitch channel <:ApuApproved:1497724288256446465>"
+        "body": "{RAW:USER} cleared the color for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})'s Twitch channel <:ApuApproved:1497724288256446465>",
+        "footer": ""
       },
       "color_updated": {
         "title": "Channel Color Updated",
-        "message": "{RAW:USER} updated the color for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})'s Twitch channel to {CODE:COLOR} <:WOWERS:1497724770848997406>"
+        "body": "{RAW:USER} updated the color for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})'s Twitch channel to {CODE:COLOR} <:WOWERS:1497724770848997406>",
+        "footer": ""
       },
       "unsupported_action": {
         "title": "Validation Error",
-        "message": "Unsupported action. Wtf did you do? <a:peepoConfused:1497729266266275840>"
+        "body": "Unsupported action. Wtf did you do? <a:peepoConfused:1497729266266275840>",
+        "footer": ""
       },
       "in_use": {
         "title": "Channel In Use",
-        "message": "The Twitch channel of [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is still referenced by one or more pings <:oopsie:1497720439810687006>"
+        "body": "The Twitch channel of [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is still referenced by one or more pings <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "removed": {
         "title": "Channel Removed",
-        "message": "{RAW:USER} told me to stop watching the Twitch channel of [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:ApuApproved:1497724288256446465>"
+        "body": "{RAW:USER} told me to stop watching the Twitch channel of [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:ApuApproved:1497724288256446465>",
+        "footer": ""
       }
     },
     "user": {
       "permission_denied": {
         "title": "Permission Denied",
-        "message": "You can't change the Twitch users I'm supposed to remember <a:Tssk:1497685026945630208>"
+        "body": "You can't change the Twitch users I'm supposed to remember <a:Tssk:1497685026945630208>",
+        "footer": ""
       },
       "already_added": {
         "title": "Already Added",
-        "message": "I already know [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:oopsie:1497720439810687006>"
+        "body": "I already know [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "added": {
         "title": "User Added",
-        "message": "{RAW:USER} told me to remember [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <a:peepoSmart:1497731090704498781>"
+        "body": "{RAW:USER} told me to remember [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <a:peepoSmart:1497731090704498781>",
+        "footer": ""
       },
       "unsupported_action": {
         "title": "Validation Error",
-        "message": "Unsupported action. Wtf did you do? <a:peepoConfused:1497729266266275840>"
+        "body": "Unsupported action. Wtf did you do? <a:peepoConfused:1497729266266275840>",
+        "footer": ""
       },
       "not_found": {
         "title": "Not Found",
-        "message": "I don't know who [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is <:oopsie:1497720439810687006>"
+        "body": "I don't know who [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "in_use": {
         "title": "User In Use",
-        "message": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is still referenced by one or more pings <:oopsie:1497720439810687006>"
+        "body": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is still referenced by one or more pings <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "removed": {
         "title": "User Removed",
-        "message": "{RAW:USER} told me to forget [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:ApuApproved:1497724288256446465>"
+        "body": "{RAW:USER} told me to forget [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:ApuApproved:1497724288256446465>",
+        "footer": ""
       }
     },
     "show": {
       "permission_denied": {
         "title": "Permission Denied",
-        "message": "You may not view this configuration here <a:Tssk:1497685026945630208>"
+        "body": "You may not view this configuration here <a:Tssk:1497685026945630208>",
+        "footer": ""
       },
       "overview": {
         "title": "Configuration Overview",
-        "message": "{RAW:SECTION_LIST}",
         "placeholders": {
           "SECTION_LIST": {
-            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": "\n\n"}
+            "list": {
+              "item_format": "{RAW:LIST_ITEM}",
+              "separator": "\n\n"
+            }
           }
-        }
+        },
+        "body": "{RAW:SECTION_LIST}",
+        "footer": ""
       }
     },
     "account": {
       "existing_account": "an existing Twitch account",
       "unsupported_action": {
         "title": "Validation Error",
-        "message": "I don't know that account action <a:peepoConfused:1497729266266275840>"
+        "body": "I don't know that account action <a:peepoConfused:1497729266266275840>",
+        "footer": ""
       },
       "permission_denied": {
         "title": "Permission Denied",
-        "message": "You can't change the Twitch account here <a:Tssk:1497685026945630208>"
+        "body": "You can't change the Twitch account here <a:Tssk:1497685026945630208>",
+        "footer": ""
       },
       "owner_denied": {
         "title": "Permission Denied",
-        "message": "Only the owner may link or unlink the Twitch account <a:Tssk:1497685026945630208>"
+        "body": "Only the owner may link or unlink the Twitch account <a:Tssk:1497685026945630208>",
+        "footer": ""
       },
       "already_linked": {
         "title": "Account Already Linked",
-        "message": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is already connected here. Disconnect it before linking another Twitch account <:oopsie:1497720439810687006>"
+        "body": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is already connected here. Disconnect it before linking another Twitch account <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "login_pending": {
         "title": "Login Already Pending",
-        "message": "Open the Twitch login here: [Connect Twitch]({RAW:VERIFICATION_URI})\n\nCode: {CODE:USER_CODE}\nValid until: {CODE:EXPIRES_AT} <a:peepoSmart:1497731090704498781>"
+        "body": "Open the Twitch login here: [Connect Twitch]({RAW:VERIFICATION_URI})\n\nCode: {CODE:USER_CODE}\nValid until: {CODE:EXPIRES_AT} <a:peepoSmart:1497731090704498781>",
+        "footer": ""
       },
       "finish_login": {
         "title": "Finish Twitch Login",
-        "message": "Open the Twitch login here: [Connect Twitch]({RAW:VERIFICATION_URI})\n\nCode: {CODE:USER_CODE}\nValid until: {CODE:EXPIRES_AT} <a:peepoSmart:1497731090704498781>"
+        "body": "Open the Twitch login here: [Connect Twitch]({RAW:VERIFICATION_URI})\n\nCode: {CODE:USER_CODE}\nValid until: {CODE:EXPIRES_AT} <a:peepoSmart:1497731090704498781>",
+        "footer": ""
       },
       "no_linked_account": {
         "title": "No Twitch Account",
-        "message": "There is no Twitch account connected here right now <:oopsie:1497720439810687006>"
+        "body": "There is no Twitch account connected here right now <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "unlinked": {
         "title": "Twitch Account Unlinked",
-        "message": "{RAW:USER} disconnected [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}). Auto-replies stay saved and will work again once an account is linked <:ApuApproved:1497724288256446465>"
+        "body": "{RAW:USER} disconnected [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}). Auto-replies stay saved and will work again once an account is linked <:ApuApproved:1497724288256446465>",
+        "footer": ""
       },
       "show_moved": {
         "title": "Display Moved",
-        "message": "You can now find the account status in `/show` under `Account` <a:peepoSmart:1497731090704498781>"
+        "body": "You can now find the account status in `/show` under `Account` <a:peepoSmart:1497731090704498781>",
+        "footer": ""
       },
       "login_expired": {
         "title": "Twitch Login Expired",
-        "message": "The Twitch code expired. Start a new try with `/account` <a:sadcat:1497721262645051392>"
+        "body": "The Twitch code expired. Start a new try with `/account` <a:sadcat:1497721262645051392>",
+        "footer": ""
       },
       "login_failed": {
         "title": "Twitch Login Failed",
-        "message": "The Twitch login didn't work. Start a new try with `/account` <a:OhNo:1497685055948980306>"
+        "body": "The Twitch login didn't work. Start a new try with `/account` <a:OhNo:1497685055948980306>",
+        "footer": ""
       },
       "login_missing_scope": {
         "title": "Missing Twitch Permission",
-        "message": "The Twitch login is missing chat write permission. Please connect the account again <:oopsie:1497720439810687006>"
+        "body": "The Twitch login is missing chat write permission. Please connect the account again <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "linked": {
         "title": "Twitch Account Linked",
-        "message": "{RAW:USER} connected [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}). Auto-replies can now write as this account <a:yo:1497686448717959369>"
+        "body": "{RAW:USER} connected [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}). Auto-replies can now write as this account <a:yo:1497686448717959369>",
+        "footer": ""
       }
     },
     "permission": {
       "generic_denied": "You are missing the right permission for that",
       "permission_denied": {
         "title": "Permission Denied",
-        "message": "You can't change permissions here <a:Tssk:1497685026945630208>"
+        "body": "You can't change permissions here <a:Tssk:1497685026945630208>",
+        "footer": ""
       },
       "owner_locked": {
         "title": "Owner Protected",
-        "message": "The owner automatically has all permissions and can't be changed here <:oopsie:1497720439810687006>"
+        "body": "The owner automatically has all permissions and can't be changed here <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "cleared": {
         "title": "Permissions Cleared",
-        "message": "{RAW:USER} removed all permissions from {RAW:TARGET} <:ApuApproved:1497724288256446465>"
+        "body": "{RAW:USER} removed all permissions from {RAW:TARGET} <:ApuApproved:1497724288256446465>",
+        "footer": ""
       },
       "none_found": {
         "title": "No Permissions Found",
-        "message": "{RAW:TARGET} has no permissions here <:ShrugMan:1497685241962430717>"
+        "body": "{RAW:TARGET} has no permissions here <:ShrugMan:1497685241962430717>",
+        "footer": ""
       },
       "empty_selection": "Choose at least one permission first <:oopsie:1497720439810687006>",
       "granted": {
         "title": "Permissions Granted",
-        "message": "{RAW:USER} gave {RAW:TARGET} these permissions <a:yes:1497686393369919559>\n{RAW:PERMISSIONS}",
         "placeholders": {
           "PERMISSIONS": {
-            "list": {"item_format": "- {RAW:LIST_ITEM}", "separator": "\n"}
+            "list": {
+              "item_format": "- {RAW:LIST_ITEM}",
+              "separator": "\n"
+            }
           }
-        }
+        },
+        "body": "{RAW:USER} gave {RAW:TARGET} these permissions <a:yes:1497686393369919559>\n{RAW:PERMISSIONS}",
+        "footer": ""
       },
       "not_granted": {
         "title": "Not Granted",
-        "message": "{RAW:TARGET} does not explicitly have these permissions here <:ShrugMan:1497685241962430717>\n{RAW:PERMISSIONS}",
         "placeholders": {
           "PERMISSIONS": {
-            "list": {"item_format": "- {RAW:LIST_ITEM}", "separator": "\n"}
+            "list": {
+              "item_format": "- {RAW:LIST_ITEM}",
+              "separator": "\n"
+            }
           }
-        }
+        },
+        "body": "{RAW:TARGET} does not explicitly have these permissions here <:ShrugMan:1497685241962430717>\n{RAW:PERMISSIONS}",
+        "footer": ""
       },
       "revoked": {
         "title": "Permissions Revoked",
-        "message": "{RAW:USER} removed these permissions from {RAW:TARGET} <a:yes:1497686393369919559>\n{RAW:PERMISSIONS}",
         "placeholders": {
           "PERMISSIONS": {
-            "list": {"item_format": "- {RAW:LIST_ITEM}", "separator": "\n"}
+            "list": {
+              "item_format": "- {RAW:LIST_ITEM}",
+              "separator": "\n"
+            }
           }
-        }
+        },
+        "body": "{RAW:USER} removed these permissions from {RAW:TARGET} <a:yes:1497686393369919559>\n{RAW:PERMISSIONS}",
+        "footer": ""
       },
       "unsupported_action": "I don't know that permission action <a:peepoConfused:1497729266266275840>"
     },
     "reply": {
       "manage_permission_denied": {
         "title": "Permission Denied",
-        "message": "You can't add or remove auto-replies here <a:Tssk:1497685026945630208>"
+        "body": "You can't add or remove auto-replies here <a:Tssk:1497685026945630208>",
+        "footer": ""
       },
       "toggle_permission_denied": {
         "title": "Permission Denied",
-        "message": "You can't switch auto-replies on or off here <a:Tssk:1497685026945630208>"
+        "body": "You can't switch auto-replies on or off here <a:Tssk:1497685026945630208>",
+        "footer": ""
       },
       "pattern_not_found": {
         "title": "Ping Not Found",
-        "message": "I can't find a ping with that ID <a:OhNo:1497685055948980306>"
+        "body": "I can't find a ping with that ID <a:OhNo:1497685055948980306>",
+        "footer": ""
       },
       "no_linked_account": {
         "title": "No Twitch Account",
-        "message": "Connect a Twitch account with `/account` first, then I can send auto-replies <:oopsie:1497720439810687006>"
+        "body": "Connect a Twitch account with `/account` first, then I can send auto-replies <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "empty_message": "Enter a reply message first <:oopsie:1497720439810687006>",
       "message_too_long": "Twitch messages may be at most 500 characters <a:OhNo:1497685055948980306>",
       "already_exists": {
         "title": "Auto-Reply Already Exists",
-        "message": "This ping already has an auto-reply. Remove it first <:oopsie:1497720439810687006>"
+        "body": "This ping already has an auto-reply. Remove it first <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "mode": {
         "message": "Normal Twitch message",
@@ -380,69 +476,84 @@
       },
       "added_pattern": {
         "title": "Auto-Reply Added",
-        "message": "{RAW:USER} attached an auto-reply to ping {CODE:ID} <a:yo:1497686448717959369>\nMode: {CODE:MODE}\nMessage: {RAW:MESSAGE}"
+        "body": "{RAW:USER} attached an auto-reply to ping {CODE:ID} <a:yo:1497686448717959369>\nMode: {CODE:MODE}\nMessage: {RAW:MESSAGE}",
+        "footer": ""
       },
       "none_configured": {
         "title": "No Auto-Reply",
-        "message": "This ping has no auto-reply <:ShrugMan:1497685241962430717>"
+        "body": "This ping has no auto-reply <:ShrugMan:1497685241962430717>",
+        "footer": ""
       },
       "removed_pattern": {
         "title": "Auto-Reply Removed",
-        "message": "{RAW:USER} removed the auto-reply from ping {CODE:ID} <:ApuApproved:1497724288256446465>\nMessage: {RAW:MESSAGE}"
+        "body": "{RAW:USER} removed the auto-reply from ping {CODE:ID} <:ApuApproved:1497724288256446465>\nMessage: {RAW:MESSAGE}",
+        "footer": ""
       },
       "already_disabled": {
         "title": "Already Disabled",
-        "message": "This auto-reply is already disabled <:oopsie:1497720439810687006>"
+        "body": "This auto-reply is already disabled <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "already_enabled": {
         "title": "Already Enabled",
-        "message": "This auto-reply is already enabled <:oopsie:1497720439810687006>"
+        "body": "This auto-reply is already enabled <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "disabled_pattern": {
         "title": "Auto-Reply Disabled",
-        "message": "{RAW:USER} disabled the auto-reply from ping {CODE:ID} <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}"
+        "body": "{RAW:USER} disabled the auto-reply from ping {CODE:ID} <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}",
+        "footer": ""
       },
       "enabled_pattern": {
         "title": "Auto-Reply Enabled",
-        "message": "{RAW:USER} enabled the auto-reply from ping {CODE:ID} <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}"
+        "body": "{RAW:USER} enabled the auto-reply from ping {CODE:ID} <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}",
+        "footer": ""
       },
       "event_unavailable": "Event auto-replies are not available here right now <a:peepoConfused:1497729266266275840>",
       "missing_event": "Choose a live or offline event first <:oopsie:1497720439810687006>",
       "event_not_found": {
         "title": "Event Not Found",
-        "message": "That live or offline event is not configured here <a:OhNo:1497685055948980306>"
+        "body": "That live or offline event is not configured here <a:OhNo:1497685055948980306>",
+        "footer": ""
       },
       "unsupported_event": "Only live and offline events from watched Twitch channels fit here <:oopsie:1497720439810687006>",
       "added_event": {
         "title": "Auto-Reply Added",
-        "message": "{RAW:USER} added an auto-reply for {CODE:CHANNEL} on {CODE:STATE} <a:yo:1497686448717959369>\nMessage: {RAW:MESSAGE}"
+        "body": "{RAW:USER} added an auto-reply for {CODE:CHANNEL} on {CODE:STATE} <a:yo:1497686448717959369>\nMessage: {RAW:MESSAGE}",
+        "footer": ""
       },
       "none_configured_event": {
         "title": "No Auto-Reply",
-        "message": "This live or offline event has no auto-reply <:ShrugMan:1497685241962430717>"
+        "body": "This live or offline event has no auto-reply <:ShrugMan:1497685241962430717>",
+        "footer": ""
       },
       "removed_event": {
         "title": "Auto-Reply Removed",
-        "message": "{RAW:USER} removed the {CODE:STATE} auto-reply for {CODE:CHANNEL} <:ApuApproved:1497724288256446465>\nMessage: {RAW:MESSAGE}"
+        "body": "{RAW:USER} removed the {CODE:STATE} auto-reply for {CODE:CHANNEL} <:ApuApproved:1497724288256446465>\nMessage: {RAW:MESSAGE}",
+        "footer": ""
       },
       "disabled_event": {
         "title": "Auto-Reply Disabled",
-        "message": "{RAW:USER} disabled the {CODE:STATE} auto-reply for {CODE:CHANNEL} <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}"
+        "body": "{RAW:USER} disabled the {CODE:STATE} auto-reply for {CODE:CHANNEL} <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}",
+        "footer": ""
       },
       "enabled_event": {
         "title": "Auto-Reply Enabled",
-        "message": "{RAW:USER} enabled the {CODE:STATE} auto-reply for {CODE:CHANNEL} <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}"
+        "body": "{RAW:USER} enabled the {CODE:STATE} auto-reply for {CODE:CHANNEL} <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}",
+        "footer": ""
       },
       "unsupported_action": "I don't know that auto-reply action <a:peepoConfused:1497729266266275840>"
     },
     "channel_event": {
       "permission_denied": {
         "title": "Permission Denied",
-        "message": "You can't change live or offline notifications here <a:Tssk:1497685026945630208>"
+        "body": "You can't change live or offline notifications here <a:Tssk:1497685026945630208>",
+        "footer": ""
       },
       "channel_not_tracked": {
         "title": "Channel Not Watched",
-        "message": "This Twitch channel is not watched here <:Binoculars:1497727665283662077>"
+        "body": "This Twitch channel is not watched here <:Binoculars:1497727665283662077>",
+        "footer": ""
       },
       "unsupported_event": "I don't know that Twitch event <a:peepoConfused:1497729266266275840>",
       "unsupported_action": "I don't know that live action <a:peepoConfused:1497729266266275840>",
@@ -452,89 +563,109 @@
       },
       "notification_added": {
         "title": "Notification Added",
-        "message": "{RAW:USER} added the {CODE:STATE} ping for {CODE:CHANNEL} <:Binoculars:1497727665283662077>"
+        "body": "{RAW:USER} added the {CODE:STATE} ping for {CODE:CHANNEL} <:Binoculars:1497727665283662077>",
+        "footer": ""
       },
       "notification_removed": {
         "title": "Notification Removed",
-        "message": "{RAW:USER} removed the {CODE:STATE} ping for {CODE:CHANNEL} <:ApuApproved:1497724288256446465>"
+        "body": "{RAW:USER} removed the {CODE:STATE} ping for {CODE:CHANNEL} <:ApuApproved:1497724288256446465>",
+        "footer": ""
       },
       "notification_disabled": {
         "title": "Notification Disabled",
-        "message": "{RAW:USER} disabled the {CODE:STATE} ping for {CODE:CHANNEL} <:ApuApproved:1497724288256446465>"
+        "body": "{RAW:USER} disabled the {CODE:STATE} ping for {CODE:CHANNEL} <:ApuApproved:1497724288256446465>",
+        "footer": ""
       },
       "notification_enabled": {
         "title": "Notification Enabled",
-        "message": "{RAW:USER} enabled the {CODE:STATE} ping for {CODE:CHANNEL} <a:yes:1497686393369919559>"
+        "body": "{RAW:USER} enabled the {CODE:STATE} ping for {CODE:CHANNEL} <a:yes:1497686393369919559>",
+        "footer": ""
       },
       "already_configured": {
         "title": "Already Configured",
-        "message": "The {CODE:STATE} ping for {CODE:CHANNEL} is already configured <:oopsie:1497720439810687006>"
+        "body": "The {CODE:STATE} ping for {CODE:CHANNEL} is already configured <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "none_configured": {
         "title": "Not Configured",
-        "message": "There is no {CODE:STATE} ping for {CODE:CHANNEL} yet <:oopsie:1497720439810687006>"
+        "body": "There is no {CODE:STATE} ping for {CODE:CHANNEL} yet <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "already_disabled": {
         "title": "Already Disabled",
-        "message": "The {CODE:STATE} ping for {CODE:CHANNEL} is already disabled <a:Lurk:1497684902135463986>"
+        "body": "The {CODE:STATE} ping for {CODE:CHANNEL} is already disabled <a:Lurk:1497684902135463986>",
+        "footer": ""
       },
       "already_enabled": {
         "title": "Already Enabled",
-        "message": "The {CODE:STATE} ping for {CODE:CHANNEL} is already active <a:yes:1497686393369919559>"
+        "body": "The {CODE:STATE} ping for {CODE:CHANNEL} is already active <a:yes:1497686393369919559>",
+        "footer": ""
       },
       "went_live": {
         "title": "Channel Is Live",
-        "message": "{CODE:CHANNEL} is now live <:Binoculars:1497727665283662077>"
+        "body": "{CODE:CHANNEL} is now live <:Binoculars:1497727665283662077>",
+        "footer": ""
       },
       "went_offline": {
         "title": "Channel Is Offline",
-        "message": "{CODE:CHANNEL} is now offline <a:Lurk:1497684902135463986>"
+        "body": "{CODE:CHANNEL} is now offline <a:Lurk:1497684902135463986>",
+        "footer": ""
       }
     },
     "write": {
       "permission_denied": {
         "title": "Permission Denied",
-        "message": "You may not send Twitch messages here <a:Tssk:1497685026945630208>"
+        "body": "You may not send Twitch messages here <a:Tssk:1497685026945630208>",
+        "footer": ""
       },
       "empty_message": "Give me a message first, then I can send it <a:OhNo:1497685055948980306>",
       "message_too_long": "That message is too long for Twitch. Please keep it at 500 characters or less <a:OhNo:1497685055948980306>",
       "channel_not_tracked": {
         "title": "Channel Not Watched",
-        "message": "I'm not watching [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) yet. Add the channel first with `/channel add` <:Binoculars:1497727665283662077>"
+        "body": "I'm not watching [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) yet. Add the channel first with `/channel add` <:Binoculars:1497727665283662077>",
+        "footer": ""
       },
       "no_linked_account": {
         "title": "No Linked Account",
-        "message": "Link a Twitch account first with `/account link`, then I can talk in chat <:oopsie:1497720439810687006>"
+        "body": "Link a Twitch account first with `/account link`, then I can talk in chat <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "account_expired": {
         "title": "Twitch Account Expired",
-        "message": "The linked Twitch account stopped working. Link it again with `/account link` <a:sadcat:1497721262645051392>"
+        "body": "The linked Twitch account stopped working. Link it again with `/account link` <a:sadcat:1497721262645051392>",
+        "footer": ""
       },
       "reply_sent": {
         "title": "Twitch Reply Sent",
-        "message": "I replied in [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})'s chat <a:yo:1497686448717959369>\nReply target: {CODE:REPLY_TARGET}\nMessage: {CODE:MESSAGE}"
+        "body": "I replied in [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})'s chat <a:yo:1497686448717959369>\nReply target: {CODE:REPLY_TARGET}\nMessage: {CODE:MESSAGE}",
+        "footer": ""
       },
       "message_sent": {
         "title": "Twitch Message Sent",
-        "message": "I sent that to [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})'s chat <a:yo:1497686448717959369>\nMessage: {CODE:MESSAGE}"
+        "body": "I sent that to [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})'s chat <a:yo:1497686448717959369>\nMessage: {CODE:MESSAGE}",
+        "footer": ""
       }
     },
     "pattern": {
       "manage_permission_denied": {
         "title": "Permission Denied",
-        "message": "You may not add or remove pings here <a:Tssk:1497685026945630208>"
+        "body": "You may not add or remove pings here <a:Tssk:1497685026945630208>",
+        "footer": ""
       },
       "toggle_permission_denied": {
         "title": "Permission Denied",
-        "message": "You may not switch pings on or off here <a:Tssk:1497685026945630208>"
+        "body": "You may not switch pings on or off here <a:Tssk:1497685026945630208>",
+        "footer": ""
       },
       "change_permission_denied": {
         "title": "Permission Denied",
-        "message": "You may not change pings here <a:Tssk:1497685026945630208>"
+        "body": "You may not change pings here <a:Tssk:1497685026945630208>",
+        "footer": ""
       },
       "edit_permission_denied": {
         "title": "Permission Denied",
-        "message": "You may not edit pings here <a:Tssk:1497685026945630208>"
+        "body": "You may not edit pings here <a:Tssk:1497685026945630208>",
+        "footer": ""
       },
       "unsupported_action": "That ping action confused me. Please use add, remove, disable or enable <a:peepoConfused:1497729266266275840>",
       "empty_pattern": "Tell me what I should look for first <a:OhNo:1497685055948980306>",
@@ -551,44 +682,74 @@
       "missing_stable_id": "Use the ID from `/show` so I know exactly which ping you mean <a:peepoSmart:1497731090704498781>",
       "already_exists": {
         "title": "Already Exists",
-        "message": "I already know this {ALREADY_EXISTS_TYPE} as ID {CODE:ID} <:oopsie:1497720439810687006>"
+        "body": "I already know this {ALREADY_EXISTS_TYPE} as ID {CODE:ID} <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "already_exists_other": {
         "title": "Already Exists",
-        "message": "Another ping already uses those settings as ID {CODE:ID} <:oopsie:1497720439810687006>"
+        "body": "Another ping already uses those settings as ID {CODE:ID} <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "not_found_remove": {
         "title": "Not Found",
-        "message": "I couldn't find that ping to remove it <a:OhNo:1497685055948980306>"
+        "body": "I couldn't find that ping to remove it <a:OhNo:1497685055948980306>",
+        "footer": ""
       },
       "not_found_disable": {
         "title": "Not Found",
-        "message": "I couldn't find that ping to disable it <a:OhNo:1497685055948980306>"
+        "body": "I couldn't find that ping to disable it <a:OhNo:1497685055948980306>",
+        "footer": ""
       },
       "not_found_enable": {
         "title": "Not Found",
-        "message": "I couldn't find that ping to enable it <a:OhNo:1497685055948980306>"
+        "body": "I couldn't find that ping to enable it <a:OhNo:1497685055948980306>",
+        "footer": ""
       },
       "not_found_id": {
         "title": "Not Found",
-        "message": "I don't know a ping with that ID <a:nope:1497686414328860713>"
+        "body": "I don't know a ping with that ID <a:nope:1497686414328860713>",
+        "footer": ""
       },
       "already_disabled": {
         "title": "Already Disabled",
-        "message": "This {ALREADY_DISABLED_TYPE} is already quietly lurking <a:Lurk:1497684902135463986>"
+        "body": "This {ALREADY_DISABLED_TYPE} is already quietly lurking <a:Lurk:1497684902135463986>",
+        "footer": ""
       },
       "already_enabled": {
         "title": "Already Enabled",
-        "message": "This {ALREADY_ENABLED_TYPE} is already awake <a:yes:1497686393369919559>"
+        "body": "This {ALREADY_ENABLED_TYPE} is already awake <a:yes:1497686393369919559>",
+        "footer": ""
       },
       "added_title": "{ADDED_TYPE} Added",
       "removed_title": "{REMOVED_TYPE} Removed",
       "disabled_title": "{DISABLED_TYPE} Disabled",
       "enabled_title": "{ENABLED_TYPE} Enabled",
       "updated_title": "Pattern Updated",
-      "removed": "removed {REMOVED_BODY_TYPE} {CODE:ID} <:ApuApproved:1497724288256446465>\n{REMOVED_BODY_TYPE}: {CODE:TEXT}",
-      "disabled": "disabled {DISABLED_BODY_TYPE} {CODE:ID} <:ApuApproved:1497724288256446465>\n{DISABLED_BODY_TYPE}: {CODE:TEXT}",
-      "enabled": "enabled {ENABLED_BODY_TYPE} {CODE:ID} <a:yes:1497686393369919559>\n{ENABLED_BODY_TYPE}: {CODE:TEXT}",
+      "added_result": {
+        "title": "{ADDED_TYPE} Added",
+        "body": "{RAW:SUMMARY}",
+        "footer": ""
+      },
+      "removed_result": {
+        "title": "{REMOVED_TYPE} Removed",
+        "body": "removed {REMOVED_BODY_TYPE} {CODE:ID} <:ApuApproved:1497724288256446465>\n{REMOVED_BODY_TYPE}: {CODE:TEXT}",
+        "footer": ""
+      },
+      "disabled_result": {
+        "title": "{DISABLED_TYPE} Disabled",
+        "body": "disabled {DISABLED_BODY_TYPE} {CODE:ID} <:ApuApproved:1497724288256446465>\n{DISABLED_BODY_TYPE}: {CODE:TEXT}",
+        "footer": ""
+      },
+      "enabled_result": {
+        "title": "{ENABLED_TYPE} Enabled",
+        "body": "enabled {ENABLED_BODY_TYPE} {CODE:ID} <a:yes:1497686393369919559>\n{ENABLED_BODY_TYPE}: {CODE:TEXT}",
+        "footer": ""
+      },
+      "updated_result": {
+        "title": "Pattern Updated",
+        "body": "{RAW:SUMMARY}",
+        "footer": ""
+      },
       "actions": {
         "added": "added"
       },
@@ -666,7 +827,10 @@
           "template": "`Only in` {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+              "list": {
+                "item_format": "{RAW:LIST_ITEM}",
+                "separator": ", "
+              }
             }
           }
         },
@@ -674,7 +838,10 @@
           "template": "`Every watched channel except` {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+              "list": {
+                "item_format": "{RAW:LIST_ITEM}",
+                "separator": ", "
+              }
             }
           }
         },
@@ -682,7 +849,10 @@
           "template": "`Every watched channel except` {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+              "list": {
+                "item_format": "{RAW:LIST_ITEM}",
+                "separator": ", "
+              }
             }
           }
         },
@@ -691,7 +861,10 @@
           "template": "`Only from` {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+              "list": {
+                "item_format": "{RAW:LIST_ITEM}",
+                "separator": ", "
+              }
             }
           }
         },
@@ -699,7 +872,10 @@
           "template": "`Everyone except` {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+              "list": {
+                "item_format": "{RAW:LIST_ITEM}",
+                "separator": ", "
+              }
             }
           }
         },
@@ -707,7 +883,10 @@
           "template": "`All known Twitch users except` {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+              "list": {
+                "item_format": "{RAW:LIST_ITEM}",
+                "separator": ", "
+              }
             }
           }
         }
@@ -735,16 +914,6 @@
         "case_sensitive": "Case-Sensitive: From {CODE:BEFORE} to {CODE:AFTER}",
         "color": "Color: From {CODE:BEFORE} to {CODE:AFTER}",
         "priority": "Priority: From {CODE:BEFORE} to {CODE:AFTER}"
-      },
-      "lists": {
-        "bullets": {
-          "template": "{RAW:ITEMS}",
-          "placeholders": {
-            "ITEMS": {
-              "list": {"item_format": "- {RAW:LIST_ITEM}", "separator": "\n"}
-            }
-          }
-        }
       }
     },
     "validation_detail": {
@@ -754,55 +923,16 @@
         "template": "Unsupported language. Available languages: {RAW:LANGUAGES}",
         "placeholders": {
           "LANGUAGES": {
-            "list": {"item_format": "`{CODE:LIST_ITEM}`", "separator": ", "}
+            "list": {
+              "item_format": "`{CODE:LIST_ITEM}`",
+              "separator": ", "
+            }
           }
         }
       }
     }
   },
   "show": {
-    "lists": {
-      "raw_lines": {
-        "template": "{RAW:ITEMS}",
-        "placeholders": {
-          "ITEMS": {
-            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": "\n"}
-          }
-        }
-      },
-      "bullets": {
-        "template": "{RAW:ITEMS}",
-        "placeholders": {
-          "ITEMS": {
-            "list": {"item_format": "- {RAW:LIST_ITEM}", "separator": "\n"}
-          }
-        }
-      },
-      "indented_bullets": {
-        "template": "{RAW:ITEMS}",
-        "placeholders": {
-          "ITEMS": {
-            "list": {"item_format": "  - {RAW:LIST_ITEM}", "separator": "\n"}
-          }
-        }
-      },
-      "comma_raw": {
-        "template": "{RAW:ITEMS}",
-        "placeholders": {
-          "ITEMS": {
-            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
-          }
-        }
-      },
-      "section_breaks": {
-        "template": "{RAW:ITEMS}",
-        "placeholders": {
-          "ITEMS": {
-            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": "\n\n"}
-          }
-        }
-      }
-    },
     "sections": {
       "tracked_channels": "Twitch channels I'm watching",
       "pings": "Pings",
@@ -824,7 +954,10 @@
         "template": "Notifications: {RAW:STATES}",
         "placeholders": {
           "STATES": {
-            "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+            "list": {
+              "item_format": "{RAW:LIST_ITEM}",
+              "separator": ", "
+            }
           }
         }
       }
@@ -876,6 +1009,13 @@
       "token_missing": "missing",
       "pending": "{RAW:USER} has a {CODE:STATUS} login code {CODE:USER_CODE}",
       "empty": "No Twitch account is connected here <:oopsie:1497720439810687006>"
+    },
+    "show_permissions": {
+      "title": "All Permissions",
+      "body": "The permissions for the specific users are:\n{RAW:USER_LIST}\nThese were all permissions!",
+      "footer": "",
+      "user_list_item": "- {USERNAME}\n{RAW:PERMISSION_LIST}",
+      "permission_list_item": "  - {PERMISSION}"
     }
   },
   "discord": {
@@ -886,7 +1026,8 @@
     "shared": {
       "form_locked": {
         "title": "Form Locked",
-        "message": "Only the user who opened this command form can interact with it."
+        "body": "Only the user who opened this command form can interact with it.",
+        "footer": ""
       }
     },
     "thread_modal": {
@@ -895,7 +1036,8 @@
       "confirm_leave_placeholder": "LEAVE",
       "confirm_leave_cancelled": {
         "title": "Kick Cancelled",
-        "message": "Did you just attempt to kick me out? <:d_:1497685665960165417>"
+        "body": "Did you just attempt to kick me out? <:d_:1497685665960165417>",
+        "footer": ""
       },
       "observer_color_title": "Color",
       "observer_color_label": "Color",
@@ -904,7 +1046,8 @@
     "account_ui": {
       "menu": {
         "title": "Twitch Account",
-        "message": "Choose whether you want to connect or disconnect your Twitch account <:_33:1490384461290803430>"
+        "body": "Choose whether you want to connect or disconnect your Twitch account <:_33:1490384461290803430>",
+        "footer": ""
       },
       "actions": {
         "connect": "Connect",
@@ -914,7 +1057,8 @@
     "channel_ui": {
       "menu": {
         "title": "Channels",
-        "message": "Add, remove or recolor Twitch channels."
+        "body": "Add, remove or recolor Twitch channels.",
+        "footer": ""
       },
       "actions": {
         "add": "Add",
@@ -943,14 +1087,16 @@
       "errors": {
         "no_channels": {
           "title": "No Channels Available",
-          "message": "There are no Twitch channels available to modify."
+          "body": "There are no Twitch channels available to modify.",
+          "footer": ""
         }
       }
     },
     "user_ui": {
       "menu": {
         "title": "Twitch Users",
-        "message": "Add or remove Twitch users."
+        "body": "Add or remove Twitch users.",
+        "footer": ""
       },
       "actions": {
         "add": "Add",
@@ -970,14 +1116,16 @@
       "errors": {
         "no_users": {
           "title": "No Users",
-          "message": "There are no known Twitch users to remove <a:OhNo:1497685055948980306>"
+          "body": "There are no known Twitch users to remove <a:OhNo:1497685055948980306>",
+          "footer": ""
         }
       }
     },
     "permission_ui": {
       "menu": {
         "title": "Permissions",
-        "message": "Grant a permission, revoke one, or clear all permissions for a Discord user."
+        "body": "Grant a permission, revoke one, or clear all permissions for a Discord user.",
+        "footer": ""
       },
       "actions": {
         "grant": "Grant",
@@ -1001,7 +1149,8 @@
     "live_state_ui": {
       "menu": {
         "title": "Live Pings",
-        "message": "Manage Discord notifications when watched Twitch channels go live or offline."
+        "body": "Manage Discord notifications when watched Twitch channels go live or offline.",
+        "footer": ""
       },
       "actions": {
         "add_live": "Add Live Ping",
@@ -1039,23 +1188,28 @@
       "errors": {
         "command_unavailable": {
           "title": "Command Unavailable",
-          "message": "This command can only be used inside a Discord channel <a:OhNo:1497685055948980306>"
+          "body": "This command can only be used inside a Discord channel <a:OhNo:1497685055948980306>",
+          "footer": ""
         },
         "no_channels": {
           "title": "No Channels Available",
-          "message": "You need to add a channel first <:oopsie:1497720439810687006>"
+          "body": "You need to add a channel first <:oopsie:1497720439810687006>",
+          "footer": ""
         },
         "no_remove_actions": {
           "title": "No Live Pings",
-          "message": "There are no live or offline pings to remove yet <:oopsie:1497720439810687006>"
+          "body": "There are no live or offline pings to remove yet <:oopsie:1497720439810687006>",
+          "footer": ""
         },
         "no_disable_actions": {
           "title": "No Active Live Pings",
-          "message": "There are no active live or offline pings to disable <:oopsie:1497720439810687006>"
+          "body": "There are no active live or offline pings to disable <:oopsie:1497720439810687006>",
+          "footer": ""
         },
         "no_enable_actions": {
           "title": "No Disabled Live Pings",
-          "message": "There are no disabled live or offline pings to enable <:oopsie:1497720439810687006>"
+          "body": "There are no disabled live or offline pings to enable <:oopsie:1497720439810687006>",
+          "footer": ""
         }
       }
     },
@@ -1072,7 +1226,8 @@
       "errors": {
         "no_channels": {
           "title": "No Twitch Channels",
-          "message": "You need to add a channel first <:oopsie:1497720439810687006>"
+          "body": "You need to add a channel first <:oopsie:1497720439810687006>",
+          "footer": ""
         }
       }
     },
@@ -1088,7 +1243,8 @@
         "footer": "Page {CURRENT}/{TOTAL}",
         "locked": {
           "title": "Paginator Locked",
-          "message": "You can't turn those pages <a:Tssk:1497685026945630208>"
+          "body": "You can't turn those pages <a:Tssk:1497685026945630208>",
+          "footer": ""
         },
         "item_prefix": "- "
       }
@@ -1096,7 +1252,8 @@
     "pattern_ui": {
       "menu": {
         "title": "Pings",
-        "message": "Create a new ping, edit an existing one, or disable or enable it."
+        "body": "Create a new ping, edit an existing one, or disable or enable it.",
+        "footer": ""
       },
       "actions": {
         "add": "Add",
@@ -1117,14 +1274,20 @@
         "choose_title": "Choose Ping",
         "manage_title": "Manage Ping",
         "embed_title": "{ACTION}",
-        "embed_message": "Choose the ping you want to update."
+        "embed_message": "Choose the ping you want to update.",
+        "embed": {
+          "title": "{ACTION}",
+          "body": "Choose the ping you want to update.",
+          "footer": ""
+        }
       },
       "create": {
         "title": "New Ping"
       },
       "edit": {
         "title": "Edit Ping",
-        "message": "Choose the ping you want to change."
+        "body": "Choose the ping you want to change.",
+        "footer": ""
       },
       "summary": {
         "text": "Text: {CODE:TEXT}",
@@ -1145,7 +1308,10 @@
           "template": "{RAW:SUMMARY_LINES}\n\nUse the buttons below to fill out each section.\nNeed a hex color? [Open color picker]({RAW:COLOR_PICKER_URL})",
           "placeholders": {
             "SUMMARY_LINES": {
-              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": "\n"}
+              "list": {
+                "item_format": "{RAW:LIST_ITEM}",
+                "separator": "\n"
+              }
             }
           }
         },
@@ -1154,7 +1320,10 @@
           "template": "Only: {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+              "list": {
+                "item_format": "{RAW:LIST_ITEM}",
+                "separator": ", "
+              }
             }
           }
         },
@@ -1163,7 +1332,10 @@
           "template": "All except: {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+              "list": {
+                "item_format": "{RAW:LIST_ITEM}",
+                "separator": ", "
+              }
             }
           }
         },
@@ -1174,7 +1346,10 @@
           "template": "All known except: {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+              "list": {
+                "item_format": "{RAW:LIST_ITEM}",
+                "separator": ", "
+              }
             }
           }
         },
@@ -1183,7 +1358,10 @@
           "template": "Only: {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+              "list": {
+                "item_format": "{RAW:LIST_ITEM}",
+                "separator": ", "
+              }
             }
           }
         },
@@ -1192,7 +1370,10 @@
           "template": "Everyone except: {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
-              "list": {"item_format": "{RAW:LIST_ITEM}", "separator": ", "}
+              "list": {
+                "item_format": "{RAW:LIST_ITEM}",
+                "separator": ", "
+              }
             }
           }
         },
@@ -1252,31 +1433,64 @@
       "errors": {
         "no_enabled": {
           "title": "No Enabled Pings",
-          "message": "There are no enabled pings to disable <a:OhNo:1497685055948980306>"
+          "body": "There are no enabled pings to disable <a:OhNo:1497685055948980306>",
+          "footer": ""
         },
         "no_disabled": {
           "title": "No Disabled Pings",
-          "message": "There are no disabled pings to enable <a:OhNo:1497685055948980306>"
+          "body": "There are no disabled pings to enable <a:OhNo:1497685055948980306>",
+          "footer": ""
         },
         "no_pings": {
           "title": "No Pings Yet",
-          "message": "There are no pings yet <:oopsie:1497720439810687006>"
+          "body": "There are no pings yet <:oopsie:1497720439810687006>",
+          "footer": ""
         },
         "not_found": {
           "title": "Ping Not Found",
-          "message": "The selected ping no longer exists <a:OhNo:1497685055948980306>"
+          "body": "The selected ping no longer exists <a:OhNo:1497685055948980306>",
+          "footer": ""
         },
         "no_channels": {
           "title": "No Channels",
-          "message": "You have to add a channel first <:oopsie:1497720439810687006>"
+          "body": "You have to add a channel first <:oopsie:1497720439810687006>",
+          "footer": ""
         },
         "no_users": {
           "title": "No known Users",
-          "message": "You have to add a user first <:oopsie:1497720439810687006>"
+          "body": "You have to add a user first <:oopsie:1497720439810687006>",
+          "footer": ""
         },
         "invalid_priority": {
           "title": "Invalid Priority",
-          "message": "Priority must be a whole number between `0` and `9` <:oopsie:1497720439810687006>"
+          "body": "Priority must be a whole number between `0` and `9` <:oopsie:1497720439810687006>",
+          "footer": ""
+        }
+      },
+      "create_embed": {
+        "title": "New Ping",
+        "body": "{RAW:SUMMARY_LINES}\n\nUse the buttons below to fill out each section.\nNeed a hex color? [Open color picker]({RAW:COLOR_PICKER_URL})",
+        "footer": "",
+        "placeholders": {
+          "SUMMARY_LINES": {
+            "list": {
+              "item_format": "{RAW:LIST_ITEM}",
+              "separator": "\n"
+            }
+          }
+        }
+      },
+      "edit_embed": {
+        "title": "Edit Ping",
+        "body": "{RAW:SUMMARY_LINES}\n\nUse the buttons below to fill out each section.\nNeed a hex color? [Open color picker]({RAW:COLOR_PICKER_URL})",
+        "footer": "",
+        "placeholders": {
+          "SUMMARY_LINES": {
+            "list": {
+              "item_format": "{RAW:LIST_ITEM}",
+              "separator": "\n"
+            }
+          }
         }
       }
     },
@@ -1295,7 +1509,8 @@
       },
       "menu": {
         "title": "Auto-Replies",
-        "message": "Attach automatic Twitch messages either to a ping or regex pattern or to a configured live or offline event trigger."
+        "body": "Attach automatic Twitch messages either to a ping or regex pattern or to a configured live or offline event trigger.",
+        "footer": ""
       },
       "actions": {
         "add_pattern": "On Ping",
@@ -1335,18 +1550,20 @@
       "errors": {
         "no_patterns": {
           "title": "No Ping Available",
-          "message": "You need to add a ping first <:oopsie:1497720439810687006>"
+          "body": "You need to add a ping first <:oopsie:1497720439810687006>",
+          "footer": ""
         },
         "no_event_triggers": {
           "title": "No Event Triggers Available",
-          "message": "You need to add a live or offline event first <:oopsie:1497720439810687006>"
+          "body": "You need to add a live or offline event first <:oopsie:1497720439810687006>",
+          "footer": ""
         },
         "no_replies": {
           "title": "No Auto-Replies",
-          "message": "There are no auto-replies yet <:oopsie:1497720439810687006>"
+          "body": "There are no auto-replies yet <:oopsie:1497720439810687006>",
+          "footer": ""
         }
       }
     }
   }
 }
-

@@ -110,6 +110,7 @@ class DiscordCommandResult:
 
     title: str
     message: str
+    footer: str = ""
     style: DiscordResultStyle = DiscordResultStyle.INFO
     ephemeral: bool = False
     thumbnail_url: str | None = None

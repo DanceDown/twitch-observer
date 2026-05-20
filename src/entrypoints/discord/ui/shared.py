@@ -21,15 +21,10 @@ if TYPE_CHECKING:
 COLOR_PICKER_URL = "https://htmlcolorcodes.com/color-picker/"
 
 
-def build_form_embed(title: str, message: str) -> discord.Embed:
+def build_form_embed(result: DiscordCommandResult) -> discord.Embed:
     """Render one neutral configuration embed used by interactive command forms."""
     return build_result_embed(
-        DiscordCommandResult(
-            title=title,
-            message=message,
-            style=DiscordResultStyle.INFO,
-            ephemeral=True,
-        )
+        result
     )
 
 
@@ -105,11 +100,15 @@ class BaseFormView(discord.ui.View):
             **placeholders,
         )
 
-    def form_embed(self, title_key: str, message_key: str, **placeholders: object) -> discord.Embed:
+    def form_embed(self, result_key: str, **placeholders: object) -> discord.Embed:
         """Build one localized configuration embed for the current form state."""
         return build_form_embed(
-            self.text(title_key, **placeholders),
-            self.text(message_key, **placeholders),
+            self.result(
+                result_key,
+                style=DiscordResultStyle.INFO,
+                ephemeral=True,
+                **placeholders,
+            )
         )
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:

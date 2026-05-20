@@ -52,7 +52,7 @@ class LiveStateMenuView(BaseFormView):
         self.enable.label = self.text("discord.live_state_ui.actions.enable")
 
     def render_embed(self) -> discord.Embed:
-        return self.form_embed("discord.live_state_ui.menu.title", "discord.live_state_ui.menu.message")
+        return self.form_embed("discord.live_state_ui.menu")
 
     @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def add_live(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:

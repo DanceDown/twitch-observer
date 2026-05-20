@@ -51,18 +51,11 @@ class PatternIdActionView(BaseFormView):
         self._patterns = patterns
         if self._patterns:
             return None
-        return DiscordCommandResult(
-            title={
-                PatternActionKind.DISABLE: self.text("discord.pattern_ui.errors.no_enabled.title"),
-                PatternActionKind.ENABLE: self.text("discord.pattern_ui.errors.no_disabled.title"),
-            }.get(self._action, self.text("discord.pattern_ui.errors.no_pings.title")),
-            message={
-                PatternActionKind.DISABLE: self.text("discord.pattern_ui.errors.no_enabled.message"),
-                PatternActionKind.ENABLE: self.text("discord.pattern_ui.errors.no_disabled.message"),
-            }.get(self._action, self.text("discord.pattern_ui.errors.no_pings.message")),
-            style=DiscordResultStyle.ERROR,
-            ephemeral=True,
-        )
+        key = {
+            PatternActionKind.DISABLE: "discord.pattern_ui.errors.no_enabled",
+            PatternActionKind.ENABLE: "discord.pattern_ui.errors.no_disabled",
+        }.get(self._action, "discord.pattern_ui.errors.no_pings")
+        return self.result(key, style=DiscordResultStyle.ERROR, ephemeral=True)
 
     def render_embed(self) -> discord.Embed:
         action_label = {
@@ -70,11 +63,7 @@ class PatternIdActionView(BaseFormView):
             PatternActionKind.DISABLE: self.text("discord.pattern_ui.action.disable_title"),
             PatternActionKind.ENABLE: self.text("discord.pattern_ui.action.enable_title"),
         }.get(self._action, self.text("discord.pattern_ui.action.manage_title"))
-        return self.form_embed(
-            "discord.pattern_ui.action.embed_title",
-            "discord.pattern_ui.action.embed_message",
-            ACTION=action_label,
-        )
+        return self.form_embed("discord.pattern_ui.action.embed", ACTION=action_label)
 
     async def run_action(self, interaction: discord.Interaction, pattern_id: int) -> None:
         if self._action is PatternActionKind.REMOVE:

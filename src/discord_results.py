@@ -17,15 +17,16 @@ def build_result(
     thumbnail_url: str | None = None,
     **placeholders: object,
 ) -> DiscordCommandResult:
-    """Build one Discord command result from a localized `title`/`message` object."""
+    """Build one Discord command result from a localized `title`/`body`/`footer` object."""
     value = localizer.value(key, language=language)
     if not isinstance(value, dict):
         raise LocalizationError(f"Translation key {key!r} is not an object.")
     title = value.get("title")
-    message = value.get("message")
+    body = value.get("body")
+    footer = value.get("footer")
     placeholder_specs = value.get("placeholders")
-    if not isinstance(title, str) or not isinstance(message, str):
-        raise LocalizationError(f"Translation result {key!r} must contain string title/message.")
+    if not isinstance(title, str) or not isinstance(body, str) or not isinstance(footer, str):
+        raise LocalizationError(f"Translation result {key!r} must contain string title/body/footer.")
     if placeholder_specs is not None and not isinstance(placeholder_specs, dict):
         raise LocalizationError(f"Translation result {key!r} must contain object placeholders when provided.")
     return DiscordCommandResult(
@@ -36,7 +37,13 @@ def build_result(
             placeholder_specs=placeholder_specs,
         ),
         message=localizer.render_with_placeholders(
-            message,
+            body,
+            language=language,
+            placeholders=placeholders,
+            placeholder_specs=placeholder_specs,
+        ),
+        footer=localizer.render_with_placeholders(
+            footer,
             language=language,
             placeholders=placeholders,
             placeholder_specs=placeholder_specs,

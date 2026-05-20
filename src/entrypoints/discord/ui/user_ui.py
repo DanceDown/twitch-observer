@@ -5,7 +5,7 @@ from __future__ import annotations
 import discord
 
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle, UIFlowKind, UIFlowStep
+from src.events.event_types import DiscordResultStyle, UIFlowKind, UIFlowStep
 from src.localization import Localizer
 
 from ..dispatch import dispatch_add_tracked_user, dispatch_remove_tracked_user
@@ -124,7 +124,7 @@ class UserMenuView(BaseFormView):
         self.remove.label = self.text("discord.user_ui.actions.remove")
 
     def render_embed(self) -> discord.Embed:
-        return self.form_embed("discord.user_ui.menu.title", "discord.user_ui.menu.message")
+        return self.form_embed("discord.user_ui.menu")
 
     @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def add(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
@@ -162,12 +162,7 @@ class UserMenuView(BaseFormView):
         if not tracked_users:
             await self.finish_with_interaction(
                 interaction,
-                DiscordCommandResult(
-                    title=self.text("discord.user_ui.errors.no_users.title"),
-                    message=self.text("discord.user_ui.errors.no_users.message"),
-                    style=DiscordResultStyle.ERROR,
-                    ephemeral=True,
-                ),
+                self.result("discord.user_ui.errors.no_users", style=DiscordResultStyle.ERROR, ephemeral=True),
             )
             return
         await interaction.response.send_modal(

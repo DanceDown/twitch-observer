@@ -25,6 +25,8 @@ def build_result_embed(result: DiscordCommandResult) -> discord.Embed:
     )
     if result.thumbnail_url:
         embed.set_thumbnail(url=result.thumbnail_url)
+    if result.footer:
+        embed.set_footer(text=result.footer)
     return embed
 
 

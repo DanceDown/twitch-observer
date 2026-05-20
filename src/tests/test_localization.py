@@ -10,7 +10,7 @@ def test_localizer_interpolates_placeholders_and_supports_backslash_escaping() -
     localizer = Localizer.from_directory()
 
     rendered = localizer.text(
-        "results.thread.language_updated.message",
+        "results.thread.language_updated.body",
         language="english",
         USER="<@123456789012345678>",
         LANGUAGE_NAME="German",
