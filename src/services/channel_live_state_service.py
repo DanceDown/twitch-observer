@@ -53,7 +53,7 @@ class ChannelEventCommandService:
     channel_repository: ChannelRepository
     adapter_event_repository: AdapterEventRepository
     adapter_event_action_repository: AdapterEventActionRepository
-    twitch_api: TwitchChannelStateLookup | None = None
+    twitch_api: TwitchChannelStateLookup
     permission_repository: UserPermissionRepository | None = None
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     _runner: CommandExecutionRunner = field(init=False, repr=False)
@@ -246,8 +246,6 @@ class ChannelEventCommandService:
         )
 
     async def _channel_display_name(self, twitch_channel_id: str) -> str:
-        if self.twitch_api is None:
-            return twitch_channel_id
         try:
             cached = self.twitch_api.get_cached_user_by_id(twitch_channel_id.strip())
             if cached is not None:

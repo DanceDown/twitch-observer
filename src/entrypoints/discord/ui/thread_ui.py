@@ -28,8 +28,7 @@ class LeaveConfirmationModal(discord.ui.Modal):
         data_provider: DiscordUIDataProvider,
         localizer: Localizer,
     ) -> None:
-        thread = data_provider.get_thread(discord_channel_id)
-        language = localizer.language_for_thread(thread)
+        language = localizer.resolve_language(data_provider.get_thread_language(discord_channel_id))
         super().__init__(
             title=localizer.text("discord.thread_modal.confirm_leave_title", language=language),
             timeout=300,
@@ -89,8 +88,7 @@ class ThreadColorModal(discord.ui.Modal):
         data_provider: DiscordUIDataProvider,
         localizer: Localizer,
     ) -> None:
-        thread = data_provider.get_thread(discord_channel_id)
-        language = localizer.language_for_thread(thread)
+        language = localizer.resolve_language(data_provider.get_thread_language(discord_channel_id))
         super().__init__(
             title=localizer.text("discord.thread_modal.observer_color_title", language=language),
             timeout=300,

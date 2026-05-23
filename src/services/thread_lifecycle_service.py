@@ -36,9 +36,9 @@ class ThreadLifecycleService:
     channel_repository: ChannelRepository
     twitch_api: TwitchDirectoryGateway
     irc_gateway: TwitchIRCChannelGateway
+    tracked_channels_notifier: TrackedChannelsChangedNotifier
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     permission_repository: UserPermissionRepository | None = None
-    tracked_channels_notifier: TrackedChannelsChangedNotifier | None = None
     _guards: ThreadCommandGuards = field(init=False, repr=False)
     _runner: CommandExecutionRunner = field(init=False, repr=False)
 
@@ -299,6 +299,4 @@ class ThreadLifecycleService:
         )
 
     async def _notify_tracked_channels_changed(self) -> None:
-        if self.tracked_channels_notifier is None:
-            return
         await self.tracked_channels_notifier.notify_tracked_channels_changed()

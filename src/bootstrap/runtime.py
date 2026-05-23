@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from src.entrypoints.discord import DiscordEntrypoint
@@ -28,16 +29,15 @@ def build_entrypoints(
         ui_data_provider=DiscordUIDataProvider(queries=services.ui_queries),
         localizer=core.localizer,
     )
-    services.runtime_coordinator.tracking_sender = discord_entrypoint
-    services.runtime_coordinator.account_sender = discord_entrypoint
-    services.runtime_coordinator.channel_result_sender = discord_entrypoint
-    services.runtime_coordinator.presence_sender = discord_entrypoint
+    services.runtime_coordinator.bind_discord(discord_entrypoint)
     twitch_irc_entrypoint = TwitchIRCEntrypoint(gateways.twitch_irc, message_processor=services.chat_pipeline)
     return ApplicationEntrypoints(twitch_irc=twitch_irc_entrypoint, discord=discord_entrypoint)
 
 
 def build_runtime(
-    core: ApplicationCore, services: ApplicationServices, gateways: ApplicationGateways, entrypoints: ApplicationEntrypoints
+    core: ApplicationCore,
+    services: ApplicationServices,
+    gateways: ApplicationGateways,
 ) -> ApplicationRuntime:
     live_monitor_service = TwitchLiveMonitorService(
         channel_repository=core.channel_repository,
@@ -45,9 +45,9 @@ def build_runtime(
         poll_interval_seconds=core.config.twitch_live_monitor_poll_interval_seconds,
         batch_size=core.config.twitch_live_monitor_batch_size,
         refresh_on_startup=core.config.twitch_live_monitor_refresh_on_startup,
-        on_change=services.live_state_orchestrator.handle_change,
+        on_change=services.live_state_orchestrator,
     )
-    services.runtime_coordinator.tracked_channels_notifier = _LiveMonitorTrackedChannelsNotifier(live_monitor_service)
+    services.runtime_coordinator.bind_tracked_channels_notifier(_LiveMonitorTrackedChannelsNotifier(live_monitor_service))
 
     irc_bootstrap_service = IRCBootstrapService(
         channel_repository=core.channel_repository,
@@ -61,13 +61,13 @@ def build_runtime(
         account_repository=core.account_repository,
         thread_repository=core.thread_repository,
         twitch_api=core.twitch_bundle,
-        notifier=entrypoints.discord,
+        notifier=services.runtime_coordinator.accounts,
         poll_interval_seconds=core.config.twitch_device_flow_poll_interval_seconds,
         localizer=core.localizer,
     )
     presence_service = DiscordPresenceService(
         message_repository=core.message_repository,
-        notifier=entrypoints.discord,
+        notifier=services.runtime_coordinator.presence,
         poll_interval_seconds=core.config.discord_presence_poll_interval_seconds,
         lookback_minutes=core.config.discord_presence_lookback_minutes,
         message_limit=core.config.discord_presence_message_limit,
@@ -78,8 +78,6 @@ def build_runtime(
         irc_bootstrap_service=irc_bootstrap_service,
         device_flow_poller=device_flow_poller,
         presence_service=presence_service,
-        twitch_irc_task=asyncio.create_task(entrypoints.twitch_irc.start(), name="twitch-irc-entrypoint"),
-        discord_task=asyncio.create_task(entrypoints.discord.start(), name="discord-entrypoint"),
     )
 
 
@@ -91,7 +89,17 @@ class _LiveMonitorTrackedChannelsNotifier:
         self.monitor.notify_tracked_channels_changed()
 
 
-async def start_runtime(runtime: ApplicationRuntime) -> None:
+async def start_runtime(
+    runtime: ApplicationRuntime,
+    entrypoints: ApplicationEntrypoints,
+    *,
+    task_failure_callback: Callable[[asyncio.Task[object]], None] | None = None,
+) -> None:
+    runtime.twitch_irc_task = asyncio.create_task(entrypoints.twitch_irc.start(), name="twitch-irc-entrypoint")
+    runtime.discord_task = asyncio.create_task(entrypoints.discord.start(), name="discord-entrypoint")
+    if task_failure_callback is not None:
+        runtime.twitch_irc_task.add_done_callback(task_failure_callback)
+        runtime.discord_task.add_done_callback(task_failure_callback)
     await runtime.live_monitor_service.start()
     await runtime.irc_bootstrap_service.sync_persisted_channels()
     await runtime.irc_bootstrap_service.start_periodic_sync()
@@ -100,12 +108,16 @@ async def start_runtime(runtime: ApplicationRuntime) -> None:
 
 
 async def stop_runtime(core: ApplicationCore, entrypoints: ApplicationEntrypoints, runtime: ApplicationRuntime) -> None:
-    runtime.twitch_irc_task.cancel()
-    runtime.discord_task.cancel()
-    with suppress(asyncio.CancelledError):
-        await runtime.twitch_irc_task
-    with suppress(asyncio.CancelledError):
-        await runtime.discord_task
+    if runtime.twitch_irc_task is not None:
+        runtime.twitch_irc_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await runtime.twitch_irc_task
+        runtime.twitch_irc_task = None
+    if runtime.discord_task is not None:
+        runtime.discord_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await runtime.discord_task
+        runtime.discord_task = None
     await runtime.live_monitor_service.stop()
     await runtime.irc_bootstrap_service.stop_periodic_sync()
     await runtime.device_flow_poller.stop()
@@ -114,4 +126,3 @@ async def stop_runtime(core: ApplicationCore, entrypoints: ApplicationEntrypoint
     await entrypoints.discord.stop()
     await entrypoints.twitch_irc.stop()
     core.database.close()
-

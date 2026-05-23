@@ -22,7 +22,7 @@ from src.services.live_state_orchestrator import LiveStateChangeOrchestrator
 from src.services.message_ingest_service import MessageIngestService
 from src.services.patterns import PatternCommandService, PatternTrackingService, ShowCommandService
 from src.services.permission_service import PermissionCommandService
-from src.services.replies import AutoReplyService, ChannelEventAutoReplyService, ReplyCommandService
+from src.services.replies import AutoReplyService, ChannelEventAutoReplyService, ReplyCommandService, ReplyEventConfiguration
 from src.services.runtime_coordinator import ApplicationRuntimeCoordinator
 from src.services.thread_lifecycle_service import ThreadLifecycleService
 from src.services.twitch_user_directory_service import TwitchUserDirectoryIngestService
@@ -79,7 +79,7 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         irc_gateway=gateways.twitch_irc,
         localizer=core.localizer,
         permission_repository=core.permission_repository,
-        tracked_channels_notifier=runtime_coordinator,
+        tracked_channels_notifier=runtime_coordinator.tracked_channels,
     )
     channel_service = ChannelCommandService(
         thread_repository=core.thread_repository,
@@ -89,7 +89,7 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         irc_gateway=gateways.twitch_irc,
         localizer=core.localizer,
         permission_repository=core.permission_repository,
-        tracked_channels_notifier=runtime_coordinator,
+        tracked_channels_notifier=runtime_coordinator.tracked_channels,
     )
     user_service = UserCommandService(
         thread_repository=core.thread_repository,
@@ -122,13 +122,14 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
     )
     reply_service = ReplyCommandService(
         thread_repository=core.thread_repository,
-        channel_repository=core.channel_repository,
         pattern_repository=core.pattern_repository,
         reply_repository=core.reply_repository,
         account_repository=core.account_repository,
-        twitch_api=core.twitch_bundle,
-        adapter_event_repository=core.adapter_event_repository,
-        adapter_event_action_repository=core.adapter_event_action_repository,
+        event_configuration=ReplyEventConfiguration(
+            adapter_event_repository=core.adapter_event_repository,
+            adapter_event_action_repository=core.adapter_event_action_repository,
+            twitch_api=core.twitch_bundle,
+        ),
         permission_repository=core.permission_repository,
         localizer=core.localizer,
     )
@@ -180,7 +181,7 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         pattern_repository=core.pattern_repository,
         reply_repository=core.reply_repository,
         twitch_api=core.twitch_bundle,
-        notifier=runtime_coordinator,
+        notifier=runtime_coordinator.tracking,
         localizer=core.localizer,
     )
     auto_reply = AutoReplyService(
@@ -191,7 +192,8 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         reply_repository=core.reply_repository,
         account_repository=core.account_repository,
         twitch_api=core.twitch_bundle,
-        notifier=runtime_coordinator,
+        tracking_notifier=runtime_coordinator.tracking,
+        account_notifier=runtime_coordinator.accounts,
         token_refresh_skew_seconds=core.config.twitch_account_token_refresh_skew_seconds,
     )
     live_state_persistence = ChannelLiveStatePersistenceService(channel_repository=core.channel_repository)
@@ -199,7 +201,7 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         thread_repository=core.thread_repository,
         adapter_event_repository=core.adapter_event_repository,
         adapter_event_action_repository=core.adapter_event_action_repository,
-        notifier=runtime_coordinator,
+        notifier=runtime_coordinator.channel_results,
         localizer=core.localizer,
     )
     channel_event_auto_reply = ChannelEventAutoReplyService(
@@ -249,4 +251,3 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         ui_queries=ui_queries,
         runtime_coordinator=runtime_coordinator,
     )
-

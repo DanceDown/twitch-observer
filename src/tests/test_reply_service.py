@@ -44,7 +44,9 @@ from src.events.event_types import (
     TwitchChannelLiveStateChangedEvent,
     TwitchChatMessageEvent,
 )
-from src.services.account_service import AccountCommandService, AccountNotificationSender, DeviceFlowPollingService
+from src.services.account_polling_service import DeviceFlowPollingService
+from src.services.account_service import AccountCommandService
+from src.services.account_support import AccountNotificationSender
 from src.services.channel_live_state_service import ChannelEventCommandService
 from src.services.patterns import ShowCommandService
 from src.services.replies import AutoReplyService, ChannelEventAutoReplyService, ReplyCommandService
@@ -1673,7 +1675,8 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
         token_refresh_skew_seconds=30,
-        notifier=notifier,
+        tracking_notifier=notifier,
+        account_notifier=notifier,
     )
 
     await service.handle_chat_message(
@@ -1740,6 +1743,7 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
+    notifier = FakeNotifier()
     service = AutoReplyService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
@@ -1748,7 +1752,8 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
         token_refresh_skew_seconds=30,
-        notifier=FakeNotifier(),
+        tracking_notifier=notifier,
+        account_notifier=notifier,
     )
 
     await service.handle_chat_message(
@@ -1812,6 +1817,7 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
+    notifier = FakeNotifier()
     service = AutoReplyService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
@@ -1820,7 +1826,8 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
         token_refresh_skew_seconds=30,
-        notifier=FakeNotifier(),
+        tracking_notifier=notifier,
+        account_notifier=notifier,
     )
 
     await service.handle_chat_message(
@@ -1885,6 +1892,7 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
+    notifier = FakeNotifier()
     service = AutoReplyService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
@@ -1893,7 +1901,8 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
         token_refresh_skew_seconds=30,
-        notifier=FakeNotifier(),
+        tracking_notifier=notifier,
+        account_notifier=notifier,
     )
 
     await service.handle_chat_message(
@@ -1974,6 +1983,7 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
+    notifier = FakeNotifier()
     service = AutoReplyService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
@@ -1982,7 +1992,8 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
         token_refresh_skew_seconds=30,
-        notifier=FakeNotifier(),
+        tracking_notifier=notifier,
+        account_notifier=notifier,
     )
 
     await service.handle_chat_message(
@@ -2047,6 +2058,7 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
+    notifier = FakeNotifier()
     service = AutoReplyService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
@@ -2055,7 +2067,8 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
         token_refresh_skew_seconds=30,
-        notifier=FakeNotifier(),
+        tracking_notifier=notifier,
+        account_notifier=notifier,
     )
 
     await service.handle_chat_message(

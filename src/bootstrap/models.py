@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from src.config import AppConfig
 from src.database.connection import (
@@ -21,28 +22,30 @@ from src.database.connection import (
     UserPermissionRepository,
 )
 from src.database.postgres import PostgresDatabase
-from src.entrypoints.discord import DiscordEntrypoint, DiscordServiceBundle
-from src.entrypoints.twitch_irc import TwitchIRCEntrypoint
 from src.gateways.twitch_api import TwitchAPIClient
 from src.gateways.twitch_irc import AnonymousTwitchIRCGateway
 from src.localization import Localizer
-from src.services.account_polling_service import DeviceFlowPollingService
 from src.services.channel_event_notification_service import (
     ChannelEventNotificationService,
     ChannelLiveStatePersistenceService,
 )
 from src.services.chat_pipeline import ChatMessageProcessingService
-from src.services.discord_presence_service import DiscordPresenceService
 from src.services.discord_ui_query_service import DiscordUIQueryBundle
-from src.services.irc_bootstrap_service import IRCBootstrapService
 from src.services.live_state_orchestrator import LiveStateChangeOrchestrator
 from src.services.message_ingest_service import MessageIngestService
 from src.services.patterns import PatternTrackingService
 from src.services.replies import AutoReplyService, ChannelEventAutoReplyService
 from src.services.runtime_coordinator import ApplicationRuntimeCoordinator
 from src.services.twitch_service_bundle import TwitchServiceBundle
-from src.services.twitch_live_monitor_service import TwitchLiveMonitorService
 from src.services.twitch_user_directory_service import TwitchUserDirectoryIngestService, TwitchUserDirectoryService
+
+if TYPE_CHECKING:
+    from src.entrypoints.discord import DiscordEntrypoint, DiscordServiceBundle
+    from src.entrypoints.twitch_irc import TwitchIRCEntrypoint
+    from src.services.account_polling_service import DeviceFlowPollingService
+    from src.services.discord_presence_service import DiscordPresenceService
+    from src.services.irc_bootstrap_service import IRCBootstrapService
+    from src.services.twitch_live_monitor_service import TwitchLiveMonitorService
 
 
 @dataclass(slots=True)
@@ -100,6 +103,5 @@ class ApplicationRuntime:
     irc_bootstrap_service: IRCBootstrapService
     device_flow_poller: DeviceFlowPollingService
     presence_service: DiscordPresenceService
-    twitch_irc_task: asyncio.Task[None]
-    discord_task: asyncio.Task[None]
-
+    twitch_irc_task: asyncio.Task[None] | None = None
+    discord_task: asyncio.Task[None] | None = None

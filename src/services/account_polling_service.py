@@ -8,7 +8,6 @@ import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Protocol
 
 from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import (
@@ -21,29 +20,10 @@ from src.database.connection import (
 from src.discord_results import build_thread_result, discord_user_mention
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
+from src.services.account_support import AccountNotificationSender
 from src.services.twitch_gateways import TwitchAccountGateway
 
 logger = logging.getLogger(__name__)
-
-
-class AccountNotificationSender(Protocol):
-    async def send_account_result(
-        self,
-        discord_user_id: int,
-        discord_channel_id: int | None,
-        result: DiscordCommandResult,
-    ) -> None: ...
-
-
-def format_account_timestamp(raw_value: str | None) -> str:
-    """Render ISO timestamps in a shorter human-friendly form."""
-    if raw_value is None:
-        return "unknown"
-    try:
-        parsed = datetime.fromisoformat(raw_value)
-    except ValueError:
-        return raw_value
-    return parsed.strftime("%d-%m-%Y %H:%M:%S %Z").strip() or parsed.isoformat(sep=" ", timespec="seconds")
 
 
 @dataclass(slots=True)

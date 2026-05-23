@@ -5,9 +5,8 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
-from src.database.records import ThreadRecord
 from src.utils.discord_text import escape_discord_text, normalize_discord_code_value
 
 DEFAULT_LANGUAGE = "english"
@@ -17,6 +16,12 @@ DEFAULT_LIST_ITEM_PLACEHOLDER = "LIST_ITEM"
 
 class LocalizationError(ValueError):
     """Raised when a translation catalog is invalid or a lookup fails."""
+
+
+class SupportsLanguage(Protocol):
+    """Minimal contract for values that carry a persisted language setting."""
+
+    language: str | None
 
 
 @dataclass(slots=True, frozen=True)
@@ -55,12 +60,16 @@ class Localizer:
         """Return whether one configured catalog exists for the requested language."""
         return self.normalize_language(language) in self.catalogs
 
-    def language_for_thread(self, thread: ThreadRecord | None) -> str:
+    def resolve_language(self, language: str | None) -> str:
+        """Resolve one persisted language value against the available catalogs."""
+        language = self.normalize_language(language)
+        return language if language in self.catalogs else self.default_language
+
+    def language_for_thread(self, thread: SupportsLanguage | None) -> str:
         """Resolve the effective language for one persisted Discord thread."""
         if thread is None:
             return self.default_language
-        language = self.normalize_language(thread.language)
-        return language if language in self.catalogs else self.default_language
+        return self.resolve_language(thread.language)
 
     def text(self, key: str, *, language: str | None = None, **placeholders: object) -> str:
         """Resolve one localized string and interpolate its placeholders."""

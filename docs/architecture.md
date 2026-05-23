@@ -17,6 +17,9 @@ This is the main runtime reference for the Twitch Observer.
   - coordinate repositories and side effects through direct calls
 - Pipelines and orchestrators
   - run explicit ordered multi-step flows
+- Runtime relays
+  - own late-bound communication from services/workers back into runtime adapters
+  - keep services unaware of concrete Discord or live-monitor instances
 - Repositories
   - persist configuration, cache, and runtime state in PostgreSQL
 - Localization
@@ -54,6 +57,8 @@ This is the main runtime reference for the Twitch Observer.
    - `ChannelLiveStatePersistenceService`
    - `ChannelEventNotificationService`
    - `ChannelEventAutoReplyService`
+6. Runtime-side notifications go through small relays from
+   `ApplicationRuntimeCoordinator`.
 
 ### Command flow
 
@@ -63,6 +68,9 @@ This is the main runtime reference for the Twitch Observer.
 4. The service validates permissions and inputs, updates repositories, and returns a `DiscordCommandResult`.
 5. The Discord entrypoint renders the result using the language stored on the
    active thread/context.
+
+Read-only Discord UI flows use `DiscordUIQueryBundle` query services instead of
+reading repositories directly from the Discord adapter.
 
 Pattern and reply entries use:
 
@@ -106,6 +114,18 @@ That keeps ownership correct:
 
 This avoids forcing live/offline events into the pattern model.
 
+### Runtime communication stays narrow
+
+`ApplicationRuntimeCoordinator` owns small relays for:
+
+- tracking embeds
+- account-link results
+- channel-event Discord results
+- Discord presence updates
+- tracked-channel wake-ups for the live monitor
+
+Services receive only the relay they need, not the whole runtime adapter graph.
+
 ## Caching model
 
 ### Twitch users
@@ -119,7 +139,8 @@ It uses:
 - Helix fallback only when needed
 
 IRC metadata updates login and display-name information without a Helix call.
-Profile images require Helix.
+Parallel cache misses for the same user are deduplicated in-process so only one
+Helix lookup runs per key at a time. Profile images still require Helix.
 
 ### Live state
 
@@ -155,8 +176,16 @@ PostgreSQL drivers.
 
 ## Implementation notes
 
+- `src/bootstrap/core.py`
+  - persistence, localization, and Twitch bundle assembly
+- `src/bootstrap/services.py`
+  - application service, query-service, and relay assembly
+- `src/bootstrap/runtime.py`
+  - entrypoint and runtime worker assembly
+- `src/bootstrap/models.py`
+  - shared bootstrap dataclasses
 - `src/bootstrap/application.py`
-  - dependency wiring and lifecycle
+  - compatibility wrapper exporting the split bootstrap API
 - `src/main.py`
   - thin process entrypoint
 - `src/entrypoints/`
@@ -177,6 +206,8 @@ PostgreSQL drivers.
   - ordered Twitch chat processing pipeline
 - `src/services/live_state_orchestrator.py`
   - ordered live/offline side effects
+- `src/services/runtime_coordinator.py`
+  - grouped late-bound runtime relays
 - `src/services/patterns/`
   - split pattern command, show, and tracking services
 - `src/services/replies/`
@@ -185,6 +216,8 @@ PostgreSQL drivers.
   - account command handling for link/unlink/show flows
 - `src/services/account_polling_service.py`
   - background polling and completion of pending Twitch device-code logins
+- `src/services/account_support.py`
+  - shared account-link formatting and notification contracts
 - `src/services/channel_live_state_service.py`
   - tracked channel event configuration commands
 - `src/services/channel_event_notification_service.py`

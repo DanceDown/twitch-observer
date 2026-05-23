@@ -58,12 +58,10 @@ class ChannelEventNotificationService:
     thread_repository: ThreadRepository
     adapter_event_repository: AdapterEventRepository
     adapter_event_action_repository: AdapterEventActionRepository
-    notifier: ChannelEventNotificationSender | None = None
+    notifier: ChannelEventNotificationSender
     localizer: Localizer = field(default_factory=Localizer.from_directory)
 
     async def handle_change(self, event: TwitchChannelLiveStateChangedEvent) -> None:
-        if self.notifier is None:
-            return
         event_key = STREAM_ONLINE_EVENT_KEY if event.is_live else STREAM_OFFLINE_EVENT_KEY
         configured_events = self.adapter_event_repository.list_matching_events(
             adapter_key=TWITCH_ADAPTER_KEY,

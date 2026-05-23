@@ -74,6 +74,10 @@ class TrackedChannelQueryService:
     def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
         return self.thread_repository.get_by_discord_channel_id(discord_channel_id)
 
+    def get_thread_language(self, discord_channel_id: int) -> str | None:
+        thread = self.get_thread(discord_channel_id)
+        return None if thread is None else thread.language
+
     async def list_tracked_channels(self, discord_channel_id: int) -> list[TrackedChannelPresentation]:
         thread = self.get_thread(discord_channel_id)
         if thread is None:
@@ -263,4 +267,3 @@ class DiscordUIQueryBundle:
     users: TrackedUserQueryService
     replies: ReplyQueryService
     events: AdapterEventQueryService
-

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.database.connection import ThreadRecord
 from src.services.discord_ui_query_service import (
     AdapterEventActionPresentation,
     AdapterEventPresentation,
@@ -22,8 +21,8 @@ class DiscordUIDataProvider:
 
     queries: DiscordUIQueryBundle
 
-    def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
-        return self.queries.channels.get_thread(discord_channel_id)
+    def get_thread_language(self, discord_channel_id: int) -> str | None:
+        return self.queries.channels.get_thread_language(discord_channel_id)
 
     async def list_tracked_channels(self, discord_channel_id: int) -> list[TrackedChannelPresentation]:
         return await self.queries.channels.list_tracked_channels(discord_channel_id)
@@ -45,4 +44,3 @@ class DiscordUIDataProvider:
 
     async def get_pattern(self, discord_channel_id: int, pattern_id: int) -> PatternPresentation | None:
         return await self.queries.patterns.get_pattern(discord_channel_id, pattern_id)
-

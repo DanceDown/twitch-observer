@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from src.database.connection import (
     AdapterEventActionRepository,
@@ -41,19 +41,35 @@ class ShowCommandService:
     tracked_user_repository: TrackedUserRepository | None = None
     adapter_event_repository: AdapterEventRepository | None = None
     adapter_event_action_repository: AdapterEventActionRepository | None = None
-    localizer: Localizer | None = None
+    localizer: Localizer = field(default_factory=Localizer.from_directory)
     permission_repository: UserPermissionRepository | None = None
     account_repository: TwitchAccountRepository | None = None
     device_flow_repository: TwitchDeviceFlowRepository | None = None
+    _renderer: ShowSectionRenderer = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self._renderer = ShowSectionRenderer(
+            channel_repository=self.channel_repository,
+            pattern_repository=self.pattern_repository,
+            reply_repository=self.reply_repository,
+            twitch_api=self.twitch_api,
+            tracked_user_repository=self.tracked_user_repository,
+            adapter_event_repository=self.adapter_event_repository,
+            adapter_event_action_repository=self.adapter_event_action_repository,
+            localizer=self.localizer,
+            permission_repository=self.permission_repository,
+            account_repository=self.account_repository,
+            device_flow_repository=self.device_flow_repository,
+        )
 
     async def handle_command(self, command: ShowConfigurationCommand) -> DiscordCommandResult:
         """Create an overview embed body for the selected sections."""
         thread = self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
         if thread is None:
             result = build_result(
-                self._localizer,
+                self.localizer,
                 "results.not_joined",
-                language=self._localizer.default_language,
+                language=self.localizer.default_language,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -65,7 +81,7 @@ class ShowCommandService:
                 required_permission=ObserverPermission.VIEW,
             ):
                 result = build_thread_result(
-                    self._localizer,
+                    self.localizer,
                     "results.show.permission_denied",
                     thread=thread,
                     style=DiscordResultStyle.ERROR,
@@ -74,20 +90,20 @@ class ShowCommandService:
                 return result
             lines = []
             sections = self._normalize_sections(command.sections)
-            language = self._localizer.language_for_thread(thread)
+            language = self.localizer.language_for_thread(thread)
             if "channels" in sections:
-                lines.append(await self._renderer.render_channels_section(thread.thread_id))
+                lines.append(await self._renderer.render_channels_section(thread))
             if "pings" in sections:
                 lines.append(
                     await self._renderer.render_patterns_section(
-                        thread.thread_id,
-                        title=self._localizer.text("show.sections.pings", language=language),
+                        thread,
+                        title=self.localizer.text("show.sections.pings", language=language),
                     )
                 )
             if "auto_replies" in sections:
-                lines.append(await self._renderer.render_auto_replies_section(thread.thread_id))
+                lines.append(await self._renderer.render_auto_replies_section(thread))
             if "users" in sections:
-                lines.append(await self._renderer.render_users_section(thread.thread_id))
+                lines.append(await self._renderer.render_users_section(thread))
             if "permissions" in sections:
                 lines.append(self._renderer.render_permissions_section(thread))
             thumbnail_url = None
@@ -95,7 +111,7 @@ class ShowCommandService:
                 account_section, thumbnail_url = await self._renderer.render_account_section(thread)
                 lines.append(account_section)
             result = build_thread_result(
-                self._localizer,
+                self.localizer,
                 "results.show.overview",
                 thread=thread,
                 style=DiscordResultStyle.INFO,
@@ -116,24 +132,3 @@ class ShowCommandService:
         if normalized:
             return normalized
         return ("channels",)
-
-    @property
-    def _renderer(self) -> ShowSectionRenderer:
-        return ShowSectionRenderer(
-            thread_repository=self.thread_repository,
-            channel_repository=self.channel_repository,
-            pattern_repository=self.pattern_repository,
-            reply_repository=self.reply_repository,
-            twitch_api=self.twitch_api,
-            tracked_user_repository=self.tracked_user_repository,
-            adapter_event_repository=self.adapter_event_repository,
-            adapter_event_action_repository=self.adapter_event_action_repository,
-            localizer=self.localizer,
-            permission_repository=self.permission_repository,
-            account_repository=self.account_repository,
-            device_flow_repository=self.device_flow_repository,
-        )
-
-    @property
-    def _localizer(self) -> Localizer:
-        return self.localizer or Localizer.from_directory()

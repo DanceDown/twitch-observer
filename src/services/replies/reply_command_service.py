@@ -9,7 +9,6 @@ from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import (
     AdapterEventActionRepository,
     AdapterEventRepository,
-    ChannelRepository,
     PatternRepository,
     ReplyRepository,
     ThreadRecord,
@@ -53,6 +52,15 @@ class _ReplyPermissionCommand:
     requester_id: int
 
 
+@dataclass(slots=True, frozen=True)
+class ReplyEventConfiguration:
+    """Dependencies needed only for adapter-event reply commands."""
+
+    adapter_event_repository: AdapterEventRepository
+    adapter_event_action_repository: AdapterEventActionRepository
+    twitch_api: TwitchChannelStateLookup
+
+
 @dataclass(slots=True)
 class ReplyCommandService:
     """Handle `/reply` add/remove/disable/enable requests."""
@@ -61,10 +69,7 @@ class ReplyCommandService:
     pattern_repository: PatternRepository
     reply_repository: ReplyRepository
     account_repository: TwitchAccountRepository
-    channel_repository: ChannelRepository | None = None
-    twitch_api: TwitchChannelStateLookup | None = None
-    adapter_event_repository: AdapterEventRepository | None = None
-    adapter_event_action_repository: AdapterEventActionRepository | None = None
+    event_configuration: ReplyEventConfiguration | None = None
     permission_repository: UserPermissionRepository | None = None
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     _runner: CommandExecutionRunner = field(init=False, repr=False)
@@ -305,13 +310,17 @@ class ReplyCommandService:
         if isinstance(thread, DiscordCommandResult):
             return thread
 
-        if self.adapter_event_repository is None or self.adapter_event_action_repository is None:
+        event_configuration = self.event_configuration
+        if event_configuration is None:
             raise ValueError(self.localizer.text("results.reply.event_unavailable", language=thread.language))
 
         adapter_event = next(
             (
                 item
-                for item in self.adapter_event_repository.list_events_for_thread(thread.thread_id, include_disabled=True)
+                for item in event_configuration.adapter_event_repository.list_events_for_thread(
+                    thread.thread_id,
+                    include_disabled=True,
+                )
                 if item.event_id == command.adapter_event_id
             ),
             None,
@@ -330,15 +339,18 @@ class ReplyCommandService:
             raise ValueError(self.localizer.text("results.reply.unsupported_event", language=thread.language))
 
         channel_name = adapter_event.subject_id
-        if self.twitch_api is not None:
-            try:
-                cached = self.twitch_api.get_cached_user_by_id(adapter_event.subject_id.strip())
-                twitch_channel = cached if cached is not None else await self.twitch_api.get_channel_by_id(adapter_event.subject_id)
-                channel_name = twitch_channel.display_name
-            except TwitchAPIError:
-                channel_name = adapter_event.subject_id
+        try:
+            cached = event_configuration.twitch_api.get_cached_user_by_id(adapter_event.subject_id.strip())
+            twitch_channel = (
+                cached
+                if cached is not None
+                else await event_configuration.twitch_api.get_channel_by_id(adapter_event.subject_id)
+            )
+            channel_name = twitch_channel.display_name
+        except TwitchAPIError:
+            channel_name = adapter_event.subject_id
 
-        existing_reply = self.adapter_event_action_repository.get_action(
+        existing_reply = event_configuration.adapter_event_action_repository.get_action(
             event_id=adapter_event.event_id,
             action_type=TWITCH_SEND_MESSAGE_ACTION,
         )
@@ -358,7 +370,7 @@ class ReplyCommandService:
                 raise ValueError(self.localizer.text("results.reply.empty_message", language=thread.language))
             if len(message) > 500:
                 raise ValueError(self.localizer.text("results.reply.message_too_long", language=thread.language))
-            created = self.adapter_event_action_repository.upsert_action(
+            created = event_configuration.adapter_event_action_repository.upsert_action(
                 event_id=adapter_event.event_id,
                 action_type=TWITCH_SEND_MESSAGE_ACTION,
                 message_template=message,
@@ -386,7 +398,7 @@ class ReplyCommandService:
             )
 
         if action == "remove":
-            removed = self.adapter_event_action_repository.remove_action(
+            removed = event_configuration.adapter_event_action_repository.remove_action(
                 event_id=adapter_event.event_id,
                 action_type=TWITCH_SEND_MESSAGE_ACTION,
             )
@@ -413,7 +425,7 @@ class ReplyCommandService:
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
-            disabled_reply = self.adapter_event_action_repository.set_action_disabled(
+            disabled_reply = event_configuration.adapter_event_action_repository.set_action_disabled(
                 event_id=adapter_event.event_id,
                 action_type=TWITCH_SEND_MESSAGE_ACTION,
                 disabled=True,
@@ -441,7 +453,7 @@ class ReplyCommandService:
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
-            enabled_reply = self.adapter_event_action_repository.set_action_disabled(
+            enabled_reply = event_configuration.adapter_event_action_repository.set_action_disabled(
                 event_id=adapter_event.event_id,
                 action_type=TWITCH_SEND_MESSAGE_ACTION,
                 disabled=False,

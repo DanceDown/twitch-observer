@@ -47,8 +47,7 @@ def resolve_context_language(
     """Resolve the active UI language for one Discord context."""
     if data_provider is None or discord_channel_id is None:
         return localizer.default_language
-    thread = data_provider.get_thread(discord_channel_id)
-    return localizer.language_for_thread(thread)
+    return localizer.resolve_language(data_provider.get_thread_language(discord_channel_id))
 
 
 def _build_public_actor_embed(result: DiscordCommandResult, actor_mention: str) -> discord.Embed:

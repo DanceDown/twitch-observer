@@ -24,28 +24,15 @@ from src.events.event_types import (
     UnlinkAccountCommand,
 )
 from src.localization import Localizer
-from src.services.account_polling_service import DeviceFlowPollingService, format_account_timestamp
+from src.services.account_support import AccountNotificationSender, format_account_timestamp
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
 from src.services.twitch_gateways import TwitchAccountGateway
 from src.utils.permissions import ObserverPermission
 
 logger = logging.getLogger(__name__)
-__all__ = ("AccountCommandService", "AccountNotificationSender", "DeviceFlowPollingService")
+__all__ = ("AccountCommandService", "AccountNotificationSender")
 
 AccountCommand = StartAccountLinkCommand | UnlinkAccountCommand | ShowAccountCommand
-
-
-class AccountNotificationSender:
-    """Interface for optionally notifying Discord users about link results."""
-
-    async def send_account_result(
-        self,
-        discord_user_id: int,
-        discord_channel_id: int | None,
-        result: DiscordCommandResult,
-    ) -> None:  # pragma: no cover
-        raise NotImplementedError
-
 
 @dataclass(slots=True)
 class AccountCommandService:

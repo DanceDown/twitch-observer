@@ -23,7 +23,7 @@ async def _run() -> None:
     gateways = build_gateways(core)
     services = build_services(core, gateways)
     entrypoints = build_entrypoints(core, services, gateways)
-    runtime = build_runtime(core, services, gateways, entrypoints)
+    runtime = build_runtime(core, services, gateways)
 
     stop_event = asyncio.Event()
 
@@ -35,9 +35,7 @@ async def _run() -> None:
         with suppress(NotImplementedError):
             loop.add_signal_handler(signum, _request_stop)
 
-    runtime.twitch_irc_task.add_done_callback(_log_background_task_failure)
-    runtime.discord_task.add_done_callback(_log_background_task_failure)
-    await start_runtime(runtime)
+    await start_runtime(runtime, entrypoints, task_failure_callback=_log_background_task_failure)
 
     try:
         await stop_event.wait()

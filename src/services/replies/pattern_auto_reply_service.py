@@ -23,7 +23,7 @@ from src.events.event_types import (
     TwitchChatMessageEvent,
 )
 from src.localization import Localizer
-from src.services.account_service import AccountNotificationSender
+from src.services.account_support import AccountNotificationSender
 from src.services.patterns import TrackingNotificationSender
 from src.services.twitch_gateways import TwitchReplyGateway
 from src.services.twitch_runtime import (
@@ -51,9 +51,10 @@ class AutoReplyService:
     account_repository: TwitchAccountRepository
     twitch_api: TwitchReplyGateway
     token_refresh_skew_seconds: int
+    tracking_notifier: TrackingNotificationSender
+    account_notifier: AccountNotificationSender
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     tracked_user_repository: TrackedUserRepository | None = None
-    notifier: TrackingNotificationSender | AccountNotificationSender | None = None
     handled_messages: int = field(default=0, init=False)
     sent_replies: int = field(default=0, init=False)
 
@@ -318,13 +319,11 @@ class AutoReplyService:
         channel_display_name: str | None = None,
         channel_login: str | None = None,
     ) -> None:
-        if self.notifier is None:
-            return
         source_channel = self.channel_repository.get_by_thread_and_twitch_channel(
             thread.thread_id,
             event.broadcaster_id or "",
         )
-        await self.notifier.send_tracking_embed(
+        await self.tracking_notifier.send_tracking_embed(
             thread.discord_channel_id,
             build_auto_reply_embed(
                 event=event,
@@ -350,9 +349,7 @@ class AutoReplyService:
         return rendered.replace("{MESSAGE}", event.content)
 
     async def _notify_account_expired(self, discord_channel_id: int) -> None:
-        if self.notifier is None:
-            return
-        await self.notifier.send_account_result(
+        await self.account_notifier.send_account_result(
             0,
             discord_channel_id,
             build_result(

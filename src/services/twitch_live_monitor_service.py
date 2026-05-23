@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Protocol
 
 from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import ChannelRepository
@@ -16,6 +16,12 @@ from src.services.twitch_gateways import TwitchLiveMonitorGateway
 from src.services.twitch_runtime import safe_get_twitch_user_by_id
 
 logger = logging.getLogger(__name__)
+
+
+class LiveStateChangeHandler(Protocol):
+    """Async handler for live/offline transition events."""
+
+    async def handle_change(self, event: TwitchChannelLiveStateChangedEvent) -> None: ...
 
 
 def _batched(values: list[str], batch_size: int) -> list[list[str]]:
@@ -32,7 +38,7 @@ class TwitchLiveMonitorService:
     poll_interval_seconds: float
     batch_size: int
     refresh_on_startup: bool
-    on_change: Callable[[TwitchChannelLiveStateChangedEvent], Awaitable[None] | None] | None = None
+    on_change: LiveStateChangeHandler
     _stop_event: asyncio.Event = field(default_factory=asyncio.Event, init=False)
     _wake_event: asyncio.Event = field(default_factory=asyncio.Event, init=False)
     _task: asyncio.Task[None] | None = field(default=None, init=False)
@@ -118,7 +124,4 @@ class TwitchLiveMonitorService:
                 is_live=current_is_live,
                 changed_at=changed_at,
             )
-            if self.on_change is not None:
-                outcome = self.on_change(event)
-                if hasattr(outcome, "__await__"):
-                    await outcome
+            await self.on_change.handle_change(event)
