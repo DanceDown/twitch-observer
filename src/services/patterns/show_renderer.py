@@ -252,10 +252,11 @@ class ShowSectionRenderer:
         permission_msg = self._localizer.value("show.show_permissions", language=language)
         if not isinstance(permission_msg, dict):
             raise ValueError("show.show_permissions must be an object.")
+        body_template = permission_msg.get("body")
         user_list_item = permission_msg.get("user_list_item")
         permission_list_item = permission_msg.get("permission_list_item")
-        if not isinstance(user_list_item, str) or not isinstance(permission_list_item, str):
-            raise ValueError("show.show_permissions must define user_list_item and permission_list_item.")
+        if not isinstance(body_template, str) or not isinstance(user_list_item, str) or not isinstance(permission_list_item, str):
+            raise ValueError("show.show_permissions must define body, user_list_item and permission_list_item.")
 
         owner_permissions = self._localizer.render(
             permission_list_item,
@@ -270,7 +271,7 @@ class ShowSectionRenderer:
         )
 
         if self.permission_repository is None:
-            return self._localizer.text("show.show_permissions", language=language, USER_LIST="\n".join(user_entries))
+            return self._localizer.render(body_template, USER_LIST="\n".join(user_entries))
 
         grants = self.permission_repository.list_for_thread(thread_id=thread.thread_id)
         for grant in grants:
@@ -291,7 +292,7 @@ class ShowSectionRenderer:
                     PERMISSION_LIST=permission_lines,
                 )
             )
-        return self._localizer.text("show.show_permissions", language=language, USER_LIST="\n".join(user_entries))
+        return self._localizer.render(body_template, USER_LIST="\n".join(user_entries))
 
     async def render_account_section(self, thread: ThreadRecord) -> tuple[str, str | None]:
         """Render linked account and pending device-flow details."""

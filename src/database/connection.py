@@ -1,20 +1,4 @@
-"""Shared database exports for records, repository contracts, and PostgreSQL implementations."""
-
-from .postgres import (
-    PostgresAdapterEventActionRepository,
-    PostgresAdapterEventRepository,
-    PostgresChannelRepository,
-    PostgresDatabase,
-    PostgresMessageRepository,
-    PostgresPatternRepository,
-    PostgresReplyRepository,
-    PostgresThreadRepository,
-    PostgresTrackedUserRepository,
-    PostgresTwitchAccountRepository,
-    PostgresTwitchDeviceFlowRepository,
-    PostgresTwitchUserCacheRepository,
-    PostgresUserPermissionRepository,
-)
+"""Shared database exports for records and repository contracts."""
 from .records import (
     AdapterEventActionRecord,
     AdapterEventRecord,
@@ -55,19 +39,6 @@ __all__ = [
     "MessageRepository",
     "PatternRecord",
     "PatternRepository",
-    "PostgresAdapterEventActionRepository",
-    "PostgresAdapterEventRepository",
-    "PostgresChannelRepository",
-    "PostgresDatabase",
-    "PostgresMessageRepository",
-    "PostgresPatternRepository",
-    "PostgresReplyRepository",
-    "PostgresThreadRepository",
-    "PostgresTrackedUserRepository",
-    "PostgresTwitchAccountRepository",
-    "PostgresTwitchDeviceFlowRepository",
-    "PostgresTwitchUserCacheRepository",
-    "PostgresUserPermissionRepository",
     "RecentMessageRecord",
     "ReplyRecord",
     "ReplyRepository",

@@ -6,17 +6,7 @@ from contextlib import suppress
 
 import discord
 
-from src.gateways.twitch_api import TwitchAPIClient
 from src.config import AppConfig
-from src.database.connection import (
-    AdapterEventActionRepository,
-    AdapterEventRepository,
-    ChannelRepository,
-    PatternRepository,
-    ReplyRepository,
-    ThreadRepository,
-    TrackedUserRepository,
-)
 from src.events.event_types import DiscordCommandResult
 from src.localization import Localizer
 from src.services.discord_presence_service import DiscordPresenceStatusSender
@@ -35,30 +25,14 @@ class DiscordEntrypoint(TrackingNotificationSender, DiscordPresenceStatusSender)
         config: AppConfig,
         services: DiscordServiceBundle,
         *,
-        thread_repository: ThreadRepository,
-        channel_repository: ChannelRepository,
-        tracked_user_repository: TrackedUserRepository,
-        pattern_repository: PatternRepository,
-        reply_repository: ReplyRepository,
-        adapter_event_repository: AdapterEventRepository,
-        adapter_event_action_repository: AdapterEventActionRepository,
-        twitch_api: TwitchAPIClient,
+        ui_data_provider: DiscordUIDataProvider,
         localizer: Localizer,
     ) -> None:
         self._config = config
         self._client = ObserverDiscordClient(
             config=config,
             services=services,
-            ui_data_provider=DiscordUIDataProvider(
-                thread_repository=thread_repository,
-                channel_repository=channel_repository,
-                tracked_user_repository=tracked_user_repository,
-                pattern_repository=pattern_repository,
-                reply_repository=reply_repository,
-                adapter_event_repository=adapter_event_repository,
-                adapter_event_action_repository=adapter_event_action_repository,
-                twitch_api=twitch_api,
-            ),
+            ui_data_provider=ui_data_provider,
             localizer=localizer,
         )
 

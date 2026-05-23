@@ -43,7 +43,6 @@ class ChannelEventAutoReplyService:
     account_repository: TwitchAccountRepository
     twitch_api: TwitchReplyGateway
     token_refresh_skew_seconds: int
-    notifier: object | None = None
 
     async def handle_channel_live_state_changed(
         self,

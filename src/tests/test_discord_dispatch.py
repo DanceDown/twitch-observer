@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from src.entrypoints.discord import dispatch_join_thread, dispatch_ui_flow_decision
+from src.entrypoints.discord.dispatch import dispatch_join_thread, dispatch_ui_flow_decision
 from src.events.event_types import DiscordResultStyle, DiscordUIFlowDecision, RequestUIFlowCommand, UIFlowKind, UIFlowStep
 from src.tests.dispatch_helpers import make_services
 

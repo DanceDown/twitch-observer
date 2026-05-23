@@ -96,7 +96,7 @@ def test_german_catalog_uses_utf8_umlauts() -> None:
     localizer = Localizer.from_directory()
 
     rendered = localizer.text("results.command_unavailable.title", language="german")
-    scope_text = localizer.text("common.scope.everyone_except", language="german", ITEMS="x")
+    scope_text = localizer.text("common.scope.everyone_except", language="german", ITEMS=("x",))
 
     assert "verfügbar" in rendered
     assert "außer" in scope_text

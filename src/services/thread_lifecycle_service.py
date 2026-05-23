@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from src.gateways.twitch_api import TwitchAPIError
@@ -22,6 +21,7 @@ from src.events.event_types import (
 from src.localization import Localizer
 from src.normalization import normalize_language, normalize_optional_color
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
+from src.services.runtime_coordinator import TrackedChannelsChangedNotifier
 from src.services.twitch_gateways import TwitchDirectoryGateway, TwitchIRCChannelGateway
 from src.utils.permissions import ObserverPermission
 
@@ -38,7 +38,7 @@ class ThreadLifecycleService:
     irc_gateway: TwitchIRCChannelGateway
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     permission_repository: UserPermissionRepository | None = None
-    tracked_channels_changed: Callable[[], Awaitable[None] | None] | None = None
+    tracked_channels_notifier: TrackedChannelsChangedNotifier | None = None
     _guards: ThreadCommandGuards = field(init=False, repr=False)
     _runner: CommandExecutionRunner = field(init=False, repr=False)
 
@@ -299,8 +299,6 @@ class ThreadLifecycleService:
         )
 
     async def _notify_tracked_channels_changed(self) -> None:
-        if self.tracked_channels_changed is None:
+        if self.tracked_channels_notifier is None:
             return
-        outcome = self.tracked_channels_changed()
-        if hasattr(outcome, "__await__"):
-            await outcome
+        await self.tracked_channels_notifier.notify_tracked_channels_changed()

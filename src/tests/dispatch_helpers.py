@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.entrypoints.discord import (
+from src.entrypoints.discord.dispatch import (
     dispatch_add_channel_event,
     dispatch_add_channel_event_reply,
     dispatch_add_pattern,

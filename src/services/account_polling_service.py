@@ -8,6 +8,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from typing import Protocol
 
 from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import (
@@ -23,6 +24,15 @@ from src.localization import Localizer
 from src.services.twitch_gateways import TwitchAccountGateway
 
 logger = logging.getLogger(__name__)
+
+
+class AccountNotificationSender(Protocol):
+    async def send_account_result(
+        self,
+        discord_user_id: int,
+        discord_channel_id: int | None,
+        result: DiscordCommandResult,
+    ) -> None: ...
 
 
 def format_account_timestamp(raw_value: str | None) -> str:
@@ -221,7 +231,7 @@ class DeviceFlowPollingService:
     thread_repository: ThreadRepository
     twitch_api: TwitchAccountGateway
     poll_interval_seconds: float
-    notifier: object | None = None
+    notifier: AccountNotificationSender
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     _task: asyncio.Task[None] | None = field(default=None, init=False)
     _stop_event: asyncio.Event = field(default_factory=asyncio.Event, init=False)
@@ -275,6 +285,4 @@ class DeviceFlowPollingService:
             self.account_repository.remove_by_account_id(account.account_id)
 
     async def _notify(self, discord_user_id: int, result: DiscordCommandResult, discord_channel_id: int | None) -> None:
-        if self.notifier is None:
-            return
         await self.notifier.send_account_result(discord_user_id, discord_channel_id, result)

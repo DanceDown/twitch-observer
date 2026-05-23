@@ -58,6 +58,7 @@
 
 - Prefer targeted tests for the touched flow before broader runs.
 - Docker-based test execution is available and is the preferred integration test path in this repo.
+- By default, always run tests, checks, and runtime validation through Docker (instead of host-local tooling) unless explicitly requested otherwise.
 - Tests should validate behavior, side effects, persisted state, permissions, and triggered actions rather than exact user-facing wording.
 - Avoid assertions that depend on 1:1 response text, embed titles, labels, or other easily changeable visual copy unless the text format itself is the feature under test.
 - If schema changes are intentional and incompatible, call that out clearly and reset local persisted DB data only when explicitly required by the task.

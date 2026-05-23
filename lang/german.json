@@ -17,7 +17,7 @@
         }
       },
       "everyone_except": {
-        "template": "`Alle auÃƒÅ¸er` {RAW:ITEMS}",
+        "template": "`Alle au\u00dfer` {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
             "list": {
@@ -75,7 +75,7 @@
   },
   "results": {
     "command_unavailable": {
-      "title": "Befehl nicht verfÃƒÂ¼gbar",
+      "title": "Befehl nicht verf\u00fcgbar",
       "body": "Dieser Befehl kann nur in einem Discord-Kanal oder einer DM verwendet werden <a:Tssk:1497685026945630208>",
       "footer": ""
     },
