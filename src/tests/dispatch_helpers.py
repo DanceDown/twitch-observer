@@ -35,7 +35,6 @@ from src.entrypoints.discord.dispatch import (
     dispatch_set_thread_color,
     dispatch_set_thread_language,
     dispatch_set_tracked_channel_color,
-    dispatch_show_account,
     dispatch_show_configuration,
     dispatch_start_account_link,
     dispatch_ui_flow_decision,
@@ -285,12 +284,6 @@ async def dispatch_account_command(
         )
     if action == "unlink":
         return await dispatch_unlink_account(
-            services,
-            requester_id=requester_id,
-            discord_channel_id=discord_channel_id,
-        )
-    if action == "show":
-        return await dispatch_show_account(
             services,
             requester_id=requester_id,
             discord_channel_id=discord_channel_id,

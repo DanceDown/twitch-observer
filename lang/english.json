@@ -6,55 +6,55 @@
       "all_tracked_users": "All known Twitch users",
       "everyone": "Everyone",
       "only_in": {
-        "template": "`Only in` {RAW:ITEMS}",
+        "template": "Only in {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
             "list": {
-              "item_format": "{RAW:LIST_ITEM}",
+              "item_format": "`{CODE:LIST_ITEM}`",
               "separator": ", "
             }
           }
         }
       },
       "everyone_except": {
-        "template": "`Everyone except` {RAW:ITEMS}",
+        "template": "Everyone except {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
             "list": {
-              "item_format": "{RAW:LIST_ITEM}",
+              "item_format": "`{CODE:LIST_ITEM}`",
               "separator": ", "
             }
           }
         }
       },
       "all_tracked_channels_except": {
-        "template": "`Every watched channel except` {RAW:ITEMS}",
+        "template": "Every watched channel except {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
             "list": {
-              "item_format": "{RAW:LIST_ITEM}",
+              "item_format": "`{CODE:LIST_ITEM}`",
               "separator": ", "
             }
           }
         }
       },
       "only_from": {
-        "template": "`Only from` {RAW:ITEMS}",
+        "template": "Only from {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
             "list": {
-              "item_format": "{RAW:LIST_ITEM}",
+              "item_format": "`{CODE:LIST_ITEM}`",
               "separator": ", "
             }
           }
         }
       },
       "all_tracked_users_except": {
-        "template": "`All known Twitch users except` {RAW:ITEMS}",
+        "template": "All known Twitch users except {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
             "list": {
-              "item_format": "{RAW:LIST_ITEM}",
+              "item_format": "`{CODE:LIST_ITEM}`",
               "separator": ", "
             }
           }
@@ -69,7 +69,6 @@
       "twitch_code_link": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
       "twitch_link": "[{DISPLAY_NAME}](https://www.twitch.tv/{RAW:LOGIN})",
       "section": "**{TITLE}**\n{RAW:SECTION_BODY}",
-      "inline_code": "`{CODE:TEXT}`",
       "discord_user_mention": "<@{RAW:USER_ID}>"
     }
   },
@@ -94,11 +93,6 @@
       "body": "{DETAIL} <a:OhNo:1497685055948980306>",
       "footer": ""
     },
-    "regex_error": {
-      "title": "Regex Error",
-      "body": "{DETAIL} <a:OhNo:1497685055948980306>\n\nConsider using prebuilt patterns (e.g. from [howtoregex.com](https://howtoregex.com/patterns/python))",
-      "footer": ""
-    },
     "not_joined": {
       "title": "Not Joined",
       "body": "Please invite me first by using `/join` <a:Lurk:1497684902135463986>",
@@ -110,11 +104,6 @@
       "footer": ""
     },
     "thread": {
-      "unsupported_action": {
-        "title": "Validation Error",
-        "body": "Unsupported action. Please take a look at the available commands <a:OhNo:1497685055948980306>",
-        "footer": ""
-      },
       "already_joined": {
         "title": "Already Joined",
         "body": "There is no need to invite me again <:ShrugMan:1497685241962430717>",
@@ -182,7 +171,7 @@
       },
       "color_updated": {
         "title": "Color Updated",
-        "body": "{RAW:USER} updated my color to {CODE:COLOR} <:WOWERS:1497724770848997406>",
+        "body": "{RAW:USER} updated my color to `{CODE:COLOR}` <:WOWERS:1497724770848997406>",
         "footer": ""
       },
       "language_denied": {
@@ -192,17 +181,17 @@
       },
       "language_updated": {
         "title": "Language Updated",
-        "body": "{RAW:USER} taught me {CODE:LANGUAGE_NAME} <a:yo:1497686448717959369>",
+        "body": "{RAW:USER} taught me `{CODE:LANGUAGE_NAME}` <a:yo:1497686448717959369>",
         "footer": ""
       },
       "already_color": {
         "title": "Already This Color",
-        "body": "I'm already wearing {CODE:COLOR} <:oopsie:1497720439810687006>",
+        "body": "I'm already wearing `{CODE:COLOR}` <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "already_language": {
         "title": "Already This Language",
-        "body": "I'm already speaking {CODE:LANGUAGE_NAME} <:oopsie:1497720439810687006>",
+        "body": "I'm already speaking `{CODE:LANGUAGE_NAME}` <:oopsie:1497720439810687006>",
         "footer": ""
       }
     },
@@ -234,12 +223,7 @@
       },
       "color_updated": {
         "title": "Channel Color Updated",
-        "body": "{RAW:USER} updated the color for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})'s Twitch channel to {CODE:COLOR} <:WOWERS:1497724770848997406>",
-        "footer": ""
-      },
-      "unsupported_action": {
-        "title": "Validation Error",
-        "body": "Unsupported action. Wtf did you do? <a:peepoConfused:1497729266266275840>",
+        "body": "{RAW:USER} updated the color for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})'s Twitch channel to `{CODE:COLOR}` <:WOWERS:1497724770848997406>",
         "footer": ""
       },
       "in_use": {
@@ -267,11 +251,6 @@
       "added": {
         "title": "User Added",
         "body": "{RAW:USER} told me to remember [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <a:peepoSmart:1497731090704498781>",
-        "footer": ""
-      },
-      "unsupported_action": {
-        "title": "Validation Error",
-        "body": "Unsupported action. Wtf did you do? <a:peepoConfused:1497729266266275840>",
         "footer": ""
       },
       "not_found": {
@@ -312,11 +291,6 @@
     },
     "account": {
       "existing_account": "an existing Twitch account",
-      "unsupported_action": {
-        "title": "Validation Error",
-        "body": "I don't know that account action <a:peepoConfused:1497729266266275840>",
-        "footer": ""
-      },
       "permission_denied": {
         "title": "Permission Denied",
         "body": "You can't change the Twitch account here <a:Tssk:1497685026945630208>",
@@ -350,11 +324,6 @@
       "unlinked": {
         "title": "Twitch Account Unlinked",
         "body": "{RAW:USER} disconnected [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}). Auto-replies stay saved and will work again once an account is linked <:ApuApproved:1497724288256446465>",
-        "footer": ""
-      },
-      "show_moved": {
-        "title": "Display Moved",
-        "body": "You can now find the account status in `/show` under `Account` <a:peepoSmart:1497731090704498781>",
         "footer": ""
       },
       "login_expired": {
@@ -439,8 +408,7 @@
         },
         "body": "{RAW:USER} removed these permissions from {RAW:TARGET} <a:yes:1497686393369919559>\n{RAW:PERMISSIONS}",
         "footer": ""
-      },
-      "unsupported_action": "I don't know that permission action <a:peepoConfused:1497729266266275840>"
+      }
     },
     "reply": {
       "manage_permission_denied": {
@@ -510,7 +478,6 @@
         "footer": ""
       },
       "event_unavailable": "Event auto-replies are not available here right now <a:peepoConfused:1497729266266275840>",
-      "missing_event": "Choose a live or offline event first <:oopsie:1497720439810687006>",
       "event_not_found": {
         "title": "Event Not Found",
         "body": "That live or offline event is not configured here <a:OhNo:1497685055948980306>",
@@ -541,8 +508,7 @@
         "title": "Auto-Reply Enabled",
         "body": "{RAW:USER} enabled the {CODE:STATE} auto-reply for {CODE:CHANNEL} <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}",
         "footer": ""
-      },
-      "unsupported_action": "I don't know that auto-reply action <a:peepoConfused:1497729266266275840>"
+      }
     },
     "channel_event": {
       "permission_denied": {
@@ -556,7 +522,6 @@
         "footer": ""
       },
       "unsupported_event": "I don't know that Twitch event <a:peepoConfused:1497729266266275840>",
-      "unsupported_action": "I don't know that live action <a:peepoConfused:1497729266266275840>",
       "state": {
         "live": "Live",
         "offline": "Offline"
@@ -637,7 +602,7 @@
       },
       "reply_sent": {
         "title": "Twitch Reply Sent",
-        "body": "I replied in [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})'s chat <a:yo:1497686448717959369>\nReply target: {CODE:REPLY_TARGET}\nMessage: {CODE:MESSAGE}",
+        "body": "replied in [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})'s chat <a:yo:1497686448717959369>\nReply target: {CODE:REPLY_TARGET}\nMessage: {CODE:MESSAGE}",
         "footer": ""
       },
       "message_sent": {
@@ -657,19 +622,12 @@
         "body": "You may not switch pings on or off here <a:Tssk:1497685026945630208>",
         "footer": ""
       },
-      "change_permission_denied": {
-        "title": "Permission Denied",
-        "body": "You may not change pings here <a:Tssk:1497685026945630208>",
-        "footer": ""
-      },
       "edit_permission_denied": {
         "title": "Permission Denied",
         "body": "You may not edit pings here <a:Tssk:1497685026945630208>",
         "footer": ""
       },
-      "unsupported_action": "That ping action confused me. Please use add, remove, disable or enable <a:peepoConfused:1497729266266275840>",
       "empty_pattern": "Tell me what I should look for first <a:OhNo:1497685055948980306>",
-      "missing_mode": "Tell me whether this should be a normal ping or a regex first <a:OhNo:1497685055948980306>",
       "invalid_color": "That color looks suspicious. Please use something like `#9146FF` <:d_:1497685665960165417>",
       "invalid_priority": "Priority has to be a number between `0` and `9` <:oopsie:1497720439810687006>",
       "unsupported_channel_scope": "That channel scope confused me <a:peepoConfused:1497729266266275840>",
@@ -679,7 +637,6 @@
       "unsupported_user_scope": "That user scope confused me <a:peepoConfused:1497729266266275840>",
       "missing_selected_users": "Pick at least one Twitch user for this scope first <a:peepoSmart:1497731090704498781>",
       "user_not_tracked": "I don't remember [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) yet. Add the user first with `/user` <a:peepoSmart:1497731090704498781>",
-      "missing_stable_id": "Use the ID from `/show` so I know exactly which ping you mean <a:peepoSmart:1497731090704498781>",
       "already_exists": {
         "title": "Already Exists",
         "body": "I already know this {ALREADY_EXISTS_TYPE} as ID {CODE:ID} <:oopsie:1497720439810687006>",
@@ -720,11 +677,6 @@
         "body": "This {ALREADY_ENABLED_TYPE} is already awake <a:yes:1497686393369919559>",
         "footer": ""
       },
-      "added_title": "{ADDED_TYPE} Added",
-      "removed_title": "{REMOVED_TYPE} Removed",
-      "disabled_title": "{DISABLED_TYPE} Disabled",
-      "enabled_title": "{ENABLED_TYPE} Enabled",
-      "updated_title": "Pattern Updated",
       "added_result": {
         "title": "{ADDED_TYPE} Added",
         "body": "{RAW:SUMMARY}",
@@ -756,10 +708,6 @@
       "type": {
         "ping": "ping",
         "regex": "regex"
-      },
-      "type_title": {
-        "ping": "Ping",
-        "regex": "Regex"
       },
       "type_for": {
         "already_exists": {
@@ -915,10 +863,8 @@
         "color": "Color: From {CODE:BEFORE} to {CODE:AFTER}",
         "priority": "Priority: From {CODE:BEFORE} to {CODE:AFTER}"
       }
-    },
-    "validation_detail": {
-      "color_hex_or_empty": "Die Farbe muss das Format `#RRGGBB` haben oder leer sein.",
-      "color_hex_or_clear": "Die Farbe muss das Format `#RRGGBB` haben oder `clear:true` setzen.",
+      },
+      "validation_detail": {
       "unsupported_language": {
         "template": "Unsupported language. Available languages: {RAW:LANGUAGES}",
         "placeholders": {
@@ -1306,17 +1252,6 @@
         "priority": "Priority: {CODE:VALUE}",
         "priority_auto": "Automatic",
         "not_set": "not set yet",
-        "embed_message": {
-          "template": "{RAW:SUMMARY_LINES}\n\nUse the buttons below to fill out each section.\nNeed a hex color? [Open color picker]({RAW:COLOR_PICKER_URL})",
-          "placeholders": {
-            "SUMMARY_LINES": {
-              "list": {
-                "item_format": "{RAW:LIST_ITEM}",
-                "separator": "\n"
-              }
-            }
-          }
-        },
         "channel_scope_all": "All watched Twitch channels",
         "channel_scope_only": {
           "template": "Only: {RAW:ITEMS}",

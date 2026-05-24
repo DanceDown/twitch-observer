@@ -1030,36 +1030,6 @@ async def test_account_link_command_starts_device_flow() -> None:
 
 
 @pytest.mark.asyncio
-async def test_account_show_reports_pending_device_flow() -> None:
-    bus = SimpleNamespace()
-    device_flow_repository = InMemoryDeviceFlowRepository()
-    thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
-    device_flow_repository.upsert_pending_flow(
-        discord_user_id=200,
-        discord_channel_id=100,
-        device_code="device-123",
-        user_code="ABCDEFGH",
-        verification_uri="https://example.test/activate",
-        interval_seconds=5,
-        expires_at=datetime.now(UTC).isoformat(),
-        scope=("user:write:chat",),
-    )
-    bus.account = AccountCommandService(
-        account_repository=InMemoryAccountRepository(),
-        device_flow_repository=device_flow_repository,
-        thread_repository=thread_repository,
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
-    )
-
-    result = await dispatch_account_command(bus, requester_id=200, discord_channel_id=100, action="show")
-
-    assert result.style == DiscordResultStyle.INFO
-    assert result.ephemeral is True
-    assert result.message
-
-
-@pytest.mark.asyncio
 async def test_show_account_lists_linked_account_with_display_name_and_thumbnail() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()

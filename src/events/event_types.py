@@ -292,14 +292,6 @@ class UnlinkAccountCommand:
 
 
 @dataclass(slots=True, frozen=True)
-class ShowAccountCommand:
-    """Return the account-help result for the moved `/show account` flow."""
-
-    requester_id: int
-    discord_channel_id: int | None
-
-
-@dataclass(slots=True, frozen=True)
 class AddPatternReplyCommand:
     """Attach one auto-reply to an existing pattern."""
 

@@ -1,6 +1,6 @@
 """Typed Discord dispatch helpers grouped by command domain."""
 
-from .account import dispatch_show_account, dispatch_start_account_link, dispatch_unlink_account
+from .account import dispatch_start_account_link, dispatch_unlink_account
 from .channel import dispatch_add_tracked_channel, dispatch_remove_tracked_channel, dispatch_set_tracked_channel_color
 from .channel_events import (
     dispatch_add_channel_event,
@@ -72,7 +72,6 @@ __all__ = [
     "dispatch_set_thread_color",
     "dispatch_set_thread_language",
     "dispatch_set_tracked_channel_color",
-    "dispatch_show_account",
     "dispatch_show_configuration",
     "dispatch_start_account_link",
     "dispatch_ui_flow_decision",

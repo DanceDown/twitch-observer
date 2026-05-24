@@ -564,9 +564,6 @@ class PatternCommandService:
             **placeholders,
         )
 
-    def _pattern_type(self, is_regex: bool, *, language: str) -> str:
-        return self._presenter().pattern_type(is_regex, language=language)
-
     def _pattern_type_for(self, context: str, is_regex: bool, *, language: str) -> str:
         suffix = "regex" if is_regex else "ping"
         key = f"results.pattern.type_for.{context}.{suffix}"

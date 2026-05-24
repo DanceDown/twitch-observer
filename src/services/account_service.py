@@ -19,7 +19,6 @@ from src.discord_results import build_result, build_thread_result, discord_user_
 from src.events.event_types import (
     DiscordCommandResult,
     DiscordResultStyle,
-    ShowAccountCommand,
     StartAccountLinkCommand,
     UnlinkAccountCommand,
 )
@@ -32,7 +31,7 @@ from src.utils.permissions import ObserverPermission
 logger = logging.getLogger(__name__)
 __all__ = ("AccountCommandService", "AccountNotificationSender")
 
-AccountCommand = StartAccountLinkCommand | UnlinkAccountCommand | ShowAccountCommand
+AccountCommand = StartAccountLinkCommand | UnlinkAccountCommand
 
 @dataclass(slots=True)
 class AccountCommandService:
@@ -61,9 +60,6 @@ class AccountCommandService:
 
     async def handle_unlink_command(self, command: UnlinkAccountCommand) -> DiscordCommandResult:
         return await self._runner.run(command, lambda: self._unlink_account(command), logger_=logger)
-
-    async def handle_show_command(self, command: ShowAccountCommand) -> DiscordCommandResult:
-        return await self._runner.run(command, lambda: self._show_account_removed(command), logger_=logger)
 
     async def _start_link(self, command: StartAccountLinkCommand) -> DiscordCommandResult:
         thread = self._require_owner_thread(command=command)
@@ -146,18 +142,6 @@ class AccountCommandService:
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
-        )
-
-    def _show_account_removed(self, command: ShowAccountCommand) -> DiscordCommandResult:
-        thread = (
-            None if command.discord_channel_id is None else self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
-        )
-        return build_thread_result(
-            self.localizer,
-            "results.account.show_moved",
-            thread=thread,
-            style=DiscordResultStyle.INFO,
-            ephemeral=True,
         )
 
     def _require_thread_with_permission(
