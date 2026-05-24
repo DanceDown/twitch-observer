@@ -10,7 +10,7 @@
         "placeholders": {
           "ITEMS": {
             "list": {
-              "item_format": "{RAW:LIST_ITEM}",
+              "item_format": "`{CODE:LIST_ITEM}`",
               "separator": ", "
             }
           }
@@ -21,18 +21,18 @@
         "placeholders": {
           "ITEMS": {
             "list": {
-              "item_format": "{RAW:LIST_ITEM}",
+              "item_format": "`{CODE:LIST_ITEM}`",
               "separator": ", "
             }
           }
         }
       },
       "all_tracked_channels_except": {
-        "template": "`Jeder beobachtete Kanal au?er` {RAW:ITEMS}",
+        "template": "`Jeder beobachtete Kanal außer` {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
             "list": {
-              "item_format": "{RAW:LIST_ITEM}",
+              "item_format": "`{CODE:LIST_ITEM}`",
               "separator": ", "
             }
           }
@@ -43,18 +43,18 @@
         "placeholders": {
           "ITEMS": {
             "list": {
-              "item_format": "{RAW:LIST_ITEM}",
+              "item_format": "`{CODE:LIST_ITEM}`",
               "separator": ", "
             }
           }
         }
       },
       "all_tracked_users_except": {
-        "template": "`Alle bekannten Twitch-Nutzer au?er` {RAW:ITEMS}",
+        "template": "`Alle bekannten Twitch-Nutzer außer` {RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
             "list": {
-              "item_format": "{RAW:LIST_ITEM}",
+              "item_format": "`{CODE:LIST_ITEM}`",
               "separator": ", "
             }
           }
@@ -121,7 +121,7 @@
       },
       "missing_channel_access": {
         "title": "Kein Kanalzugriff",
-        "body": "Ich kann leider nicht auf diesen Kanal zugreifen <a:sadcat:1497721262645051392>\nWenn es ein privater Thread ist, kannst du mich mit `@` erwÃƒÂ¤hnen und es noch einmal probieren <a:yes:1497686393369919559>",
+        "body": "Ich kann leider nicht auf diesen Kanal zugreifen <a:sadcat:1497721262645051392>\nWenn es ein privater Thread ist, kannst du mich mit `@` erwähnen und es noch einmal probieren <a:yes:1497686393369919559>",
         "footer": ""
       },
       "leave_denied": {
@@ -131,12 +131,12 @@
       },
       "left": {
         "title": "Verlassen",
-        "body": "{RAW:USER} hat mich rausgeworfen <a:sadcat:1497721262645051392>\nAlle gespeicherten Einstellungen wurden gelÃƒÂ¶scht <a:ppPoof:1497721964259967068>",
+        "body": "{RAW:USER} hat mich rausgeworfen <a:sadcat:1497721262645051392>\nAlle gespeicherten Einstellungen wurden gelöscht <a:ppPoof:1497721964259967068>",
         "footer": ""
       },
       "enable_denied": {
         "title": "Keine Berechtigung",
-        "body": "Ich hÃƒÂ¶re nicht auf dich <:_b:1497722659793014966>",
+        "body": "Ich höre nicht auf dich <:_b:1497722659793014966>",
         "footer": ""
       },
       "already_on": {
@@ -156,12 +156,12 @@
       },
       "disabled": {
         "title": "Deaktiviert",
-        "body": "{RAW:USER} meinte, es ist Zeit fÃƒÂ¼r ein Nickerchen <:Bedge:1497723609517658223>",
+        "body": "{RAW:USER} meinte, es ist Zeit für ein Nickerchen <:Bedge:1497723609517658223>",
         "footer": ""
       },
       "color_denied": {
         "title": "Keine Berechtigung",
-        "body": "Wag es ja nicht, meine Farbe zu ÃƒÂ¤ndern <:d_:1497685665960165417>",
+        "body": "Wag es ja nicht, meine Farbe zu ändern <:d_:1497685665960165417>",
         "footer": ""
       },
       "color_cleared": {
@@ -171,43 +171,43 @@
       },
       "color_updated": {
         "title": "Farbe aktualisiert",
-        "body": "{RAW:USER} hat meine Farbe auf {CODE:COLOR} geÃƒÂ¤ndert <:WOWERS:1497724770848997406>",
+        "body": "{RAW:USER} hat meine Farbe auf `{CODE:COLOR}` geändert <:WOWERS:1497724770848997406>",
         "footer": ""
       },
       "language_denied": {
         "title": "Keine Berechtigung",
-        "body": "Du kannst meine Sprache nicht ÃƒÂ¤ndern <a:Tssk:1497685026945630208>",
+        "body": "Du kannst meine Sprache nicht ändern <a:Tssk:1497685026945630208>",
         "footer": ""
       },
       "language_updated": {
         "title": "Sprache aktualisiert",
-        "body": "{RAW:USER} hat mir {CODE:LANGUAGE_NAME} beigebracht <a:yo:1497686448717959369>",
+        "body": "{RAW:USER} hat mir `{CODE:LANGUAGE_NAME}` beigebracht <a:yo:1497686448717959369>",
         "footer": ""
       },
       "already_color": {
         "title": "Diese Farbe habe ich schon",
-        "body": "Ich trage schon {CODE:COLOR} <:oopsie:1497720439810687006>",
+        "body": "Ich trage schon `{CODE:COLOR}` <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "already_language": {
         "title": "Diese Sprache spreche ich schon",
-        "body": "Ich spreche schon {CODE:LANGUAGE_NAME} <:oopsie:1497720439810687006>",
+        "body": "Ich spreche schon `{CODE:LANGUAGE_NAME}` <:oopsie:1497720439810687006>",
         "footer": ""
       }
     },
     "channel": {
       "permission_denied": {
         "title": "Keine Berechtigung",
-        "body": "Du kannst die Twitch-KanÃƒÂ¤le, die ich beobachte, nicht ÃƒÂ¤ndern <a:Tssk:1497685026945630208>",
+        "body": "Du kannst die Twitch-Kanäle, die ich beobachte, nicht ändern <a:Tssk:1497685026945630208>",
         "footer": ""
       },
       "already_added": {
-        "title": "Bereits hinzugefÃƒÂ¼gt",
+        "title": "Bereits hinzugefügt",
         "body": "Ich beobachte den Twitch-Kanal von [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) bereits <:Binoculars:1497727665283662077>",
         "footer": ""
       },
       "added": {
-        "title": "Kanal hinzugefÃƒÂ¼gt",
+        "title": "Kanal hinzugefügt",
         "body": "{RAW:USER} hat mir gesagt, ich soll den Twitch-Kanal von [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) beobachten <:Binoculars:1497727665283662077>",
         "footer": ""
       },
@@ -218,12 +218,12 @@
       },
       "color_cleared": {
         "title": "Kanalfarbe entfernt",
-        "body": "{RAW:USER} hat die Farbe fÃƒÂ¼r den Twitch-Kanal von [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) entfernt <:ApuApproved:1497724288256446465>",
+        "body": "{RAW:USER} hat die Farbe für den Twitch-Kanal von [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) entfernt <:ApuApproved:1497724288256446465>",
         "footer": ""
       },
       "color_updated": {
         "title": "Kanalfarbe aktualisiert",
-        "body": "{RAW:USER} hat die Farbe fÃƒÂ¼r den Twitch-Kanal von [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) auf {CODE:COLOR} geÃƒÂ¤ndert <:WOWERS:1497724770848997406>",
+        "body": "{RAW:USER} hat die Farbe für den Twitch-Kanal von [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) auf `{CODE:COLOR}` geändert <:WOWERS:1497724770848997406>",
         "footer": ""
       },
       "in_use": {
@@ -240,22 +240,22 @@
     "user": {
       "permission_denied": {
         "title": "Keine Berechtigung",
-        "body": "Du kannst die Twitch-Nutzer, an die ich mich erinnern soll, nicht ÃƒÂ¤ndern <a:Tssk:1497685026945630208>",
+        "body": "Du kannst die Twitch-Nutzer, an die ich mich erinnern soll, nicht ändern <a:Tssk:1497685026945630208>",
         "footer": ""
       },
       "already_added": {
-        "title": "Bereits hinzugefÃƒÂ¼gt",
+        "title": "Bereits hinzugefügt",
         "body": "Ich kenne [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) bereits <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "added": {
-        "title": "Nutzer hinzugefÃƒÂ¼gt",
+        "title": "Nutzer hinzugefügt",
         "body": "{RAW:USER} hat mir gesagt, ich soll mir [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) merken <a:peepoSmart:1497731090704498781>",
         "footer": ""
       },
       "not_found": {
         "title": "Nicht gefunden",
-        "body": "Ich weiÃƒÅ¸ nicht, wer [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) ist <:oopsie:1497720439810687006>",
+        "body": "Ich weiß nicht, wer [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) ist <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "in_use": {
@@ -276,7 +276,7 @@
         "footer": ""
       },
       "overview": {
-        "title": "KonfigurationsÃƒÂ¼bersicht",
+        "title": "Konfigurationsübersicht",
         "placeholders": {
           "SECTION_LIST": {
             "list": {
@@ -293,7 +293,7 @@
       "existing_account": "ein bestehendes Twitch-Konto",
       "permission_denied": {
         "title": "Keine Berechtigung",
-        "body": "Du kannst das Twitch-Konto hier nicht ÃƒÂ¤ndern <a:Tssk:1497685026945630208>",
+        "body": "Du kannst das Twitch-Konto hier nicht ändern <a:Tssk:1497685026945630208>",
         "footer": ""
       },
       "owner_denied": {
@@ -302,18 +302,18 @@
         "footer": ""
       },
       "already_linked": {
-        "title": "Konto bereits verknÃƒÂ¼pft",
+        "title": "Konto bereits verknüpft",
         "body": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) ist hier schon verbunden. Trenne es zuerst, bevor du ein neues Twitch-Konto verbindest <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "login_pending": {
         "title": "Login wartet schon",
-        "body": "Ãƒâ€“ffne den Twitch-Login hier: [Twitch verbinden]({RAW:VERIFICATION_URI})\n\nCode: {CODE:USER_CODE}\nGÃƒÂ¼ltig bis: {CODE:EXPIRES_AT} <a:peepoSmart:1497731090704498781>",
+        "body": "Öffne den Twitch-Login hier: [Twitch verbinden]({RAW:VERIFICATION_URI})\n\nCode: `{CODE:USER_CODE}`\nGültig bis: `{CODE:EXPIRES_AT}` <a:peepoSmart:1497731090704498781>",
         "footer": ""
       },
       "finish_login": {
-        "title": "Twitch-Login abschlieÃƒÅ¸en",
-        "body": "Ãƒâ€“ffne den Twitch-Login hier: [Twitch verbinden]({RAW:VERIFICATION_URI})\n\nCode: {CODE:USER_CODE}\nGÃƒÂ¼ltig bis: {CODE:EXPIRES_AT} <a:peepoSmart:1497731090704498781>",
+        "title": "Twitch-Login abschließen",
+        "body": "Öffne den Twitch-Login hier: [Twitch verbinden]({RAW:VERIFICATION_URI})\n\nCode: `{CODE:USER_CODE}`\nGültig bis: `{CODE:EXPIRES_AT}` <a:peepoSmart:1497731090704498781>",
         "footer": ""
       },
       "no_linked_account": {
@@ -343,24 +343,24 @@
       },
       "linked": {
         "title": "Twitch-Konto verbunden",
-        "body": "{RAW:USER} hat [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) verbunden. Auto-Antworten kÃƒÂ¶nnen jetzt als dieses Konto schreiben <a:yo:1497686448717959369>",
+        "body": "{RAW:USER} hat [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) verbunden. Auto-Antworten können jetzt als dieses Konto schreiben <a:yo:1497686448717959369>",
         "footer": ""
       }
     },
     "permission": {
-      "generic_denied": "DafÃƒÂ¼r fehlt dir die passende Berechtigung",
+      "generic_denied": "Dafür fehlt dir die passende Berechtigung",
       "permission_denied": {
         "title": "Keine Berechtigung",
-        "body": "Du kannst hier keine Berechtigungen ÃƒÂ¤ndern <a:Tssk:1497685026945630208>",
+        "body": "Du kannst hier keine Berechtigungen ändern <a:Tssk:1497685026945630208>",
         "footer": ""
       },
       "owner_locked": {
-        "title": "Besitzer geschÃƒÂ¼tzt",
-        "body": "Der Besitzer hat automatisch alle Berechtigungen und kann hier nicht geÃƒÂ¤ndert werden <:oopsie:1497720439810687006>",
+        "title": "Besitzer geschützt",
+        "body": "Der Besitzer hat automatisch alle Berechtigungen und kann hier nicht geändert werden <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "cleared": {
-        "title": "Berechtigungen gelÃƒÂ¶scht",
+        "title": "Berechtigungen gelöscht",
         "body": "{RAW:USER} hat alle Berechtigungen von {RAW:TARGET} entfernt <:ApuApproved:1497724288256446465>",
         "footer": ""
       },
@@ -369,7 +369,7 @@
         "body": "{RAW:TARGET} hat hier keine Berechtigungen <:ShrugMan:1497685241962430717>",
         "footer": ""
       },
-      "empty_selection": "WÃƒÂ¤hle zuerst mindestens eine Berechtigung aus <:oopsie:1497720439810687006>",
+      "empty_selection": "Wähle zuerst mindestens eine Berechtigung aus <:oopsie:1497720439810687006>",
       "granted": {
         "title": "Berechtigungen vergeben",
         "placeholders": {
@@ -413,7 +413,7 @@
     "reply": {
       "manage_permission_denied": {
         "title": "Keine Berechtigung",
-        "body": "Du kannst hier keine Auto-Antworten hinzufÃƒÂ¼gen oder entfernen <a:Tssk:1497685026945630208>",
+        "body": "Du kannst hier keine Auto-Antworten hinzufügen oder entfernen <a:Tssk:1497685026945630208>",
         "footer": ""
       },
       "toggle_permission_denied": {
@@ -423,7 +423,7 @@
       },
       "pattern_not_found": {
         "title": "Ping nicht gefunden",
-        "body": "Ich finde keinen Ping mit dieser ID <a:OhNo:1497685055948980306>",
+        "body": "Ich finde keinen Ping mit dieser Nummer <a:OhNo:1497685055948980306>",
         "footer": ""
       },
       "no_linked_account": {
@@ -432,7 +432,7 @@
         "footer": ""
       },
       "empty_message": "Gib zuerst eine Antwort-Nachricht ein <:oopsie:1497720439810687006>",
-      "message_too_long": "Twitch-Nachrichten dÃƒÂ¼rfen hÃƒÂ¶chstens 500 Zeichen haben <a:OhNo:1497685055948980306>",
+      "message_too_long": "Twitch-Nachrichten dürfen höchstens 500 Zeichen haben <a:OhNo:1497685055948980306>",
       "already_exists": {
         "title": "Auto-Antwort existiert schon",
         "body": "Dieser Ping hat schon eine Auto-Antwort. Entferne sie zuerst <:oopsie:1497720439810687006>",
@@ -443,8 +443,8 @@
         "reply": "Antwort auf die gematchte Nachricht"
       },
       "added_pattern": {
-        "title": "Auto-Antwort hinzugefÃƒÂ¼gt",
-        "body": "{RAW:USER} hat eine Auto-Antwort an Ping {CODE:ID} gehÃƒÂ¤ngt <a:yo:1497686448717959369>\nModus: {CODE:MODE}\nNachricht: {RAW:MESSAGE} ",
+        "title": "Auto-Antwort hinzugefügt",
+        "body": "{RAW:USER} hat eine Auto-Antwort an Ping Nummer #`{CODE:ID}` gehängt <a:yo:1497686448717959369>\nModus: `{CODE:MODE}`\nNachricht: {RAW:MESSAGE}",
         "footer": ""
       },
       "none_configured": {
@@ -454,7 +454,7 @@
       },
       "removed_pattern": {
         "title": "Auto-Antwort entfernt",
-        "body": "{RAW:USER} hat die Auto-Antwort von Ping {CODE:ID} entfernt <:ApuApproved:1497724288256446465>\nNachricht: {RAW:MESSAGE}",
+        "body": "{RAW:USER} hat die Auto-Antwort von Ping Nummer #`{CODE:ID}` entfernt <:ApuApproved:1497724288256446465>\nNachricht: {RAW:MESSAGE}",
         "footer": ""
       },
       "already_disabled": {
@@ -469,24 +469,24 @@
       },
       "disabled_pattern": {
         "title": "Auto-Antwort deaktiviert",
-        "body": "{RAW:USER} hat die Auto-Antwort von Ping {CODE:ID} deaktiviert <a:yes:1497686393369919559>\nNachricht: {RAW:MESSAGE}",
+        "body": "{RAW:USER} hat die Auto-Antwort von Ping Nummer #`{CODE:ID}` deaktiviert <a:yes:1497686393369919559>\nNachricht: {RAW:MESSAGE}",
         "footer": ""
       },
       "enabled_pattern": {
         "title": "Auto-Antwort aktiviert",
-        "body": "{RAW:USER} hat die Auto-Antwort von Ping {CODE:ID} aktiviert <a:yes:1497686393369919559>\nNachricht: {RAW:MESSAGE}",
+        "body": "{RAW:USER} hat die Auto-Antwort von Ping Nummer #`{CODE:ID}` aktiviert <a:yes:1497686393369919559>\nNachricht: {RAW:MESSAGE}",
         "footer": ""
       },
-      "event_unavailable": "Event-Auto-Antworten sind hier gerade nicht verfÃƒÂ¼gbar <a:peepoConfused:1497729266266275840>",
+      "event_unavailable": "Event-Auto-Antworten sind hier gerade nicht verfügbar <a:peepoConfused:1497729266266275840>",
       "event_not_found": {
         "title": "Event nicht gefunden",
         "body": "Dieses Live- oder Offline-Event ist hier nicht eingerichtet <a:OhNo:1497685055948980306>",
         "footer": ""
       },
-      "unsupported_event": "Nur Live- und Offline-Events von beobachteten Twitch-KanÃƒÂ¤len passen hier <:oopsie:1497720439810687006>",
+      "unsupported_event": "Nur Live- und Offline-Events von beobachteten Twitch-Kanälen passen hier <:oopsie:1497720439810687006>",
       "added_event": {
-        "title": "Auto-Antwort hinzugefÃƒÂ¼gt",
-        "body": "{RAW:USER} hat eine Auto-Antwort fÃƒÂ¼r {CODE:CHANNEL} bei {CODE:STATE} hinzugefÃƒÂ¼gt <a:yo:1497686448717959369>\nNachricht: {RAW:MESSAGE} ",
+        "title": "Auto-Antwort hinzugefügt",
+        "body": "{RAW:USER} hat eine Auto-Antwort für `{CODE:CHANNEL}` bei `{CODE:STATE}` hinzugefügt <a:yo:1497686448717959369>\nNachricht: {RAW:MESSAGE}",
         "footer": ""
       },
       "none_configured_event": {
@@ -496,24 +496,24 @@
       },
       "removed_event": {
         "title": "Auto-Antwort entfernt",
-        "body": "{RAW:USER} hat die {CODE:STATE}-Auto-Antwort f?r {CODE:CHANNEL} entfernt <:ApuApproved:1497724288256446465>\nNachricht: {RAW:MESSAGE}",
+        "body": "{RAW:USER} hat die `{CODE:STATE}`-Auto-Antwort für `{CODE:CHANNEL}` entfernt <:ApuApproved:1497724288256446465>\nNachricht: {RAW:MESSAGE}",
         "footer": ""
       },
       "disabled_event": {
         "title": "Auto-Antwort deaktiviert",
-        "body": "{RAW:USER} hat die {CODE:STATE}-Auto-Antwort f?r {CODE:CHANNEL} deaktiviert <a:yes:1497686393369919559>\nNachricht: {RAW:MESSAGE}",
+        "body": "{RAW:USER} hat die `{CODE:STATE}`-Auto-Antwort für `{CODE:CHANNEL}` deaktiviert <a:yes:1497686393369919559>\nNachricht: {RAW:MESSAGE}",
         "footer": ""
       },
       "enabled_event": {
         "title": "Auto-Antwort aktiviert",
-        "body": "{RAW:USER} hat die {CODE:STATE}-Auto-Antwort f?r {CODE:CHANNEL} aktiviert <a:yes:1497686393369919559>\nNachricht: {RAW:MESSAGE}",
+        "body": "{RAW:USER} hat die `{CODE:STATE}`-Auto-Antwort für `{CODE:CHANNEL}` aktiviert <a:yes:1497686393369919559>\nNachricht: {RAW:MESSAGE}",
         "footer": ""
       }
     },
     "channel_event": {
       "permission_denied": {
         "title": "Keine Berechtigung",
-        "body": "Du kannst hier keine Live- oder Offline-Benachrichtigungen ÃƒÂ¤ndern <a:Tssk:1497685026945630208>",
+        "body": "Du kannst hier keine Live- oder Offline-Benachrichtigungen ändern <a:Tssk:1497685026945630208>",
         "footer": ""
       },
       "channel_not_tracked": {
@@ -527,53 +527,53 @@
         "offline": "Offline"
       },
       "notification_added": {
-        "title": "Benachrichtigung hinzugefÃƒÂ¼gt",
-        "body": "{RAW:USER} hat den {CODE:STATE}-Ping fÃƒÂ¼r [`{CODE:CHANNEL}`](https://www.twitch.tv/{RAW:LOGIN}) hinzugefÃƒÂ¼gt <:Binoculars:1497727665283662077>",
+        "title": "Benachrichtigung hinzugefügt",
+        "body": "{RAW:USER} hat die `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` hinzugefügt <:Binoculars:1497727665283662077>",
         "footer": ""
       },
       "notification_removed": {
         "title": "Benachrichtigung entfernt",
-        "body": "{RAW:USER} hat den {CODE:STATE}-Ping fÃƒÂ¼r [`{CODE:CHANNEL}`](https://www.twitch.tv/{RAW:LOGIN}) entfernt <:ApuApproved:1497724288256446465>",
+        "body": "{RAW:USER} hat die `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` entfernt <:ApuApproved:1497724288256446465>",
         "footer": ""
       },
       "notification_disabled": {
         "title": "Benachrichtigung deaktiviert",
-        "body": "{RAW:USER} hat den {CODE:STATE}-Ping fÃƒÂ¼r [`{CODE:CHANNEL}`](https://www.twitch.tv/{RAW:LOGIN}) deaktiviert <:ApuApproved:1497724288256446465>",
+        "body": "{RAW:USER} hat die `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` deaktiviert <:ApuApproved:1497724288256446465>",
         "footer": ""
       },
       "notification_enabled": {
         "title": "Benachrichtigung aktiviert",
-        "body": "{RAW:USER} hat den {CODE:STATE}-Ping fÃƒÂ¼r [`{CODE:CHANNEL}`](https://www.twitch.tv/{RAW:LOGIN}) aktiviert <a:yes:1497686393369919559>",
+        "body": "{RAW:USER} hat die `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` aktiviert <a:yes:1497686393369919559>",
         "footer": ""
       },
       "already_configured": {
         "title": "Schon eingerichtet",
-        "body": "Der {CODE:STATE}-Ping fÃƒÂ¼r [`{CODE:CHANNEL}`](https://www.twitch.tv/{RAW:LOGIN}) ist schon eingerichtet <:oopsie:1497720439810687006>",
+        "body": "Die `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` ist schon eingerichtet <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "none_configured": {
         "title": "Nicht eingerichtet",
-        "body": "FÃƒÂ¼r [`{CODE:CHANNEL}`](https://www.twitch.tv/{RAW:LOGIN}) gibt es noch keinen {CODE:STATE}-Ping <:oopsie:1497720439810687006>",
+        "body": "Es gibt noch keine `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "already_disabled": {
         "title": "Bereits deaktiviert",
-        "body": "Der {CODE:STATE}-Ping fÃƒÂ¼r [`{CODE:CHANNEL}`](https://www.twitch.tv/{RAW:LOGIN}) ist schon deaktiviert <a:Lurk:1497684902135463986>",
+        "body": "Die `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` ist schon deaktiviert <a:Lurk:1497684902135463986>",
         "footer": ""
       },
       "already_enabled": {
         "title": "Bereits aktiviert",
-        "body": "Der {CODE:STATE}-Ping fÃƒÂ¼r [`{CODE:CHANNEL}`](https://www.twitch.tv/{RAW:LOGIN}) ist schon aktiv <a:yes:1497686393369919559>",
+        "body": "Die `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` ist schon aktiv <a:yes:1497686393369919559>",
         "footer": ""
       },
       "went_live": {
         "title": "Kanal ist live",
-        "body": "{CODE:CHANNEL} ist jetzt live <:Binoculars:1497727665283662077>",
+        "body": "`{CODE:CHANNEL}` ist jetzt live <:Binoculars:1497727665283662077>",
         "footer": ""
       },
       "went_offline": {
         "title": "Kanal ist offline",
-        "body": "{CODE:CHANNEL} ist jetzt offline <a:Lurk:1497684902135463986>",
+        "body": "`{CODE:CHANNEL}` ist jetzt offline <a:Lurk:1497684902135463986>",
         "footer": ""
       }
     },
@@ -584,37 +584,37 @@
         "footer": ""
       },
       "empty_message": "Gib mir zuerst eine Nachricht, dann kann ich sie senden <a:OhNo:1497685055948980306>",
-      "message_too_long": "Die Nachricht ist zu lang fÃƒÂ¼r Twitch. Bitte bleib bei hÃƒÂ¶chstens 500 Zeichen <a:OhNo:1497685055948980306>",
+      "message_too_long": "Die Nachricht ist zu lang für Twitch. Bitte bleib bei höchstens 500 Zeichen <a:OhNo:1497685055948980306>",
       "channel_not_tracked": {
         "title": "Kanal nicht beobachtet",
-        "body": "Ich beobachte [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) noch nicht. FÃƒÂ¼ge den Kanal zuerst mit `/channel add` hinzu <:Binoculars:1497727665283662077>",
+        "body": "Ich beobachte [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) noch nicht. Füge den Kanal zuerst mit `/channel` hinzu <:Binoculars:1497727665283662077>",
         "footer": ""
       },
       "no_linked_account": {
-        "title": "Kein verknÃƒÂ¼pftes Konto",
-        "body": "VerknÃƒÂ¼pfe zuerst mit `/account link` ein Twitch-Konto, dann kann ich im Chat sprechen <:oopsie:1497720439810687006>",
+        "title": "Kein verknüpftes Konto",
+        "body": "Verknüpfe zuerst mit `/account` ein Twitch-Konto, dann kann ich im Chat sprechen <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "account_expired": {
         "title": "Twitch-Konto abgelaufen",
-        "body": "Das verknÃƒÂ¼pfte Twitch-Konto funktioniert nicht mehr. VerknÃƒÂ¼pfe es erneut mit `/account link` <a:sadcat:1497721262645051392>",
+        "body": "Das verknüpfte Twitch-Konto funktioniert nicht mehr. Verknüpfe es erneut mit `/account` <a:sadcat:1497721262645051392>",
         "footer": ""
       },
       "reply_sent": {
         "title": "Twitch-Antwort gesendet",
-        "body": "Ich habe im Chat von [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) geantwortet <a:yo:1497686448717959369>\nAntwort-Ziel: {CODE:REPLY_TARGET}\nNachricht: {CODE:MESSAGE}",
+        "body": "{RAW:USER} hat im Chat von [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) geantwortet <a:yo:1497686448717959369>\nAntwort-Ziel: `{CODE:REPLY_TARGET}`\nNachricht: `{CODE:MESSAGE}`",
         "footer": ""
       },
       "message_sent": {
         "title": "Twitch-Nachricht gesendet",
-        "body": "Ich habe das in den Chat von [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) geschickt <a:yo:1497686448717959369>\nNachricht: {CODE:MESSAGE}",
+        "body": "{RAW:USER} hat eine Nachricht in den Chat von [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) gesendet <a:yo:1497686448717959369>\nNachricht: `{CODE:MESSAGE}`",
         "footer": ""
       }
     },
     "pattern": {
       "manage_permission_denied": {
         "title": "Keine Berechtigung",
-        "body": "Du darfst hier keine Pings hinzufÃƒÂ¼gen oder entfernen <a:Tssk:1497685026945630208>",
+        "body": "Du darfst hier keine Pings hinzufügen oder entfernen <a:Tssk:1497685026945630208>",
         "footer": ""
       },
       "toggle_permission_denied": {
@@ -628,23 +628,23 @@
         "footer": ""
       },
       "empty_pattern": "Sag mir zuerst, wonach ich Ausschau halten soll <a:OhNo:1497685055948980306>",
-      "invalid_color": "Diese Farbe sieht verdÃƒÂ¤chtig aus. Nutze bitte etwas wie `#9146FF` <:d_:1497685665960165417>",
-      "invalid_priority": "Die PrioritÃƒÂ¤t muss eine Zahl zwischen `0` und `9` sein <:oopsie:1497720439810687006>",
+      "invalid_color": "Diese Farbe sieht verdächtig aus. Nutze bitte etwas wie `#9146FF` <:d_:1497685665960165417>",
+      "invalid_priority": "Die Priorität muss eine Zahl zwischen `0` und `9` sein <:oopsie:1497720439810687006>",
       "unsupported_channel_scope": "Dieser Kanalbereich verwirrt mich <a:peepoConfused:1497729266266275840>",
-      "unexpected_selected_channels": "Bei allen beobachteten KanÃƒÂ¤len brauche ich keine extra Auswahl <:ShrugMan:1497685241962430717>",
-      "missing_selected_channels": "WÃƒÂ¤hle fÃƒÂ¼r diesen Bereich zuerst mindestens einen Kanal aus <:Binoculars:1497727665283662077>",
-      "channel_not_tracked": "Ich beobachte [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) noch nicht. FÃƒÂ¼ge den Kanal zuerst mit `/channel` hinzu <:Binoculars:1497727665283662077>",
+      "unexpected_selected_channels": "Bei allen beobachteten Kanälen brauche ich keine extra Auswahl <:ShrugMan:1497685241962430717>",
+      "missing_selected_channels": "Wähle für diesen Bereich zuerst mindestens einen Kanal aus <:Binoculars:1497727665283662077>",
+      "channel_not_tracked": "Ich beobachte [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) noch nicht. Füge den Kanal zuerst mit `/channel` hinzu <:Binoculars:1497727665283662077>",
       "unsupported_user_scope": "Dieser Nutzerbereich verwirrt mich <a:peepoConfused:1497729266266275840>",
-      "missing_selected_users": "WÃƒÂ¤hle fÃƒÂ¼r diesen Bereich zuerst mindestens einen Twitch-Nutzer aus <a:peepoSmart:1497731090704498781>",
-      "user_not_tracked": "Ich erinnere mich noch nicht an [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}). FÃƒÂ¼ge den Nutzer zuerst mit `/user` hinzu <a:peepoSmart:1497731090704498781>",
+      "missing_selected_users": "Wähle für diesen Bereich zuerst mindestens einen Twitch-Nutzer aus <a:peepoSmart:1497731090704498781>",
+      "user_not_tracked": "Ich erinnere mich noch nicht an [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}). Füge den Nutzer zuerst mit `/user` hinzu <a:peepoSmart:1497731090704498781>",
       "already_exists": {
         "title": "Bereits vorhanden",
-        "body": "Dieses {ALREADY_EXISTS_TYPE} kenne ich schon als ID {CODE:ID} <:oopsie:1497720439810687006>",
+        "body": "Dieses {ALREADY_EXISTS_TYPE} kenne ich schon als Ping Nummer #`{CODE:ID}` <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "already_exists_other": {
         "title": "Bereits vorhanden",
-        "body": "Ein anderer Ping nutzt diese Einstellungen schon als ID {CODE:ID} <:oopsie:1497720439810687006>",
+        "body": "Ein anderer Ping nutzt diese Einstellungen schon als Ping Nummer #`{CODE:ID}` <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "not_found_remove": {
@@ -664,7 +664,7 @@
       },
       "not_found_id": {
         "title": "Nicht gefunden",
-        "body": "Ich kenne keinen Ping mit dieser ID <a:nope:1497686414328860713>",
+        "body": "Ich kenne keinen Ping mit dieser Nummer <a:nope:1497686414328860713>",
         "footer": ""
       },
       "already_disabled": {
@@ -684,17 +684,17 @@
       },
       "removed_result": {
         "title": "{REMOVED_TYPE} entfernt",
-        "body": "hat {REMOVED_BODY_TYPE} {CODE:ID} entfernt <:ApuApproved:1497724288256446465>\n{REMOVED_BODY_TYPE}: {CODE:TEXT}",
+        "body": "{REMOVED_BODY_TYPE} #`{CODE:ID}` entfernt <:ApuApproved:1497724288256446465>\n{REMOVED_BODY_TYPE}: `{CODE:TEXT}`",
         "footer": ""
       },
       "disabled_result": {
         "title": "{DISABLED_TYPE} deaktiviert",
-        "body": "hat {DISABLED_BODY_TYPE} {CODE:ID} deaktiviert <:ApuApproved:1497724288256446465>\n{DISABLED_BODY_TYPE}: {CODE:TEXT}",
+        "body": "{DISABLED_BODY_TYPE} #`{CODE:ID}` deaktiviert <:ApuApproved:1497724288256446465>\n{DISABLED_BODY_TYPE}: `{CODE:TEXT}`",
         "footer": ""
       },
       "enabled_result": {
         "title": "{ENABLED_TYPE} aktiviert",
-        "body": "hat {ENABLED_BODY_TYPE} {CODE:ID} aktiviert <a:yes:1497686393369919559>\n{ENABLED_BODY_TYPE}: {CODE:TEXT}",
+        "body": "{ENABLED_BODY_TYPE} #`{CODE:ID}` aktiviert <a:yes:1497686393369919559>\n{ENABLED_BODY_TYPE}: `{CODE:TEXT}`",
         "footer": ""
       },
       "updated_result": {
@@ -766,8 +766,8 @@
       },
       "offline_state": {
         "both": "Online und offline",
-        "online": "Nur wÃƒÂ¤hrend live",
-        "offline": "Nur wÃƒÂ¤hrend offline"
+        "online": "Nur während live",
+        "offline": "Nur während offline"
       },
       "scope": {
         "channel_all": "Jeder beobachtete Kanal",
@@ -783,7 +783,7 @@
           }
         },
         "channel_except": {
-          "template": "`Jeder beobachtete Kanal au?er` {RAW:ITEMS}",
+          "template": "`Jeder beobachtete Kanal außer` {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
               "list": {
@@ -794,7 +794,7 @@
           }
         },
         "channel_tracked_except": {
-          "template": "`Jeder beobachtete Kanal au?er` {RAW:ITEMS}",
+          "template": "`Jeder beobachtete Kanal außer` {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
               "list": {
@@ -817,7 +817,7 @@
           }
         },
         "user_except": {
-          "template": "`Alle au?er` {RAW:ITEMS}",
+          "template": "`Alle außer` {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
               "list": {
@@ -828,7 +828,7 @@
           }
         },
         "user_tracked_except": {
-          "template": "`Alle bekannten Twitch-Nutzer au?er` {RAW:ITEMS}",
+          "template": "`Alle bekannten Twitch-Nutzer außer` {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
               "list": {
@@ -840,33 +840,33 @@
         }
       },
       "summary": {
-        "action": "{ACTION} {TYPE} {CODE:ID} hinzugefÃƒÂ¼gt:",
-        "text": "Text: {CODE:TEXT}",
+        "action": "{ACTION} {TYPE} #`{CODE:ID}`:",
+        "text": "Text: `{CODE:TEXT}`",
         "subscribers_only": "Nur Abonnenten",
         "non_subscribers_only": "Nur Nicht-Abonnenten",
-        "only_while_live": "Nur wÃƒÂ¤hrend live",
-        "only_while_offline": "Nur wÃƒÂ¤hrend offline",
-        "case_sensitive": "Gro?-/Kleinschreibung: {CODE:VALUE}",
-        "custom_color": "Eigene Farbe: {CODE:COLOR}",
+        "only_while_live": "Nur während live",
+        "only_while_offline": "Nur während offline",
+        "case_sensitive": "Groß-/Kleinschreibung: `{CODE:VALUE}`",
+        "custom_color": "Eigene Farbe: `{CODE:COLOR}`",
         "color_inherited": "Automatisch geerbt",
-        "priority": "Priorit?t: {CODE:PRIORITY}"
+        "priority": "Priorität: `{CODE:PRIORITY}`"
       },
       "changes": {
-        "updated": "{TYPE} {CODE:ID} aktualisiert.",
-        "text": "Text: Von {CODE:BEFORE} zu {CODE:AFTER}",
-        "mode": "Modus: Von {CODE:BEFORE} zu {CODE:AFTER}",
+        "updated": "{TYPE} #`{CODE:ID}` aktualisiert.",
+        "text": "Text: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
+        "mode": "Modus: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
         "where": "Wo: Von {RAW:BEFORE} zu {RAW:AFTER}",
         "who": "Wer: Von {RAW:BEFORE} zu {RAW:AFTER}",
-        "subscribers": "Abonnenten: Von {CODE:BEFORE} zu {CODE:AFTER}",
-        "stream_state": "Stream-Status: Von {CODE:BEFORE} zu {CODE:AFTER}",
-        "case_sensitive": "Gro?-/Kleinschreibung: Von {CODE:BEFORE} zu {CODE:AFTER}",
-        "color": "Farbe: Von {CODE:BEFORE} zu {CODE:AFTER}",
-        "priority": "Priorit?t: Von {CODE:BEFORE} zu {CODE:AFTER}"
+        "subscribers": "Abonnenten: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
+        "stream_state": "Stream-Status: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
+        "case_sensitive": "Groß-/Kleinschreibung: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
+        "color": "Farbe: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
+        "priority": "Priorität: von `{CODE:BEFORE}` zu `{CODE:AFTER}`"
       }
-      },
+    },
     "validation_detail": {
       "unsupported_language": {
-        "template": "Nicht unterst?tzte Sprache. Verf?gbare Sprachen: {RAW:LANGUAGES}",
+        "template": "Nicht unterstützte Sprache. Verfügbare Sprachen: {RAW:LANGUAGES}",
         "placeholders": {
           "LANGUAGES": {
             "list": {
@@ -880,7 +880,7 @@
   },
   "show": {
     "sections": {
-      "tracked_channels": "Twitch-KanÃƒÂ¤le, die ich beobachte",
+      "tracked_channels": "Twitch-Kanäle, die ich beobachte",
       "pings": "Pings",
       "auto_replies": "Auto-Antworten",
       "tracked_users": "Nutzer, die ich kenne",
@@ -888,14 +888,14 @@
       "account": "Twitch-Konto"
     },
     "empty": {
-      "tracked_channels": "Ich beobachte noch keine KanÃƒÂ¤le <a:OhNo:1497685055948980306>",
+      "tracked_channels": "Ich beobachte noch keine Kanäle <a:OhNo:1497685055948980306>",
       "pings": "Es sind noch keine Pings gespeichert <a:OhNo:1497685055948980306>",
       "auto_replies": "Es sind keine automatischen Antworten konfiguriert <a:Lurk:1497684902135463986>",
       "tracked_users": "Ich kenne keine Twitch-Nutzer <a:nope:1497686414328860713>"
     },
     "channel": {
-      "custom_color": "Eigene Farbe: {CODE:COLOR}",
-      "live_state": "Live-Status: {CODE:STATE}",
+      "custom_color": "Eigene Farbe: `{CODE:COLOR}`",
+      "live_state": "Live-Status: `{CODE:STATE}`",
       "notifications": {
         "template": "Benachrichtigungen: {RAW:STATES}",
         "placeholders": {
@@ -909,11 +909,11 @@
       }
     },
     "pattern": {
-      "line": "{TYPE} {CODE:ID}",
-      "text": "Text: {CODE:TEXT}",
-      "priority": "Priorit?t: {CODE:PRIORITY}",
-      "custom_color": "Eigene Farbe: {CODE:COLOR}",
-      "case_sensitive": "Gro?-/Kleinschreibung",
+      "line": "{TYPE} #`{CODE:ID}`",
+      "text": "Text: `{CODE:TEXT}`",
+      "priority": "Priorität: `{CODE:PRIORITY}`",
+      "custom_color": "Eigene Farbe: `{CODE:COLOR}`",
+      "case_sensitive": "Groß-/Kleinschreibung",
       "disabled": "Deaktiviert",
       "subscribers_only": "Nur Abonnenten",
       "non_subscribers_only": "Nur Nicht-Abonnenten",
@@ -923,21 +923,21 @@
       "who": "Wer: {RAW:VALUE}"
     },
     "reply": {
-      "line": "{CODE:ID}",
-      "trigger": "Ausl?ser: {CODE:TEXT}",
-      "reply": "Antwort: {CODE:TEXT}"
+      "line": "Ping #`{CODE:ID}`",
+      "trigger": "Auslöser: `{CODE:TEXT}`",
+      "reply": "Antwort: `{CODE:TEXT}`"
     },
     "event_reply": {
-      "line": "Event {CODE:STATE}",
+      "line": "Event `{CODE:STATE}`",
       "channel": "Kanal: [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
-      "reply": "Antwort: {CODE:TEXT}",
+      "reply": "Antwort: `{CODE:TEXT}`",
       "disabled": "Deaktiviert"
     },
     "permission": {
       "owner": "Besitzer (alle Berechtigungen)",
-      "none": "Keine zusÃƒÂ¤tzlichen Berechtigungen",
+      "none": "Keine zusätzlichen Berechtigungen",
       "view": "Konfiguration ansehen",
-      "manage_channels": "KanÃƒÂ¤le hinzufÃƒÂ¼gen und entfernen",
+      "manage_channels": "Kanäle hinzufügen und entfernen",
       "toggle_patterns": "Pings aktivieren und deaktivieren",
       "manage_patterns": "Pings erstellen, bearbeiten und entfernen",
       "toggle_replies": "Auto-Antworten aktivieren und deaktivieren",
@@ -950,15 +950,15 @@
     },
     "account": {
       "linked": "Dieser Kanal ist mit {RAW:TWITCH} verbunden",
-      "token_status": "Token-Status: {CODE:STATUS}",
+      "token_status": "Token-Status: `{CODE:STATUS}`",
       "token_available": "bereit",
       "token_missing": "fehlt",
-      "pending": "{RAW:USER} hat einen {CODE:STATUS} Login-Code {CODE:USER_CODE}",
+      "pending": "{RAW:USER} hat einen `{CODE:STATUS}` Login-Code `{CODE:USER_CODE}`",
       "empty": "Hier ist kein Twitch-Konto verbunden <:oopsie:1497720439810687006>"
     },
     "show_permissions": {
       "title": "Alle Berechtigungen",
-      "body": "Die Berechtigungen f?r die jeweiligen Nutzer sind:\n{RAW:USER_LIST}\nDas waren alle Berechtigungen!",
+      "body": "Die Berechtigungen für die jeweiligen Nutzer sind:\n{RAW:USER_LIST}\nDas waren alle Berechtigungen!",
       "footer": "",
       "user_list_item": "- {USERNAME}\n{RAW:PERMISSION_LIST}",
       "permission_list_item": "  - {PERMISSION}"
@@ -972,13 +972,13 @@
     "shared": {
       "form_locked": {
         "title": "Formular gesperrt",
-        "body": "Nur die Person, die dieses Befehlsformular geÃƒÂ¶ffnet hat, kann damit interagieren.",
+        "body": "Nur die Person, die dieses Befehlsformular geöffnet hat, kann damit interagieren.",
         "footer": ""
       }
     },
     "thread_modal": {
-      "confirm_leave_title": "Verlassen bestÃƒÂ¤tigen",
-      "confirm_leave_label": "Tippe GEHEN zur BestÃƒÂ¤tigung",
+      "confirm_leave_title": "Verlassen bestätigen",
+      "confirm_leave_label": "Tippe GEHEN zur Bestätigung",
       "confirm_leave_placeholder": "GEHEN",
       "confirm_leave_cancelled": {
         "title": "Rauswurf abgebrochen",
@@ -992,7 +992,7 @@
     "account_ui": {
       "menu": {
         "title": "Twitch-Konto",
-        "body": "WÃƒÂ¤hle aus, ob du dein Twitch-Konto verbinden oder trennen mÃƒÂ¶chtest <:_33:1490384461290803430>",
+        "body": "Wähle aus, ob du dein Twitch-Konto verbinden oder trennen möchtest <:_33:1490384461290803430>",
         "footer": ""
       },
       "actions": {
@@ -1002,18 +1002,18 @@
     },
     "channel_ui": {
       "menu": {
-        "title": "KanÃƒÂ¤le",
-        "body": "Twitch-KanÃƒÂ¤le hinzufÃƒÂ¼gen, entfernen oder umfÃƒÂ¤rben.",
+        "title": "Kanäle",
+        "body": "Twitch-Kanäle hinzufügen, entfernen oder umfärben.",
         "footer": ""
       },
       "actions": {
-        "add": "HinzufÃƒÂ¼gen",
+        "add": "Hinzufügen",
         "remove": "Entfernen",
         "color": "Farbe"
       },
       "modal": {
         "add": {
-          "title": "Kanal hinzufÃƒÂ¼gen",
+          "title": "Kanal hinzufügen",
           "name_label": "Twitch-Name",
           "name_placeholder": "DanceDown"
         },
@@ -1025,15 +1025,15 @@
         },
         "select": {
           "channel_label": "Twitch-Kanal",
-          "channel_description": "WÃƒÂ¤hle einen Twitch-Kanal aus.",
+          "channel_description": "Wähle einen Twitch-Kanal aus.",
           "color_label": "Farbe",
           "color_placeholder": "z. B. #9146FF"
         }
       },
       "errors": {
         "no_channels": {
-          "title": "Keine KanÃƒÂ¤le verfÃƒÂ¼gbar",
-          "body": "Es sind keine Twitch-KanÃƒÂ¤le verfÃƒÂ¼gbar, die geÃƒÂ¤ndert werden kÃƒÂ¶nnten.",
+          "title": "Keine Kanäle verfügbar",
+          "body": "Es sind keine Twitch-Kanäle verfügbar, die geändert werden könnten.",
           "footer": ""
         }
       }
@@ -1041,16 +1041,16 @@
     "user_ui": {
       "menu": {
         "title": "Twitch-Nutzer",
-        "body": "Twitch-Nutzer hinzufÃƒÂ¼gen oder entfernen.",
+        "body": "Twitch-Nutzer hinzufügen oder entfernen.",
         "footer": ""
       },
       "actions": {
-        "add": "HinzufÃƒÂ¼gen",
+        "add": "Hinzufügen",
         "remove": "Entfernen"
       },
       "modal": {
         "add": {
-          "title": "Nutzer hinzufÃƒÂ¼gen",
+          "title": "Nutzer hinzufügen",
           "name_label": "Twitch-Name",
           "name_placeholder": "DanceDown"
         },
@@ -1062,7 +1062,7 @@
       "errors": {
         "no_users": {
           "title": "Keine Nutzer",
-          "body": "Es gibt keine bekannten Twitch-Nutzer, die entfernt werden kÃƒÂ¶nnten <a:OhNo:1497685055948980306>",
+          "body": "Es gibt keine bekannten Twitch-Nutzer, die entfernt werden könnten <a:OhNo:1497685055948980306>",
           "footer": ""
         }
       }
@@ -1070,7 +1070,7 @@
     "permission_ui": {
       "menu": {
         "title": "Berechtigungen",
-        "body": "Einer Discord-Person eine Berechtigung geben, entziehen oder alle Berechtigungen lÃƒÂ¶schen.",
+        "body": "Einer Discord-Person eine Berechtigung geben, entziehen oder alle Berechtigungen löschen.",
         "footer": ""
       },
       "actions": {
@@ -1086,7 +1086,7 @@
           "title": "Berechtigung entziehen"
         },
         "clear": {
-          "title": "Berechtigung lÃƒÂ¶schen"
+          "title": "Berechtigung löschen"
         },
         "user_label": "Discord-Nutzer",
         "permissions_label": "Berechtigungen"
@@ -1095,12 +1095,12 @@
     "live_state_ui": {
       "menu": {
         "title": "Live-Pings",
-        "body": "Verwalte Discord-Benachrichtigungen, wenn beobachtete Twitch-KanÃƒÂ¤le live oder offline gehen.",
+        "body": "Verwalte Discord-Benachrichtigungen, wenn beobachtete Twitch-Kanäle live oder offline gehen.",
         "footer": ""
       },
       "actions": {
-        "add_live": "Live-Ping hinzufÃƒÂ¼gen",
-        "add_offline": "Offline-Ping hinzufÃƒÂ¼gen",
+        "add_live": "Live-Ping hinzufügen",
+        "add_offline": "Offline-Ping hinzufügen",
         "remove": "Entfernen",
         "disable": "Deaktivieren",
         "enable": "Aktivieren"
@@ -1116,30 +1116,30 @@
         "disable_title": "Live-Ping deaktivieren",
         "enable_title": "Live-Ping aktivieren",
         "notification_label": "Live- oder Offline-Ping",
-        "notification_description": "WÃƒÂ¤hle aus, welche Discord-Benachrichtigung geÃƒÂ¤ndert werden soll.",
+        "notification_description": "Wähle aus, welche Discord-Benachrichtigung geändert werden soll.",
         "notification_option": "{CHANNEL} - {STATE}"
       },
       "modal": {
         "channel_label": "Twitch-Kanal",
-        "channel_description": "WÃƒÂ¤hle den Twitch-Kanal aus, der eine Discord-Benachrichtigung auslÃƒÂ¶sen soll, wenn er {STATE}.",
+        "channel_description": "Wähle den Twitch-Kanal aus, der eine Discord-Benachrichtigung auslösen soll, wenn er {STATE}.",
         "stream": {
           "online": {
-            "title": "Live-Benachrichtigung hinzufÃƒÂ¼gen"
+            "title": "Live-Benachrichtigung hinzufügen"
           },
           "offline": {
-            "title": "Offline-Benachrichtigung hinzufÃƒÂ¼gen"
+            "title": "Offline-Benachrichtigung hinzufügen"
           }
         }
       },
       "errors": {
         "command_unavailable": {
-          "title": "Befehl nicht verfÃƒÂ¼gbar",
+          "title": "Befehl nicht verfügbar",
           "body": "Dieser Befehl kann nur in einem Discord-Kanal verwendet werden <a:OhNo:1497685055948980306>",
           "footer": ""
         },
         "no_channels": {
-          "title": "Keine KanÃƒÂ¤le verfÃƒÂ¼gbar",
-          "body": "Du musst zuerst einen Kanal hinzufÃƒÂ¼gen <:oopsie:1497720439810687006>",
+          "title": "Keine Kanäle verfügbar",
+          "body": "Du musst zuerst einen Kanal hinzufügen <:oopsie:1497720439810687006>",
           "footer": ""
         },
         "no_remove_actions": {
@@ -1169,12 +1169,12 @@
         "reply_to_none_label": "Keine Antwort",
         "reply_to_none_description": "Als normale Nachricht senden.",
         "channel_label": "Twitch-Kanal",
-        "channel_description": "WÃƒÂ¤hle aus, wohin die Nachricht gesendet werden soll."
+        "channel_description": "Wähle aus, wohin die Nachricht gesendet werden soll."
       },
       "errors": {
         "no_channels": {
-          "title": "Keine Twitch-KanÃƒÂ¤le",
-          "body": "Du musst zuerst einen Kanal hinzufÃƒÂ¼gen <:oopsie:1497720439810687006>",
+          "title": "Keine Twitch-Kanäle",
+          "body": "Du musst zuerst einen Kanal hinzufügen <:oopsie:1497720439810687006>",
           "footer": ""
         }
       }
@@ -1185,13 +1185,13 @@
         "section_label": "Bereich"
       },
       "pagination": {
-        "empty_message": "Keine KonfigurationseintrÃƒÂ¤ge gefunden <:ShrugMan:1497685241962430717>",
-        "previous": "ZurÃƒÂ¼ck",
+        "empty_message": "Keine Konfigurationseinträge gefunden <:ShrugMan:1497685241962430717>",
+        "previous": "Zurück",
         "next": "Weiter",
         "footer": "Seite {CURRENT}/{TOTAL}",
         "locked": {
           "title": "Paginator gesperrt",
-          "body": "Du kannst diese Seiten nicht umblÃƒÂ¤ttern <a:Tssk:1497685026945630208>",
+          "body": "Du kannst diese Seiten nicht umblättern <a:Tssk:1497685026945630208>",
           "footer": ""
         },
         "item_prefix": "- "
@@ -1204,13 +1204,13 @@
         "footer": ""
       },
       "actions": {
-        "add": "HinzufÃƒÂ¼gen",
+        "add": "Hinzufügen",
         "edit": "Bearbeiten",
         "remove": "Entfernen",
         "disable": "Deaktivieren",
         "enable": "Aktivieren",
         "basics": "Grundlagen",
-        "channels": "KanÃƒÂ¤le",
+        "channels": "Kanäle",
         "users": "Nutzer",
         "options": "Optionen",
         "save": "Speichern"
@@ -1219,13 +1219,13 @@
         "remove_title": "Ping entfernen",
         "disable_title": "Ping deaktivieren",
         "enable_title": "Ping aktivieren",
-        "choose_title": "Ping auswÃƒÂ¤hlen",
+        "choose_title": "Ping auswählen",
         "manage_title": "Ping verwalten",
         "embed_title": "{ACTION}",
-        "embed_message": "WÃƒÂ¤hle den Ping aus, den du aktualisieren mÃƒÂ¶chtest.",
+        "embed_message": "Wähle den Ping aus, den du aktualisieren möchtest.",
         "embed": {
           "title": "{ACTION}",
-          "body": "WÃƒÂ¤hle den Ping aus, den du aktualisieren mÃƒÂ¶chtest.",
+          "body": "Wähle den Ping aus, den du aktualisieren möchtest.",
           "footer": ""
         }
       },
@@ -1234,25 +1234,25 @@
       },
       "edit": {
         "title": "Ping bearbeiten",
-        "body": "WÃƒÂ¤hle den Ping aus, den du ÃƒÂ¤ndern mÃƒÂ¶chtest.",
+        "body": "Wähle den Ping aus, den du ändern möchtest.",
         "footer": ""
       },
       "summary": {
-        "text": "Text: {CODE:TEXT}",
-        "mode": "Modus: {CODE:MODE}",
+        "text": "Text: `{CODE:TEXT}`",
+        "mode": "Modus: `{CODE:MODE}`",
         "mode_regex": "Regex",
         "mode_ping": "Normaler Ping",
         "where": "Wo: {RAW:VALUE}",
         "who": "Wer: {RAW:VALUE}",
-        "subscribers": "Abonnenten: {CODE:VALUE}",
-        "stream_state": "Stream-Status: {CODE:VALUE}",
-        "case_sensitive": "Gro?-/Kleinschreibung: {CODE:VALUE}",
-        "color": "Farbe: {CODE:VALUE}",
+        "subscribers": "Abonnenten: `{CODE:VALUE}`",
+        "stream_state": "Stream-Status: `{CODE:VALUE}`",
+        "case_sensitive": "Groß-/Kleinschreibung: `{CODE:VALUE}`",
+        "color": "Farbe: `{CODE:VALUE}`",
         "color_inherited": "Automatisch geerbt",
-        "priority": "Priorit?t: {CODE:VALUE}",
+        "priority": "Priorität: `{CODE:VALUE}`",
         "priority_auto": "Automatisch",
         "not_set": "noch nicht gesetzt",
-        "channel_scope_all": "Alle beobachteten Twitch-KanÃƒÂ¤le",
+        "channel_scope_all": "Alle beobachteten Twitch-Kanäle",
         "channel_scope_only": {
           "template": "Nur: {RAW:ITEMS}",
           "placeholders": {
@@ -1264,9 +1264,9 @@
             }
           }
         },
-        "channel_scope_only_fallback": "Nur ausgewÃƒÂ¤hlte KanÃƒÂ¤le",
+        "channel_scope_only_fallback": "Nur ausgewählte Kanäle",
         "channel_scope_except": {
-          "template": "Alle au?er: {RAW:ITEMS}",
+          "template": "Alle außer: {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
               "list": {
@@ -1276,11 +1276,11 @@
             }
           }
         },
-        "channel_scope_except_fallback": "Alle auÃƒÅ¸er ausgewÃƒÂ¤hlte KanÃƒÂ¤le",
+        "channel_scope_except_fallback": "Alle außer ausgewählte Kanäle",
         "user_scope_everyone": "Alle",
         "user_scope_all_tracked": "Alle bekannten Twitch-Nutzer",
         "user_scope_all_tracked_except": {
-          "template": "Alle bekannten au?er: {RAW:ITEMS}",
+          "template": "Alle bekannten außer: {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
               "list": {
@@ -1290,7 +1290,7 @@
             }
           }
         },
-        "user_scope_all_tracked_except_fallback": "Alle bekannten auÃƒÅ¸er ausgewÃƒÂ¤hlte Twitch-Namen",
+        "user_scope_all_tracked_except_fallback": "Alle bekannten außer ausgewählte Twitch-Namen",
         "user_scope_only": {
           "template": "Nur: {RAW:ITEMS}",
           "placeholders": {
@@ -1302,9 +1302,9 @@
             }
           }
         },
-        "user_scope_only_fallback": "Nur ausgewÃƒÂ¤hlte Twitch-Namen",
+        "user_scope_only_fallback": "Nur ausgewählte Twitch-Namen",
         "user_scope_except": {
-          "template": "Alle au?er: {RAW:ITEMS}",
+          "template": "Alle außer: {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
               "list": {
@@ -1314,68 +1314,68 @@
             }
           }
         },
-        "user_scope_except_fallback": "Alle auÃƒÅ¸er ausgewÃƒÂ¤hlte Twitch-Namen",
+        "user_scope_except_fallback": "Alle außer ausgewählte Twitch-Namen",
         "sub_state_all": "Alle",
         "sub_state_subs": "Nur Abonnenten",
         "sub_state_non_subs": "Nur Nicht-Abonnenten",
         "offline_state_both": "Online und offline",
-        "offline_state_online": "Nur wÃƒÂ¤hrend live",
-        "offline_state_offline": "Nur wÃƒÂ¤hrend offline"
+        "offline_state_online": "Nur während live",
+        "offline_state_offline": "Nur während offline"
       },
       "basics": {
         "title": "Ping-Grundlagen",
         "pattern_text_label": "Wonach soll ich suchen?",
         "pattern_text_placeholder": "z. B. dein Name",
         "mode_label": "Wie soll es abgeglichen werden?",
-        "extra_options_label": "ZusÃƒÂ¤tzliche Optionen",
-        "extra_options_description": "Schalte das nur ein, wenn GroÃƒÅ¸- und Kleinschreibung wichtig sein soll.",
-        "case_sensitive_option": "GroÃƒÅ¸-/Kleinschreibung beachten",
+        "extra_options_label": "Zusätzliche Optionen",
+        "extra_options_description": "Schalte das nur ein, wenn Groß- und Kleinschreibung wichtig sein soll.",
+        "case_sensitive_option": "Groß-/Kleinschreibung beachten",
         "color_label": "Farbe",
         "color_placeholder": "z. B. #9146FF"
       },
       "channels": {
-        "title": "Wo soll es matchen?",
+        "title": "Wo soll es auslösen?",
         "scope_label": "Kanalbereich",
         "scope_all": "Jeder beobachtete Kanal",
-        "scope_only": "Nur diese KanÃƒÂ¤le",
-        "scope_except": "Jeder Kanal auÃƒÅ¸er diesen",
-        "tracked_label": "Beobachtete Twitch-KanÃƒÂ¤le",
-        "tracked_description": "WÃƒÂ¤hle KanÃƒÂ¤le nur aus, wenn du einen Bereich mit ausgewÃƒÂ¤hlten KanÃƒÂ¤len verwendest."
+        "scope_only": "Nur diese Kanäle",
+        "scope_except": "Jeder Kanal außer diesen",
+        "tracked_label": "Beobachtete Twitch-Kanäle",
+        "tracked_description": "Wähle Kanäle nur aus, wenn du einen Bereich mit ausgewählten Kanälen verwendest."
       },
       "users": {
-        "title": "Wer kann es auslÃƒÂ¶sen?",
+        "title": "Wer kann es auslösen?",
         "scope_label": "Twitch-Namensbereich",
         "scope_everyone": "Alle",
         "scope_all_tracked": "Alle bekannten Twitch-Nutzer",
-        "scope_all_tracked_except": "Alle bekannten auÃƒÅ¸er ausgewÃƒÂ¤hlte Namen",
-        "scope_only": "Nur ausgewÃƒÂ¤hlte Namen",
-        "scope_everyone_except": "Alle auÃƒÅ¸er ausgewÃƒÂ¤hlte Namen",
+        "scope_all_tracked_except": "Alle bekannten außer ausgewählte Namen",
+        "scope_only": "Nur ausgewählte Namen",
+        "scope_everyone_except": "Alle außer ausgewählte Namen",
         "tracked_label": "Twitch-Nutzer",
-        "tracked_description": "WÃƒÂ¤hle Nutzer nur aus, wenn du einen Bereich mit ausgewÃƒÂ¤hlten Nutzern verwendest."
+        "tracked_description": "Wähle Nutzer nur aus, wenn du einen Bereich mit ausgewählten Nutzern verwendest."
       },
       "options": {
         "title": "Ping-Optionen",
-        "sub_state_label": "Wer soll als Treffer zÃƒÂ¤hlen?",
-        "offline_state_label": "Wann soll es auslÃƒÂ¶sen?",
-        "priority_label": "PrioritÃƒÂ¤t",
+        "sub_state_label": "Wer soll als Treffer zählen?",
+        "offline_state_label": "Wann soll es auslösen?",
+        "priority_label": "Priorität",
         "priority_placeholder": "Leer lassen, um die Standardreihenfolge zu behalten"
       },
       "selection": {
-        "choose_title": "Ping auswÃƒÂ¤hlen",
-        "edit_label": "Welchen Ping mÃƒÂ¶chtest du bearbeiten?",
-        "update_label": "Welchen Ping mÃƒÂ¶chtest du aktualisieren?",
+        "choose_title": "Ping auswählen",
+        "edit_label": "Welchen Ping möchtest du bearbeiten?",
+        "update_label": "Welchen Ping möchtest du aktualisieren?",
         "untitled_ping": "Unbenannter Ping",
         "option_description": "{TYPE}"
       },
       "errors": {
         "no_enabled": {
           "title": "Keine aktiven Pings",
-          "body": "Es gibt keine aktiven Pings, die deaktiviert werden kÃƒÂ¶nnen <a:OhNo:1497685055948980306>",
+          "body": "Es gibt keine aktiven Pings, die deaktiviert werden können <a:OhNo:1497685055948980306>",
           "footer": ""
         },
         "no_disabled": {
           "title": "Keine deaktivierten Pings",
-          "body": "Es gibt keine deaktivierten Pings, die aktiviert werden kÃƒÂ¶nnen <a:OhNo:1497685055948980306>",
+          "body": "Es gibt keine deaktivierten Pings, die aktiviert werden können <a:OhNo:1497685055948980306>",
           "footer": ""
         },
         "no_pings": {
@@ -1385,28 +1385,28 @@
         },
         "not_found": {
           "title": "Ping nicht gefunden",
-          "body": "Der ausgewÃƒÂ¤hlte Ping existiert nicht mehr <a:OhNo:1497685055948980306>",
+          "body": "Der ausgewählte Ping existiert nicht mehr <a:OhNo:1497685055948980306>",
           "footer": ""
         },
         "no_channels": {
-          "title": "Keine KanÃƒÂ¤le",
-          "body": "Du musst zuerst einen Kanal hinzufÃƒÂ¼gen <:oopsie:1497720439810687006>",
+          "title": "Keine Kanäle",
+          "body": "Du musst zuerst einen Kanal hinzufügen <:oopsie:1497720439810687006>",
           "footer": ""
         },
         "no_users": {
           "title": "Keine bekannten Nutzer",
-          "body": "Du musst zuerst einen Nutzer hinzufÃƒÂ¼gen <:oopsie:1497720439810687006>",
+          "body": "Du musst zuerst einen Nutzer hinzufügen <:oopsie:1497720439810687006>",
           "footer": ""
         },
         "invalid_priority": {
-          "title": "UngÃƒÂ¼ltige PrioritÃƒÂ¤t",
-          "body": "Die PrioritÃƒÂ¤t muss eine ganze Zahl zwischen `0` und `9` sein <:oopsie:1497720439810687006>",
+          "title": "Ungültige Priorität",
+          "body": "Die Priorität muss eine ganze Zahl zwischen `0` und `9` sein <:oopsie:1497720439810687006>",
           "footer": ""
         }
       },
       "create_embed": {
         "title": "Neuer Ping",
-        "body": "{RAW:SUMMARY_LINES}\n\nNutze die Buttons unten, um jeden Bereich auszuf?llen.\nDu brauchst eine Hex-Farbe? [Farbw?hler ?ffnen]({RAW:COLOR_PICKER_URL})",
+        "body": "{RAW:SUMMARY_LINES}\n\nNutze die Buttons unten, um jeden Bereich auszufüllen.\nDu brauchst eine Hex-Farbe? [Farbwähler öffnen]({RAW:COLOR_PICKER_URL})",
         "footer": "",
         "placeholders": {
           "SUMMARY_LINES": {
@@ -1419,7 +1419,7 @@
       },
       "edit_embed": {
         "title": "Ping bearbeiten",
-        "body": "{RAW:SUMMARY_LINES}\n\nNutze die Buttons unten, um jeden Bereich auszuf?llen.\nDu brauchst eine Hex-Farbe? [Farbw?hler ?ffnen]({RAW:COLOR_PICKER_URL})",
+        "body": "{RAW:SUMMARY_LINES}\n\nNutze die Buttons unten, um jeden Bereich auszufüllen.\nDu brauchst eine Hex-Farbe? [Farbwähler öffnen]({RAW:COLOR_PICKER_URL})",
         "footer": "",
         "placeholders": {
           "SUMMARY_LINES": {
@@ -1446,7 +1446,7 @@
       },
       "menu": {
         "title": "Auto-Antworten",
-        "body": "Automatische Twitch-Nachrichten entweder an ein Ping- oder Regex-Pattern oder an einen konfigurierten Live- oder Offline-Trigger hÃƒÂ¤ngen.",
+        "body": "Automatische Twitch-Nachrichten entweder an ein Ping- oder Regex-Pattern oder an einen konfigurierten Live- oder Offline-Trigger hängen.",
         "footer": ""
       },
       "actions": {
@@ -1457,22 +1457,22 @@
         "enable": "Aktivieren"
       },
       "pattern_add": {
-        "title": "Pattern-Auto-Antwort hinzufÃƒÂ¼gen",
+        "title": "Pattern-Auto-Antwort hinzufügen",
         "message_label": "Was soll sie sagen?",
         "message_placeholder": "Hallo {NAME}!",
         "pattern_label": "Pattern",
-        "pattern_description": "WÃƒÂ¤hle den Ping oder die Regex-Regel aus, die automatisch eine Twitch-Nachricht senden soll.",
-        "pattern_option_description": "ID {ID} - {TYPE}",
+        "pattern_description": "Wähle den Ping oder die Regex-Regel aus, die automatisch eine Twitch-Nachricht senden soll.",
+        "pattern_option_description": "Nr. {ID} - {TYPE}",
         "mode_label": "Antwortmodus",
         "mode_message": "Als normale Chat-Nachricht senden",
         "mode_reply": "Auf die gematchte Nachricht antworten"
       },
       "event_add": {
-        "title": "Event-Auto-Antwort hinzufÃƒÂ¼gen",
+        "title": "Event-Auto-Antwort hinzufügen",
         "message_label": "Was soll sie sagen?",
         "message_placeholder": "YIPPIE {CHANNEL} ist jetzt {STATE}!",
         "trigger_label": "Event-Trigger",
-        "trigger_description": "WÃƒÂ¤hle das konfigurierte Live- oder Offline-Event aus, das eine Twitch-Nachricht senden soll.",
+        "trigger_description": "Wähle das konfigurierte Live- oder Offline-Event aus, das eine Twitch-Nachricht senden soll.",
         "trigger_option_description": "{LOGIN} - {STATE}-Benachrichtigung"
       },
       "action": {
@@ -1480,19 +1480,19 @@
         "disable_title": "Auto-Antwort deaktivieren",
         "enable_title": "Auto-Antwort aktivieren",
         "reply_label": "Auto-Antwort",
-        "reply_description": "WÃƒÂ¤hle die automatische Antwort aus, die du aktualisieren mÃƒÂ¶chtest.",
-        "linked_pattern_description": "VerknÃƒÂ¼pft mit: {PATTERN}",
-        "linked_event_description": "VerknÃƒÂ¼pft mit: {EVENT}"
+        "reply_description": "Wähle die automatische Antwort aus, die du aktualisieren möchtest.",
+        "linked_pattern_description": "Verknüpft mit: {PATTERN}",
+        "linked_event_description": "Verknüpft mit: {EVENT}"
       },
       "errors": {
         "no_patterns": {
-          "title": "Kein Ping verfÃƒÂ¼gbar",
-          "body": "Du musst zuerst einen Ping hinzufÃƒÂ¼gen <:oopsie:1497720439810687006>",
+          "title": "Kein Ping verfügbar",
+          "body": "Du musst zuerst einen Ping hinzufügen <:oopsie:1497720439810687006>",
           "footer": ""
         },
         "no_event_triggers": {
-          "title": "Keine Event-Trigger verfÃƒÂ¼gbar",
-          "body": "Du musst zuerst ein Live- oder Offline-Event hinzufÃƒÂ¼gen <:oopsie:1497720439810687006>",
+          "title": "Keine Event-Trigger verfügbar",
+          "body": "Du musst zuerst ein Live- oder Offline-Event hinzufügen <:oopsie:1497720439810687006>",
           "footer": ""
         },
         "no_replies": {
