@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 from src.database.connection import (
     AdapterEventActionRecord,
@@ -10,6 +11,7 @@ from src.database.connection import (
     AdapterEventRecord,
     AdapterEventRepository,
     ChannelRepository,
+    MessageRepository,
     PatternRecord,
     PatternRepository,
     ReplyRecord,
@@ -63,6 +65,15 @@ class TrackedUserPresentation:
     user_id: str
     login: str
     display_name: str
+
+
+@dataclass(slots=True, frozen=True)
+class WriteReplyCandidatePresentation:
+    message_id: str
+    twitch_channel_id: str
+    username: str
+    content: str
+    timestamp: datetime
 
 
 @dataclass(slots=True)
@@ -243,6 +254,50 @@ class AdapterEventQueryService:
             presentations.append(AdapterEventPresentation(event=event, channel=channel))
         return presentations
 
+
+@dataclass(slots=True)
+class WriteQueryService:
+    thread_repository: ThreadRepository
+    channel_repository: ChannelRepository
+    message_repository: MessageRepository
+
+    def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
+        return self.thread_repository.get_by_discord_channel_id(discord_channel_id)
+
+    async def list_recent_reply_candidates(
+        self,
+        *,
+        discord_channel_id: int,
+        max_age_minutes: int,
+        limit: int,
+    ) -> list[WriteReplyCandidatePresentation]:
+        thread = self.get_thread(discord_channel_id)
+        if thread is None:
+            return []
+        if max_age_minutes <= 0 or limit <= 0:
+            return []
+
+        since = datetime.now(UTC) - timedelta(minutes=max_age_minutes)
+        candidates: list[WriteReplyCandidatePresentation] = []
+        for channel in self.channel_repository.list_channels_for_thread(thread.thread_id):
+            rows = self.message_repository.list_recent_messages_for_channel(
+                twitch_channel_id=channel.twitch_channel_id,
+                since=since,
+                limit=limit,
+            )
+            for row in rows:
+                candidates.append(
+                    WriteReplyCandidatePresentation(
+                        message_id=row.message_id,
+                        twitch_channel_id=row.twitch_channel_id,
+                        username=row.username,
+                        content=row.content,
+                        timestamp=row.timestamp,
+                    )
+                )
+        candidates.sort(key=lambda item: item.timestamp, reverse=True)
+        return candidates[:limit]
+
     async def list_adapter_event_actions(self, discord_channel_id: int) -> list[AdapterEventActionPresentation]:
         thread = self.get_thread(discord_channel_id)
         if thread is None or self.adapter_event_repository is None or self.adapter_event_action_repository is None:
@@ -267,3 +322,4 @@ class DiscordUIQueryBundle:
     users: TrackedUserQueryService
     replies: ReplyQueryService
     events: AdapterEventQueryService
+    write: WriteQueryService

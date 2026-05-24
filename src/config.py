@@ -81,6 +81,10 @@ class AppConfig:
     discord_presence_lookback_minutes: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_LOOKBACK_MINUTES", "5"))
     discord_presence_message_limit: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_MESSAGE_LIMIT", "50"))
     discord_presence_max_status_length: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_MAX_STATUS_LENGTH", "120"))
+    discord_write_reply_candidate_max_age_minutes: int = field(
+        default_factory=lambda: _get_int("DISCORD_WRITE_REPLY_CANDIDATE_MAX_AGE_MINUTES", "1440")
+    )
+    discord_write_reply_candidate_limit: int = field(default_factory=lambda: _get_int("DISCORD_WRITE_REPLY_CANDIDATE_LIMIT", "25"))
     irc_bootstrap_connect_timeout_seconds: float = field(default_factory=lambda: _get_float("IRC_BOOTSTRAP_CONNECT_TIMEOUT_SECONDS", "15"))
     irc_channel_resync_interval_seconds: float = field(default_factory=lambda: _get_float("IRC_CHANNEL_RESYNC_INTERVAL_SECONDS", "300"))
     log_level: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))

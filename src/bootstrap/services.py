@@ -17,6 +17,7 @@ from src.services.discord_ui_query_service import (
     ReplyQueryService,
     TrackedChannelQueryService,
     TrackedUserQueryService,
+    WriteQueryService,
 )
 from src.services.live_state_orchestrator import LiveStateChangeOrchestrator
 from src.services.message_ingest_service import MessageIngestService
@@ -63,12 +64,18 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         adapter_event_repository=core.adapter_event_repository,
         adapter_event_action_repository=core.adapter_event_action_repository,
     )
+    write_queries = WriteQueryService(
+        thread_repository=core.thread_repository,
+        channel_repository=core.channel_repository,
+        message_repository=core.message_repository,
+    )
     ui_queries = DiscordUIQueryBundle(
         channels=tracked_channel_queries,
         patterns=pattern_queries,
         users=tracked_user_queries,
         replies=reply_queries,
         events=event_queries,
+        write=write_queries,
     )
     runtime_coordinator = ApplicationRuntimeCoordinator()
 

@@ -20,6 +20,9 @@ def register_write_commands(
     services: DiscordServiceBundle,
     ui_data_provider: DiscordUIDataProvider,
     localizer: Localizer,
+    *,
+    reply_candidate_max_age_minutes: int,
+    reply_candidate_limit: int,
 ) -> None:
     """Register the single-word `/write` command."""
 
@@ -48,12 +51,18 @@ def register_write_commands(
                 ),
             )
             return
+        recent_replies = await ui_data_provider.list_recent_write_reply_candidates(
+            discord_channel_id=interaction.channel_id,
+            max_age_minutes=reply_candidate_max_age_minutes,
+            limit=min(max(reply_candidate_limit, 1), 25),
+        )
         await interaction.response.send_modal(
             WriteModal(
                 services=services,
                 discord_channel_id=interaction.channel_id,
                 requester_id=interaction.user.id,
                 tracked_channels=tracked_channels,
+                reply_candidates=recent_replies,
                 localizer=localizer,
                 language=language,
             )

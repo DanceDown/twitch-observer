@@ -37,6 +37,15 @@ class MessageRepository:
     ) -> list[RecentMessageRecord]:  # pragma: no cover - interface
         raise NotImplementedError
 
+    def list_recent_messages_for_channel(
+        self,
+        *,
+        twitch_channel_id: str,
+        since: datetime,
+        limit: int,
+    ) -> list[RecentMessageRecord]:  # pragma: no cover - interface
+        raise NotImplementedError
+
 
 class ThreadRepository:
     """Persistence interface for Discord thread/channel configuration roots."""

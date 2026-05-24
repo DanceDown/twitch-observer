@@ -45,6 +45,7 @@ class ObserverDiscordClient(discord.Client):
         self._services = services
         self._ui_data_provider = ui_data_provider
         self._localizer = localizer
+        self._config = config
         self.tree = discord.app_commands.CommandTree(self)
         self._guild_commands_cleaned = False
 
@@ -58,7 +59,14 @@ class ObserverDiscordClient(discord.Client):
         register_permission_commands(self.tree, self._services, self._ui_data_provider, self._localizer)
         register_account_commands(self.tree, self._services, self._ui_data_provider, self._localizer)
         register_reply_commands(self.tree, self._services, self._ui_data_provider, self._localizer)
-        register_write_commands(self.tree, self._services, self._ui_data_provider, self._localizer)
+        register_write_commands(
+            self.tree,
+            self._services,
+            self._ui_data_provider,
+            self._localizer,
+            reply_candidate_max_age_minutes=self._config.discord_write_reply_candidate_max_age_minutes,
+            reply_candidate_limit=self._config.discord_write_reply_candidate_limit,
+        )
         register_show_commands(self.tree, self._services, self._ui_data_provider, self._localizer)
         await self.tree.sync()
         logger.info("Synced global Discord commands: %s", ", ".join(command.name for command in self.tree.get_commands()))

@@ -12,6 +12,7 @@ from src.services.discord_ui_query_service import (
     ReplyPresentation,
     TrackedChannelPresentation,
     TrackedUserPresentation,
+    WriteReplyCandidatePresentation,
 )
 
 
@@ -44,3 +45,16 @@ class DiscordUIDataProvider:
 
     async def get_pattern(self, discord_channel_id: int, pattern_id: int) -> PatternPresentation | None:
         return await self.queries.patterns.get_pattern(discord_channel_id, pattern_id)
+
+    async def list_recent_write_reply_candidates(
+        self,
+        *,
+        discord_channel_id: int,
+        max_age_minutes: int,
+        limit: int,
+    ) -> list[WriteReplyCandidatePresentation]:
+        return await self.queries.write.list_recent_reply_candidates(
+            discord_channel_id=discord_channel_id,
+            max_age_minutes=max_age_minutes,
+            limit=limit,
+        )

@@ -1020,7 +1020,7 @@
   },
   "discord": {
     "tracking_embed": {
-      "footer_channel": "Channel: {CHANNEL}\n{MESSAGE_ID}",
+      "footer_channel": "Channel: {CHANNEL}",
       "reply_field": "Reply"
     },
     "shared": {
@@ -1219,7 +1219,9 @@
         "message_label": "Message",
         "message_placeholder": "Hello Twitch!",
         "reply_to_label": "Reply to",
-        "reply_to_placeholder": "Optional message ID",
+        "reply_to_description": "Choose one recent message to reply to (optional).",
+        "reply_to_none_label": "No reply",
+        "reply_to_none_description": "Send as a normal message.",
         "channel_label": "Twitch Channel",
         "channel_description": "Choose where the message should be sent."
       },

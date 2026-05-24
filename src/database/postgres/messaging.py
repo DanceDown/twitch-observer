@@ -52,7 +52,7 @@ class PostgresMessageRepository(MessageRepository):
         with self.database.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT username, content, timestamp
+                SELECT message_id, twitch_channel_id, username, content, timestamp
                 FROM message
                 WHERE timestamp >= %s
                 ORDER BY timestamp DESC
@@ -63,9 +63,43 @@ class PostgresMessageRepository(MessageRepository):
             rows = cursor.fetchall()
         return [
             RecentMessageRecord(
-                username=str(row[0]),
-                content=str(row[1]),
-                timestamp=row[2],
+                message_id=str(row[0]),
+                twitch_channel_id=str(row[1]),
+                username=str(row[2]),
+                content=str(row[3]),
+                timestamp=row[4],
+            )
+            for row in rows
+        ]
+
+    def list_recent_messages_for_channel(
+        self,
+        *,
+        twitch_channel_id: str,
+        since: datetime,
+        limit: int,
+    ) -> list[RecentMessageRecord]:
+        """Load recent Twitch messages for one tracked channel."""
+        with self.database.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT message_id, twitch_channel_id, username, content, timestamp
+                FROM message
+                WHERE twitch_channel_id = %s
+                  AND timestamp >= %s
+                ORDER BY timestamp DESC
+                LIMIT %s
+                """,
+                (twitch_channel_id, since, limit),
+            )
+            rows = cursor.fetchall()
+        return [
+            RecentMessageRecord(
+                message_id=str(row[0]),
+                twitch_channel_id=str(row[1]),
+                username=str(row[2]),
+                content=str(row[3]),
+                timestamp=row[4],
             )
             for row in rows
         ]

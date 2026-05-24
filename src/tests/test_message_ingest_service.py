@@ -22,6 +22,8 @@ class InMemoryMessageRepository(MessageRepository):
     def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
         rows = [
             RecentMessageRecord(
+                message_id=message.message_id or f"{message.channel_login}:{message.author_login}:{message.sent_at.isoformat()}",
+                twitch_channel_id=message.broadcaster_id or message.channel_login,
                 username=message.author_display_name or message.author_login,
                 content=message.content,
                 timestamp=message.sent_at,
@@ -30,6 +32,16 @@ class InMemoryMessageRepository(MessageRepository):
             if message.sent_at >= since
         ]
         rows.sort(key=lambda row: row.timestamp, reverse=True)
+        return rows[:limit]
+
+    def list_recent_messages_for_channel(
+        self,
+        *,
+        twitch_channel_id: str,
+        since: datetime,
+        limit: int,
+    ) -> list[RecentMessageRecord]:
+        rows = [row for row in self.list_recent_messages(since=since, limit=max(limit * 5, limit)) if row.twitch_channel_id == twitch_channel_id]
         return rows[:limit]
 
 

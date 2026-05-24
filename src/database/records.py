@@ -163,6 +163,8 @@ class UserPermissionRecord:
 class RecentMessageRecord:
     """Compact stored Twitch message used for status text and lightweight displays."""
 
+    message_id: str
+    twitch_channel_id: str
     username: str
     content: str
     timestamp: datetime
