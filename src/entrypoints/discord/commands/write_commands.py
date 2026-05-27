@@ -9,6 +9,7 @@ from src.events.event_types import DiscordResultStyle, UIFlowKind, UIFlowStep
 from src.localization import Localizer
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
+from ..dispatch import dispatch_send_twitch_message
 from ..helpers import command_unavailable_result, ensure_ui_flow_allowed, send_initial_result
 from ..ui.shared import resolve_context_language
 from ..ui.write_ui import WriteModal
@@ -26,13 +27,38 @@ def register_write_commands(
 ) -> None:
     """Register the single-word `/write` command."""
 
+    @discord.app_commands.describe(
+        twitch_channel_login="Optional direct target channel login.",
+        message="Optional direct message text.",
+        reply_parent_message_id="Optional Twitch message ID to send as reply.",
+    )
     @tree.command(name="write", description="Send a Twitch message from the linked account.")
-    async def write(interaction: discord.Interaction) -> None:
+    async def write(
+        interaction: discord.Interaction,
+        twitch_channel_login: str | None = None,
+        message: str | None = None,
+        reply_parent_message_id: str | None = None,
+    ) -> None:
         if interaction.channel_id is None:
             await send_initial_result(interaction, command_unavailable_result())
             return
         if not await ensure_ui_flow_allowed(interaction, services, flow=UIFlowKind.WRITE, step=UIFlowStep.ROOT):
             return
+
+        normalized_login = (twitch_channel_login or "").strip()
+        normalized_message = (message or "").strip()
+        if normalized_login and normalized_message:
+            result = await dispatch_send_twitch_message(
+                services,
+                discord_channel_id=interaction.channel_id,
+                requester_id=interaction.user.id,
+                twitch_channel_login=normalized_login,
+                message=normalized_message,
+                reply_parent_message_id=(reply_parent_message_id or "").strip() or None,
+            )
+            await send_initial_result(interaction, result)
+            return
+
         language = resolve_context_language(
             localizer=localizer,
             data_provider=ui_data_provider,

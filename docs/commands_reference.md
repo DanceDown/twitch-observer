@@ -2,8 +2,8 @@
 
 This is the authoritative command reference for the Discord control surface.
 
-Root commands open component-driven flows.  
-Business actions are selected inside Discord views, selects, and modals.  
+Commands support direct parameters and guided follow-up UI.  
+When required action fields are missing, the bot opens the matching modal or flow and keeps provided values prefilled where possible.  
 All final results are embeds.
 
 ## General rules
@@ -60,8 +60,8 @@ Choose the context language (`english` or `german`).
 
 ## Feature commands with form-based actions
 
-The commands below open interactive component flows.  
-Actions are selected inside the UI rather than typed manually.
+The commands below support both direct action parameters and interactive UI flows.  
+If you omit the action-specific fields, the bot opens the matching modal or follow-up UI for that action.
 
 ### `/channel`
 
@@ -116,13 +116,10 @@ Supported rule settings:
 
 Manage auto-replies.
 
-Actions:
+Subgroups:
 
-- `On Ping`
-- `On Live Ping`
-- `Remove`
-- `Disable`
-- `Enable`
+- `/reply pattern add|remove|disable|enable`
+- `/reply event add|remove|disable|enable`
 
 Behavior:
 
@@ -130,14 +127,24 @@ Behavior:
 - event-bound replies target configured live/offline triggers
 - one pattern has at most one pattern-bound reply
 
-### `/live`
+### `/liveping`
 
-Manage live/offline notification triggers for tracked Twitch channels.
+Manage live notification triggers for tracked Twitch channels.
 
 Actions:
 
-- `Add Live Ping`
-- `Add Offline Ping`
+- `Remove`
+- `Disable`
+- `Enable`
+- `Add`
+
+### `/offlineping`
+
+Manage offline notification triggers for tracked Twitch channels.
+
+Actions:
+
+- `Add`
 - `Remove`
 - `Disable`
 - `Enable`

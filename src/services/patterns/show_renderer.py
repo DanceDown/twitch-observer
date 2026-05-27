@@ -421,7 +421,7 @@ class ShowSectionRenderer:
                     self.localizer.text(
                         "show.pattern.where",
                         language=language,
-                        VALUE=self.localizer.text("common.scope.only_in", language=language, ITEMS=channel_names),
+                        VALUE=self.localizer.text("results.pattern.scope.channel_only", language=language, ITEMS=channel_names),
                     )
                 )
             elif pattern.channel_scope_mode == "all_except_selected":
@@ -429,11 +429,7 @@ class ShowSectionRenderer:
                     self.localizer.text(
                         "show.pattern.where",
                         language=language,
-                        VALUE=self.localizer.text(
-                            "common.scope.all_tracked_channels_except",
-                            language=language,
-                            ITEMS=channel_names,
-                        ),
+                        VALUE=self.localizer.text("results.pattern.scope.channel_except", language=language, ITEMS=channel_names),
                     )
                 )
         if pattern.user_scope_mode != "all_users":
@@ -443,7 +439,7 @@ class ShowSectionRenderer:
                     self.localizer.text(
                         "show.pattern.who",
                         language=language,
-                        VALUE=self.localizer.text("common.scope.only_from", language=language, ITEMS=user_names),
+                        VALUE=self.localizer.text("results.pattern.scope.user_only", language=language, ITEMS=user_names),
                     )
                 )
             elif pattern.user_scope_mode == "all_except_selected":
@@ -451,11 +447,7 @@ class ShowSectionRenderer:
                     self.localizer.text(
                         "show.pattern.who",
                         language=language,
-                        VALUE=self.localizer.text(
-                            "common.scope.everyone_except",
-                            language=language,
-                            ITEMS=user_names,
-                        ),
+                        VALUE=self.localizer.text("results.pattern.scope.user_except", language=language, ITEMS=user_names),
                     )
                 )
             elif pattern.user_scope_mode == "all_tracked":
@@ -463,7 +455,7 @@ class ShowSectionRenderer:
                     self.localizer.text(
                         "show.pattern.who",
                         language=language,
-                        VALUE=self.localizer.text("common.scope.all_tracked_users", language=language),
+                        VALUE=self.localizer.text("results.pattern.scope.user_all", language=language),
                     )
                 )
             elif pattern.user_scope_mode == "all_tracked_except_selected":
@@ -472,7 +464,7 @@ class ShowSectionRenderer:
                         "show.pattern.who",
                         language=language,
                         VALUE=self.localizer.text(
-                            "common.scope.all_tracked_users_except",
+                            "results.pattern.scope.user_tracked_except",
                             language=language,
                             ITEMS=user_names,
                         ),

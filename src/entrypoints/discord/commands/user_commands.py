@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import discord
 
+from src.discord_results import build_result
+from src.events.event_types import DiscordResultStyle
 from src.events.event_types import UIFlowKind, UIFlowStep
 from src.localization import Localizer
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
+from ..dispatch import dispatch_add_tracked_user, dispatch_remove_tracked_user
 from ..helpers import command_unavailable_result, ensure_ui_flow_allowed, send_initial_result
-from ..ui.shared import start_form
-from ..ui.user_ui import UserMenuView
+from ..ui.user_ui import UserNameModal, UserSelectionModal
 from ..ui_data import DiscordUIDataProvider
 
 
@@ -20,22 +22,79 @@ def register_user_commands(
     ui_data_provider: DiscordUIDataProvider,
     localizer: Localizer,
 ) -> None:
-    """Register the single-word `/user` command."""
+    """Register `/user` action subcommands."""
 
-    @tree.command(name="user", description="Add or remove tracked Twitch users.")
-    async def user(interaction: discord.Interaction) -> None:
+    group = discord.app_commands.Group(name="user", description="Add or remove tracked Twitch users.")
+
+    @group.command(name="add", description="Add one tracked Twitch user.")
+    @discord.app_commands.describe(twitch_user_login="Twitch user login.")
+    async def user_add(interaction: discord.Interaction, twitch_user_login: str | None = None) -> None:
         if interaction.channel_id is None:
             await send_initial_result(interaction, command_unavailable_result())
             return
         if not await ensure_ui_flow_allowed(interaction, services, flow=UIFlowKind.USER, step=UIFlowStep.ROOT):
             return
-        await start_form(
-            interaction,
-            view=UserMenuView(
-                owner_id=interaction.user.id,
-                services=services,
-                data_provider=ui_data_provider,
-                discord_channel_id=interaction.channel_id,
-                localizer=localizer,
-            ),
+        normalized_login = twitch_user_login.strip() if twitch_user_login is not None else ""
+        if not normalized_login:
+            await interaction.response.send_modal(
+                UserNameModal(
+                    services=services,
+                    discord_channel_id=interaction.channel_id,
+                    requester_id=interaction.user.id,
+                    action="add",
+                    localizer=localizer,
+                    language=localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id)),
+                )
+            )
+            return
+        result = await dispatch_add_tracked_user(
+            services,
+            discord_channel_id=interaction.channel_id,
+            requester_id=interaction.user.id,
+            twitch_user_login=normalized_login,
         )
+        await send_initial_result(interaction, result)
+
+    @group.command(name="remove", description="Remove one tracked Twitch user.")
+    @discord.app_commands.describe(twitch_user_login="Tracked Twitch user login.")
+    async def user_remove(interaction: discord.Interaction, twitch_user_login: str | None = None) -> None:
+        if interaction.channel_id is None:
+            await send_initial_result(interaction, command_unavailable_result())
+            return
+        if not await ensure_ui_flow_allowed(interaction, services, flow=UIFlowKind.USER, step=UIFlowStep.REMOVE):
+            return
+        normalized_login = twitch_user_login.strip() if twitch_user_login is not None else ""
+        if not normalized_login:
+            tracked_users = await ui_data_provider.list_tracked_users(interaction.channel_id)
+            if not tracked_users:
+                await send_initial_result(
+                    interaction,
+                    build_result(
+                        localizer,
+                        "discord.user_ui.errors.no_users",
+                        language=localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id)),
+                        style=DiscordResultStyle.ERROR,
+                        ephemeral=True,
+                    ),
+                )
+                return
+            await interaction.response.send_modal(
+                UserSelectionModal(
+                    services=services,
+                    discord_channel_id=interaction.channel_id,
+                    requester_id=interaction.user.id,
+                    tracked_users=tracked_users,
+                    localizer=localizer,
+                    language=localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id)),
+                )
+            )
+            return
+        result = await dispatch_remove_tracked_user(
+            services,
+            discord_channel_id=interaction.channel_id,
+            requester_id=interaction.user.id,
+            twitch_user_login=normalized_login,
+        )
+        await send_initial_result(interaction, result)
+
+    tree.add_command(group)

@@ -5,9 +5,7 @@ from __future__ import annotations
 import discord
 
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
-from src.events.event_types import DiscordResultStyle, UIFlowKind, UIFlowStep
 from src.localization import Localizer
-from src.services.twitch_runtime import TWITCH_SEND_MESSAGE_ACTION
 
 from ..dispatch import (
     dispatch_add_channel_event_reply,
@@ -23,11 +21,9 @@ from ..helpers import complete_bound_result, normalize_optional_text
 from ..ui_data import (
     AdapterEventActionPresentation,
     AdapterEventPresentation,
-    DiscordUIDataProvider,
     PatternPresentation,
     ReplyPresentation,
 )
-from .shared import BaseFormView, resolve_context_language
 
 
 def _pattern_label(pattern: PatternPresentation, *, localizer: Localizer, language: str) -> str:
@@ -80,6 +76,9 @@ class PatternReplyAddModal(discord.ui.Modal):
         patterns: list[PatternPresentation],
         localizer: Localizer,
         language: str,
+        default_pattern_id: int | None = None,
+        default_message: str | None = None,
+        default_reply_as_reply: bool = False,
         bound_message: discord.InteractionMessage | None = None,
     ) -> None:
         super().__init__(title=localizer.text("discord.reply_ui.pattern_add.title", language=language), timeout=300)
@@ -90,6 +89,7 @@ class PatternReplyAddModal(discord.ui.Modal):
         self.message = discord.ui.TextInput(
             label=localizer.text("discord.reply_ui.pattern_add.message_label", language=language),
             style=discord.TextStyle.paragraph,
+            default=default_message,
             placeholder=localizer.text(
                 "discord.reply_ui.pattern_add.message_placeholder",
                 language=language,
@@ -106,6 +106,7 @@ class PatternReplyAddModal(discord.ui.Modal):
                     discord.SelectOption(
                         label=_pattern_label(pattern, localizer=localizer, language=language),
                         value=_encode_pattern_target(pattern.pattern.pattern_id),
+                        default=pattern.pattern.pattern_id == default_pattern_id,
                         description=localizer.text(
                             "discord.reply_ui.pattern_add.pattern_option_description",
                             language=language,
@@ -129,11 +130,12 @@ class PatternReplyAddModal(discord.ui.Modal):
                     discord.RadioGroupOption(
                         label=localizer.text("discord.reply_ui.pattern_add.mode_message", language=language),
                         value="message",
-                        default=True,
+                        default=not default_reply_as_reply,
                     ),
                     discord.RadioGroupOption(
                         label=localizer.text("discord.reply_ui.pattern_add.mode_reply", language=language),
                         value="reply",
+                        default=default_reply_as_reply,
                     ),
                 ]
             ),
@@ -167,6 +169,8 @@ class EventReplyAddModal(discord.ui.Modal):
         adapter_events: list[AdapterEventPresentation],
         localizer: Localizer,
         language: str,
+        default_event_id: int | None = None,
+        default_message: str | None = None,
         bound_message: discord.InteractionMessage | None = None,
     ) -> None:
         super().__init__(title=localizer.text("discord.reply_ui.event_add.title", language=language), timeout=300)
@@ -177,6 +181,7 @@ class EventReplyAddModal(discord.ui.Modal):
         self.message = discord.ui.TextInput(
             label=localizer.text("discord.reply_ui.event_add.message_label", language=language),
             style=discord.TextStyle.paragraph,
+            default=default_message,
             placeholder=localizer.text(
                 "discord.reply_ui.event_add.message_placeholder",
                 language=language,
@@ -194,6 +199,7 @@ class EventReplyAddModal(discord.ui.Modal):
                     discord.SelectOption(
                         label=_adapter_event_label(event, localizer=localizer, language=language),
                         value=_encode_adapter_event_target(event.event.event_id),
+                        default=event.event.event_id == default_event_id,
                         description=localizer.text(
                             "discord.reply_ui.event_add.trigger_option_description",
                             language=language,
@@ -330,156 +336,3 @@ class ReplyActionModal(discord.ui.Modal):
                 adapter_event_id=identifier,
             )
         await complete_bound_result(interaction, bound_message=self._bound_message, result=result)
-
-
-class ReplyMenuView(BaseFormView):
-    """Root `/reply` flow with separate buttons for pattern and event actions."""
-
-    def __init__(
-        self,
-        *,
-        owner_id: int,
-        services: DiscordServiceBundle,
-        data_provider: DiscordUIDataProvider,
-        discord_channel_id: int,
-        localizer: Localizer,
-    ) -> None:
-        super().__init__(
-            owner_id=owner_id,
-            localizer=localizer,
-            language=resolve_context_language(
-                localizer=localizer,
-                data_provider=data_provider,
-                discord_channel_id=discord_channel_id,
-            ),
-        )
-        self._services = services
-        self._data_provider = data_provider
-        self._discord_channel_id = discord_channel_id
-        self.add_pattern.label = self.text("discord.reply_ui.actions.add_pattern")
-        self.add_event.label = self.text("discord.reply_ui.actions.add_event")
-        self.remove.label = self.text("discord.reply_ui.actions.remove")
-        self.disable.label = self.text("discord.reply_ui.actions.disable")
-        self.enable.label = self.text("discord.reply_ui.actions.enable")
-
-    def render_embed(self) -> discord.Embed:
-        return self.form_embed("discord.reply_ui.menu")
-
-    @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
-    async def add_pattern(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
-        if not await self.ensure_step_allowed(
-            interaction,
-            self._services,
-            flow=UIFlowKind.REPLY,
-            step=UIFlowStep.ADD_PATTERN,
-            discord_channel_id=self._discord_channel_id,
-        ):
-            return
-        patterns = await self._data_provider.list_patterns(self._discord_channel_id)
-        if not patterns:
-            await self.finish_with_interaction(
-                interaction,
-                self.result("discord.reply_ui.errors.no_patterns", style=DiscordResultStyle.ERROR, ephemeral=True),
-            )
-            return
-        await interaction.response.send_modal(
-            PatternReplyAddModal(
-                services=self._services,
-                discord_channel_id=self._discord_channel_id,
-                requester_id=interaction.user.id,
-                patterns=patterns,
-                localizer=self._localizer,
-                language=self.language,
-                bound_message=self.bound_message,
-            )
-        )
-
-    @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
-    async def add_event(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
-        if not await self.ensure_step_allowed(
-            interaction,
-            self._services,
-            flow=UIFlowKind.REPLY,
-            step=UIFlowStep.ADD_EVENT,
-            discord_channel_id=self._discord_channel_id,
-        ):
-            return
-        adapter_events = await self._data_provider.list_adapter_events(self._discord_channel_id)
-        if not adapter_events:
-            await self.finish_with_interaction(
-                interaction,
-                self.result("discord.reply_ui.errors.no_event_triggers", style=DiscordResultStyle.ERROR, ephemeral=True),
-            )
-            return
-        await interaction.response.send_modal(
-            EventReplyAddModal(
-                services=self._services,
-                discord_channel_id=self._discord_channel_id,
-                requester_id=interaction.user.id,
-                adapter_events=adapter_events,
-                localizer=self._localizer,
-                language=self.language,
-                bound_message=self.bound_message,
-            )
-        )
-
-    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
-    async def remove(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
-        await self._open_action_modal(interaction, "remove")
-
-    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
-    async def disable(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
-        await self._open_action_modal(interaction, "disable")
-
-    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
-    async def enable(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
-        await self._open_action_modal(interaction, "enable")
-
-    async def _open_action_modal(self, interaction: discord.Interaction, action: str) -> None:
-        if not await self.ensure_step_allowed(
-            interaction,
-            self._services,
-            flow=UIFlowKind.REPLY,
-            step={
-                "remove": UIFlowStep.REMOVE,
-                "disable": UIFlowStep.DISABLE,
-                "enable": UIFlowStep.ENABLE,
-            }[action],
-            discord_channel_id=self._discord_channel_id,
-        ):
-            return
-        replies = list(await self._data_provider.list_replies(self._discord_channel_id))
-        replies.extend(
-            item
-            for item in await self._data_provider.list_adapter_event_actions(self._discord_channel_id)
-            if item.action.action_type == TWITCH_SEND_MESSAGE_ACTION
-        )
-        if action == "disable":
-            replies = [item for item in replies if not _is_reply_target_disabled(item)]
-        elif action == "enable":
-            replies = [item for item in replies if _is_reply_target_disabled(item)]
-        if not replies:
-            await self.finish_with_interaction(
-                interaction,
-                self.result("discord.reply_ui.errors.no_replies", style=DiscordResultStyle.ERROR, ephemeral=True),
-            )
-            return
-        await interaction.response.send_modal(
-            ReplyActionModal(
-                title=self.text(f"discord.reply_ui.action.{action}_title"),
-                services=self._services,
-                discord_channel_id=self._discord_channel_id,
-                requester_id=interaction.user.id,
-                action=action,
-                replies=replies,
-                localizer=self._localizer,
-                language=self.language,
-                bound_message=self.bound_message,
-            )
-        )
-
-
-def _is_reply_target_disabled(reply: ReplyPresentation | AdapterEventActionPresentation) -> bool:
-    if isinstance(reply, ReplyPresentation):
-        return reply.reply.disabled
-    return reply.action.disabled

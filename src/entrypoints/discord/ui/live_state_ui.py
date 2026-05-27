@@ -5,10 +5,8 @@ from __future__ import annotations
 import discord
 
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
-from src.discord_results import build_result
-from src.events.event_types import DiscordResultStyle, StreamEventKind, UIFlowKind, UIFlowStep
+from src.events.event_types import StreamEventKind
 from src.localization import Localizer
-from src.services.twitch_runtime import DISCORD_NOTIFY_ACTION, STREAM_OFFLINE_EVENT_KEY, STREAM_ONLINE_EVENT_KEY
 
 from ..dispatch import (
     dispatch_add_channel_event,
@@ -16,138 +14,8 @@ from ..dispatch import (
     dispatch_enable_channel_event,
     dispatch_remove_channel_event,
 )
-from ..helpers import complete_bound_result, send_initial_result
-from ..ui_data import AdapterEventActionPresentation, DiscordUIDataProvider, TrackedChannelPresentation
-from .shared import BaseFormView, resolve_context_language, start_form
-
-
-class LiveStateMenuView(BaseFormView):
-    """Root `/live` menu for live and offline Discord notifications."""
-
-    def __init__(
-        self,
-        *,
-        owner_id: int,
-        services: DiscordServiceBundle,
-        data_provider: DiscordUIDataProvider,
-        discord_channel_id: int,
-        localizer: Localizer,
-    ) -> None:
-        super().__init__(
-            owner_id=owner_id,
-            localizer=localizer,
-            language=resolve_context_language(
-                localizer=localizer,
-                data_provider=data_provider,
-                discord_channel_id=discord_channel_id,
-            ),
-        )
-        self._services = services
-        self._data_provider = data_provider
-        self._discord_channel_id = discord_channel_id
-        self.add_live.label = self.text("discord.live_state_ui.actions.add_live")
-        self.add_offline.label = self.text("discord.live_state_ui.actions.add_offline")
-        self.remove.label = self.text("discord.live_state_ui.actions.remove")
-        self.disable.label = self.text("discord.live_state_ui.actions.disable")
-        self.enable.label = self.text("discord.live_state_ui.actions.enable")
-
-    def render_embed(self) -> discord.Embed:
-        return self.form_embed("discord.live_state_ui.menu")
-
-    @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
-    async def add_live(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
-        await self._open_add_modal(interaction, STREAM_ONLINE_EVENT_KEY)
-
-    @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
-    async def add_offline(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
-        await self._open_add_modal(interaction, STREAM_OFFLINE_EVENT_KEY)
-
-    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
-    async def remove(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
-        await self._open_action_modal(interaction, "remove")
-
-    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
-    async def disable(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
-        await self._open_action_modal(interaction, "disable")
-
-    @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
-    async def enable(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
-        await self._open_action_modal(interaction, "enable")
-
-    async def _open_add_modal(self, interaction: discord.Interaction, event_key: str) -> None:
-        if not await self.ensure_step_allowed(
-            interaction,
-            self._services,
-            flow=UIFlowKind.LIVE,
-            step=UIFlowStep.ADD_EVENT,
-            discord_channel_id=self._discord_channel_id,
-        ):
-            return
-        tracked_channels = await self._data_provider.list_tracked_channels(self._discord_channel_id)
-        if not tracked_channels:
-            await self.finish_with_interaction(
-                interaction,
-                self.result("discord.live_state_ui.errors.no_channels", style=DiscordResultStyle.ERROR),
-            )
-            return
-        await interaction.response.send_modal(
-            ChannelEventModal(
-                title=self.text(f"discord.live_state_ui.modal.{event_key}.title"),
-                services=self._services,
-                discord_channel_id=self._discord_channel_id,
-                requester_id=interaction.user.id,
-                tracked_channels=tracked_channels,
-                event_key=event_key,
-                localizer=self._localizer,
-                language=self.language,
-                bound_message=self.bound_message,
-            )
-        )
-
-    async def _open_action_modal(self, interaction: discord.Interaction, action: str) -> None:
-        if not await self.ensure_step_allowed(
-            interaction,
-            self._services,
-            flow=UIFlowKind.LIVE,
-            step={
-                "remove": UIFlowStep.REMOVE,
-                "disable": UIFlowStep.DISABLE,
-                "enable": UIFlowStep.ENABLE,
-            }[action],
-            discord_channel_id=self._discord_channel_id,
-        ):
-            return
-        actions = [
-            item
-            for item in await self._data_provider.list_adapter_event_actions(self._discord_channel_id)
-            if item.action.action_type == DISCORD_NOTIFY_ACTION
-        ]
-        if action == "disable":
-            actions = [item for item in actions if not item.action.disabled]
-        elif action == "enable":
-            actions = [item for item in actions if item.action.disabled]
-        if not actions:
-            await self.finish_with_interaction(
-                interaction,
-                self.result(
-                    f"discord.live_state_ui.errors.no_{action}_actions",
-                    style=DiscordResultStyle.ERROR,
-                ),
-            )
-            return
-        await interaction.response.send_modal(
-            ChannelEventActionModal(
-                title=self.text(f"discord.live_state_ui.action.{action}_title"),
-                services=self._services,
-                discord_channel_id=self._discord_channel_id,
-                requester_id=interaction.user.id,
-                action=action,
-                actions=actions,
-                localizer=self._localizer,
-                language=self.language,
-                bound_message=self.bound_message,
-            )
-        )
+from ..helpers import complete_bound_result
+from ..ui_data import AdapterEventActionPresentation, TrackedChannelPresentation
 
 
 class ChannelEventModal(discord.ui.Modal):
@@ -164,6 +32,7 @@ class ChannelEventModal(discord.ui.Modal):
         event_key: str,
         localizer: Localizer,
         language: str,
+        default_channel_id: str | None = None,
         bound_message: discord.InteractionMessage | None = None,
     ) -> None:
         super().__init__(title=title, timeout=300)
@@ -186,6 +55,7 @@ class ChannelEventModal(discord.ui.Modal):
                         label=channel.display_name[:100],
                         value=channel.user_id,
                         description=channel.login[:100],
+                        default=channel.user_id == default_channel_id or channel.login == default_channel_id,
                     )
                     for channel in tracked_channels[:25]
                 ],
@@ -274,44 +144,6 @@ class ChannelEventActionModal(discord.ui.Modal):
                 event_kind=event_kind,
             )
         await complete_bound_result(interaction, bound_message=self._bound_message, result=result)
-
-
-async def open_live_state_menu(
-    interaction: discord.Interaction,
-    *,
-    services: DiscordServiceBundle,
-    ui_data_provider: DiscordUIDataProvider,
-    localizer: Localizer,
-) -> None:
-    """Open the owner-bound `/live` management menu."""
-    language = resolve_context_language(
-        localizer=localizer,
-        data_provider=ui_data_provider,
-        discord_channel_id=interaction.channel_id,
-    )
-    if interaction.channel_id is None:
-        await send_initial_result(
-            interaction,
-            build_result(
-                localizer,
-                "discord.live_state_ui.errors.command_unavailable",
-                language=language,
-                style=DiscordResultStyle.ERROR,
-                ephemeral=True,
-            ),
-        )
-        return
-
-    await start_form(
-        interaction,
-        view=LiveStateMenuView(
-            owner_id=interaction.user.id,
-            services=services,
-            data_provider=ui_data_provider,
-            discord_channel_id=interaction.channel_id,
-            localizer=localizer,
-        ),
-    )
 
 
 def _notification_label(

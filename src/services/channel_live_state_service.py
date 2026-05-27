@@ -47,7 +47,7 @@ class _ChannelEventPermissionCommand:
 
 @dataclass(slots=True)
 class ChannelEventCommandService:
-    """Handle `/live` and `/offline` as notification-trigger configuration."""
+    """Handle live/offline notification command configuration."""
 
     thread_repository: ThreadRepository
     channel_repository: ChannelRepository

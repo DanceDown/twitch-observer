@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import discord
+from typing import Any
 
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
@@ -25,6 +26,7 @@ class PatternPickerView(BaseFormView):
         services: DiscordServiceBundle,
         data_provider: DiscordUIDataProvider,
         discord_channel_id: int,
+        state_overrides: dict[str, Any] | None = None,
         localizer: Localizer,
     ) -> None:
         super().__init__(
@@ -40,6 +42,7 @@ class PatternPickerView(BaseFormView):
         self._data_provider = data_provider
         self._discord_channel_id = discord_channel_id
         self._patterns: list[PatternPresentation] = []
+        self._state_overrides = state_overrides
 
     async def prepare(self) -> DiscordCommandResult | None:
         self._patterns = await self._data_provider.list_patterns(self._discord_channel_id)
@@ -86,6 +89,8 @@ class PatternPickerView(BaseFormView):
             color=pattern.pattern.color,
             priority=pattern.pattern.priority,
         )
+        if self._state_overrides is not None:
+            _merge_state_overrides(state, self._state_overrides)
         view = PatternHomeView(
             owner_id=self.owner_id,
             services=self._services,
@@ -96,9 +101,20 @@ class PatternPickerView(BaseFormView):
             localizer=self._localizer,
         )
         view.bound_message = self.bound_message
-        await interaction.response.defer()
         if self.bound_message is not None:
+            await interaction.response.defer()
             await self.bound_message.edit(embed=view.render_embed(), view=view)
+            return
+        await interaction.response.send_message(embed=view.render_embed(), view=view, ephemeral=True)
+        view.bound_message = await interaction.original_response()
+
+
+def _merge_state_overrides(target: PatternFormState, overrides: dict[str, Any]) -> None:
+    for field_name, value in overrides.items():
+        if field_name in {"selected_channels", "selected_channel_names", "selected_users", "selected_user_names"}:
+            setattr(target, field_name, list(value))
+        else:
+            setattr(target, field_name, value)
 
 
 class PatternEditSelectionModal(discord.ui.Modal):
