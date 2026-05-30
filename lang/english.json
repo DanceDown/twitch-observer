@@ -493,7 +493,7 @@
       },
       "added_pattern": {
         "title": "Auto-Reply Added",
-        "body": "{RAW:USER} attached an auto-reply to ping number #`{CODE:ID}` <a:yo:1497686448717959369>\nMode: `{CODE:MODE}`\nMessage: {RAW:MESSAGE}",
+        "body": "{RAW:USER} attached an auto-reply to ping number #`{CODE:ID}` <a:yo:1497686448717959369>\nMode: `{CODE:MODE}`\nMessage: `{CODE:MESSAGE}`",
         "footer": "",
         "mode": {
           "message": "Normal Twitch message",
@@ -507,7 +507,7 @@
       },
       "removed_pattern": {
         "title": "Auto-Reply Removed",
-        "body": "{RAW:USER} removed the auto-reply from ping number #`{CODE:ID}` <:ApuApproved:1497724288256446465>\nMessage: {RAW:MESSAGE}",
+        "body": "{RAW:USER} removed the auto-reply from ping number #`{CODE:ID}` <:ApuApproved:1497724288256446465>\nMessage: `{CODE:MESSAGE}`",
         "footer": ""
       },
       "already_disabled": {
@@ -539,7 +539,7 @@
       "unsupported_event": "Only live and offline events from watched Twitch channels fit here <:oopsie:1497720439810687006>",
       "added_event": {
         "title": "Auto-Reply Added",
-        "body": "{RAW:USER} added an auto-reply for `{CODE:CHANNEL}` on `{CODE:STATE}` <a:yo:1497686448717959369>\nMessage: {RAW:MESSAGE}",
+        "body": "{RAW:USER} added an auto-reply for `{CODE:CHANNEL}` on `{CODE:STATE}` <a:yo:1497686448717959369>\nMessage: `{CODE:MESSAGE}`",
         "footer": ""
       },
       "none_configured_event": {
@@ -549,7 +549,7 @@
       },
       "removed_event": {
         "title": "Auto-Reply Removed",
-        "body": "{RAW:USER} removed the `{CODE:STATE}` auto-reply for `{CODE:CHANNEL}` <:ApuApproved:1497724288256446465>\nMessage: {RAW:MESSAGE}",
+        "body": "{RAW:USER} removed the `{CODE:STATE}` auto-reply for `{CODE:CHANNEL}` <:ApuApproved:1497724288256446465>\nMessage: `{CODE:MESSAGE}`",
         "footer": ""
       },
       "disabled_event": {

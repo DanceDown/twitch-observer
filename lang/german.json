@@ -493,7 +493,7 @@
       },
       "added_pattern": {
         "title": "Auto-Antwort hinzugefügt",
-        "body": "{RAW:USER} hat eine Auto-Antwort an Ping Nummer #`{CODE:ID}` gehängt <a:yo:1497686448717959369>\nModus: `{CODE:MODE}`\nNachricht: {RAW:MESSAGE}",
+        "body": "{RAW:USER} hat eine Auto-Antwort an Ping Nummer #`{CODE:ID}` gehängt <a:yo:1497686448717959369>\nModus: `{CODE:MODE}`\nNachricht: `{CODE:MESSAGE}`",
         "footer": "",
         "mode": {
           "message": "Normale Twitch-Nachricht",
@@ -507,7 +507,7 @@
       },
       "removed_pattern": {
         "title": "Auto-Antwort entfernt",
-        "body": "{RAW:USER} hat die Auto-Antwort von Ping Nummer #`{CODE:ID}` entfernt <:ApuApproved:1497724288256446465>\nNachricht: {RAW:MESSAGE}",
+        "body": "{RAW:USER} hat die Auto-Antwort von Ping Nummer #`{CODE:ID}` entfernt <:ApuApproved:1497724288256446465>\nNachricht: `{CODE:MESSAGE}`",
         "footer": ""
       },
       "already_disabled": {
@@ -539,7 +539,7 @@
       "unsupported_event": "Nur Live- und Offline-Events von beobachteten Twitch-Kanälen passen hier <:oopsie:1497720439810687006>",
       "added_event": {
         "title": "Auto-Antwort hinzugefügt",
-        "body": "{RAW:USER} hat eine Auto-Antwort für `{CODE:CHANNEL}` bei `{CODE:STATE}` hinzugefügt <a:yo:1497686448717959369>\nNachricht: {RAW:MESSAGE}",
+        "body": "{RAW:USER} hat eine Auto-Antwort für `{CODE:CHANNEL}` bei `{CODE:STATE}` hinzugefügt <a:yo:1497686448717959369>\nNachricht: `{CODE:MESSAGE}`",
         "footer": ""
       },
       "none_configured_event": {
@@ -549,7 +549,7 @@
       },
       "removed_event": {
         "title": "Auto-Antwort entfernt",
-        "body": "{RAW:USER} hat die `{CODE:STATE}`-Auto-Antwort für `{CODE:CHANNEL}` entfernt <:ApuApproved:1497724288256446465>\nNachricht: {RAW:MESSAGE}",
+        "body": "{RAW:USER} hat die `{CODE:STATE}`-Auto-Antwort für `{CODE:CHANNEL}` entfernt <:ApuApproved:1497724288256446465>\nNachricht: `{CODE:MESSAGE}`",
         "footer": ""
       },
       "disabled_event": {
