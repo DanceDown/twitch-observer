@@ -114,10 +114,10 @@ class PatternReplyAddModal(discord.ui.Modal):
                             "discord.reply_ui.pattern_add.pattern_option_description",
                             language=language,
                             ID=pattern.display_index,
-                            TYPE=localizer.text(
-                                "discord.reply_ui.pattern_add.pattern_type.regex"
+                            PING_MODE=localizer.text(
+                                "discord.pattern_ui.summary.mode_regex"
                                 if pattern.pattern.is_regex
-                                else "discord.reply_ui.pattern_add.pattern_type.ping",
+                                else "discord.pattern_ui.summary.mode_word",
                                 language=language,
                             ),
                         ),

@@ -759,12 +759,8 @@
       "user_not_tracked": "Ich erinnere mich noch nicht an [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}). Füge den Nutzer zuerst mit `/user` hinzu <a:peepoSmart:1497731090704498781>",
       "already_exists": {
         "title": "Bereits vorhanden",
-        "body": "Dieses {ALREADY_EXISTS_TYPE} kenne ich schon als Ping Nummer #`{CODE:ID}` <:oopsie:1497720439810687006>",
-        "footer": "",
-        "type": {
-          "ping": "Ping",
-          "regex": "Regex"
-        }
+        "body": "Diesen Ping kenne ich schon als Ping Nummer #`{CODE:ID}` <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "already_exists_other": {
         "title": "Bereits vorhanden",
@@ -793,73 +789,49 @@
       },
       "already_disabled": {
         "title": "Bereits deaktiviert",
-        "body": "Dieses {ALREADY_DISABLED_TYPE} lurkt schon ganz leise <a:Lurk:1497684902135463986>",
-        "footer": "",
-        "type": {
-          "ping": "Ping",
-          "regex": "Regex"
-        }
+        "body": "Dieser Ping lurkt schon ganz leise <a:Lurk:1497684902135463986>",
+        "footer": ""
       },
       "already_enabled": {
         "title": "Bereits aktiviert",
-        "body": "Dieses {ALREADY_ENABLED_TYPE} ist schon wach <a:yes:1497686393369919559>",
-        "footer": "",
-        "type": {
-          "ping": "Ping",
-          "regex": "Regex"
-        }
+        "body": "Dieser Ping ist schon wach <a:yes:1497686393369919559>",
+        "footer": ""
       },
       "added_result": {
-        "title": "{ADDED_TYPE} hinzugefügt",
+        "title": "Ping hinzugefügt",
         "body": "{RAW:USER}\n{RAW:SUMMARY}",
         "footer": "",
-        "summary_action": "hat",
-        "title_type": {
-          "ping": "Ping",
-          "regex": "Regex"
-        }
+        "summary_action": "hat"
       },
       "removed_result": {
-        "title": "{REMOVED_TYPE} entfernt",
-        "body": "{RAW:USER} hat {REMOVED_BODY_TYPE} #`{CODE:ID}` entfernt <:ApuApproved:1497724288256446465>\n{REMOVED_BODY_TYPE}: `{CODE:TEXT}`",
+        "title": "Ping entfernt",
+        "body": "{RAW:USER} hat Ping #`{CODE:ID}` entfernt <:ApuApproved:1497724288256446465>\nText: `{CODE:TEXT}`\nModus: `{CODE:PING_MODE}`",
         "footer": "",
-        "title_type": {
-          "ping": "Ping",
-          "regex": "Regex"
-        },
-        "body_type": {
-          "ping": "Ping",
+        "mode_value": {
+          "word": "Wort",
           "regex": "Regex"
         }
       },
       "disabled_result": {
-        "title": "{DISABLED_TYPE} deaktiviert",
-        "body": "{RAW:USER} hat {DISABLED_BODY_TYPE} #`{CODE:ID}` deaktiviert <:ApuApproved:1497724288256446465>\n{DISABLED_BODY_TYPE}: `{CODE:TEXT}`",
+        "title": "Ping deaktiviert",
+        "body": "{RAW:USER} hat Ping #`{CODE:ID}` deaktiviert <:ApuApproved:1497724288256446465>\nText: `{CODE:TEXT}`\nModus: `{CODE:PING_MODE}`",
         "footer": "",
-        "title_type": {
-          "ping": "Ping",
-          "regex": "Regex"
-        },
-        "body_type": {
-          "ping": "Ping",
+        "mode_value": {
+          "word": "Wort",
           "regex": "Regex"
         }
       },
       "enabled_result": {
-        "title": "{ENABLED_TYPE} aktiviert",
-        "body": "{RAW:USER} hat {ENABLED_BODY_TYPE} #`{CODE:ID}` aktiviert <a:yes:1497686393369919559>\n{ENABLED_BODY_TYPE}: `{CODE:TEXT}`",
+        "title": "Ping aktiviert",
+        "body": "{RAW:USER} hat Ping #`{CODE:ID}` aktiviert <a:yes:1497686393369919559>\nText: `{CODE:TEXT}`\nModus: `{CODE:PING_MODE}`",
         "footer": "",
-        "title_type": {
-          "ping": "Ping",
-          "regex": "Regex"
-        },
-        "body_type": {
-          "ping": "Ping",
+        "mode_value": {
+          "word": "Wort",
           "regex": "Regex"
         }
       },
       "updated_result": {
-        "title": "Pattern aktualisiert",
+        "title": "Ping aktualisiert",
         "body": "{RAW:USER}\n{RAW:SUMMARY}",
         "footer": ""
       },
@@ -875,14 +847,15 @@
             }
           }
         },
-        "action": "{ACTION} {TYPE} #`{CODE:ID}`:",
+        "action": "{ACTION} Ping #`{CODE:ID}`:",
         "text": "Text: `{CODE:TEXT}`",
+        "mode": "Modus: `{CODE:PING_MODE}`",
         "subscribers_only": "Nur Abonnenten",
         "non_subscribers_only": "Nur Nicht-Abonnenten",
         "only_while_live": "Nur während live",
         "only_while_offline": "Nur während offline",
-        "type": {
-          "ping": "Ping",
+        "mode_value": {
+          "word": "Wort",
           "regex": "Regex"
         },
         "scope": {
@@ -974,12 +947,8 @@
             }
           }
         },
-        "type": {
-          "ping": "Ping",
-          "regex": "Regex"
-        },
         "mode_value": {
-          "ping": "Normaler Ping",
+          "word": "Wort",
           "regex": "Regex"
         },
         "scope": {
@@ -1065,7 +1034,7 @@
         },
         "case_sensitive_yes": "Ja",
         "case_sensitive_no": "Nein",
-        "updated": "{TYPE} #`{CODE:ID}` aktualisiert.",
+        "updated": "Ping #`{CODE:ID}` aktualisiert.",
         "text": "Text: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
         "mode": "Modus: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
         "where": "Wo: Von {RAW:BEFORE} zu {RAW:AFTER}",
@@ -1174,10 +1143,6 @@
       "empty": "Ich beobachte noch keine Kanäle <a:OhNo:1497685055948980306>"
     },
     "pattern": {
-      "type": {
-        "ping": "Ping",
-        "regex": "Regex"
-      },
       "scope": {
         "channel_only": {
           "template": "`Nur in` {RAW:ITEMS}",
@@ -1236,8 +1201,13 @@
           }
         }
       },
-      "line": "{TYPE} #`{CODE:ID}`",
+      "line": "Ping #`{CODE:ID}`",
       "text": "Text: `{CODE:TEXT}`",
+      "mode": "Modus: `{CODE:PING_MODE}`",
+      "mode_value": {
+        "word": "Wort",
+        "regex": "Regex"
+      },
       "priority": "Priorität: `{CODE:PRIORITY}`",
       "custom_color": "Eigene Farbe: `{CODE:COLOR}`",
       "case_sensitive": "Groß-/Kleinschreibung",
@@ -1716,9 +1686,9 @@
       },
       "summary": {
         "text": "Text: `{CODE:TEXT}`",
-        "mode": "Modus: `{CODE:MODE}`",
+        "mode": "Modus: `{CODE:PING_MODE}`",
         "mode_regex": "Regex",
-        "mode_ping": "Normaler Ping",
+        "mode_word": "Wort",
         "where": "Wo: {RAW:VALUE}",
         "who": "Wer: {RAW:VALUE}",
         "subscribers": "Abonnenten: `{CODE:VALUE}`",
@@ -1843,7 +1813,7 @@
         "choose_title": "Ping auswählen",
         "edit_label": "Welchen Ping möchtest du bearbeiten?",
         "update_label": "Welchen Ping möchtest du aktualisieren?",
-        "option_description": "{TYPE}",
+        "option_description": "Nr. {ID} - Modus: {PING_MODE}",
         "edit_untitled_ping": "Unbenannter Ping",
         "update_untitled_ping": "Unbenannter Ping"
       },
@@ -1914,7 +1884,7 @@
     "reply_ui": {
       "menu": {
         "title": "Auto-Antworten",
-        "body": "Automatische Twitch-Nachrichten entweder an ein Ping- oder Regex-Pattern oder an einen konfigurierten Live- oder Offline-Trigger hängen.",
+        "body": "Automatische Twitch-Nachrichten entweder an ein Ping oder an einen konfigurierten Live- oder Offline-Trigger hängen.",
         "footer": ""
       },
       "actions": {
@@ -1925,21 +1895,17 @@
         "enable": "Aktivieren"
       },
       "pattern_add": {
-        "title": "Pattern-Auto-Antwort hinzufügen",
+        "title": "Ping-Auto-Antwort hinzufügen",
         "message_label": "Was soll sie sagen?",
         "message_placeholder": "Hallo {NAME}!",
-        "pattern_label": "Pattern",
-        "pattern_description": "Wähle den Ping oder die Regex-Regel aus, die automatisch eine Twitch-Nachricht senden soll.",
-        "pattern_option_description": "Nr. {ID} - {TYPE}",
+        "pattern_label": "Ping",
+        "pattern_description": "Wähle den Ping aus, der automatisch eine Twitch-Nachricht senden soll.",
+        "pattern_option_description": "Nr. {ID} - Modus: {PING_MODE}",
         "mode_label": "Antwortmodus",
         "mode_message": "Als normale Chat-Nachricht senden",
         "mode_reply": "Auf die gematchte Nachricht antworten",
         "example_name": "Name",
-        "untitled_pattern": "Unbenannter Ping",
-        "pattern_type": {
-          "regex": "Regex",
-          "ping": "Ping"
-        }
+        "untitled_pattern": "Unbenannter Ping"
       },
       "event_add": {
         "title": "Event-Auto-Antwort hinzufügen",

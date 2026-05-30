@@ -759,12 +759,8 @@
       "user_not_tracked": "I don't remember [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) yet. Add the user first with `/user` <a:peepoSmart:1497731090704498781>",
       "already_exists": {
         "title": "Already Exists",
-        "body": "I already know this {ALREADY_EXISTS_TYPE} as ping number #`{CODE:ID}` <:oopsie:1497720439810687006>",
-        "footer": "",
-        "type": {
-          "ping": "ping",
-          "regex": "regex"
-        }
+        "body": "I already know this ping as ping number #`{CODE:ID}` <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "already_exists_other": {
         "title": "Already Exists",
@@ -793,73 +789,49 @@
       },
       "already_disabled": {
         "title": "Already Disabled",
-        "body": "This {ALREADY_DISABLED_TYPE} is already quietly lurking <a:Lurk:1497684902135463986>",
-        "footer": "",
-        "type": {
-          "ping": "ping",
-          "regex": "regex"
-        }
+        "body": "This ping is already quietly lurking <a:Lurk:1497684902135463986>",
+        "footer": ""
       },
       "already_enabled": {
         "title": "Already Enabled",
-        "body": "This {ALREADY_ENABLED_TYPE} is already awake <a:yes:1497686393369919559>",
-        "footer": "",
-        "type": {
-          "ping": "ping",
-          "regex": "regex"
-        }
+        "body": "This ping is already awake <a:yes:1497686393369919559>",
+        "footer": ""
       },
       "added_result": {
-        "title": "{ADDED_TYPE} Added",
+        "title": "Ping Added",
         "body": "{RAW:USER}\n{RAW:SUMMARY}",
         "footer": "",
-        "summary_action": "added",
-        "title_type": {
-          "ping": "Ping",
-          "regex": "Regex"
-        }
+        "summary_action": "added"
       },
       "removed_result": {
-        "title": "{REMOVED_TYPE} Removed",
-        "body": "{RAW:USER} removed {REMOVED_BODY_TYPE} #`{CODE:ID}` <:ApuApproved:1497724288256446465>\n{REMOVED_BODY_TYPE}: `{CODE:TEXT}`",
+        "title": "Ping Removed",
+        "body": "{RAW:USER} removed ping #`{CODE:ID}` <:ApuApproved:1497724288256446465>\nText: `{CODE:TEXT}`\nMode: `{CODE:PING_MODE}`",
         "footer": "",
-        "title_type": {
-          "ping": "Ping",
+        "mode_value": {
+          "word": "Word",
           "regex": "Regex"
-        },
-        "body_type": {
-          "ping": "ping",
-          "regex": "regex"
         }
       },
       "disabled_result": {
-        "title": "{DISABLED_TYPE} Disabled",
-        "body": "{RAW:USER} disabled {DISABLED_BODY_TYPE} #`{CODE:ID}` <:ApuApproved:1497724288256446465>\n{DISABLED_BODY_TYPE}: `{CODE:TEXT}`",
+        "title": "Ping Disabled",
+        "body": "{RAW:USER} disabled ping #`{CODE:ID}` <:ApuApproved:1497724288256446465>\nText: `{CODE:TEXT}`\nMode: `{CODE:PING_MODE}`",
         "footer": "",
-        "title_type": {
-          "ping": "Ping",
+        "mode_value": {
+          "word": "Word",
           "regex": "Regex"
-        },
-        "body_type": {
-          "ping": "ping",
-          "regex": "regex"
         }
       },
       "enabled_result": {
-        "title": "{ENABLED_TYPE} Enabled",
-        "body": "{RAW:USER} enabled {ENABLED_BODY_TYPE} #`{CODE:ID}` <a:yes:1497686393369919559>\n{ENABLED_BODY_TYPE}: `{CODE:TEXT}`",
+        "title": "Ping Enabled",
+        "body": "{RAW:USER} enabled ping #`{CODE:ID}` <a:yes:1497686393369919559>\nText: `{CODE:TEXT}`\nMode: `{CODE:PING_MODE}`",
         "footer": "",
-        "title_type": {
-          "ping": "Ping",
+        "mode_value": {
+          "word": "Word",
           "regex": "Regex"
-        },
-        "body_type": {
-          "ping": "ping",
-          "regex": "regex"
         }
       },
       "updated_result": {
-        "title": "Pattern Updated",
+        "title": "Ping Updated",
         "body": "{RAW:USER}\n{RAW:SUMMARY}",
         "footer": ""
       },
@@ -875,8 +847,8 @@
             }
           }
         },
-        "type": {
-          "ping": "ping",
+        "mode_value": {
+          "word": "Word",
           "regex": "regex"
         },
         "scope": {
@@ -949,8 +921,9 @@
             }
           }
         },
-        "action": "{ACTION} {TYPE} #`{CODE:ID}`:",
+        "action": "{ACTION} ping #`{CODE:ID}`:",
         "text": "Text: `{CODE:TEXT}`",
+        "mode": "Mode: `{CODE:PING_MODE}`",
         "subscribers_only": "Subscribers only",
         "non_subscribers_only": "Non-subscribers only",
         "only_while_live": "Only while live",
@@ -974,12 +947,8 @@
             }
           }
         },
-        "type": {
-          "ping": "ping",
-          "regex": "regex"
-        },
         "mode_value": {
-          "ping": "Normal ping",
+          "word": "Word",
           "regex": "Regex"
         },
         "scope": {
@@ -1065,7 +1034,7 @@
         },
         "case_sensitive_yes": "Yes",
         "case_sensitive_no": "No",
-        "updated": "Updated {TYPE} #`{CODE:ID}`.",
+        "updated": "Updated ping #`{CODE:ID}`.",
         "text": "Text: from `{CODE:BEFORE}` to `{CODE:AFTER}`",
         "mode": "Mode: from `{CODE:BEFORE}` to `{CODE:AFTER}`",
         "where": "Where: From {RAW:BEFORE} to {RAW:AFTER}",
@@ -1236,8 +1205,13 @@
           }
         }
       },
-      "line": "{TYPE} #`{CODE:ID}`",
+      "line": "Ping #`{CODE:ID}`",
       "text": "Text: `{CODE:TEXT}`",
+      "mode": "Mode: `{CODE:PING_MODE}`",
+      "mode_value": {
+        "word": "Word",
+        "regex": "Regex"
+      },
       "priority": "Priority: `{CODE:PRIORITY}`",
       "custom_color": "Custom color: `{CODE:COLOR}`",
       "case_sensitive": "Case-Sensitive",
@@ -1716,9 +1690,9 @@
       },
       "summary": {
         "text": "Text: `{CODE:TEXT}`",
-        "mode": "Mode: `{CODE:MODE}`",
+        "mode": "Mode: `{CODE:PING_MODE}`",
         "mode_regex": "Regex",
-        "mode_ping": "Normal ping",
+        "mode_word": "Word",
         "where": "Where: {RAW:VALUE}",
         "who": "Who: {RAW:VALUE}",
         "subscribers": "Subscribers: `{CODE:VALUE}`",
@@ -1843,7 +1817,7 @@
         "choose_title": "Choose Ping",
         "edit_label": "Which ping do you want to edit?",
         "update_label": "Which ping do you want to update?",
-        "option_description": "{TYPE}",
+        "option_description": "No. {ID} - Mode: {PING_MODE}",
         "edit_untitled_ping": "Untitled ping",
         "update_untitled_ping": "Untitled ping"
       },
@@ -1914,7 +1888,7 @@
     "reply_ui": {
       "menu": {
         "title": "Auto-Replies",
-        "body": "Attach automatic Twitch messages either to a ping or regex pattern or to a configured live or offline event trigger.",
+        "body": "Attach automatic Twitch messages either to a ping or to a configured live or offline event trigger.",
         "footer": ""
       },
       "actions": {
@@ -1925,21 +1899,17 @@
         "enable": "Enable"
       },
       "pattern_add": {
-        "title": "Add Pattern Auto-Reply",
+        "title": "Add Ping Auto-Reply",
         "message_label": "What should it say?",
         "message_placeholder": "Hello {NAME}!",
-        "pattern_label": "Pattern",
-        "pattern_description": "Choose the ping or regex rule that should send an automatic Twitch message.",
-        "pattern_option_description": "No. {ID} - {TYPE}",
+        "pattern_label": "Ping",
+        "pattern_description": "Choose the ping that should send an automatic Twitch message.",
+        "pattern_option_description": "No. {ID} - Mode: {PING_MODE}",
         "mode_label": "Reply Mode",
         "mode_message": "Send as normal chat message",
         "mode_reply": "Reply to the matched message",
         "example_name": "Name",
-        "untitled_pattern": "Untitled ping",
-        "pattern_type": {
-          "regex": "Regex",
-          "ping": "ping"
-        }
+        "untitled_pattern": "Untitled ping"
       },
       "event_add": {
         "title": "Add Event Auto-Reply",

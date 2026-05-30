@@ -28,7 +28,7 @@ class PatternBasicsModal(discord.ui.Modal):
             component=discord.ui.RadioGroup(
                 options=[
                     discord.RadioGroupOption(
-                        label=parent.text("discord.pattern_ui.summary.mode_ping"),
+                        label=parent.text("discord.pattern_ui.summary.mode_word"),
                         value="ping",
                         default=not parent.state.is_regex,
                     ),

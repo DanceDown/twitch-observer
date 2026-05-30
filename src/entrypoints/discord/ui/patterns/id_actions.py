@@ -115,11 +115,11 @@ class PatternActionSelectionModal(discord.ui.Modal):
                             "discord.pattern_ui.selection.option_description",
                             language=language,
                             ID=item.display_index,
-                            TYPE=localizer.text(
+                            PING_MODE=localizer.text(
                                 (
                                     "discord.pattern_ui.summary.mode_regex"
                                     if item.pattern.is_regex
-                                    else "discord.pattern_ui.summary.mode_ping"
+                                    else "discord.pattern_ui.summary.mode_word"
                                 ),
                                 language=language,
                             ),

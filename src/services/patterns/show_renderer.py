@@ -122,7 +122,7 @@ class ShowSectionRenderer:
         return self.render_section("show.channel.section", self.localizer.text("show.channel.rows", language=language, ITEMS=tuple(rows)), language=language)
 
     async def render_patterns_section(self, thread: ThreadRecord) -> str:
-        """Render all stored ping and regex rules with dense display IDs."""
+        """Render all stored pings with dense display IDs."""
         language = self.localizer.language_for_thread(thread)
         patterns = self.pattern_repository.list_patterns_for_thread(
             thread.thread_id,
@@ -347,7 +347,6 @@ class ShowSectionRenderer:
         head = self.localizer.text(
             "show.pattern.line",
             language=language,
-            TYPE=self.localizer.text("show.pattern.type.regex" if pattern.is_regex else "show.pattern.type.ping", language=language),
             ID=display_index,
         )
         details = [
@@ -355,7 +354,15 @@ class ShowSectionRenderer:
                 "show.pattern.text",
                 language=language,
                 TEXT=pattern.regex,
-            )
+            ),
+            self.localizer.text(
+                "show.pattern.mode",
+                language=language,
+                PING_MODE=self.localizer.text(
+                    "show.pattern.mode_value.regex" if pattern.is_regex else "show.pattern.mode_value.word",
+                    language=language,
+                ),
+            ),
         ]
         details.extend(await self.describe_pattern_details(pattern, language=language))
         return self.render_row(

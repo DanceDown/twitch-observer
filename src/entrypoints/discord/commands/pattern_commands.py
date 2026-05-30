@@ -67,7 +67,7 @@ def register_pattern_commands(
         discord.app_commands.Choice(name="offline", value="offline"),
     ]
 
-    @group.command(name="add", description="Add one ping or regex.")
+    @group.command(name="add", description="Add one ping.")
     @discord.app_commands.describe(
         pattern_text="Pattern text.",
         is_regex="Use regex mode.",
@@ -149,7 +149,7 @@ def register_pattern_commands(
         )
         await send_initial_result(interaction, result)
 
-    @group.command(name="edit", description="Edit one existing ping or regex.")
+    @group.command(name="edit", description="Edit one existing ping.")
     @discord.app_commands.describe(
         pattern_id="Pattern ID or display index.",
         pattern_text="New pattern text.",
@@ -264,7 +264,7 @@ def register_pattern_commands(
         )
         await send_initial_result(interaction, result)
 
-    @group.command(name="remove", description="Remove one ping or regex.")
+    @group.command(name="remove", description="Remove one ping.")
     @discord.app_commands.describe(pattern_id="Pattern ID or display index.")
     async def ping_remove(interaction: discord.Interaction, pattern_id: int | None = None) -> None:
         await _handle_ping_state_action(
@@ -277,7 +277,7 @@ def register_pattern_commands(
             pattern_id=pattern_id,
         )
 
-    @group.command(name="disable", description="Disable one ping or regex.")
+    @group.command(name="disable", description="Disable one ping.")
     @discord.app_commands.describe(pattern_id="Pattern ID or display index.")
     async def ping_disable(interaction: discord.Interaction, pattern_id: int | None = None) -> None:
         await _handle_ping_state_action(
@@ -290,7 +290,7 @@ def register_pattern_commands(
             pattern_id=pattern_id,
         )
 
-    @group.command(name="enable", description="Enable one ping or regex.")
+    @group.command(name="enable", description="Enable one ping.")
     @discord.app_commands.describe(pattern_id="Pattern ID or display index.")
     async def ping_enable(interaction: discord.Interaction, pattern_id: int | None = None) -> None:
         await _handle_ping_state_action(

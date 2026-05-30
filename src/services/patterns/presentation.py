@@ -29,13 +29,17 @@ class PatternCommandPresenter:
                 "results.pattern.summary.action",
                 language=language,
                 ACTION=action,
-                TYPE=self.pattern_type(pattern.is_regex, language=language, scope="summary"),
                 ID=display_id,
             ),
             self.localizer.text(
                 "results.pattern.summary.text",
                 language=language,
                 TEXT=pattern.regex,
+            ),
+            self.localizer.text(
+                "results.pattern.summary.mode",
+                language=language,
+                PING_MODE=self.pattern_mode(pattern.is_regex, language=language, scope="summary"),
             ),
         ]
         channel_scope = self.scope_text(
@@ -123,7 +127,6 @@ class PatternCommandPresenter:
             self.localizer.text(
                 "results.pattern.changes.updated",
                 language=language,
-                TYPE=self.pattern_type(after.is_regex, language=language, scope="changes"),
                 ID=display_id,
             )
         ]
@@ -141,8 +144,8 @@ class PatternCommandPresenter:
                 self.localizer.text(
                     "results.pattern.changes.mode",
                     language=language,
-                    BEFORE=self.pattern_mode(before.is_regex, language=language),
-                    AFTER=self.pattern_mode(after.is_regex, language=language),
+                    BEFORE=self.pattern_mode(before.is_regex, language=language, scope="changes"),
+                    AFTER=self.pattern_mode(after.is_regex, language=language, scope="changes"),
                 )
             )
 
@@ -280,12 +283,8 @@ class PatternCommandPresenter:
             )
         return None
 
-    def pattern_type(self, is_regex: bool, *, language: str, scope: str) -> str:
-        key = f"results.pattern.{scope}.type.regex" if is_regex else f"results.pattern.{scope}.type.ping"
-        return self.localizer.text(key, language=language)
-
-    def pattern_mode(self, is_regex: bool, *, language: str) -> str:
-        key = "results.pattern.changes.mode_value.regex" if is_regex else "results.pattern.changes.mode_value.ping"
+    def pattern_mode(self, is_regex: bool, *, language: str, scope: str) -> str:
+        key = f"results.pattern.{scope}.mode_value.regex" if is_regex else f"results.pattern.{scope}.mode_value.word"
         return self.localizer.text(key, language=language)
 
     def case_sensitive_value(self, value: bool, *, language: str) -> str:

@@ -210,7 +210,6 @@ class PatternCommandService:
                 self.localizer,
                 "results.pattern.already_exists",
                 thread=thread,
-                ALREADY_EXISTS_TYPE=self._pattern_value("results.pattern.already_exists.type", command.is_regex, language=thread.language),
                 ID=display_id,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
@@ -240,14 +239,13 @@ class PatternCommandService:
                 )
             ),
         )
-        mode_name_title = self._pattern_value("results.pattern.added_result.title_type", command.is_regex, language=thread.language)
         display_id = self._display_index(thread.thread_id, created.pattern_id) or created.pattern_id
         logger.debug(
-            "Added %s pattern thread_id=%s pattern_id=%s regex=%r channel_filter=%s user_filter=%s",
-            mode_name_title,
+            "Added ping thread_id=%s pattern_id=%s regex=%r is_regex=%s channel_filter=%s user_filter=%s",
             thread.thread_id,
             created.pattern_id,
             created.regex,
+            created.is_regex,
             created.channel_scope_ids,
             created.user_scope_ids,
         )
@@ -255,7 +253,6 @@ class PatternCommandService:
             self.localizer,
             "results.pattern.added_result",
             thread=thread,
-            ADDED_TYPE=mode_name_title,
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
             SUMMARY=self._presenter().format_pattern_summary(
                 action=self.localizer.text("results.pattern.added_result.summary_action", language=thread.language),
@@ -306,17 +303,14 @@ class PatternCommandService:
         display_id = self._display_index(thread.thread_id, pattern.pattern_id) or pattern.pattern_id
         self.pattern_repository.remove_pattern(thread_id=pattern.thread_id, pattern_id=pattern.pattern_id)
         logger.debug("Removed pattern thread_id=%s pattern_id=%s regex=%r", pattern.thread_id, pattern.pattern_id, pattern.regex)
-        mode_name_title = self._pattern_value("results.pattern.removed_result.title_type", pattern.is_regex, language=thread.language)
-        mode_name_body = self._pattern_value("results.pattern.removed_result.body_type", pattern.is_regex, language=thread.language)
         return build_thread_result(
             self.localizer,
             "results.pattern.removed_result",
             thread=thread,
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
-            REMOVED_TYPE=mode_name_title,
-            REMOVED_BODY_TYPE=mode_name_body,
             ID=display_id,
             TEXT=pattern.regex,
+            PING_MODE=self._pattern_mode(pattern.is_regex, language=thread.language, scope="results.pattern.removed_result"),
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
         )
@@ -347,7 +341,6 @@ class PatternCommandService:
                 self.localizer,
                 "results.pattern.already_disabled",
                 thread=thread,
-                ALREADY_DISABLED_TYPE=self._pattern_value("results.pattern.already_disabled.type", pattern.is_regex, language=thread.language),
                 ID=display_id,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
@@ -359,18 +352,15 @@ class PatternCommandService:
         )
         if updated is None:
             raise RuntimeError("Pattern repository returned no row for disable.")
-        mode_name_title = self._pattern_value("results.pattern.disabled_result.title_type", pattern.is_regex, language=thread.language)
-        mode_name_body = self._pattern_value("results.pattern.disabled_result.body_type", updated.is_regex, language=thread.language)
         display_id = self._display_index(thread.thread_id, updated.pattern_id) or updated.pattern_id
         return build_thread_result(
             self.localizer,
             "results.pattern.disabled_result",
             thread=thread,
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
-            DISABLED_TYPE=mode_name_title,
-            DISABLED_BODY_TYPE=mode_name_body,
             ID=display_id,
             TEXT=updated.regex,
+            PING_MODE=self._pattern_mode(updated.is_regex, language=thread.language, scope="results.pattern.disabled_result"),
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
         )
@@ -401,7 +391,6 @@ class PatternCommandService:
                 self.localizer,
                 "results.pattern.already_enabled",
                 thread=thread,
-                ALREADY_ENABLED_TYPE=self._pattern_value("results.pattern.already_enabled.type", pattern.is_regex, language=thread.language),
                 ID=display_id,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
@@ -413,18 +402,15 @@ class PatternCommandService:
         )
         if updated is None:
             raise RuntimeError("Pattern repository returned no row for enable.")
-        mode_name_title = self._pattern_value("results.pattern.enabled_result.title_type", pattern.is_regex, language=thread.language)
-        mode_name_body = self._pattern_value("results.pattern.enabled_result.body_type", updated.is_regex, language=thread.language)
         display_id = self._display_index(thread.thread_id, updated.pattern_id) or updated.pattern_id
         return build_thread_result(
             self.localizer,
             "results.pattern.enabled_result",
             thread=thread,
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
-            ENABLED_TYPE=mode_name_title,
-            ENABLED_BODY_TYPE=mode_name_body,
             ID=display_id,
             TEXT=updated.regex,
+            PING_MODE=self._pattern_mode(updated.is_regex, language=thread.language, scope="results.pattern.enabled_result"),
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
         )
@@ -583,9 +569,9 @@ class PatternCommandService:
             **placeholders,
         )
 
-    def _pattern_value(self, key_prefix: str, is_regex: bool, *, language: str) -> str:
-        suffix = "regex" if is_regex else "ping"
-        key = f"{key_prefix}.{suffix}"
+    def _pattern_mode(self, is_regex: bool, *, language: str, scope: str) -> str:
+        suffix = "regex" if is_regex else "word"
+        key = f"{scope}.mode_value.{suffix}"
         return self.localizer.text(key, language=language)
 
     def _presenter(self) -> PatternCommandPresenter:

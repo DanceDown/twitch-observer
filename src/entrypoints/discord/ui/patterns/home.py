@@ -66,7 +66,11 @@ class PatternHomeView(BaseFormView):
             self.text("discord.pattern_ui.summary.text", TEXT=self.state.pattern_text or self.text("discord.pattern_ui.summary.not_set")),
             self.text(
                 "discord.pattern_ui.summary.mode",
-                MODE=self.text("discord.pattern_ui.summary.mode_regex" if self.state.is_regex else "discord.pattern_ui.summary.mode_ping"),
+                PING_MODE=self.text(
+                    "discord.pattern_ui.summary.mode_regex"
+                    if self.state.is_regex
+                    else "discord.pattern_ui.summary.mode_word"
+                ),
             ),
             self.text(
                 "discord.pattern_ui.summary.where",
