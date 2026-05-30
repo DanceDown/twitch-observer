@@ -10,7 +10,7 @@ from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
 from ..dispatch import dispatch_show_configuration
 from ..helpers import command_unavailable_result, ensure_ui_flow_allowed, send_initial_result
-from ..ui.show_ui import ShowPaginationView, ShowSectionModal
+from ..ui.show_ui import ShowPaginationView, ShowSectionModal, _show_section_item_prefix
 from ..ui_data import DiscordUIDataProvider
 
 
@@ -59,6 +59,11 @@ def register_show_commands(
                 result=result,
                 localizer=localizer,
                 language=language,
+                item_prefix=_show_section_item_prefix(
+                    localizer=localizer,
+                    language=language,
+                    section=section.value,
+                ),
             )
             await interaction.response.send_message(embed=view.render_embed(), view=view, ephemeral=True)
             view.bound_message = await interaction.original_response()
