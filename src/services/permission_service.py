@@ -37,10 +37,14 @@ class PermissionCommandService:
             permission_repository=self.permission_repository,
             account_repository=None,
             localizer=self.localizer,
+            not_joined_key="results.permission.not_joined",
         )
         self._runner = CommandExecutionRunner(
             localizer=self.localizer,
             resolve_thread=lambda command: self.thread_repository.get_by_discord_channel_id(command.discord_channel_id),
+            validation_error_key="results.permission.validation_error",
+            twitch_api_error_key="results.permission.twitch_api_error",
+            unexpected_error_key="results.permission.unexpected_error",
         )
 
     async def handle_grant(self, command: GrantPermissionsCommand) -> DiscordCommandResult:
@@ -93,7 +97,7 @@ class PermissionCommandService:
         if denied is not None:
             return denied
         if not command.permissions:
-            raise ValueError(self.localizer.text("results.permission.empty_selection", language=thread.language))
+            raise ValueError(self.localizer.text("results.permission.grant_empty_selection", language=thread.language))
         requested_permissions = tuple(dict.fromkeys(command.permissions))
         permission_mask = permissions_mask_from_values(requested_permissions)
         current = self.permission_repository.get_by_user_and_thread(
@@ -111,7 +115,7 @@ class PermissionCommandService:
             "results.permission.granted",
             thread=thread,
             TARGET=f"<@{updated.discord_user_id}>",
-            PERMISSIONS=[self._permission_label(value, language=thread.language) for value in requested_permissions],
+            PERMISSIONS=[self._permission_label("results.permission.granted", value, language=thread.language) for value in requested_permissions],
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
@@ -122,7 +126,7 @@ class PermissionCommandService:
         if denied is not None:
             return denied
         if not command.permissions:
-            raise ValueError(self.localizer.text("results.permission.empty_selection", language=thread.language))
+            raise ValueError(self.localizer.text("results.permission.revoke_empty_selection", language=thread.language))
         requested_permissions = tuple(dict.fromkeys(command.permissions))
         permission_mask = permissions_mask_from_values(requested_permissions)
         current = self.permission_repository.get_by_user_and_thread(
@@ -137,7 +141,10 @@ class PermissionCommandService:
                 "results.permission.not_granted",
                 thread=thread,
                 TARGET=f"<@{command.target_user_id}>",
-                PERMISSIONS=[self._permission_label(value, language=thread.language) for value in requested_permissions],
+                PERMISSIONS=[
+                    self._permission_label("results.permission.not_granted", value, language=thread.language)
+                    for value in requested_permissions
+                ],
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
             )
@@ -158,14 +165,11 @@ class PermissionCommandService:
             "results.permission.revoked",
             thread=thread,
             TARGET=f"<@{command.target_user_id}>",
-            PERMISSIONS=[self._permission_label(value, language=thread.language) for value in requested_permissions],
+            PERMISSIONS=[self._permission_label("results.permission.revoked", value, language=thread.language) for value in requested_permissions],
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
         )
 
-    def _permission_label(self, value: str, *, language: str) -> str:
-        try:
-            return self.localizer.text(f"show.permission.{value}", language=language)
-        except ValueError:
-            return value.replace("_", " ").capitalize()
+    def _permission_label(self, scope: str, value: str, *, language: str) -> str:
+        return self.localizer.text(f"{scope}.permission_label.{value}", language=language)

@@ -53,11 +53,7 @@ class ShowSectionRenderer:
         language = self.localizer.language_for_thread(thread)
         channels = self.channel_repository.list_channels_for_thread(thread.thread_id)
         if not channels:
-            return self.section(
-                self.localizer.text("show.sections.tracked_channels", language=language),
-                self.localizer.text("show.empty.tracked_channels", language=language),
-                language=language,
-            )
+            return self.render_section("show.channel.section", self.localizer.text("show.channel.empty", language=language), language=language)
 
         rows: list[str] = []
         thread_events = (
@@ -109,24 +105,23 @@ class ShowSectionRenderer:
                     )
                 )
             rows.append(
-                self.grouped_bullet(
-                    format_twitch_code_link(
+                self.render_row(
+                    row_key="show.channel.row",
+                    details_key="show.channel.details",
+                    head=format_twitch_code_link(
                         localizer=self.localizer,
                         language=language,
+                        key="show.channel.profile_link",
                         display_name=twitch_user.display_name,
                         login=twitch_user.login,
                     ),
-                    details,
+                    details=details,
                     language=language,
                 )
             )
-        return self.section(
-            self.localizer.text("show.sections.tracked_channels", language=language),
-            self.raw_lines(rows, language=language),
-            language=language,
-        )
+        return self.render_section("show.channel.section", self.localizer.text("show.channel.rows", language=language, ITEMS=tuple(rows)), language=language)
 
-    async def render_patterns_section(self, thread: ThreadRecord, *, title: str) -> str:
+    async def render_patterns_section(self, thread: ThreadRecord) -> str:
         """Render all stored ping and regex rules with dense display IDs."""
         language = self.localizer.language_for_thread(thread)
         patterns = self.pattern_repository.list_patterns_for_thread(
@@ -134,12 +129,12 @@ class ShowSectionRenderer:
             is_regex=None,
         )
         if not patterns:
-            return self.section(title, self.localizer.text("show.empty.pings", language=language), language=language)
+            return self.render_section("show.pattern.section", self.localizer.text("show.pattern.empty", language=language), language=language)
         rows = [
             await self.format_pattern_row(pattern, display_index=display_index, language=language)
             for display_index, pattern in enumerate(patterns, start=1)
         ]
-        return self.section(title, self.raw_lines(rows, language=language), language=language)
+        return self.render_section("show.pattern.section", self.localizer.text("show.pattern.rows", language=language, ITEMS=tuple(rows)), language=language)
 
     async def render_auto_replies_section(self, thread: ThreadRecord) -> str:
         """Render all patterns and event-actions that currently send auto-replies."""
@@ -162,12 +157,9 @@ class ShowSectionRenderer:
                 if action_record.action_type == TWITCH_SEND_MESSAGE_ACTION
             ]
         )
+        empty_text = self.localizer.text("show.auto_replies.empty", language=language)
         if not replies and not adapter_event_actions:
-            return self.section(
-                self.localizer.text("show.sections.auto_replies", language=language),
-                self.localizer.text("show.empty.auto_replies", language=language),
-                language=language,
-            )
+            return self.render_section("show.auto_replies.section", empty_text, language=language)
         rows: list[str] = []
         pattern_display_indices = {
             pattern.pattern_id: display_index
@@ -195,33 +187,18 @@ class ShowSectionRenderer:
         for adapter_event, action in adapter_event_actions:
             rows.append(await self.format_adapter_event_action_row(adapter_event, action, language=language))
         if not rows:
-            return self.section(
-                self.localizer.text("show.sections.auto_replies", language=language),
-                self.localizer.text("show.empty.auto_replies", language=language),
-                language=language,
-            )
-        return self.section(
-            self.localizer.text("show.sections.auto_replies", language=language),
-            self.raw_lines(rows, language=language),
-            language=language,
-        )
+            return self.render_section("show.auto_replies.section", empty_text, language=language)
+        return self.render_section("show.auto_replies.section", self.localizer.text("show.auto_replies.rows", language=language, ITEMS=tuple(rows)), language=language)
 
     async def render_users_section(self, thread: ThreadRecord) -> str:
         """Render the tracked Twitch users for one Discord configuration root."""
         language = self.localizer.language_for_thread(thread)
+        empty_text = self.localizer.text("show.tracked_users.empty", language=language)
         if self.tracked_user_repository is None:
-            return self.section(
-                self.localizer.text("show.sections.tracked_users", language=language),
-                self.localizer.text("show.empty.tracked_users", language=language),
-                language=language,
-            )
+            return self.render_section("show.tracked_users.section", empty_text, language=language)
         tracked_users = self.tracked_user_repository.list_users_for_thread(thread.thread_id)
         if not tracked_users:
-            return self.section(
-                self.localizer.text("show.sections.tracked_users", language=language),
-                self.localizer.text("show.empty.tracked_users", language=language),
-                language=language,
-            )
+            return self.render_section("show.tracked_users.section", empty_text, language=language)
         rows: list[str] = []
         for tracked_user in tracked_users:
             twitch_user = await self.resolve_user_by_id(tracked_user.twitch_user_id)
@@ -229,15 +206,12 @@ class ShowSectionRenderer:
                 format_twitch_code_link(
                     localizer=self.localizer,
                     language=language,
+                    key="show.tracked_users.profile_link",
                     display_name=twitch_user.display_name,
                     login=twitch_user.login,
                 )
             )
-        return self.section(
-            self.localizer.text("show.sections.tracked_users", language=language),
-            self.bullets(rows, language=language),
-            language=language,
-        )
+        return self.render_section("show.tracked_users.section", self.localizer.text("show.tracked_users.rows", language=language, ITEMS=tuple(rows)), language=language)
 
     def render_permissions_section(self, thread: ThreadRecord) -> str:
         """Render the permission overview for one Discord context."""
@@ -248,24 +222,32 @@ class ShowSectionRenderer:
             raise ValueError("show.show_permissions must be an object.")
         body_template = permission_msg.get("body")
         user_list_item = permission_msg.get("user_list_item")
-        permission_list_item = permission_msg.get("permission_list_item")
-        if not isinstance(body_template, str) or not isinstance(user_list_item, str) or not isinstance(permission_list_item, str):
-            raise ValueError("show.show_permissions must define body, user_list_item and permission_list_item.")
+        if not isinstance(body_template, str) or not isinstance(user_list_item, str):
+            raise ValueError("show.show_permissions must define body and user_list_item.")
 
-        owner_permissions = self.localizer.render(
-            permission_list_item,
-            PERMISSION=self.localizer.text("show.permission.owner", language=language),
+        owner_permissions = self.localizer.text(
+            "show.show_permissions.permission_list",
+            language=language,
+            PERMISSIONS=(self.localizer.text("show.show_permissions.permission_label.owner", language=language),),
         )
         user_entries.append(
             self.localizer.render(
                 user_list_item,
-                USERNAME=self.mention(thread.owner_id, language=language),
+                USERNAME=self.mention(thread.owner_id),
                 PERMISSION_LIST=owner_permissions,
             )
         )
+        rendered_user_list = self.render_permissions_user_list(user_entries, language=language)
 
         if self.permission_repository is None:
-            return self.localizer.render(body_template, USER_LIST="\n".join(user_entries))
+            return self.render_section(
+                "show.show_permissions.section",
+                self.localizer.render(
+                    body_template,
+                    USER_LIST=rendered_user_list,
+                ),
+                language=language,
+            )
 
         grants = self.permission_repository.list_for_thread(thread_id=thread.thread_id)
         for grant in grants:
@@ -273,25 +255,33 @@ class ShowSectionRenderer:
             rendered = (
                 [self.permission_label(label, language=language) for label in labels]
                 if labels
-                else [self.localizer.text("show.permission.none", language=language)]
+                else [self.localizer.text("show.show_permissions.permission_label.none", language=language)]
             )
-            permission_lines = "\n".join(
-                self.localizer.render(permission_list_item, PERMISSION=item)
-                for item in rendered
+            permission_lines = self.localizer.text(
+                "show.show_permissions.permission_list",
+                language=language,
+                PERMISSIONS=tuple(rendered),
             )
             user_entries.append(
                 self.localizer.render(
                     user_list_item,
-                    USERNAME=self.mention(grant.discord_user_id, language=language),
+                    USERNAME=self.mention(grant.discord_user_id),
                     PERMISSION_LIST=permission_lines,
                 )
             )
-        return self.localizer.render(body_template, USER_LIST="\n".join(user_entries))
+        rendered_user_list = self.render_permissions_user_list(user_entries, language=language)
+        return self.render_section(
+            "show.show_permissions.section",
+            self.localizer.render(
+                body_template,
+                USER_LIST=rendered_user_list,
+            ),
+            language=language,
+        )
 
     async def render_account_section(self, thread: ThreadRecord) -> tuple[str, str | None]:
         """Render linked account and pending device-flow details."""
         language = self.localizer.language_for_thread(thread)
-        title = self.localizer.text("show.sections.account", language=language)
         rows: list[str] = []
         thumbnail_url = None
         account = (
@@ -306,10 +296,11 @@ class ShowSectionRenderer:
                 self.localizer.text(
                     "show.account.linked",
                     language=language,
-                    USER=self.mention(account.discord_user_id, language=language),
+                    USER=self.mention(account.discord_user_id),
                     TWITCH=format_twitch_code_link(
                         localizer=self.localizer,
                         language=language,
+                        key="show.account.profile_link",
                         display_name=twitch_user.display_name,
                         login=twitch_user.login,
                     ),
@@ -335,24 +326,28 @@ class ShowSectionRenderer:
                 self.localizer.text(
                     "show.account.pending",
                     language=language,
-                    USER=self.mention(pending.discord_user_id, language=language),
+                    USER=self.mention(pending.discord_user_id),
                     STATUS=pending.status,
                     USER_CODE=pending.user_code,
                 )
             )
         if not rows:
             rows.append(self.localizer.text("show.account.empty", language=language))
-        return self.section(title, self.bullets(rows, language=language), language=language), thumbnail_url
+        return (
+            self.render_section(
+                "show.account.section",
+                self.localizer.text("show.account.rows", language=language, ITEMS=tuple(rows)),
+                language=language,
+            ),
+            thumbnail_url,
+        )
 
     async def format_pattern_row(self, pattern: PatternRecord, *, display_index: int, language: str) -> str:
         """Render one compact row containing all identifying pattern fields."""
         head = self.localizer.text(
             "show.pattern.line",
             language=language,
-            TYPE=self.localizer.text(
-                "results.pattern.type.regex" if pattern.is_regex else "results.pattern.type.ping",
-                language=language,
-            ),
+            TYPE=self.localizer.text("show.pattern.type.regex" if pattern.is_regex else "show.pattern.type.ping", language=language),
             ID=display_index,
         )
         details = [
@@ -363,7 +358,13 @@ class ShowSectionRenderer:
             )
         ]
         details.extend(await self.describe_pattern_details(pattern, language=language))
-        return self.grouped_bullet(head, details, language=language)
+        return self.render_row(
+            row_key="show.pattern.row",
+            details_key="show.pattern.details",
+            head=head,
+            details=details,
+            language=language,
+        )
 
     async def format_auto_reply_row(
         self,
@@ -378,9 +379,11 @@ class ShowSectionRenderer:
             self.localizer.text("show.reply.trigger", language=language, TEXT=pattern.regex),
             self.localizer.text("show.reply.reply", language=language, TEXT=reply.reply_message),
         ]
-        return self.grouped_bullet(
-            self.localizer.text("show.reply.line", language=language, ID=display_index),
-            details,
+        return self.render_row(
+            row_key="show.reply.row",
+            details_key="show.reply.details",
+            head=self.localizer.text("show.reply.line", language=language, ID=display_index),
+            details=details,
             language=language,
         )
 
@@ -405,9 +408,11 @@ class ShowSectionRenderer:
         ]
         if action.disabled:
             details.append(self.localizer.text("show.event_reply.disabled", language=language))
-        return self.grouped_bullet(
-            self.localizer.text("show.event_reply.line", language=language, STATE=state_label),
-            details,
+        return self.render_row(
+            row_key="show.event_reply.row",
+            details_key="show.event_reply.details",
+            head=self.localizer.text("show.event_reply.line", language=language, STATE=state_label),
+            details=details,
             language=language,
         )
 
@@ -415,13 +420,17 @@ class ShowSectionRenderer:
         """Render the optional modifiers for a pattern."""
         details: list[str] = []
         if pattern.channel_scope_mode != "all_tracked":
-            channel_names = await self.resolve_twitch_links(pattern.channel_scope_ids, language=language)
+            channel_names = await self.resolve_twitch_links(
+                pattern.channel_scope_ids,
+                language=language,
+                link_key="show.pattern.profile_link",
+            )
             if pattern.channel_scope_mode == "only_selected":
                 details.append(
                     self.localizer.text(
                         "show.pattern.where",
                         language=language,
-                        VALUE=self.localizer.text("results.pattern.scope.channel_only", language=language, ITEMS=channel_names),
+                        VALUE=self.localizer.text("show.pattern.scope.channel_only", language=language, ITEMS=channel_names),
                     )
                 )
             elif pattern.channel_scope_mode == "all_except_selected":
@@ -429,17 +438,21 @@ class ShowSectionRenderer:
                     self.localizer.text(
                         "show.pattern.where",
                         language=language,
-                        VALUE=self.localizer.text("results.pattern.scope.channel_except", language=language, ITEMS=channel_names),
+                        VALUE=self.localizer.text("show.pattern.scope.channel_except", language=language, ITEMS=channel_names),
                     )
                 )
         if pattern.user_scope_mode != "all_users":
-            user_names = await self.resolve_twitch_names(pattern.user_scope_ids, language=language)
+            user_names = await self.resolve_twitch_names(
+                pattern.user_scope_ids,
+                language=language,
+                link_key="show.pattern.profile_link",
+            )
             if pattern.user_scope_mode == "only_selected":
                 details.append(
                     self.localizer.text(
                         "show.pattern.who",
                         language=language,
-                        VALUE=self.localizer.text("results.pattern.scope.user_only", language=language, ITEMS=user_names),
+                        VALUE=self.localizer.text("show.pattern.scope.user_only", language=language, ITEMS=user_names),
                     )
                 )
             elif pattern.user_scope_mode == "all_except_selected":
@@ -447,7 +460,7 @@ class ShowSectionRenderer:
                     self.localizer.text(
                         "show.pattern.who",
                         language=language,
-                        VALUE=self.localizer.text("results.pattern.scope.user_except", language=language, ITEMS=user_names),
+                        VALUE=self.localizer.text("show.pattern.scope.user_except", language=language, ITEMS=user_names),
                     )
                 )
             elif pattern.user_scope_mode == "all_tracked":
@@ -455,7 +468,7 @@ class ShowSectionRenderer:
                     self.localizer.text(
                         "show.pattern.who",
                         language=language,
-                        VALUE=self.localizer.text("results.pattern.scope.user_all", language=language),
+                        VALUE=self.localizer.text("show.pattern.scope.user_all", language=language),
                     )
                 )
             elif pattern.user_scope_mode == "all_tracked_except_selected":
@@ -463,11 +476,7 @@ class ShowSectionRenderer:
                     self.localizer.text(
                         "show.pattern.who",
                         language=language,
-                        VALUE=self.localizer.text(
-                            "results.pattern.scope.user_tracked_except",
-                            language=language,
-                            ITEMS=user_names,
-                        ),
+                        VALUE=self.localizer.text("show.pattern.scope.user_tracked_except", language=language, ITEMS=user_names),
                     )
                 )
         if pattern.sub_state != "all":
@@ -498,6 +507,7 @@ class ShowSectionRenderer:
         twitch_ids: tuple[str, ...],
         *,
         language: str,
+        link_key: str,
     ) -> tuple[str, ...]:
         """Resolve a list of Twitch user IDs to rendered markdown links."""
         resolved: list[str] = []
@@ -507,6 +517,7 @@ class ShowSectionRenderer:
                 format_twitch_code_link(
                     localizer=self.localizer,
                     language=language,
+                    key=link_key,
                     display_name=user.display_name,
                     login=user.login,
                 )
@@ -518,6 +529,7 @@ class ShowSectionRenderer:
         twitch_ids: tuple[str, ...],
         *,
         language: str,
+        link_key: str,
     ) -> tuple[str, ...]:
         """Resolve a list of Twitch user IDs to rendered markdown links."""
         resolved: list[str] = []
@@ -527,6 +539,7 @@ class ShowSectionRenderer:
                 format_twitch_code_link(
                     localizer=self.localizer,
                     language=language,
+                    key=link_key,
                     display_name=user.display_name,
                     login=user.login,
                 )
@@ -535,46 +548,33 @@ class ShowSectionRenderer:
 
     def permission_label(self, label: str, *, language: str) -> str:
         """Render one permission label using localization when available."""
-        key = f"show.permission.{label}"
-        try:
-            return self.localizer.text(key, language=language)
-        except ValueError:
-            return label.replace("_", " ").capitalize()
+        return self.localizer.text(f"show.show_permissions.permission_label.{label}", language=language)
 
-    def section(self, title: str, body: str, *, language: str) -> str:
-        """Render one localized section wrapper."""
-        return self.localizer.text("common.fragments.section", language=language, TITLE=title, SECTION_BODY=body)
+    def render_permissions_user_list(self, user_entries: list[str], *, language: str) -> str:
+        """Render the caller-owned permission user list wrapper."""
+        return self.localizer.text("show.show_permissions.user_list", language=language, USER_LIST=tuple(user_entries))
 
-    def bullets(self, items: list[str], *, language: str) -> str:
-        """Render plain bullet items."""
-        return "\n".join(f"- {item}" for item in items)
+    def render_section(self, wrapper_key: str, body: str, *, language: str) -> str:
+        """Render one caller-owned localized section wrapper."""
+        return self.localizer.text(wrapper_key, language=language, SECTION_BODY=body)
 
-    def indented_bullets(self, items: list[str], *, language: str) -> str:
-        """Render indented bullet items."""
-        return "\n".join(f"  - {item}" for item in items)
+    def render_row(self, *, row_key: str, details_key: str, head: str, details: list[str], language: str) -> str:
+        """Render one caller-owned row template with an optional caller-owned detail block."""
+        return self.localizer.text(
+            row_key,
+            language=language,
+            HEAD=head,
+            DETAILS=(
+                ""
+                if not details
+                else self.localizer.text(details_key, language=language, ITEMS=tuple(details))
+            ),
+        )
 
-    def raw_lines(self, items: list[str], *, language: str) -> str:
-        """Join already-rendered lines without adding prefixes."""
-        return "\n".join(items)
-
-    def section_breaks(self, items: list[str], *, language: str) -> str:
-        """Join full sections with the standard section separator."""
-        return "\n\n".join(items)
-
-    def comma_list(self, items: list[str] | tuple[str, ...], *, language: str) -> str:
-        """Render inline comma-separated fragments."""
-        return ", ".join(items)
-
-    def grouped_bullet(self, head: str, details: list[str], *, language: str) -> str:
-        """Render one main bullet with optional indented detail bullets."""
-        rendered = [self.bullets([head], language=language)]
-        if details:
-            rendered.append(self.indented_bullets(details, language=language))
-        return self.raw_lines(rendered, language=language)
-
-    def mention(self, user_id: int, *, language: str) -> str:
+    @staticmethod
+    def mention(user_id: int) -> str:
         """Render one Discord user mention."""
-        return self.localizer.text("common.fragments.discord_user_mention", language=language, USER_ID=user_id)
+        return f"<@{user_id}>"
 
     def stream_state_label(self, value: str, *, language: str) -> str:
         """Render a localized stream-state label."""

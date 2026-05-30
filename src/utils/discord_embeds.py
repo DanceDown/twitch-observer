@@ -117,20 +117,10 @@ def _parse_hex_color(value: str) -> int:
     return int(normalized, 16)
 
 
-def format_twitch_code_link(*, localizer: Localizer, language: str, display_name: str, login: str) -> str:
-    """Render one localized Twitch profile link with code-style display text."""
+def format_twitch_code_link(*, localizer: Localizer, language: str, key: str, display_name: str, login: str) -> str:
+    """Render one localized Twitch profile link with caller-owned localization scope."""
     return localizer.text(
-        "common.fragments.twitch_code_link",
-        language=language,
-        DISPLAY_NAME=display_name,
-        LOGIN=login,
-    )
-
-
-def format_twitch_link(*, localizer: Localizer, language: str, display_name: str, login: str) -> str:
-    """Render one localized Twitch profile link without code-style display text."""
-    return localizer.text(
-        "common.fragments.twitch_link",
+        key,
         language=language,
         DISPLAY_NAME=display_name,
         LOGIN=login,

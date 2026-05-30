@@ -186,6 +186,7 @@ class PatternFilterResolver:
         twitch_user_ids: tuple[str, ...],
         *,
         language: str,
+        link_key: str,
     ) -> tuple[str, ...]:
         links: list[str] = []
         for twitch_user_id in twitch_user_ids:
@@ -194,6 +195,7 @@ class PatternFilterResolver:
                 format_twitch_code_link(
                     localizer=self.localizer,
                     language=language,
+                    key=link_key,
                     display_name=user.display_name,
                     login=user.login,
                 )

@@ -14,7 +14,7 @@ def test_build_show_pages_repeats_header_and_keeps_items_together() -> None:
     first_page = f"**Pings**\n{item_one}\n{item_two}"
     message = f"{first_page}\n{item_three}"
 
-    pages = build_show_pages(message, description_limit=len(first_page))
+    pages = build_show_pages(message, description_limit=len(first_page), item_prefix="- ")
 
     assert len(pages) == 2
     assert pages[0] == first_page
@@ -22,7 +22,7 @@ def test_build_show_pages_repeats_header_and_keeps_items_together() -> None:
 
 
 def test_build_show_pages_splits_oversized_single_item_when_needed() -> None:
-    pages = build_show_pages("**Pings**\n- " + ("x" * 25), description_limit=20)
+    pages = build_show_pages("**Pings**\n- " + ("x" * 25), description_limit=20, item_prefix="- ")
 
     assert len(pages) == 3
     assert all(page.startswith("**Pings**\n") for page in pages)
@@ -39,7 +39,7 @@ def test_show_pagination_view_sets_footer_and_button_states() -> None:
     )
 
     localizer = Localizer.from_directory()
-    view = ShowPaginationView(owner_id=200, result=result, localizer=localizer, language="german")
+    view = ShowPaginationView(owner_id=200, result=result, localizer=localizer, language="german", item_prefix="- ")
     view._page_index = 0
     view._sync_button_states()
     embed = view.render_embed()

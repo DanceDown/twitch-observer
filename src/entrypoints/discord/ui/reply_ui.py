@@ -26,8 +26,8 @@ from ..ui_data import (
 )
 
 
-def _pattern_label(pattern: PatternPresentation, *, localizer: Localizer, language: str) -> str:
-    fallback = localizer.text("discord.reply_ui.common.untitled_ping", language=language)
+def _pattern_label(pattern: PatternPresentation, *, localizer: Localizer, language: str, scope: str) -> str:
+    fallback = localizer.text(f"{scope}.untitled_pattern", language=language)
     return (pattern.pattern.regex or fallback)[:100]
 
 
@@ -35,19 +35,17 @@ def _reply_label(reply: ReplyPresentation) -> str:
     return reply.reply.reply_message[:100]
 
 
-def _event_state_label(event_key: str, *, localizer: Localizer, language: str) -> str:
-    return localizer.text(
-        "discord.reply_ui.common.state_live" if event_key == "stream.online" else "discord.reply_ui.common.state_offline",
-        language=language,
-    )
+def _event_state_label(event_key: str, *, localizer: Localizer, language: str, scope: str) -> str:
+    state_key = "live" if event_key == "stream.online" else "offline"
+    return localizer.text(f"{scope}.state.{state_key}", language=language)
 
 
-def _adapter_event_label(event: AdapterEventPresentation, *, localizer: Localizer, language: str) -> str:
+def _adapter_event_label(event: AdapterEventPresentation, *, localizer: Localizer, language: str, scope: str) -> str:
     return localizer.text(
-        "discord.reply_ui.common.event_label",
+        f"{scope}.event_label",
         language=language,
         CHANNEL=event.channel.display_name,
-        STATE=_event_state_label(event.event.event_key, localizer=localizer, language=language),
+        STATE=_event_state_label(event.event.event_key, localizer=localizer, language=language, scope=scope),
     )[:100]
 
 
@@ -93,7 +91,7 @@ class PatternReplyAddModal(discord.ui.Modal):
             placeholder=localizer.text(
                 "discord.reply_ui.pattern_add.message_placeholder",
                 language=language,
-                NAME=localizer.text("discord.reply_ui.common.example_name", language=language),
+                NAME=localizer.text("discord.reply_ui.pattern_add.example_name", language=language),
             ),
             required=True,
             max_length=500,
@@ -104,7 +102,12 @@ class PatternReplyAddModal(discord.ui.Modal):
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
-                        label=_pattern_label(pattern, localizer=localizer, language=language),
+                        label=_pattern_label(
+                            pattern,
+                            localizer=localizer,
+                            language=language,
+                            scope="discord.reply_ui.pattern_add",
+                        ),
                         value=_encode_pattern_target(pattern.pattern.pattern_id),
                         default=pattern.pattern.pattern_id == default_pattern_id,
                         description=localizer.text(
@@ -112,7 +115,9 @@ class PatternReplyAddModal(discord.ui.Modal):
                             language=language,
                             ID=pattern.display_index,
                             TYPE=localizer.text(
-                                "discord.reply_ui.common.regex_type" if pattern.pattern.is_regex else "discord.reply_ui.common.ping_type",
+                                "discord.reply_ui.pattern_add.pattern_type.regex"
+                                if pattern.pattern.is_regex
+                                else "discord.reply_ui.pattern_add.pattern_type.ping",
                                 language=language,
                             ),
                         ),
@@ -185,8 +190,8 @@ class EventReplyAddModal(discord.ui.Modal):
             placeholder=localizer.text(
                 "discord.reply_ui.event_add.message_placeholder",
                 language=language,
-                CHANNEL=localizer.text("discord.reply_ui.common.example_channel", language=language),
-                STATE=localizer.text("discord.reply_ui.common.example_state", language=language),
+                CHANNEL=localizer.text("discord.reply_ui.event_add.example_channel", language=language),
+                STATE=localizer.text("discord.reply_ui.event_add.example_state", language=language),
             ),
             required=True,
             max_length=500,
@@ -197,7 +202,12 @@ class EventReplyAddModal(discord.ui.Modal):
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
-                        label=_adapter_event_label(event, localizer=localizer, language=language),
+                        label=_adapter_event_label(
+                            event,
+                            localizer=localizer,
+                            language=language,
+                            scope="discord.reply_ui.event_add",
+                        ),
                         value=_encode_adapter_event_target(event.event.event_id),
                         default=event.event.event_id == default_event_id,
                         description=localizer.text(
@@ -208,6 +218,7 @@ class EventReplyAddModal(discord.ui.Modal):
                                 event.event.event_key,
                                 localizer=localizer,
                                 language=language,
+                                scope="discord.reply_ui.event_add",
                             ).lower(),
                         ),
                     )
@@ -266,20 +277,30 @@ class ReplyActionModal(discord.ui.Modal):
                         description=localizer.text(
                             "discord.reply_ui.action.linked_pattern_description",
                             language=language,
-                            PATTERN=_pattern_label(reply.pattern, localizer=localizer, language=language),
+                            PATTERN=_pattern_label(
+                                reply.pattern,
+                                localizer=localizer,
+                                language=language,
+                                scope="discord.reply_ui.action",
+                            ),
                         ),
                     )
                     if isinstance(reply, ReplyPresentation)
                     else discord.SelectOption(
                         label=(
                             reply.action.message_template
-                            or localizer.text("discord.reply_ui.common.untitled_event_action", language=language)
+                            or localizer.text("discord.reply_ui.action.untitled_event_action", language=language)
                         )[:100],
                         value=_encode_adapter_event_target(reply.event.event.event_id),
                         description=localizer.text(
                             "discord.reply_ui.action.linked_event_description",
                             language=language,
-                            EVENT=_adapter_event_label(reply.event, localizer=localizer, language=language),
+                            EVENT=_adapter_event_label(
+                                reply.event,
+                                localizer=localizer,
+                                language=language,
+                                scope="discord.reply_ui.action",
+                            ),
                         ),
                     )
                     for reply in replies[:25]

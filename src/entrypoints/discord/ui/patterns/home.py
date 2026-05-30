@@ -96,7 +96,11 @@ class PatternHomeView(BaseFormView):
             ),
             self.text(
                 "discord.pattern_ui.summary.case_sensitive",
-                VALUE=self.text("common.boolean.yes" if self.state.case_sensitive else "common.boolean.no"),
+                VALUE=self.text(
+                    "discord.pattern_ui.summary.case_sensitive_yes"
+                    if self.state.case_sensitive
+                    else "discord.pattern_ui.summary.case_sensitive_no"
+                ),
             ),
             self.text(
                 "discord.pattern_ui.summary.color",

@@ -46,10 +46,14 @@ class ChannelCommandService:
             permission_repository=self.permission_repository,
             account_repository=None,
             localizer=self.localizer,
+            not_joined_key="results.channel.not_joined",
         )
         self._runner = CommandExecutionRunner(
             localizer=self.localizer,
             resolve_thread=lambda command: self.thread_repository.get_by_discord_channel_id(command.discord_channel_id),
+            validation_error_key="results.channel.validation_error",
+            twitch_api_error_key="results.channel.twitch_api_error",
+            unexpected_error_key="results.channel.unexpected_error",
         )
 
     async def handle_add(self, command: AddTrackedChannelCommand) -> DiscordCommandResult:

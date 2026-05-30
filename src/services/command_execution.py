@@ -42,13 +42,14 @@ class ThreadCommandGuards:
     permission_repository: UserPermissionRepository | None
     account_repository: TwitchAccountRepository | None
     localizer: Localizer
+    not_joined_key: str
 
     def require_thread(self, command: ThreadScopedCommand) -> ThreadRecord | DiscordCommandResult:
         thread = self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
         if thread is None:
             return build_result(
                 self.localizer,
-                "results.not_joined",
+                self.not_joined_key,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -144,9 +145,20 @@ class ThreadCommandGuards:
 class CommandExecutionRunner:
     """Shared error normalization for direct command handlers."""
 
-    def __init__(self, *, localizer: Localizer, resolve_thread: Callable[[object], ThreadRecord | None]) -> None:
+    def __init__(
+        self,
+        *,
+        localizer: Localizer,
+        resolve_thread: Callable[[object], ThreadRecord | None],
+        validation_error_key: str,
+        twitch_api_error_key: str,
+        unexpected_error_key: str,
+    ) -> None:
         self._localizer = localizer
         self._resolve_thread = resolve_thread
+        self._validation_error_key = validation_error_key
+        self._twitch_api_error_key = twitch_api_error_key
+        self._unexpected_error_key = unexpected_error_key
 
     async def run(
         self,
@@ -169,7 +181,7 @@ class CommandExecutionRunner:
         except validation_exceptions as error:
             result = self._thread_result(
                 command,
-                "results.validation_error",
+                self._validation_error_key,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
                 DETAIL=str(error),
@@ -177,7 +189,7 @@ class CommandExecutionRunner:
         except TwitchAPIError as error:
             result = self._thread_result(
                 command,
-                "results.twitch_api_error",
+                self._twitch_api_error_key,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
                 DETAIL=str(error),
@@ -186,7 +198,7 @@ class CommandExecutionRunner:
             logger_.error("Database pool exhausted while handling %s.", command.__class__.__name__)
             result = self._thread_result(
                 command,
-                "results.unexpected_error",
+                self._unexpected_error_key,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
                 DETAIL=str(error),
@@ -195,7 +207,7 @@ class CommandExecutionRunner:
             logger_.exception("Unexpected error while handling %s.", command.__class__.__name__)
             result = self._thread_result(
                 command,
-                "results.unexpected_error",
+                self._unexpected_error_key,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
                 DETAIL=str(error),

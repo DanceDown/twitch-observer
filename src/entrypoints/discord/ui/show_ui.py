@@ -25,7 +25,7 @@ def build_show_pages(
     *,
     description_limit: int = SHOW_EMBED_DESCRIPTION_LIMIT,
     empty_message: str = "",
-    item_prefix: str = "- ",
+    item_prefix: str,
 ) -> tuple[str, ...]:
     """Split one `/show` result into embed-safe pages while keeping bullet items intact."""
     normalized = message.strip()
@@ -116,7 +116,15 @@ def _split_by_characters(text: str, limit: int) -> tuple[str, ...]:
 class ShowPaginationView(discord.ui.View):
     """Ephemeral paginator used by `/show` when the rendered section spans multiple pages."""
 
-    def __init__(self, *, owner_id: int, result: DiscordCommandResult, localizer: Localizer, language: str) -> None:
+    def __init__(
+        self,
+        *,
+        owner_id: int,
+        result: DiscordCommandResult,
+        localizer: Localizer,
+        language: str,
+        item_prefix: str,
+    ) -> None:
         super().__init__(timeout=840)
         self._owner_id = owner_id
         self._result = result
@@ -125,7 +133,7 @@ class ShowPaginationView(discord.ui.View):
         self._pages = build_show_pages(
             result.message,
             empty_message=localizer.text("discord.show_ui.pagination.empty_message", language=language),
-            item_prefix=localizer.text("discord.show_ui.pagination.item_prefix", language=language),
+            item_prefix=item_prefix,
         )
         self._page_index = 0
         self.bound_message: discord.InteractionMessage | None = None
@@ -218,26 +226,29 @@ class ShowSectionModal(discord.ui.Modal):
             text=localizer.text("discord.show_ui.modal.section_label", language=language),
             component=discord.ui.RadioGroup(
                 options=[
-                    discord.RadioGroupOption(label=localizer.text("show.sections.pings", language=language), value="pings"),
                     discord.RadioGroupOption(
-                        label=localizer.text("show.sections.auto_replies", language=language),
+                        label=localizer.text("discord.show_ui.modal.section_option.pings", language=language),
+                        value="pings",
+                    ),
+                    discord.RadioGroupOption(
+                        label=localizer.text("discord.show_ui.modal.section_option.auto_replies", language=language),
                         value="auto_replies",
                     ),
                     discord.RadioGroupOption(
-                        label=localizer.text("show.sections.tracked_channels", language=language),
+                        label=localizer.text("discord.show_ui.modal.section_option.channels", language=language),
                         value="channels",
                         default=True,
                     ),
                     discord.RadioGroupOption(
-                        label=localizer.text("show.sections.tracked_users", language=language),
+                        label=localizer.text("discord.show_ui.modal.section_option.users", language=language),
                         value="users",
                     ),
                     discord.RadioGroupOption(
-                        label=localizer.text("show.sections.permissions", language=language),
+                        label=localizer.text("discord.show_ui.modal.section_option.permissions", language=language),
                         value="permissions",
                     ),
                     discord.RadioGroupOption(
-                        label=localizer.text("show.sections.account", language=language),
+                        label=localizer.text("discord.show_ui.modal.section_option.account", language=language),
                         value="account",
                     ),
                 ]
@@ -262,6 +273,11 @@ class ShowSectionModal(discord.ui.Modal):
             result=result,
             localizer=self._localizer,
             language=self._language,
+            item_prefix=_show_section_item_prefix(
+                localizer=self._localizer,
+                language=self._language,
+                section=self.section.component.value or "channels",
+            ),
         )
         await interaction.response.send_message(
             embed=view.render_embed(),
@@ -269,3 +285,16 @@ class ShowSectionModal(discord.ui.Modal):
             ephemeral=True,
         )
         view.bound_message = await interaction.original_response()
+
+
+def _show_section_item_prefix(*, localizer: Localizer, language: str, section: str) -> str:
+    """Resolve the caller-owned row prefix for one `/show` section paginator."""
+    key_by_section = {
+        "channels": "show.channel.pagination.item_prefix",
+        "pings": "show.pattern.pagination.item_prefix",
+        "auto_replies": "show.auto_replies.pagination.item_prefix",
+        "users": "show.tracked_users.pagination.item_prefix",
+        "permissions": "show.show_permissions.pagination.item_prefix",
+        "account": "show.account.pagination.item_prefix",
+    }
+    return localizer.text(key_by_section.get(section, "show.channel.pagination.item_prefix"), language=language)

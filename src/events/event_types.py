@@ -114,6 +114,7 @@ class DiscordCommandResult:
     style: DiscordResultStyle = DiscordResultStyle.INFO
     ephemeral: bool = False
     thumbnail_url: str | None = None
+    language: str | None = None
 
 
 @dataclass(slots=True, frozen=True)

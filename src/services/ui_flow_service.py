@@ -47,7 +47,7 @@ class DiscordUIFlowGuardService:
         if thread is None:
             return self._blocked(
                 event,
-                build_result(self.localizer, "results.not_joined", style=DiscordResultStyle.ERROR, ephemeral=True),
+                build_result(self.localizer, "results.ui_flow.not_joined", style=DiscordResultStyle.ERROR, ephemeral=True),
             )
 
         required = self._required_permission(event.flow, event.step)
@@ -173,9 +173,9 @@ class DiscordUIFlowGuardService:
         if key is None:
             return build_thread_result(
                 self.localizer,
-                "results.permission_denied",
+                "results.ui_flow.permission_denied",
                 thread=thread,
-                DETAIL=self.localizer.text("results.permission.generic_denied", language=thread.language),
+                DETAIL=self.localizer.text("results.ui_flow.permission_detail.generic", language=thread.language),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )

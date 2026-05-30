@@ -47,12 +47,19 @@ class AccountCommandService:
     _guards: ThreadCommandGuards = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._runner = CommandExecutionRunner(localizer=self.localizer, resolve_thread=self._resolve_thread)
+        self._runner = CommandExecutionRunner(
+            localizer=self.localizer,
+            resolve_thread=self._resolve_thread,
+            validation_error_key="results.account.validation_error",
+            twitch_api_error_key="results.account.twitch_api_error",
+            unexpected_error_key="results.account.unexpected_error",
+        )
         self._guards = ThreadCommandGuards(
             thread_repository=self.thread_repository,
             permission_repository=self.permission_repository,
             account_repository=self.account_repository,
             localizer=self.localizer,
+            not_joined_key="results.account.not_joined",
         )
 
     async def handle_link_command(self, command: StartAccountLinkCommand) -> DiscordCommandResult:
@@ -72,7 +79,7 @@ class AccountCommandService:
                 self.localizer,
                 "results.account.already_linked",
                 thread=thread,
-                DISPLAY_NAME=account_name or self.localizer.text("results.account.existing_account", language=thread.language),
+                DISPLAY_NAME=account_name or self.localizer.text("results.account.already_linked.fallback_display_name", language=thread.language),
                 LOGIN=account.twitch_login if account is not None else "",
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
@@ -137,7 +144,7 @@ class AccountCommandService:
             self.localizer,
             "results.account.unlinked",
             thread=thread,
-            DISPLAY_NAME=account_name or self.localizer.text("results.account.existing_account", language=thread.language),
+            DISPLAY_NAME=account_name or self.localizer.text("results.account.unlinked.fallback_display_name", language=thread.language),
             LOGIN=account.twitch_login if account is not None else "",
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
@@ -154,7 +161,7 @@ class AccountCommandService:
         if command.discord_channel_id is None:
             return build_result(
                 self.localizer,
-                "results.not_joined",
+                "results.account.not_joined",
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )

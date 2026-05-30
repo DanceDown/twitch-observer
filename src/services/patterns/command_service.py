@@ -36,6 +36,7 @@ from src.services.patterns.presentation import PatternCommandPresenter
 from src.services.twitch_gateways import TwitchDirectoryGateway
 from src.utils.discord_embeds import format_twitch_code_link
 from src.utils.permissions import ObserverPermission
+from src.discord_results import discord_user_mention
 
 logger = logging.getLogger(__name__)
 
@@ -63,12 +64,19 @@ class PatternCommandService:
     _guards: ThreadCommandGuards = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._runner = CommandExecutionRunner(localizer=self.localizer, resolve_thread=self._resolve_thread)
+        self._runner = CommandExecutionRunner(
+            localizer=self.localizer,
+            resolve_thread=self._resolve_thread,
+            validation_error_key="results.pattern.validation_error",
+            twitch_api_error_key="results.pattern.twitch_api_error",
+            unexpected_error_key="results.pattern.unexpected_error",
+        )
         self._guards = ThreadCommandGuards(
             thread_repository=self.thread_repository,
             permission_repository=self.permission_repository,
             account_repository=None,
             localizer=self.localizer,
+            not_joined_key="results.pattern.not_joined",
         )
 
     async def handle_add_command(self, command: AddPatternCommand) -> DiscordCommandResult:
@@ -202,7 +210,7 @@ class PatternCommandService:
                 self.localizer,
                 "results.pattern.already_exists",
                 thread=thread,
-                ALREADY_EXISTS_TYPE=self._pattern_type_for("already_exists", command.is_regex, language=thread.language),
+                ALREADY_EXISTS_TYPE=self._pattern_value("results.pattern.already_exists.type", command.is_regex, language=thread.language),
                 ID=display_id,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
@@ -232,7 +240,7 @@ class PatternCommandService:
                 )
             ),
         )
-        mode_name_title = self._pattern_type_for("added_title", command.is_regex, language=thread.language)
+        mode_name_title = self._pattern_value("results.pattern.added_result.title_type", command.is_regex, language=thread.language)
         display_id = self._display_index(thread.thread_id, created.pattern_id) or created.pattern_id
         logger.debug(
             "Added %s pattern thread_id=%s pattern_id=%s regex=%r channel_filter=%s user_filter=%s",
@@ -248,14 +256,16 @@ class PatternCommandService:
             "results.pattern.added_result",
             thread=thread,
             ADDED_TYPE=mode_name_title,
+            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
             SUMMARY=self._presenter().format_pattern_summary(
-                action=self.localizer.text("results.pattern.actions.added", language=thread.language),
+                action=self.localizer.text("results.pattern.added_result.summary_action", language=thread.language),
                 pattern=created,
                 display_id=display_id,
                 channel_logins=tuple(
                     format_twitch_code_link(
                         localizer=self.localizer,
                         language=thread.language,
+                        key="results.pattern.summary.profile_link",
                         display_name=channel.display_name,
                         login=channel.login,
                     )
@@ -265,6 +275,7 @@ class PatternCommandService:
                     format_twitch_code_link(
                         localizer=self.localizer,
                         language=thread.language,
+                        key="results.pattern.summary.profile_link",
                         display_name=user.display_name,
                         login=user.login,
                     )
@@ -295,12 +306,13 @@ class PatternCommandService:
         display_id = self._display_index(thread.thread_id, pattern.pattern_id) or pattern.pattern_id
         self.pattern_repository.remove_pattern(thread_id=pattern.thread_id, pattern_id=pattern.pattern_id)
         logger.debug("Removed pattern thread_id=%s pattern_id=%s regex=%r", pattern.thread_id, pattern.pattern_id, pattern.regex)
-        mode_name_title = self._pattern_type_for("removed_title", pattern.is_regex, language=thread.language)
-        mode_name_body = self._pattern_type_for("removed_body", pattern.is_regex, language=thread.language)
+        mode_name_title = self._pattern_value("results.pattern.removed_result.title_type", pattern.is_regex, language=thread.language)
+        mode_name_body = self._pattern_value("results.pattern.removed_result.body_type", pattern.is_regex, language=thread.language)
         return build_thread_result(
             self.localizer,
             "results.pattern.removed_result",
             thread=thread,
+            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
             REMOVED_TYPE=mode_name_title,
             REMOVED_BODY_TYPE=mode_name_body,
             ID=display_id,
@@ -335,7 +347,7 @@ class PatternCommandService:
                 self.localizer,
                 "results.pattern.already_disabled",
                 thread=thread,
-                ALREADY_DISABLED_TYPE=self._pattern_type_for("already_disabled", pattern.is_regex, language=thread.language),
+                ALREADY_DISABLED_TYPE=self._pattern_value("results.pattern.already_disabled.type", pattern.is_regex, language=thread.language),
                 ID=display_id,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
@@ -347,13 +359,14 @@ class PatternCommandService:
         )
         if updated is None:
             raise RuntimeError("Pattern repository returned no row for disable.")
-        mode_name_title = self._pattern_type_for("disabled_title", pattern.is_regex, language=thread.language)
-        mode_name_body = self._pattern_type_for("disabled_body", updated.is_regex, language=thread.language)
+        mode_name_title = self._pattern_value("results.pattern.disabled_result.title_type", pattern.is_regex, language=thread.language)
+        mode_name_body = self._pattern_value("results.pattern.disabled_result.body_type", updated.is_regex, language=thread.language)
         display_id = self._display_index(thread.thread_id, updated.pattern_id) or updated.pattern_id
         return build_thread_result(
             self.localizer,
             "results.pattern.disabled_result",
             thread=thread,
+            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
             DISABLED_TYPE=mode_name_title,
             DISABLED_BODY_TYPE=mode_name_body,
             ID=display_id,
@@ -388,7 +401,7 @@ class PatternCommandService:
                 self.localizer,
                 "results.pattern.already_enabled",
                 thread=thread,
-                ALREADY_ENABLED_TYPE=self._pattern_type_for("already_enabled", pattern.is_regex, language=thread.language),
+                ALREADY_ENABLED_TYPE=self._pattern_value("results.pattern.already_enabled.type", pattern.is_regex, language=thread.language),
                 ID=display_id,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
@@ -400,13 +413,14 @@ class PatternCommandService:
         )
         if updated is None:
             raise RuntimeError("Pattern repository returned no row for enable.")
-        mode_name_title = self._pattern_type_for("enabled_title", pattern.is_regex, language=thread.language)
-        mode_name_body = self._pattern_type_for("enabled_body", updated.is_regex, language=thread.language)
+        mode_name_title = self._pattern_value("results.pattern.enabled_result.title_type", pattern.is_regex, language=thread.language)
+        mode_name_body = self._pattern_value("results.pattern.enabled_result.body_type", updated.is_regex, language=thread.language)
         display_id = self._display_index(thread.thread_id, updated.pattern_id) or updated.pattern_id
         return build_thread_result(
             self.localizer,
             "results.pattern.enabled_result",
             thread=thread,
+            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
             ENABLED_TYPE=mode_name_title,
             ENABLED_BODY_TYPE=mode_name_body,
             ID=display_id,
@@ -513,15 +527,18 @@ class PatternCommandService:
         old_channel_logins = await self._filter_resolver().resolve_profile_links_from_ids(
             pattern.channel_scope_ids,
             language=thread.language,
+            link_key="results.pattern.changes.profile_link",
         )
         old_user_logins = await self._filter_resolver().resolve_profile_links_from_ids(
             pattern.user_scope_ids,
             language=thread.language,
+            link_key="results.pattern.changes.profile_link",
         )
         return build_thread_result(
             self.localizer,
             "results.pattern.updated_result",
             thread=thread,
+            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
             SUMMARY=self._presenter().format_pattern_changes(
                 before=pattern,
                 after=updated,
@@ -531,6 +548,7 @@ class PatternCommandService:
                     format_twitch_code_link(
                         localizer=self.localizer,
                         language=thread.language,
+                        key="results.pattern.changes.profile_link",
                         display_name=channel.display_name,
                         login=channel.login,
                     )
@@ -541,6 +559,7 @@ class PatternCommandService:
                     format_twitch_code_link(
                         localizer=self.localizer,
                         language=thread.language,
+                        key="results.pattern.changes.profile_link",
                         display_name=user.display_name,
                         login=user.login,
                     )
@@ -564,9 +583,9 @@ class PatternCommandService:
             **placeholders,
         )
 
-    def _pattern_type_for(self, context: str, is_regex: bool, *, language: str) -> str:
+    def _pattern_value(self, key_prefix: str, is_regex: bool, *, language: str) -> str:
         suffix = "regex" if is_regex else "ping"
-        key = f"results.pattern.type_for.{context}.{suffix}"
+        key = f"{key_prefix}.{suffix}"
         return self.localizer.text(key, language=language)
 
     def _presenter(self) -> PatternCommandPresenter:

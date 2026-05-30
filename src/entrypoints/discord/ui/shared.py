@@ -50,11 +50,6 @@ def resolve_context_language(
     return localizer.resolve_language(data_provider.get_thread_language(discord_channel_id))
 
 
-def _build_public_actor_embed(result: DiscordCommandResult, actor_mention: str) -> discord.Embed:
-    """Backward-compatible alias for the centralized public embed renderer."""
-    return build_public_result_embed(result, actor_mention)
-
-
 class BaseFormView(discord.ui.View):
     """Base class for owner-bound ephemeral configuration views."""
 
@@ -138,14 +133,14 @@ class BaseFormView(discord.ui.View):
                     with suppress(discord.HTTPException):
                         await interaction.edit_original_response(embed=embed)
                 elif interaction.channel is not None:
-                    await interaction.channel.send(embed=build_public_result_embed(result, interaction.user.mention))
+                    await interaction.channel.send(embed=build_public_result_embed(result))
             else:
                 if result.ephemeral:
                     await interaction.response.send_message(embed=embed, ephemeral=True)
                 else:
                     await interaction.response.defer(ephemeral=True)
                     if interaction.channel is not None:
-                        await interaction.channel.send(embed=build_public_result_embed(result, interaction.user.mention))
+                        await interaction.channel.send(embed=build_public_result_embed(result))
                     with suppress(discord.HTTPException):
                         await interaction.delete_original_response()
             return
@@ -162,11 +157,11 @@ class BaseFormView(discord.ui.View):
             await self.bound_message.edit(view=None)
         if interaction.response.is_done():
             if interaction.channel is not None:
-                await interaction.channel.send(embed=build_public_result_embed(result, interaction.user.mention))
+                await interaction.channel.send(embed=build_public_result_embed(result))
         else:
             await interaction.response.defer(ephemeral=True)
             if interaction.channel is not None:
-                await interaction.channel.send(embed=build_public_result_embed(result, interaction.user.mention))
+                await interaction.channel.send(embed=build_public_result_embed(result))
         with suppress(discord.HTTPException):
             await interaction.delete_original_response()
         with suppress(discord.HTTPException):

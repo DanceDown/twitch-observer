@@ -60,12 +60,19 @@ class ChannelEventCommandService:
     _guards: ThreadCommandGuards = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._runner = CommandExecutionRunner(localizer=self.localizer, resolve_thread=self._resolve_thread)
+        self._runner = CommandExecutionRunner(
+            localizer=self.localizer,
+            resolve_thread=self._resolve_thread,
+            validation_error_key="results.channel_event.validation_error",
+            twitch_api_error_key="results.channel_event.twitch_api_error",
+            unexpected_error_key="results.channel_event.unexpected_error",
+        )
         self._guards = ThreadCommandGuards(
             thread_repository=self.thread_repository,
             permission_repository=self.permission_repository,
             account_repository=None,
             localizer=self.localizer,
+            not_joined_key="results.channel_event.not_joined",
         )
 
     async def handle_add_command(self, command: AddChannelEventCommand) -> DiscordCommandResult:

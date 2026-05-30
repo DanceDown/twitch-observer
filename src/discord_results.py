@@ -51,6 +51,7 @@ def build_result(
         style=style,
         ephemeral=ephemeral,
         thumbnail_url=thumbnail_url,
+        language=localizer.resolve_language(language),
     )
 
 
@@ -78,4 +79,4 @@ def build_thread_result(
 
 def discord_user_mention(localizer: Localizer, user_id: int, *, language: str | None = None) -> str:
     """Build one localized Discord mention string for later placeholder insertion."""
-    return localizer.text("common.fragments.discord_user_mention", language=language, USER_ID=user_id)
+    return f"<@{user_id}>"

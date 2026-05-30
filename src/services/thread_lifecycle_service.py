@@ -48,10 +48,14 @@ class ThreadLifecycleService:
             permission_repository=self.permission_repository,
             account_repository=None,
             localizer=self.localizer,
+            not_joined_key="results.thread.not_joined",
         )
         self._runner = CommandExecutionRunner(
             localizer=self.localizer,
             resolve_thread=lambda command: self.thread_repository.get_by_discord_channel_id(command.discord_channel_id),
+            validation_error_key="results.thread.validation_error",
+            twitch_api_error_key="results.thread.twitch_api_error",
+            unexpected_error_key="results.thread.unexpected_error",
         )
 
     async def handle_join(self, command: JoinThreadCommand) -> DiscordCommandResult:
@@ -129,7 +133,7 @@ class ThreadLifecycleService:
         if deleted is None:
             return build_result(
                 self.localizer,
-                "results.not_joined",
+                "results.thread.not_joined",
                 language=self.localizer.default_language,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
@@ -259,7 +263,7 @@ class ThreadLifecycleService:
         if not self.localizer.has_language(requested_language):
             return build_thread_result(
                 self.localizer,
-                "results.validation_error",
+                "results.thread.validation_error",
                 thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
@@ -270,7 +274,7 @@ class ThreadLifecycleService:
                 ),
             )
         if thread.language == requested_language:
-            language_name = self.localizer.text("common.language_name", language=requested_language)
+            language_name = self._thread_language_name("results.thread.already_language", requested_language)
             return build_thread_result(
                 self.localizer,
                 "results.thread.already_language",
@@ -286,7 +290,7 @@ class ThreadLifecycleService:
         )
         if updated is None:
             raise ApplicationInvariantError("Thread language update returned no row.")
-        language_name = self.localizer.text("common.language_name", language=requested_language)
+        language_name = self._thread_language_name("results.thread.language_updated", requested_language)
         return build_thread_result(
             self.localizer,
             "results.thread.language_updated",
@@ -297,6 +301,10 @@ class ThreadLifecycleService:
             LANGUAGE_CODE=requested_language,
             USER=discord_user_mention(self.localizer, command.requester_id, language=updated.language),
         )
+
+    def _thread_language_name(self, result_key: str, requested_language: str) -> str:
+        """Resolve one embed-owned language display name for thread language results."""
+        return self.localizer.text(f"{result_key}.language_name.{requested_language}", language=requested_language)
 
     async def _notify_tracked_channels_changed(self) -> None:
         await self.tracked_channels_notifier.notify_tracked_channels_changed()

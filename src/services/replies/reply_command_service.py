@@ -76,12 +76,19 @@ class ReplyCommandService:
     _guards: ThreadCommandGuards = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._runner = CommandExecutionRunner(localizer=self.localizer, resolve_thread=self._resolve_thread)
+        self._runner = CommandExecutionRunner(
+            localizer=self.localizer,
+            resolve_thread=self._resolve_thread,
+            validation_error_key="results.reply.validation_error",
+            twitch_api_error_key="results.reply.twitch_api_error",
+            unexpected_error_key="results.reply.unexpected_error",
+        )
         self._guards = ThreadCommandGuards(
             thread_repository=self.thread_repository,
             permission_repository=self.permission_repository,
             account_repository=self.account_repository,
             localizer=self.localizer,
+            not_joined_key="results.reply.not_joined",
         )
 
     async def handle_add_pattern_command(self, command: AddPatternReplyCommand) -> DiscordCommandResult:
@@ -172,9 +179,9 @@ class ReplyCommandService:
 
             message = command.message.strip()
             if not message:
-                raise ValueError(self.localizer.text("results.reply.empty_message", language=thread.language))
+                raise ValueError(self.localizer.text("results.reply.pattern_add_empty_message", language=thread.language))
             if len(message) > 500:
-                raise ValueError(self.localizer.text("results.reply.message_too_long", language=thread.language))
+                raise ValueError(self.localizer.text("results.reply.pattern_add_message_too_long", language=thread.language))
             existing_reply = self.reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=pattern.pattern_id)
             if existing_reply is not None:
                 return build_thread_result(
@@ -198,7 +205,9 @@ class ReplyCommandService:
                 thread=thread,
                 ID=display_id,
                 MODE=self.localizer.text(
-                    "results.reply.mode.reply" if created.reply_as_reply else "results.reply.mode.message",
+                    "results.reply.added_pattern.mode.reply"
+                    if created.reply_as_reply
+                    else "results.reply.added_pattern.mode.message",
                     language=thread.language,
                 ),
                 MESSAGE=escape_discord_preserving_links(created.reply_message),
@@ -286,7 +295,7 @@ class ReplyCommandService:
                 USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
             )
 
-        raise ValueError(self.localizer.text("results.reply.unsupported_action", language=thread.language))
+        raise ValueError(self.localizer.text("results.reply.pattern_action_unsupported", language=thread.language))
 
     async def _handle_adapter_event_action(
         self,
@@ -367,9 +376,9 @@ class ReplyCommandService:
                 )
             message = command.message.strip()
             if not message:
-                raise ValueError(self.localizer.text("results.reply.empty_message", language=thread.language))
+                raise ValueError(self.localizer.text("results.reply.event_add_empty_message", language=thread.language))
             if len(message) > 500:
-                raise ValueError(self.localizer.text("results.reply.message_too_long", language=thread.language))
+                raise ValueError(self.localizer.text("results.reply.event_add_message_too_long", language=thread.language))
             created = event_configuration.adapter_event_action_repository.upsert_action(
                 event_id=adapter_event.event_id,
                 action_type=TWITCH_SEND_MESSAGE_ACTION,
@@ -472,7 +481,7 @@ class ReplyCommandService:
                 USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
             )
 
-        raise ValueError(self.localizer.text("results.reply.unsupported_action", language=thread.language))
+        raise ValueError(self.localizer.text("results.reply.event_action_unsupported", language=thread.language))
 
     def _ensure_thread_permission(
         self,

@@ -68,7 +68,7 @@ class ShowCommandService:
         if thread is None:
             result = build_result(
                 self.localizer,
-                "results.not_joined",
+                "results.show.not_joined",
                 language=self.localizer.default_language,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
@@ -94,12 +94,7 @@ class ShowCommandService:
             if "channels" in sections:
                 lines.append(await self._renderer.render_channels_section(thread))
             if "pings" in sections:
-                lines.append(
-                    await self._renderer.render_patterns_section(
-                        thread,
-                        title=self.localizer.text("show.sections.pings", language=language),
-                    )
-                )
+                lines.append(await self._renderer.render_patterns_section(thread))
             if "auto_replies" in sections:
                 lines.append(await self._renderer.render_auto_replies_section(thread))
             if "users" in sections:

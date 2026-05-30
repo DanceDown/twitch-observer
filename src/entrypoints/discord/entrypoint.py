@@ -72,18 +72,10 @@ class DiscordEntrypoint(TrackingNotificationSender, DiscordPresenceStatusSender)
             return
         if discord_channel_id is not None:
             with suppress(discord.HTTPException, discord.Forbidden):
-                await self._client.send_channel_result(
-                    discord_channel_id,
-                    result,
-                    actor_mention=f"<@{discord_user_id}>",
-                )
+                await self._client.send_channel_result(discord_channel_id, result)
                 return
         with suppress(discord.HTTPException, discord.Forbidden):
-            await self._client.send_user_result(
-                discord_user_id,
-                result,
-                actor_mention=f"<@{discord_user_id}>",
-            )
+            await self._client.send_user_result(discord_user_id, result)
 
     async def send_channel_result(self, discord_channel_id: int, result: DiscordCommandResult) -> None:
         """Send a result embed to one Discord channel when possible."""

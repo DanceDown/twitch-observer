@@ -102,22 +102,18 @@ class ObserverDiscordClient(discord.Client):
             activity=discord.CustomActivity(name=text),
         )
 
-    async def send_user_result(self, discord_user_id: int, result, *, actor_mention: str | None = None) -> None:
+    async def send_user_result(self, discord_user_id: int, result) -> None:
         """Send a result embed to a Discord user via DM when possible."""
         user = self.get_user(discord_user_id)
         if user is None:
             user = await self.fetch_user(discord_user_id)
         channel = user.dm_channel or await user.create_dm()
-        await channel.send(embed=build_result_embed(self._resolve_actor_result(result, actor_mention)))
+        await channel.send(embed=build_result_embed(result))
 
-    async def send_channel_result(self, discord_channel_id: int, result, *, actor_mention: str | None = None) -> None:
+    async def send_channel_result(self, discord_channel_id: int, result) -> None:
         """Send a result embed to the originating Discord channel when possible."""
         channel = self.get_channel(discord_channel_id)
         if channel is None:
             channel = await self.fetch_channel(discord_channel_id)
         if isinstance(channel, discord.TextChannel | discord.Thread | discord.DMChannel):
-            await channel.send(embed=build_result_embed(self._resolve_actor_result(result, actor_mention)))
-
-    @staticmethod
-    def _resolve_actor_result(result, actor_mention: str | None):
-        return result
+            await channel.send(embed=build_result_embed(result))

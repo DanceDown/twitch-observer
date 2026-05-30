@@ -14,10 +14,7 @@ from ..helpers import complete_bound_result
 
 
 def _permission_option_label(*, localizer: Localizer, language: str, value: str) -> str:
-    try:
-        return localizer.text(f"show.permission.{value}", language=language)
-    except ValueError:
-        return value.replace("_", " ").capitalize()
+    return localizer.text(f"discord.permission_ui.modal.permission_label.{value}", language=language)
 
 
 class PermissionModal(discord.ui.Modal):

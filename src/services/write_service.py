@@ -45,10 +45,14 @@ class TwitchWriteCommandService:
             permission_repository=self.permission_repository,
             account_repository=self.account_repository,
             localizer=self.localizer,
+            not_joined_key="results.write.not_joined",
         )
         self._runner = CommandExecutionRunner(
             localizer=self.localizer,
             resolve_thread=lambda command: self.thread_repository.get_by_discord_channel_id(command.discord_channel_id),
+            validation_error_key="results.write.validation_error",
+            twitch_api_error_key="results.write.twitch_api_error",
+            unexpected_error_key="results.write.unexpected_error",
         )
 
     async def handle_request(self, command: SendTwitchMessageCommand) -> DiscordCommandResult:
