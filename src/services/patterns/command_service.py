@@ -34,7 +34,6 @@ from src.services.patterns.display_index import PatternDisplayIndexResolver
 from src.services.patterns.filters import PatternFilterResolver
 from src.services.patterns.presentation import PatternCommandPresenter
 from src.services.twitch_gateways import TwitchDirectoryGateway
-from src.utils.discord_embeds import format_twitch_code_link
 from src.utils.permissions import ObserverPermission
 from src.discord_results import discord_user_mention
 
@@ -257,26 +256,8 @@ class PatternCommandService:
             ID=display_id,
             SUMMARY=self._presenter().format_pattern_summary(
                 pattern=created,
-                channel_logins=tuple(
-                    format_twitch_code_link(
-                        localizer=self.localizer,
-                        language=thread.language,
-                        key="results.pattern.added_result.summary.profile_link",
-                        display_name=channel.display_name,
-                        login=channel.login,
-                    )
-                    for channel in scoped_channels
-                ),
-                user_logins=tuple(
-                    format_twitch_code_link(
-                        localizer=self.localizer,
-                        language=thread.language,
-                        key="results.pattern.added_result.summary.profile_link",
-                        display_name=user.display_name,
-                        login=user.login,
-                    )
-                    for user in scoped_users
-                ),
+                channel_logins=tuple(self._profile_item(channel.display_name, channel.login) for channel in scoped_channels),
+                user_logins=tuple(self._profile_item(user.display_name, user.login) for user in scoped_users),
                 language=thread.language,
                 key_prefix="results.pattern.added_result.summary",
             ),
@@ -510,15 +491,11 @@ class PatternCommandService:
         if updated is None:
             raise RuntimeError("Pattern repository returned no row for update.")
         display_id = self._display_index(thread.thread_id, updated.pattern_id) or updated.pattern_id
-        old_channel_logins = await self._filter_resolver().resolve_profile_links_from_ids(
+        old_channel_logins = await self._filter_resolver().resolve_profile_items_from_ids(
             pattern.channel_scope_ids,
-            language=thread.language,
-            link_key="results.pattern.updated_result.summary.profile_link",
         )
-        old_user_logins = await self._filter_resolver().resolve_profile_links_from_ids(
+        old_user_logins = await self._filter_resolver().resolve_profile_items_from_ids(
             pattern.user_scope_ids,
-            language=thread.language,
-            link_key="results.pattern.updated_result.summary.profile_link",
         )
         return build_thread_result(
             self.localizer,
@@ -530,27 +507,9 @@ class PatternCommandService:
                 before=pattern,
                 after=updated,
                 old_channel_logins=old_channel_logins,
-                new_channel_logins=tuple(
-                    format_twitch_code_link(
-                        localizer=self.localizer,
-                        language=thread.language,
-                        key="results.pattern.updated_result.summary.profile_link",
-                        display_name=channel.display_name,
-                        login=channel.login,
-                    )
-                    for channel in scoped_channels
-                ),
+                new_channel_logins=tuple(self._profile_item(channel.display_name, channel.login) for channel in scoped_channels),
                 old_user_logins=old_user_logins,
-                new_user_logins=tuple(
-                    format_twitch_code_link(
-                        localizer=self.localizer,
-                        language=thread.language,
-                        key="results.pattern.updated_result.summary.profile_link",
-                        display_name=user.display_name,
-                        login=user.login,
-                    )
-                    for user in scoped_users
-                ),
+                new_user_logins=tuple(self._profile_item(user.display_name, user.login) for user in scoped_users),
                 language=thread.language,
                 key_prefix="results.pattern.updated_result.summary",
             ),
@@ -591,6 +550,10 @@ class PatternCommandService:
             thread_id=thread_id,
             pattern_id=pattern_id,
         )
+
+    @staticmethod
+    def _profile_item(display_name: str, login: str) -> dict[str, str]:
+        return {"DISPLAY_NAME": display_name, "LOGIN": login}
 
     def _resolve_thread(self, command: PatternCommand) -> ThreadRecord | None:
         return self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)

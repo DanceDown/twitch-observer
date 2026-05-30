@@ -13,7 +13,6 @@ from src.database.connection import (
 from src.events.event_types import ChannelScopeMode, UserScopeMode
 from src.localization import Localizer
 from src.services.twitch_gateways import TwitchDirectoryGateway
-from src.utils.discord_embeds import format_twitch_code_link
 
 
 @dataclass(slots=True)
@@ -181,25 +180,14 @@ class PatternFilterResolver:
             names.append(user.display_name)
         return tuple(names)
 
-    async def resolve_profile_links_from_ids(
+    async def resolve_profile_items_from_ids(
         self,
         twitch_user_ids: tuple[str, ...],
-        *,
-        language: str,
-        link_key: str,
-    ) -> tuple[str, ...]:
-        links: list[str] = []
+    ) -> tuple[dict[str, str], ...]:
+        links: list[dict[str, str]] = []
         for twitch_user_id in twitch_user_ids:
             user = await self._resolve_user_by_id(twitch_user_id)
-            links.append(
-                format_twitch_code_link(
-                    localizer=self.localizer,
-                    language=language,
-                    key=link_key,
-                    display_name=user.display_name,
-                    login=user.login,
-                )
-            )
+            links.append({"DISPLAY_NAME": user.display_name, "LOGIN": user.login})
         return tuple(links)
 
     async def _resolve_user_by_login(self, login: str):

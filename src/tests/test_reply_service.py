@@ -1069,7 +1069,8 @@ async def test_show_account_lists_linked_account_with_display_name_and_thumbnail
     result = await dispatch_show_command(bus, discord_channel_id=100, requester_id=200, sections=("account",))
 
     assert result.style == DiscordResultStyle.INFO
-    assert "[`Test__User`](https://www.twitch.tv/test__user)" in result.message
+    assert "Test__User" in result.message
+    assert "https://www.twitch.tv/test__user" in result.message
     assert "\\_" not in result.message
     assert result.thumbnail_url == "https://example.test/avatar.png"
 

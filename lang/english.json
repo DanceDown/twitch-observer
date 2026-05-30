@@ -826,33 +826,33 @@
           "scope": {
             "channel_all": "Every watched channel",
             "channel_only": {
-              "template": "`Only in` {RAW:ITEMS}",
+              "template": "Only in {RAW:ITEMS}",
               "placeholders": {
                 "ITEMS": {
                   "list": {
-                    "item_format": "{RAW:LIST_ITEM}",
+                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                     "separator": ", "
                   }
                 }
               }
             },
             "channel_except": {
-              "template": "`Every watched channel except` {RAW:ITEMS}",
+              "template": "Every watched channel except {RAW:ITEMS}",
               "placeholders": {
                 "ITEMS": {
                   "list": {
-                    "item_format": "{RAW:LIST_ITEM}",
+                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                     "separator": ", "
                   }
                 }
               }
             },
             "channel_tracked_except": {
-              "template": "`Every watched channel except` {RAW:ITEMS}",
+              "template": "Every watched channel except {RAW:ITEMS}",
               "placeholders": {
                 "ITEMS": {
                   "list": {
-                    "item_format": "{RAW:LIST_ITEM}",
+                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                     "separator": ", "
                   }
                 }
@@ -860,33 +860,33 @@
             },
             "user_all": "All known Twitch users",
             "user_only": {
-              "template": "`Only from` {RAW:ITEMS}",
+              "template": "Only from {RAW:ITEMS}",
               "placeholders": {
                 "ITEMS": {
                   "list": {
-                    "item_format": "{RAW:LIST_ITEM}",
+                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                     "separator": ", "
                   }
                 }
               }
             },
             "user_except": {
-              "template": "`Everyone except` {RAW:ITEMS}",
+              "template": "Everyone except {RAW:ITEMS}",
               "placeholders": {
                 "ITEMS": {
                   "list": {
-                    "item_format": "{RAW:LIST_ITEM}",
+                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                     "separator": ", "
                   }
                 }
               }
             },
             "user_tracked_except": {
-              "template": "`All known Twitch users except` {RAW:ITEMS}",
+              "template": "All known Twitch users except {RAW:ITEMS}",
               "placeholders": {
                 "ITEMS": {
                   "list": {
-                    "item_format": "{RAW:LIST_ITEM}",
+                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                     "separator": ", "
                   }
                 }
@@ -896,8 +896,7 @@
           "case_sensitive_yes": "Case-Sensitive: `Yes`",
           "case_sensitive_no": "Case-Sensitive: `No`",
           "custom_color": "Custom color: `{CODE:COLOR}`",
-          "priority": "Priority: `{CODE:PRIORITY}`",
-          "profile_link": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})"
+          "priority": "Priority: `{CODE:PRIORITY}`"
         }
       },
       "removed_result": {
@@ -950,33 +949,33 @@
           "scope": {
             "channel_all": "Every watched channel",
             "channel_only": {
-              "template": "`Only in` {RAW:ITEMS}",
+              "template": "Only in {RAW:ITEMS}",
               "placeholders": {
                 "ITEMS": {
                   "list": {
-                    "item_format": "{RAW:LIST_ITEM}",
+                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                     "separator": ", "
                   }
                 }
               }
             },
             "channel_except": {
-              "template": "`Every watched channel except` {RAW:ITEMS}",
+              "template": "Every watched channel except {RAW:ITEMS}",
               "placeholders": {
                 "ITEMS": {
                   "list": {
-                    "item_format": "{RAW:LIST_ITEM}",
+                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                     "separator": ", "
                   }
                 }
               }
             },
             "channel_tracked_except": {
-              "template": "`Every watched channel except` {RAW:ITEMS}",
+              "template": "Every watched channel except {RAW:ITEMS}",
               "placeholders": {
                 "ITEMS": {
                   "list": {
-                    "item_format": "{RAW:LIST_ITEM}",
+                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                     "separator": ", "
                   }
                 }
@@ -985,33 +984,33 @@
             "user_everyone": "Everyone",
             "user_all": "All known Twitch users",
             "user_only": {
-              "template": "`Only from` {RAW:ITEMS}",
+              "template": "Only from {RAW:ITEMS}",
               "placeholders": {
                 "ITEMS": {
                   "list": {
-                    "item_format": "{RAW:LIST_ITEM}",
+                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                     "separator": ", "
                   }
                 }
               }
             },
             "user_except": {
-              "template": "`Everyone except` {RAW:ITEMS}",
+              "template": "Everyone except {RAW:ITEMS}",
               "placeholders": {
                 "ITEMS": {
                   "list": {
-                    "item_format": "{RAW:LIST_ITEM}",
+                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                     "separator": ", "
                   }
                 }
               }
             },
             "user_tracked_except": {
-              "template": "`All known Twitch users except` {RAW:ITEMS}",
+              "template": "All known Twitch users except {RAW:ITEMS}",
               "placeholders": {
                 "ITEMS": {
                   "list": {
-                    "item_format": "{RAW:LIST_ITEM}",
+                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                     "separator": ", "
                   }
                 }
@@ -1039,7 +1038,6 @@
           "case_sensitive": "Case-Sensitive: from `{CODE:BEFORE}` to `{CODE:AFTER}`",
           "color": "Color: from `{CODE:BEFORE}` to `{CODE:AFTER}`",
           "priority": "Priority: from `{CODE:BEFORE}` to `{CODE:AFTER}`",
-          "profile_link": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
           "color_inherited": "Inherited automatically"
         }
       },
@@ -1108,7 +1106,6 @@
           }
         }
       },
-      "profile_link": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
       "details": {
         "template": "\n{RAW:ITEMS}",
         "placeholders": {
@@ -1120,7 +1117,7 @@
           }
         }
       },
-      "row": "- {RAW:HEAD}{RAW:DETAILS}",
+      "row": "- [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}){RAW:DETAILS}",
       "rows": {
         "template": "{RAW:ITEMS}",
         "placeholders": {
@@ -1145,22 +1142,22 @@
       },
       "scope": {
         "channel_only": {
-          "template": "`Only in` {RAW:ITEMS}",
+          "template": "Only in {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
               "list": {
-                "item_format": "{RAW:LIST_ITEM}",
+                "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                 "separator": ", "
               }
             }
           }
         },
         "channel_except": {
-          "template": "`Every watched channel except` {RAW:ITEMS}",
+          "template": "Every watched channel except {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
               "list": {
-                "item_format": "{RAW:LIST_ITEM}",
+                "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                 "separator": ", "
               }
             }
@@ -1168,22 +1165,22 @@
         },
         "user_all": "All known Twitch users",
         "user_only": {
-          "template": "`Only from` {RAW:ITEMS}",
+          "template": "Only from {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
               "list": {
-                "item_format": "{RAW:LIST_ITEM}",
+                "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                 "separator": ", "
               }
             }
           }
         },
         "user_except": {
-          "template": "`Everyone except` {RAW:ITEMS}",
+          "template": "Everyone except {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
               "list": {
-                "item_format": "{RAW:LIST_ITEM}",
+                "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                 "separator": ", "
               }
             }
@@ -1194,7 +1191,7 @@
           "placeholders": {
             "ITEMS": {
               "list": {
-                "item_format": "{RAW:LIST_ITEM}",
+                "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
                 "separator": ", "
               }
             }
@@ -1218,7 +1215,6 @@
       "only_while_offline": "Only while offline",
       "where": "Where: {RAW:VALUE}",
       "who": "Who: {RAW:VALUE}",
-      "profile_link": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
       "details": {
         "template": "\n{RAW:ITEMS}",
         "placeholders": {
@@ -1284,13 +1280,12 @@
       "row": "- {RAW:HEAD}{RAW:DETAILS}"
     },
     "account": {
-      "linked": "This channel is connected with {RAW:TWITCH}",
+      "linked": "This channel is connected with [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
       "token_status": "Token status: `{CODE:STATUS}`",
       "token_available": "ready",
       "token_missing": "missing",
       "pending": "{RAW:USER} has a `{CODE:STATUS}` login code `{CODE:USER_CODE}`",
       "empty": "No Twitch account is connected here <:oopsie:1497720439810687006>",
-      "profile_link": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
       "rows": {
         "template": "{RAW:ITEMS}",
         "placeholders": {
@@ -1372,13 +1367,12 @@
       "empty": "There are no automatic replies configured <a:Lurk:1497684902135463986>"
     },
     "tracked_users": {
-      "profile_link": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
       "rows": {
         "template": "{RAW:ITEMS}",
         "placeholders": {
           "ITEMS": {
             "list": {
-              "item_format": "- {RAW:LIST_ITEM}",
+              "item_format": "- [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
               "separator": "\n"
             }
           }
@@ -1703,7 +1697,7 @@
         "not_set": "not set yet",
         "channel_scope_all": "All watched Twitch channels",
         "channel_scope_only": {
-          "template": "Only: {RAW:ITEMS}",
+          "template": "Only {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
               "list": {
@@ -1715,7 +1709,7 @@
         },
         "channel_scope_only_fallback": "Only selected channels",
         "channel_scope_except": {
-          "template": "All except: {RAW:ITEMS}",
+          "template": "All except {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
               "list": {
@@ -1729,7 +1723,7 @@
         "user_scope_everyone": "Everyone",
         "user_scope_all_tracked": "All known Twitch users",
         "user_scope_all_tracked_except": {
-          "template": "All known except: {RAW:ITEMS}",
+          "template": "All known except {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
               "list": {
@@ -1741,7 +1735,7 @@
         },
         "user_scope_all_tracked_except_fallback": "All known except selected Twitch names",
         "user_scope_only": {
-          "template": "Only: {RAW:ITEMS}",
+          "template": "Only {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
               "list": {
@@ -1753,7 +1747,7 @@
         },
         "user_scope_only_fallback": "Only selected Twitch names",
         "user_scope_except": {
-          "template": "Everyone except: {RAW:ITEMS}",
+          "template": "Everyone except {RAW:ITEMS}",
           "placeholders": {
             "ITEMS": {
               "list": {

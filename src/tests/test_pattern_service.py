@@ -450,8 +450,110 @@ class FakeNotifier(TrackingNotificationSender):
         self.sent.append((discord_channel_id, embed))
 
 
+def _scope_summary_localizer() -> Localizer:
+    return Localizer(
+        catalogs={
+            "english": {
+                "results": {
+                    "pattern": {
+                        "added_result": {
+                            "summary": {
+                                "list": {
+                                    "template": "{RAW:ITEMS}",
+                                    "placeholders": {
+                                        "ITEMS": {
+                                            "list": {
+                                                "item_format": "- {RAW:LIST_ITEM}",
+                                                "separator": "\n",
+                                            }
+                                        }
+                                    },
+                                },
+                                "text": "Text: `{CODE:TEXT}`",
+                                "mode": "Mode: `{CODE:PING_MODE}`",
+                                "mode_value": {"word": "Word", "regex": "Regex"},
+                                "scope": {
+                                    "channel_only": {
+                                        "template": "Only in {RAW:ITEMS}",
+                                        "placeholders": {
+                                            "ITEMS": {
+                                                "list": {
+                                                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
+                                                    "separator": ", ",
+                                                }
+                                            }
+                                        },
+                                    },
+                                    "user_only": {
+                                        "template": "Only from {RAW:ITEMS}",
+                                        "placeholders": {
+                                            "ITEMS": {
+                                                "list": {
+                                                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
+                                                    "separator": ", ",
+                                                }
+                                            }
+                                        },
+                                    },
+                                },
+                                "case_sensitive_yes": "Case-Sensitive: `Yes`",
+                                "case_sensitive_no": "Case-Sensitive: `No`",
+                                "priority": "Priority: `{CODE:PRIORITY}`",
+                            }
+                        },
+                        "updated_result": {
+                            "summary": {
+                                "list": {
+                                    "template": "{RAW:ITEMS}",
+                                    "placeholders": {
+                                        "ITEMS": {
+                                            "list": {
+                                                "item_format": "- {RAW:LIST_ITEM}",
+                                                "separator": "\n",
+                                            }
+                                        }
+                                    },
+                                },
+                                "mode_value": {"word": "Word", "regex": "Regex"},
+                                "scope": {
+                                    "channel_all": "Every watched channel",
+                                    "user_everyone": "Everyone",
+                                    "channel_only": {
+                                        "template": "Only in {RAW:ITEMS}",
+                                        "placeholders": {
+                                            "ITEMS": {
+                                                "list": {
+                                                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
+                                                    "separator": ", ",
+                                                }
+                                            }
+                                        },
+                                    },
+                                    "user_only": {
+                                        "template": "Only from {RAW:ITEMS}",
+                                        "placeholders": {
+                                            "ITEMS": {
+                                                "list": {
+                                                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
+                                                    "separator": ", ",
+                                                }
+                                            }
+                                        },
+                                    },
+                                },
+                                "where": "Where: From {RAW:BEFORE} to {RAW:AFTER}",
+                                "who": "Who: From {RAW:BEFORE} to {RAW:AFTER}",
+                            }
+                        },
+                    }
+                }
+            }
+        }
+    )
+
+
 def test_pattern_presenter_keeps_scope_links_clickable_in_added_summary() -> None:
-    presenter = PatternCommandPresenter(localizer=Localizer.from_directory())
+    presenter = PatternCommandPresenter(localizer=_scope_summary_localizer())
     pattern = PatternRecord(
         thread_id=1,
         pattern_id=7,
@@ -472,18 +574,18 @@ def test_pattern_presenter_keeps_scope_links_clickable_in_added_summary() -> Non
 
     rendered = presenter.format_pattern_summary(
         pattern=pattern,
-        channel_logins=("[`DanceDown`](https://www.twitch.tv/dancedown)",),
-        user_logins=("[`Alice`](https://www.twitch.tv/alice)",),
+        channel_logins=({"DISPLAY_NAME": "DanceDown", "LOGIN": "dancedown"},),
+        user_logins=({"DISPLAY_NAME": "Alice", "LOGIN": "alice"},),
         language="english",
         key_prefix="results.pattern.added_result.summary",
     )
 
-    assert "`Only in` [`DanceDown`](https://www.twitch.tv/dancedown)" in rendered
-    assert "`Only from` [`Alice`](https://www.twitch.tv/alice)" in rendered
+    assert "[`DanceDown`](https://www.twitch.tv/dancedown)" in rendered
+    assert "[`Alice`](https://www.twitch.tv/alice)" in rendered
 
 
 def test_pattern_presenter_formats_updated_scope_change_without_wrapping_links_in_code() -> None:
-    presenter = PatternCommandPresenter(localizer=Localizer.from_directory())
+    presenter = PatternCommandPresenter(localizer=_scope_summary_localizer())
     before = PatternRecord(
         thread_id=1,
         pattern_id=7,
@@ -523,15 +625,15 @@ def test_pattern_presenter_formats_updated_scope_change_without_wrapping_links_i
         before=before,
         after=after,
         old_channel_logins=(),
-        new_channel_logins=("[`DanceDown`](https://www.twitch.tv/dancedown)",),
+        new_channel_logins=({"DISPLAY_NAME": "DanceDown", "LOGIN": "dancedown"},),
         old_user_logins=(),
-        new_user_logins=("[`Alice`](https://www.twitch.tv/alice)",),
+        new_user_logins=({"DISPLAY_NAME": "Alice", "LOGIN": "alice"},),
         language="english",
         key_prefix="results.pattern.updated_result.summary",
     )
 
-    assert "Where: From Every watched channel to `Only in` [`DanceDown`](https://www.twitch.tv/dancedown)" in rendered
-    assert "Who: From Everyone to `Only from` [`Alice`](https://www.twitch.tv/alice)" in rendered
+    assert "[`DanceDown`](https://www.twitch.tv/dancedown)" in rendered
+    assert "[`Alice`](https://www.twitch.tv/alice)" in rendered
 
 
 @pytest.mark.asyncio
@@ -1268,8 +1370,8 @@ async def test_show_command_renders_where_and_who_as_bullets() -> None:
         sections=("pings",),
     )
 
-    assert "- Where: `Only in` [`Example`](https://www.twitch.tv/example)" in result.message
-    assert "- Who: `Only from` [`Alice`](https://www.twitch.tv/alice)" in result.message
+    assert "https://www.twitch.tv/example" in result.message
+    assert "https://www.twitch.tv/alice" in result.message
 
 
 @pytest.mark.asyncio

@@ -28,7 +28,6 @@ from src.services.twitch_runtime import (
     TWITCH_ADAPTER_KEY,
     TWITCH_SEND_MESSAGE_ACTION,
 )
-from src.utils.discord_embeds import format_twitch_code_link
 from src.utils.permissions import explicit_permission_labels
 
 
@@ -105,18 +104,16 @@ class ShowSectionRenderer:
                     )
                 )
             rows.append(
-                self.render_row(
-                    row_key="show.channel.row",
-                    details_key="show.channel.details",
-                    head=format_twitch_code_link(
-                        localizer=self.localizer,
-                        language=language,
-                        key="show.channel.profile_link",
-                        display_name=twitch_user.display_name,
-                        login=twitch_user.login,
-                    ),
-                    details=details,
+                self.localizer.text(
+                    "show.channel.row",
                     language=language,
+                    DISPLAY_NAME=twitch_user.display_name,
+                    LOGIN=twitch_user.login,
+                    DETAILS=(
+                        ""
+                        if not details
+                        else self.localizer.text("show.channel.details", language=language, ITEMS=tuple(details))
+                    ),
                 )
             )
         return self.render_section("show.channel.section", self.localizer.text("show.channel.rows", language=language, ITEMS=tuple(rows)), language=language)
@@ -199,18 +196,10 @@ class ShowSectionRenderer:
         tracked_users = self.tracked_user_repository.list_users_for_thread(thread.thread_id)
         if not tracked_users:
             return self.render_section("show.tracked_users.section", empty_text, language=language)
-        rows: list[str] = []
+        rows: list[dict[str, str]] = []
         for tracked_user in tracked_users:
             twitch_user = await self.resolve_user_by_id(tracked_user.twitch_user_id)
-            rows.append(
-                format_twitch_code_link(
-                    localizer=self.localizer,
-                    language=language,
-                    key="show.tracked_users.profile_link",
-                    display_name=twitch_user.display_name,
-                    login=twitch_user.login,
-                )
-            )
+            rows.append({"DISPLAY_NAME": twitch_user.display_name, "LOGIN": twitch_user.login})
         return self.render_section("show.tracked_users.section", self.localizer.text("show.tracked_users.rows", language=language, ITEMS=tuple(rows)), language=language)
 
     def render_permissions_section(self, thread: ThreadRecord) -> str:
@@ -297,13 +286,8 @@ class ShowSectionRenderer:
                     "show.account.linked",
                     language=language,
                     USER=self.mention(account.discord_user_id),
-                    TWITCH=format_twitch_code_link(
-                        localizer=self.localizer,
-                        language=language,
-                        key="show.account.profile_link",
-                        display_name=twitch_user.display_name,
-                        login=twitch_user.login,
-                    ),
+                    DISPLAY_NAME=twitch_user.display_name,
+                    LOGIN=twitch_user.login,
                 )
             )
             rows.append(
@@ -427,11 +411,7 @@ class ShowSectionRenderer:
         """Render the optional modifiers for a pattern."""
         details: list[str] = []
         if pattern.channel_scope_mode != "all_tracked":
-            channel_names = await self.resolve_twitch_links(
-                pattern.channel_scope_ids,
-                language=language,
-                link_key="show.pattern.profile_link",
-            )
+            channel_names = await self.resolve_twitch_links(pattern.channel_scope_ids)
             if pattern.channel_scope_mode == "only_selected":
                 details.append(
                     self.localizer.text(
@@ -449,11 +429,7 @@ class ShowSectionRenderer:
                     )
                 )
         if pattern.user_scope_mode != "all_users":
-            user_names = await self.resolve_twitch_names(
-                pattern.user_scope_ids,
-                language=language,
-                link_key="show.pattern.profile_link",
-            )
+            user_names = await self.resolve_twitch_names(pattern.user_scope_ids)
             if pattern.user_scope_mode == "only_selected":
                 details.append(
                     self.localizer.text(
@@ -512,45 +488,23 @@ class ShowSectionRenderer:
     async def resolve_twitch_links(
         self,
         twitch_ids: tuple[str, ...],
-        *,
-        language: str,
-        link_key: str,
-    ) -> tuple[str, ...]:
-        """Resolve a list of Twitch user IDs to rendered markdown links."""
-        resolved: list[str] = []
+    ) -> tuple[dict[str, str], ...]:
+        """Resolve a list of Twitch user IDs to localized item placeholder values."""
+        resolved: list[dict[str, str]] = []
         for twitch_id in twitch_ids:
             user = await self.resolve_channel_by_id(twitch_id)
-            resolved.append(
-                format_twitch_code_link(
-                    localizer=self.localizer,
-                    language=language,
-                    key=link_key,
-                    display_name=user.display_name,
-                    login=user.login,
-                )
-            )
+            resolved.append({"DISPLAY_NAME": user.display_name, "LOGIN": user.login})
         return tuple(resolved)
 
     async def resolve_twitch_names(
         self,
         twitch_ids: tuple[str, ...],
-        *,
-        language: str,
-        link_key: str,
-    ) -> tuple[str, ...]:
-        """Resolve a list of Twitch user IDs to rendered markdown links."""
-        resolved: list[str] = []
+    ) -> tuple[dict[str, str], ...]:
+        """Resolve a list of Twitch user IDs to localized item placeholder values."""
+        resolved: list[dict[str, str]] = []
         for twitch_id in twitch_ids:
             user = await self.resolve_user_by_id(twitch_id)
-            resolved.append(
-                format_twitch_code_link(
-                    localizer=self.localizer,
-                    language=language,
-                    key=link_key,
-                    display_name=user.display_name,
-                    login=user.login,
-                )
-            )
+            resolved.append({"DISPLAY_NAME": user.display_name, "LOGIN": user.login})
         return tuple(resolved)
 
     def permission_label(self, label: str, *, language: str) -> str:

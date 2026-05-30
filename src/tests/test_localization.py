@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from src.discord_results import build_result
@@ -7,10 +9,18 @@ from src.localization import LocalizationError, Localizer
 
 
 def test_localizer_interpolates_placeholders_and_supports_backslash_escaping() -> None:
-    localizer = Localizer.from_directory()
+    localizer = Localizer(
+        catalogs={
+            "english": {
+                "example": {
+                    "body": "Language now {LANGUAGE_NAME}",
+                }
+            }
+        }
+    )
 
     rendered = localizer.text(
-        "results.thread.language_updated.body",
+        "example.body",
         language="english",
         USER="<@123456789012345678>",
         LANGUAGE_NAME="German",
@@ -66,23 +76,63 @@ def test_localizer_formats_localized_lists() -> None:
 
 
 def test_localizer_uses_list_metadata_from_template_entries() -> None:
-    localizer = Localizer.from_directory()
+    localizer = Localizer(
+        catalogs={
+            "english": {
+                "example": {
+                    "supported": {
+                        "template": "Supported: {RAW:LANGUAGES}",
+                        "placeholders": {
+                            "LANGUAGES": {
+                                "list": {
+                                    "item_format": "`{CODE:LIST_ITEM}`",
+                                    "separator": ", ",
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        }
+    )
 
     rendered = localizer.text(
-        "results.validation_detail.unsupported_language",
+        "example.supported",
         language="english",
         LANGUAGES=["english", "german"],
     )
 
-    assert rendered == "Unsupported language. Available languages: `english`, `german`"
+    assert rendered == "Supported: `english`, `german`"
 
 
 def test_build_result_uses_list_metadata_from_result_entries() -> None:
-    localizer = Localizer.from_directory()
+    localizer = Localizer(
+        catalogs={
+            "english": {
+                "results": {
+                    "example": {
+                        "granted": {
+                            "title": "Done",
+                            "body": "{RAW:USER} -> {RAW:TARGET}\n{RAW:PERMISSIONS}",
+                            "footer": "",
+                            "placeholders": {
+                                "PERMISSIONS": {
+                                    "list": {
+                                        "item_format": "- {RAW:LIST_ITEM}",
+                                        "separator": "\n",
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
 
     result = build_result(
         localizer,
-        "results.permission.granted",
+        "results.example.granted",
         language="english",
         USER="<@1>",
         TARGET="<@2>",
@@ -92,18 +142,21 @@ def test_build_result_uses_list_metadata_from_result_entries() -> None:
     assert result.message.endswith("- View\n- Edit")
 
 
-def test_german_catalog_uses_utf8_umlauts() -> None:
-    localizer = Localizer.from_directory()
+def test_localizer_loads_utf8_german_text_from_files(tmp_path) -> None:
+    (tmp_path / "english.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "german.json").write_text(
+        json.dumps({"example": {"text": "verfügbar außer äöüß"}}, ensure_ascii=False),
+        encoding="utf-8",
+    )
 
-    rendered = localizer.text("results.command_unavailable.title", language="german")
-    scope_text = localizer.text("show.pattern.scope.user_except", language="german", ITEMS=("x",))
+    localizer = Localizer.from_directory(tmp_path)
+    rendered = localizer.text("example.text", language="german")
 
-    assert "verfügbar" in rendered
-    assert "außer" in scope_text
+    assert rendered == "verfügbar außer äöüß"
 
 
 def test_localizer_raises_for_missing_placeholder_values() -> None:
-    localizer = Localizer.from_directory()
+    localizer = Localizer(catalogs={"english": {"example": {"body": "Hello {DISPLAY_NAME}"}}})
 
     with pytest.raises(LocalizationError):
-        localizer.text("results.channel.added", language="english", DISPLAY_NAME="Example")
+        localizer.text("example.body", language="english")

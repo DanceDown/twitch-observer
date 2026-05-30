@@ -18,8 +18,8 @@ class PatternCommandPresenter:
         self,
         *,
         pattern: PatternRecord,
-        channel_logins: tuple[str, ...],
-        user_logins: tuple[str, ...],
+        channel_logins: tuple[dict[str, str], ...],
+        user_logins: tuple[dict[str, str], ...],
         language: str,
         key_prefix: str,
     ) -> str:
@@ -109,10 +109,10 @@ class PatternCommandPresenter:
         *,
         before: PatternRecord,
         after: PatternRecord,
-        old_channel_logins: tuple[str, ...],
-        new_channel_logins: tuple[str, ...],
-        old_user_logins: tuple[str, ...],
-        new_user_logins: tuple[str, ...],
+        old_channel_logins: tuple[dict[str, str], ...],
+        new_channel_logins: tuple[dict[str, str], ...],
+        old_user_logins: tuple[dict[str, str], ...],
+        new_user_logins: tuple[dict[str, str], ...],
         language: str,
         key_prefix: str,
     ) -> str:
@@ -241,7 +241,7 @@ class PatternCommandPresenter:
         self,
         *,
         mode: str,
-        selected: tuple[str, ...],
+        selected: tuple[dict[str, str], ...],
         language: str,
         key_prefix: str,
         subject: str,
@@ -288,7 +288,7 @@ class PatternCommandPresenter:
         self,
         *,
         key: str,
-        items: tuple[str, ...],
+        items: tuple[dict[str, str], ...],
         language: str,
     ) -> str:
         return self.localizer.text(key, language=language, ITEMS=items)
