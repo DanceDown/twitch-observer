@@ -17,43 +17,36 @@ class PatternCommandPresenter:
     def format_pattern_summary(
         self,
         *,
-        action: str,
         pattern: PatternRecord,
-        display_id: int,
         channel_logins: tuple[str, ...],
         user_logins: tuple[str, ...],
         language: str,
+        key_prefix: str,
     ) -> str:
         parts = [
             self.localizer.text(
-                "results.pattern.summary.action",
-                language=language,
-                ACTION=action,
-                ID=display_id,
-            ),
-            self.localizer.text(
-                "results.pattern.summary.text",
+                f"{key_prefix}.text",
                 language=language,
                 TEXT=pattern.regex,
             ),
             self.localizer.text(
-                "results.pattern.summary.mode",
+                f"{key_prefix}.mode",
                 language=language,
-                PING_MODE=self.pattern_mode(pattern.is_regex, language=language, scope="summary"),
+                PING_MODE=self.pattern_mode(pattern.is_regex, language=language, key_prefix=key_prefix),
             ),
         ]
         channel_scope = self.scope_text(
             mode=pattern.channel_scope_mode,
             selected=channel_logins,
             language=language,
-            key_prefix="results.pattern.summary.scope",
+            key_prefix=f"{key_prefix}.scope",
             subject="channel",
         )
         user_scope = self.scope_text(
             mode=pattern.user_scope_mode,
             selected=user_logins,
             language=language,
-            key_prefix="results.pattern.summary.scope",
+            key_prefix=f"{key_prefix}.scope",
             subject="user",
         )
         if channel_scope:
@@ -64,9 +57,9 @@ class PatternCommandPresenter:
             parts.append(
                 self.localizer.text(
                     (
-                        "results.pattern.summary.subscribers_only"
+                        f"{key_prefix}.subscribers_only"
                         if pattern.sub_state == "subs"
-                        else "results.pattern.summary.non_subscribers_only"
+                        else f"{key_prefix}.non_subscribers_only"
                     ),
                     language=language,
                 )
@@ -75,38 +68,38 @@ class PatternCommandPresenter:
             parts.append(
                 self.localizer.text(
                     (
-                        "results.pattern.summary.only_while_live"
+                        f"{key_prefix}.only_while_live"
                         if pattern.offline_state == "online"
-                        else "results.pattern.summary.only_while_offline"
+                        else f"{key_prefix}.only_while_offline"
                     ),
                     language=language,
                 )
             )
         parts.append(
             self.localizer.text(
-                "results.pattern.summary.case_sensitive_yes"
+                f"{key_prefix}.case_sensitive_yes"
                 if pattern.case_sensitive
-                else "results.pattern.summary.case_sensitive_no",
+                else f"{key_prefix}.case_sensitive_no",
                 language=language,
             )
         )
         if pattern.color:
             parts.append(
                 self.localizer.text(
-                    "results.pattern.summary.custom_color",
+                    f"{key_prefix}.custom_color",
                     language=language,
                     COLOR=pattern.color,
                 )
             )
         parts.append(
             self.localizer.text(
-                "results.pattern.summary.priority",
+                f"{key_prefix}.priority",
                 language=language,
                 PRIORITY=pattern.priority,
             )
         )
         return self.localizer.text(
-            "results.pattern.summary.list",
+            f"{key_prefix}.list",
             language=language,
             ITEMS=tuple(parts),
         )
@@ -116,24 +109,18 @@ class PatternCommandPresenter:
         *,
         before: PatternRecord,
         after: PatternRecord,
-        display_id: int,
         old_channel_logins: tuple[str, ...],
         new_channel_logins: tuple[str, ...],
         old_user_logins: tuple[str, ...],
         new_user_logins: tuple[str, ...],
         language: str,
+        key_prefix: str,
     ) -> str:
-        changes = [
-            self.localizer.text(
-                "results.pattern.changes.updated",
-                language=language,
-                ID=display_id,
-            )
-        ]
+        changes: list[str] = []
         if before.regex != after.regex:
             changes.append(
                 self.localizer.text(
-                    "results.pattern.changes.text",
+                    f"{key_prefix}.text",
                     language=language,
                     BEFORE=before.regex,
                     AFTER=after.regex,
@@ -142,10 +129,10 @@ class PatternCommandPresenter:
         if before.is_regex != after.is_regex:
             changes.append(
                 self.localizer.text(
-                    "results.pattern.changes.mode",
+                    f"{key_prefix}.mode",
                     language=language,
-                    BEFORE=self.pattern_mode(before.is_regex, language=language, scope="changes"),
-                    AFTER=self.pattern_mode(after.is_regex, language=language, scope="changes"),
+                    BEFORE=self.pattern_mode(before.is_regex, language=language, key_prefix=key_prefix),
+                    AFTER=self.pattern_mode(after.is_regex, language=language, key_prefix=key_prefix),
                 )
             )
 
@@ -153,21 +140,21 @@ class PatternCommandPresenter:
             mode=before.channel_scope_mode,
             selected=old_channel_logins,
             language=language,
-            key_prefix="results.pattern.changes.scope",
+            key_prefix=f"{key_prefix}.scope",
             subject="channel",
         )
         new_channel_scope = self.scope_text(
             mode=after.channel_scope_mode,
             selected=new_channel_logins,
             language=language,
-            key_prefix="results.pattern.changes.scope",
+            key_prefix=f"{key_prefix}.scope",
             subject="channel",
         )
         if old_channel_scope != new_channel_scope:
-            all_channels_scope = self.localizer.text("results.pattern.changes.scope.channel_all", language=language)
+            all_channels_scope = self.localizer.text(f"{key_prefix}.scope.channel_all", language=language)
             changes.append(
                 self.localizer.text(
-                    "results.pattern.changes.where",
+                    f"{key_prefix}.where",
                     language=language,
                     BEFORE=old_channel_scope or all_channels_scope,
                     AFTER=new_channel_scope or all_channels_scope,
@@ -178,21 +165,21 @@ class PatternCommandPresenter:
             mode=before.user_scope_mode,
             selected=old_user_logins,
             language=language,
-            key_prefix="results.pattern.changes.scope",
+            key_prefix=f"{key_prefix}.scope",
             subject="user",
         )
         new_user_scope = self.scope_text(
             mode=after.user_scope_mode,
             selected=new_user_logins,
             language=language,
-            key_prefix="results.pattern.changes.scope",
+            key_prefix=f"{key_prefix}.scope",
             subject="user",
         )
         if old_user_scope != new_user_scope:
-            everyone_scope = self.localizer.text("results.pattern.changes.scope.user_everyone", language=language)
+            everyone_scope = self.localizer.text(f"{key_prefix}.scope.user_everyone", language=language)
             changes.append(
                 self.localizer.text(
-                    "results.pattern.changes.who",
+                    f"{key_prefix}.who",
                     language=language,
                     BEFORE=old_user_scope or everyone_scope,
                     AFTER=new_user_scope or everyone_scope,
@@ -201,35 +188,35 @@ class PatternCommandPresenter:
         if before.sub_state != after.sub_state:
             changes.append(
                 self.localizer.text(
-                    "results.pattern.changes.subscribers",
+                    f"{key_prefix}.subscribers",
                     language=language,
-                    BEFORE=self.sub_state(before.sub_state, language=language),
-                    AFTER=self.sub_state(after.sub_state, language=language),
+                    BEFORE=self.sub_state(before.sub_state, language=language, key_prefix=key_prefix),
+                    AFTER=self.sub_state(after.sub_state, language=language, key_prefix=key_prefix),
                 )
             )
         if before.offline_state != after.offline_state:
             changes.append(
                 self.localizer.text(
-                    "results.pattern.changes.stream_state",
+                    f"{key_prefix}.stream_state",
                     language=language,
-                    BEFORE=self.offline_state(before.offline_state, language=language),
-                    AFTER=self.offline_state(after.offline_state, language=language),
+                    BEFORE=self.offline_state(before.offline_state, language=language, key_prefix=key_prefix),
+                    AFTER=self.offline_state(after.offline_state, language=language, key_prefix=key_prefix),
                 )
             )
         if before.case_sensitive != after.case_sensitive:
             changes.append(
                 self.localizer.text(
-                    "results.pattern.changes.case_sensitive",
+                    f"{key_prefix}.case_sensitive",
                     language=language,
-                    BEFORE=self.case_sensitive_value(before.case_sensitive, language=language),
-                    AFTER=self.case_sensitive_value(after.case_sensitive, language=language),
+                    BEFORE=self.case_sensitive_value(before.case_sensitive, language=language, key_prefix=key_prefix),
+                    AFTER=self.case_sensitive_value(after.case_sensitive, language=language, key_prefix=key_prefix),
                 )
             )
         if before.color != after.color:
-            inherited_color = self.localizer.text("results.pattern.changes.color_inherited", language=language)
+            inherited_color = self.localizer.text(f"{key_prefix}.color_inherited", language=language)
             changes.append(
                 self.localizer.text(
-                    "results.pattern.changes.color",
+                    f"{key_prefix}.color",
                     language=language,
                     BEFORE=before.color or inherited_color,
                     AFTER=after.color or inherited_color,
@@ -238,14 +225,14 @@ class PatternCommandPresenter:
         if before.priority != after.priority:
             changes.append(
                 self.localizer.text(
-                    "results.pattern.changes.priority",
+                    f"{key_prefix}.priority",
                     language=language,
                     BEFORE=before.priority,
                     AFTER=after.priority,
                 )
             )
         return self.localizer.text(
-            "results.pattern.changes.list",
+            f"{key_prefix}.list",
             language=language,
             ITEMS=tuple(changes),
         )
@@ -283,19 +270,19 @@ class PatternCommandPresenter:
             )
         return None
 
-    def pattern_mode(self, is_regex: bool, *, language: str, scope: str) -> str:
-        key = f"results.pattern.{scope}.mode_value.regex" if is_regex else f"results.pattern.{scope}.mode_value.word"
+    def pattern_mode(self, is_regex: bool, *, language: str, key_prefix: str) -> str:
+        key = f"{key_prefix}.mode_value.regex" if is_regex else f"{key_prefix}.mode_value.word"
         return self.localizer.text(key, language=language)
 
-    def case_sensitive_value(self, value: bool, *, language: str) -> str:
-        key = "results.pattern.changes.case_sensitive_yes" if value else "results.pattern.changes.case_sensitive_no"
+    def case_sensitive_value(self, value: bool, *, language: str, key_prefix: str) -> str:
+        key = f"{key_prefix}.case_sensitive_yes" if value else f"{key_prefix}.case_sensitive_no"
         return self.localizer.text(key, language=language)
 
-    def sub_state(self, value: str, *, language: str) -> str:
-        return self.localizer.text(f"results.pattern.changes.sub_state.{value}", language=language)
+    def sub_state(self, value: str, *, language: str, key_prefix: str) -> str:
+        return self.localizer.text(f"{key_prefix}.sub_state.{value}", language=language)
 
-    def offline_state(self, value: str, *, language: str) -> str:
-        return self.localizer.text(f"results.pattern.changes.stream_state_value.{value}", language=language)
+    def offline_state(self, value: str, *, language: str, key_prefix: str) -> str:
+        return self.localizer.text(f"{key_prefix}.stream_state_value.{value}", language=language)
 
     def _scope_text_with_items(
         self,

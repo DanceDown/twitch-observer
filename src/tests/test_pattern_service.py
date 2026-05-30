@@ -471,12 +471,11 @@ def test_pattern_presenter_keeps_scope_links_clickable_in_added_summary() -> Non
     )
 
     rendered = presenter.format_pattern_summary(
-        action="added",
         pattern=pattern,
-        display_id=1,
         channel_logins=("[`DanceDown`](https://www.twitch.tv/dancedown)",),
         user_logins=("[`Alice`](https://www.twitch.tv/alice)",),
         language="english",
+        key_prefix="results.pattern.added_result.summary",
     )
 
     assert "`Only in` [`DanceDown`](https://www.twitch.tv/dancedown)" in rendered
@@ -523,12 +522,12 @@ def test_pattern_presenter_formats_updated_scope_change_without_wrapping_links_i
     rendered = presenter.format_pattern_changes(
         before=before,
         after=after,
-        display_id=1,
         old_channel_logins=(),
         new_channel_logins=("[`DanceDown`](https://www.twitch.tv/dancedown)",),
         old_user_logins=(),
         new_user_logins=("[`Alice`](https://www.twitch.tv/alice)",),
         language="english",
+        key_prefix="results.pattern.updated_result.summary",
     )
 
     assert "Where: From Every watched channel to `Only in` [`DanceDown`](https://www.twitch.tv/dancedown)" in rendered

@@ -254,15 +254,14 @@ class PatternCommandService:
             "results.pattern.added_result",
             thread=thread,
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            ID=display_id,
             SUMMARY=self._presenter().format_pattern_summary(
-                action=self.localizer.text("results.pattern.added_result.summary_action", language=thread.language),
                 pattern=created,
-                display_id=display_id,
                 channel_logins=tuple(
                     format_twitch_code_link(
                         localizer=self.localizer,
                         language=thread.language,
-                        key="results.pattern.summary.profile_link",
+                        key="results.pattern.added_result.summary.profile_link",
                         display_name=channel.display_name,
                         login=channel.login,
                     )
@@ -272,13 +271,14 @@ class PatternCommandService:
                     format_twitch_code_link(
                         localizer=self.localizer,
                         language=thread.language,
-                        key="results.pattern.summary.profile_link",
+                        key="results.pattern.added_result.summary.profile_link",
                         display_name=user.display_name,
                         login=user.login,
                     )
                     for user in scoped_users
                 ),
                 language=thread.language,
+                key_prefix="results.pattern.added_result.summary",
             ),
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
@@ -513,28 +513,28 @@ class PatternCommandService:
         old_channel_logins = await self._filter_resolver().resolve_profile_links_from_ids(
             pattern.channel_scope_ids,
             language=thread.language,
-            link_key="results.pattern.changes.profile_link",
+            link_key="results.pattern.updated_result.summary.profile_link",
         )
         old_user_logins = await self._filter_resolver().resolve_profile_links_from_ids(
             pattern.user_scope_ids,
             language=thread.language,
-            link_key="results.pattern.changes.profile_link",
+            link_key="results.pattern.updated_result.summary.profile_link",
         )
         return build_thread_result(
             self.localizer,
             "results.pattern.updated_result",
             thread=thread,
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            ID=display_id,
             SUMMARY=self._presenter().format_pattern_changes(
                 before=pattern,
                 after=updated,
-                display_id=display_id,
                 old_channel_logins=old_channel_logins,
                 new_channel_logins=tuple(
                     format_twitch_code_link(
                         localizer=self.localizer,
                         language=thread.language,
-                        key="results.pattern.changes.profile_link",
+                        key="results.pattern.updated_result.summary.profile_link",
                         display_name=channel.display_name,
                         login=channel.login,
                     )
@@ -545,13 +545,14 @@ class PatternCommandService:
                     format_twitch_code_link(
                         localizer=self.localizer,
                         language=thread.language,
-                        key="results.pattern.changes.profile_link",
+                        key="results.pattern.updated_result.summary.profile_link",
                         display_name=user.display_name,
                         login=user.login,
                     )
                     for user in scoped_users
                 ),
                 language=thread.language,
+                key_prefix="results.pattern.updated_result.summary",
             ),
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,

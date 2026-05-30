@@ -799,9 +799,106 @@
       },
       "added_result": {
         "title": "Ping hinzugefügt",
-        "body": "{RAW:USER}\n{RAW:SUMMARY}",
+        "body": "{RAW:USER} hat Ping #`{CODE:ID}` hinzugefügt\n{RAW:SUMMARY}",
         "footer": "",
-        "summary_action": "hat"
+        "summary": {
+          "list": {
+            "template": "{RAW:ITEMS}",
+            "placeholders": {
+              "ITEMS": {
+                "list": {
+                  "item_format": "- {RAW:LIST_ITEM}",
+                  "separator": "\n"
+                }
+              }
+            }
+          },
+          "text": "Text: `{CODE:TEXT}`",
+          "mode": "Modus: `{CODE:PING_MODE}`",
+          "subscribers_only": "Nur Abonnenten",
+          "non_subscribers_only": "Nur Nicht-Abonnenten",
+          "only_while_live": "Nur während live",
+          "only_while_offline": "Nur während offline",
+          "mode_value": {
+            "word": "Wort",
+            "regex": "Regex"
+          },
+          "scope": {
+            "channel_all": "Jeder beobachtete Kanal",
+            "channel_only": {
+              "template": "`Nur in` {RAW:ITEMS}",
+              "placeholders": {
+                "ITEMS": {
+                  "list": {
+                    "item_format": "{RAW:LIST_ITEM}",
+                    "separator": ", "
+                  }
+                }
+              }
+            },
+            "channel_except": {
+              "template": "`Jeder beobachtete Kanal außer` {RAW:ITEMS}",
+              "placeholders": {
+                "ITEMS": {
+                  "list": {
+                    "item_format": "{RAW:LIST_ITEM}",
+                    "separator": ", "
+                  }
+                }
+              }
+            },
+            "channel_tracked_except": {
+              "template": "`Jeder beobachtete Kanal außer` {RAW:ITEMS}",
+              "placeholders": {
+                "ITEMS": {
+                  "list": {
+                    "item_format": "{RAW:LIST_ITEM}",
+                    "separator": ", "
+                  }
+                }
+              }
+            },
+            "user_all": "Alle bekannten Twitch-Nutzer",
+            "user_only": {
+              "template": "`Nur von` {RAW:ITEMS}",
+              "placeholders": {
+                "ITEMS": {
+                  "list": {
+                    "item_format": "{RAW:LIST_ITEM}",
+                    "separator": ", "
+                  }
+                }
+              }
+            },
+            "user_except": {
+              "template": "`Alle außer` {RAW:ITEMS}",
+              "placeholders": {
+                "ITEMS": {
+                  "list": {
+                    "item_format": "{RAW:LIST_ITEM}",
+                    "separator": ", "
+                  }
+                }
+              }
+            },
+            "user_tracked_except": {
+              "template": "`Alle bekannten Twitch-Nutzer außer` {RAW:ITEMS}",
+              "placeholders": {
+                "ITEMS": {
+                  "list": {
+                    "item_format": "{RAW:LIST_ITEM}",
+                    "separator": ", "
+                  }
+                }
+              }
+            }
+          },
+          "case_sensitive_yes": "Groß-/Kleinschreibung: `Ja`",
+          "case_sensitive_no": "Groß-/Kleinschreibung: `Nein`",
+          "custom_color": "Eigene Farbe: `{CODE:COLOR}`",
+          "priority": "Priorität: `{CODE:PRIORITY}`",
+          "profile_link": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})"
+        }
       },
       "removed_result": {
         "title": "Ping entfernt",
@@ -832,220 +929,119 @@
       },
       "updated_result": {
         "title": "Ping aktualisiert",
-        "body": "{RAW:USER}\n{RAW:SUMMARY}",
-        "footer": ""
-      },
-      "summary": {
-        "list": {
-          "template": "{RAW:ITEMS}",
-          "placeholders": {
-            "ITEMS": {
-              "list": {
-                "item_format": "- {RAW:LIST_ITEM}",
-                "separator": "\n"
-              }
-            }
-          }
-        },
-        "action": "{ACTION} Ping #`{CODE:ID}`:",
-        "text": "Text: `{CODE:TEXT}`",
-        "mode": "Modus: `{CODE:PING_MODE}`",
-        "subscribers_only": "Nur Abonnenten",
-        "non_subscribers_only": "Nur Nicht-Abonnenten",
-        "only_while_live": "Nur während live",
-        "only_while_offline": "Nur während offline",
-        "mode_value": {
-          "word": "Wort",
-          "regex": "Regex"
-        },
-        "scope": {
-          "channel_all": "Jeder beobachtete Kanal",
-          "channel_only": {
-            "template": "`Nur in` {RAW:ITEMS}",
+        "body": "{RAW:USER} hat Ping #`{CODE:ID}` aktualisiert\n{RAW:SUMMARY}",
+        "footer": "",
+        "summary": {
+          "list": {
+            "template": "{RAW:ITEMS}",
             "placeholders": {
               "ITEMS": {
                 "list": {
-                  "item_format": "{RAW:LIST_ITEM}",
-                  "separator": ", "
+                  "item_format": "- {RAW:LIST_ITEM}",
+                  "separator": "\n"
                 }
               }
             }
           },
-          "channel_except": {
-            "template": "`Jeder beobachtete Kanal außer` {RAW:ITEMS}",
-            "placeholders": {
-              "ITEMS": {
-                "list": {
-                  "item_format": "{RAW:LIST_ITEM}",
-                  "separator": ", "
+          "mode_value": {
+            "word": "Wort",
+            "regex": "Regex"
+          },
+          "scope": {
+            "channel_all": "Jeder beobachtete Kanal",
+            "channel_only": {
+              "template": "`Nur in` {RAW:ITEMS}",
+              "placeholders": {
+                "ITEMS": {
+                  "list": {
+                    "item_format": "{RAW:LIST_ITEM}",
+                    "separator": ", "
+                  }
+                }
+              }
+            },
+            "channel_except": {
+              "template": "`Jeder beobachtete Kanal außer` {RAW:ITEMS}",
+              "placeholders": {
+                "ITEMS": {
+                  "list": {
+                    "item_format": "{RAW:LIST_ITEM}",
+                    "separator": ", "
+                  }
+                }
+              }
+            },
+            "channel_tracked_except": {
+              "template": "`Jeder beobachtete Kanal außer` {RAW:ITEMS}",
+              "placeholders": {
+                "ITEMS": {
+                  "list": {
+                    "item_format": "{RAW:LIST_ITEM}",
+                    "separator": ", "
+                  }
+                }
+              }
+            },
+            "user_everyone": "Alle",
+            "user_all": "Alle bekannten Twitch-Nutzer",
+            "user_only": {
+              "template": "`Nur von` {RAW:ITEMS}",
+              "placeholders": {
+                "ITEMS": {
+                  "list": {
+                    "item_format": "{RAW:LIST_ITEM}",
+                    "separator": ", "
+                  }
+                }
+              }
+            },
+            "user_except": {
+              "template": "`Alle außer` {RAW:ITEMS}",
+              "placeholders": {
+                "ITEMS": {
+                  "list": {
+                    "item_format": "{RAW:LIST_ITEM}",
+                    "separator": ", "
+                  }
+                }
+              }
+            },
+            "user_tracked_except": {
+              "template": "`Alle bekannten Twitch-Nutzer außer` {RAW:ITEMS}",
+              "placeholders": {
+                "ITEMS": {
+                  "list": {
+                    "item_format": "{RAW:LIST_ITEM}",
+                    "separator": ", "
+                  }
                 }
               }
             }
           },
-          "channel_tracked_except": {
-            "template": "`Jeder beobachtete Kanal außer` {RAW:ITEMS}",
-            "placeholders": {
-              "ITEMS": {
-                "list": {
-                  "item_format": "{RAW:LIST_ITEM}",
-                  "separator": ", "
-                }
-              }
-            }
+          "sub_state": {
+            "all": "Alle",
+            "subs": "Nur Abonnenten",
+            "non_subs": "Nur Nicht-Abonnenten"
           },
-          "user_all": "Alle bekannten Twitch-Nutzer",
-          "user_only": {
-            "template": "`Nur von` {RAW:ITEMS}",
-            "placeholders": {
-              "ITEMS": {
-                "list": {
-                  "item_format": "{RAW:LIST_ITEM}",
-                  "separator": ", "
-                }
-              }
-            }
+          "stream_state_value": {
+            "both": "Online und offline",
+            "online": "Nur während live",
+            "offline": "Nur während offline"
           },
-          "user_except": {
-            "template": "`Alle außer` {RAW:ITEMS}",
-            "placeholders": {
-              "ITEMS": {
-                "list": {
-                  "item_format": "{RAW:LIST_ITEM}",
-                  "separator": ", "
-                }
-              }
-            }
-          },
-          "user_tracked_except": {
-            "template": "`Alle bekannten Twitch-Nutzer außer` {RAW:ITEMS}",
-            "placeholders": {
-              "ITEMS": {
-                "list": {
-                  "item_format": "{RAW:LIST_ITEM}",
-                  "separator": ", "
-                }
-              }
-            }
-          }
-        },
-        "case_sensitive_yes": "Groß-/Kleinschreibung: `Ja`",
-        "case_sensitive_no": "Groß-/Kleinschreibung: `Nein`",
-        "custom_color": "Eigene Farbe: `{CODE:COLOR}`",
-        "color_inherited": "Automatisch geerbt",
-        "priority": "Priorität: `{CODE:PRIORITY}`",
-        "profile_link": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})"
-      },
-      "changes": {
-        "list": {
-          "template": "{RAW:ITEMS}",
-          "placeholders": {
-            "ITEMS": {
-              "list": {
-                "item_format": "- {RAW:LIST_ITEM}",
-                "separator": "\n"
-              }
-            }
-          }
-        },
-        "mode_value": {
-          "word": "Wort",
-          "regex": "Regex"
-        },
-        "scope": {
-          "channel_all": "Jeder beobachtete Kanal",
-          "channel_only": {
-            "template": "`Nur in` {RAW:ITEMS}",
-            "placeholders": {
-              "ITEMS": {
-                "list": {
-                  "item_format": "{RAW:LIST_ITEM}",
-                  "separator": ", "
-                }
-              }
-            }
-          },
-          "channel_except": {
-            "template": "`Jeder beobachtete Kanal außer` {RAW:ITEMS}",
-            "placeholders": {
-              "ITEMS": {
-                "list": {
-                  "item_format": "{RAW:LIST_ITEM}",
-                  "separator": ", "
-                }
-              }
-            }
-          },
-          "channel_tracked_except": {
-            "template": "`Jeder beobachtete Kanal außer` {RAW:ITEMS}",
-            "placeholders": {
-              "ITEMS": {
-                "list": {
-                  "item_format": "{RAW:LIST_ITEM}",
-                  "separator": ", "
-                }
-              }
-            }
-          },
-          "user_everyone": "Alle",
-          "user_all": "Alle bekannten Twitch-Nutzer",
-          "user_only": {
-            "template": "`Nur von` {RAW:ITEMS}",
-            "placeholders": {
-              "ITEMS": {
-                "list": {
-                  "item_format": "{RAW:LIST_ITEM}",
-                  "separator": ", "
-                }
-              }
-            }
-          },
-          "user_except": {
-            "template": "`Alle außer` {RAW:ITEMS}",
-            "placeholders": {
-              "ITEMS": {
-                "list": {
-                  "item_format": "{RAW:LIST_ITEM}",
-                  "separator": ", "
-                }
-              }
-            }
-          },
-          "user_tracked_except": {
-            "template": "`Alle bekannten Twitch-Nutzer außer` {RAW:ITEMS}",
-            "placeholders": {
-              "ITEMS": {
-                "list": {
-                  "item_format": "{RAW:LIST_ITEM}",
-                  "separator": ", "
-                }
-              }
-            }
-          }
-        },
-        "sub_state": {
-          "all": "Alle",
-          "subs": "Nur Abonnenten",
-          "non_subs": "Nur Nicht-Abonnenten"
-        },
-        "stream_state_value": {
-          "both": "Online und offline",
-          "online": "Nur während live",
-          "offline": "Nur während offline"
-        },
-        "case_sensitive_yes": "Ja",
-        "case_sensitive_no": "Nein",
-        "updated": "Ping #`{CODE:ID}` aktualisiert.",
-        "text": "Text: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
-        "mode": "Modus: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
-        "where": "Wo: Von {RAW:BEFORE} zu {RAW:AFTER}",
-        "who": "Wer: Von {RAW:BEFORE} zu {RAW:AFTER}",
-        "subscribers": "Abonnenten: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
-        "stream_state": "Stream-Status: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
-        "case_sensitive": "Groß-/Kleinschreibung: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
-        "color": "Farbe: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
-        "priority": "Priorität: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
-        "profile_link": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
-        "color_inherited": "Automatisch geerbt"
+          "case_sensitive_yes": "Ja",
+          "case_sensitive_no": "Nein",
+          "text": "Text: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
+          "mode": "Modus: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
+          "where": "Wo: Von {RAW:BEFORE} zu {RAW:AFTER}",
+          "who": "Wer: Von {RAW:BEFORE} zu {RAW:AFTER}",
+          "subscribers": "Abonnenten: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
+          "stream_state": "Stream-Status: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
+          "case_sensitive": "Groß-/Kleinschreibung: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
+          "color": "Farbe: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
+          "priority": "Priorität: von `{CODE:BEFORE}` zu `{CODE:AFTER}`",
+          "profile_link": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
+          "color_inherited": "Automatisch geerbt"
+        }
       },
       "not_joined": {
         "title": "Nicht beigetreten",
