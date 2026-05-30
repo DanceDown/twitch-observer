@@ -3,10 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from random import seed
+from contextlib import contextmanager
 
 import pytest
 
 from src.database.connection import MessageRepository, RecentMessageRecord
+from src.database.postgres import PostgresMessageRepository
 from src.events.event_types import TwitchChatMessageEvent
 from src.services.discord_presence_service import DiscordPresenceService, DiscordPresenceStatusSender
 from src.services.message_ingest_service import MessageIngestService
@@ -51,6 +53,23 @@ class FakePresenceNotifier(DiscordPresenceStatusSender):
 
     async def set_status_text(self, text: str) -> None:
         self.statuses.append(text)
+
+
+@dataclass
+class RecordingCursor:
+    statements: list[tuple[str, tuple[object, ...]]] = field(default_factory=list)
+
+    def execute(self, query: str, params: tuple[object, ...]) -> None:
+        self.statements.append((query, params))
+
+
+@dataclass
+class RecordingDatabase:
+    cursor_instance: RecordingCursor = field(default_factory=RecordingCursor)
+
+    @contextmanager
+    def cursor(self) -> RecordingCursor:
+        yield self.cursor_instance
 
 
 @pytest.mark.asyncio
@@ -105,3 +124,35 @@ async def test_presence_service_keeps_current_status_when_no_recent_message_exis
     await service.poll_once()
 
     assert notifier.statuses == ["old status"]
+
+
+def test_postgres_message_repository_uses_null_reply_reference_when_parent_is_missing() -> None:
+    database = RecordingDatabase()
+    repository = PostgresMessageRepository(database=database)  # type: ignore[arg-type]
+    event = TwitchChatMessageEvent(
+        channel_login="channel",
+        author_login="bob",
+        author_display_name="Bob",
+        author_id="user-1",
+        broadcaster_id="channel-1",
+        message_id="msg-1",
+        reply_parent_message_id="missing-parent",
+        content="reply body",
+    )
+
+    repository.save_twitch_message(event)
+
+    assert len(database.cursor_instance.statements) == 1
+    query, params = database.cursor_instance.statements[0]
+
+    assert query.upper().count("VALUES") == 1
+    assert "SELECT message_id FROM message WHERE message_id = %s" in query
+    assert params == (
+        "msg-1",
+        "channel-1",
+        event.sent_at,
+        "user-1",
+        "Bob",
+        "reply body",
+        "missing-parent",
+    )

@@ -33,7 +33,16 @@ class PostgresMessageRepository(MessageRepository):
                     is_reply_to,
                     is_bot
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, FALSE)
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    (SELECT message_id FROM message WHERE message_id = %s),
+                    FALSE
+                )
                 ON CONFLICT (message_id) DO NOTHING
                 """,
                 (
