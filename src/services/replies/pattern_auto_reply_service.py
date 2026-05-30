@@ -125,9 +125,14 @@ class AutoReplyService:
                 )
                 continue
             matching_pattern, matching_reply = match
+            channel_user = await safe_get_twitch_user_by_id(
+                self.twitch_api,
+                event.broadcaster_id,
+            )
             rendered_reply_message = self._render_reply_message(
                 matching_reply.reply_message,
                 event,
+                channel_name=(None if channel_user is None else channel_user.display_name),
             )
 
             try:
@@ -342,10 +347,11 @@ class AutoReplyService:
     def _render_reply_message(
         template: str,
         event: TwitchChatMessageEvent,
+        channel_name: str | None = None,
     ) -> str:
         """Expand reply placeholders using the matched Twitch chat message."""
         rendered = template.replace("{NAME}", event.author_display_name or event.author_login)
-        rendered = rendered.replace("{CHANNEL}", event.channel_login)
+        rendered = rendered.replace("{CHANNEL}", channel_name or event.channel_login)
         return rendered.replace("{MESSAGE}", event.content)
 
     async def _notify_account_expired(self, discord_channel_id: int) -> None:

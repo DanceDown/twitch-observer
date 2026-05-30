@@ -1636,7 +1636,15 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
         token_type="bearer",
     )
     thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
-    twitch_api = FakeTwitchAPI()
+    twitch_api = FakeTwitchAPI(
+        cached_users_by_id={
+            "42": TwitchUser(
+                user_id="42",
+                login="example",
+                display_name="ExampleChannel",
+            ),
+        },
+    )
     notifier = FakeNotifier()
     service = AutoReplyService(
         thread_repository=thread_repository,
@@ -1666,7 +1674,7 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
 
     assert service.sent_replies == 1
     assert len(twitch_api.sent_messages) == 1
-    assert twitch_api.sent_messages[0]["message"] == "Hi Alice, you wrote `hello there` in example"
+    assert twitch_api.sent_messages[0]["message"] == "Hi Alice, you wrote `hello there` in ExampleChannel"
     assert twitch_api.sent_messages[0]["reply_parent_message_id"] == "msg-1"
     assert len(notifier.tracking_embeds) == 1
 

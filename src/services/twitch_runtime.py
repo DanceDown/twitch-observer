@@ -117,7 +117,7 @@ async def safe_get_twitch_user_by_id(twitch_lookup: TwitchUserLookup, user_id: s
         return None
     try:
         cached = twitch_lookup.get_cached_user_by_id(normalized_user_id)
-        if cached is not None and cached.profile_image_url:
+        if cached is not None:
             return cached
         return await twitch_lookup.get_user_by_id(normalized_user_id)
     except TwitchAPIError:
