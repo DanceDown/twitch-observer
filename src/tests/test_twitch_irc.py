@@ -132,6 +132,17 @@ async def test_twitch_irc_gateway_rejoins_pending_channels_after_connect() -> No
 
 
 @pytest.mark.asyncio
+async def test_twitch_irc_gateway_logs_when_no_initial_channels_are_configured(caplog: pytest.LogCaptureFixture) -> None:
+    config = AppConfig()
+    gateway = AnonymousTwitchIRCGateway(config=config)
+
+    with caplog.at_level("DEBUG"):
+        await gateway._join_initial_channels()
+
+    assert "No initial Twitch IRC channels configured in runtime state" in caplog.text
+
+
+@pytest.mark.asyncio
 async def test_twitch_irc_gateway_reconnects_before_join_when_read_loop_stopped() -> None:
     config = AppConfig()
     gateway = AnonymousTwitchIRCGateway(config=config)

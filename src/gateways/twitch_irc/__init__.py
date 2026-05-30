@@ -166,7 +166,9 @@ class AnonymousTwitchIRCGateway:
     async def _join_initial_channels(self) -> None:
         initial_channels = set(self._config.twitch_irc_channels) | self._pending_channels
         if not initial_channels:
-            print("No Twitch IRC channels configured yet; connection is ready for later joins.")
+            logger.debug(
+                "No initial Twitch IRC channels configured in runtime state; persisted channel subscriptions can still be rejoined by startup sync."
+            )
             return
         self._pending_channels.clear()
         for channel_login in sorted(initial_channels):
