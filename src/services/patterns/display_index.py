@@ -9,7 +9,7 @@ from src.database.connection import PatternRepository
 
 @dataclass(slots=True)
 class PatternDisplayIndexResolver:
-    """Resolve dense per-thread display numbers for stable internal pattern IDs."""
+    """Resolve dense per-thread display numbers in creation order."""
 
     pattern_repository: PatternRepository
 

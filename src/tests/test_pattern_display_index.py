@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from src.database.connection import PatternRecord, PatternRepository
 from src.services.patterns.display_index import PatternDisplayIndexResolver
@@ -42,3 +42,12 @@ def test_display_indexes_are_dense_even_when_internal_pattern_ids_have_gaps() ->
 
     assert resolver.build_index_map(1) == {1: 1, 3: 2}
     assert resolver.resolve(thread_id=1, pattern_id=3) == 2
+
+
+def test_display_indexes_stay_in_creation_order_even_when_priorities_differ() -> None:
+    first = replace(_pattern(pattern_id=1), priority=0)
+    second = replace(_pattern(pattern_id=2), priority=9)
+    repository = InMemoryPatternRepository(patterns_by_thread={1: [first, second]})
+    resolver = PatternDisplayIndexResolver(repository)
+
+    assert resolver.build_index_map(1) == {1: 1, 2: 2}

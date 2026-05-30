@@ -315,7 +315,7 @@ class PostgresPatternRepository(PatternRepository):
                            notify, priority
                     FROM pattern
                     WHERE thread_id = %s
-                    ORDER BY priority DESC, pattern_id
+                    ORDER BY pattern_id
                     """,
                     (thread_id,),
                 )
@@ -327,7 +327,7 @@ class PostgresPatternRepository(PatternRepository):
                            notify, priority
                     FROM pattern
                     WHERE thread_id = %s AND is_regex = %s
-                    ORDER BY priority DESC, pattern_id
+                    ORDER BY pattern_id
                     """,
                     (thread_id, is_regex),
                 )

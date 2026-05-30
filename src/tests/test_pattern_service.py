@@ -28,6 +28,7 @@ from src.services.patterns import (
     ShowCommandService,
     TrackingNotificationSender,
 )
+from src.services.patterns.display_index import PatternDisplayIndexResolver
 from src.services.patterns.presentation import PatternCommandPresenter
 
 
@@ -329,7 +330,7 @@ class InMemoryPatternRepository(PatternRepository):
         rows = [pattern for pattern in self.patterns if pattern.thread_id == thread_id]
         if is_regex is not None:
             rows = [pattern for pattern in rows if pattern.is_regex == is_regex]
-        return sorted(rows, key=lambda pattern: (-pattern.priority, pattern.pattern_id))
+        return sorted(rows, key=lambda pattern: pattern.pattern_id)
 
     def count_channel_scope_references(self, *, thread_id: int, twitch_channel_id: str) -> int:
         return sum(1 for pattern in self.patterns if pattern.thread_id == thread_id and twitch_channel_id in pattern.channel_scope_ids)
@@ -1544,7 +1545,7 @@ async def test_tracking_service_skips_normal_embed_when_pattern_has_enabled_repl
 
 
 @pytest.mark.asyncio
-async def test_show_command_lists_patterns_in_priority_order() -> None:
+async def test_show_command_lists_patterns_in_creation_order() -> None:
     event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
@@ -1603,6 +1604,49 @@ async def test_show_command_lists_patterns_in_priority_order() -> None:
     assert result.style == DiscordResultStyle.INFO
     assert result.ephemeral is True
     assert result.message
+    assert result.message.index("general") < result.message.index("specific")
+
+
+def test_display_index_stays_stable_when_pattern_priority_changes() -> None:
+    pattern_repository = InMemoryPatternRepository()
+    first = pattern_repository.add_pattern(
+        thread_id=1,
+        regex="first",
+        channel_scope_mode="all_tracked",
+        channel_scope_ids=(),
+        user_scope_mode="all_users",
+        user_scope_ids=(),
+        sub_state="all",
+        offline_state="both",
+        is_regex=False,
+        case_sensitive=False,
+        color=None,
+        disabled=False,
+        priority=1,
+    )
+    second = pattern_repository.add_pattern(
+        thread_id=1,
+        regex="second",
+        channel_scope_mode="all_tracked",
+        channel_scope_ids=(),
+        user_scope_mode="all_users",
+        user_scope_ids=(),
+        sub_state="all",
+        offline_state="both",
+        is_regex=False,
+        case_sensitive=False,
+        color=None,
+        disabled=False,
+        priority=9,
+    )
+    resolver = PatternDisplayIndexResolver(pattern_repository)
+
+    assert resolver.build_index_map(1) == {first.pattern_id: 1, second.pattern_id: 2}
+
+    pattern_repository.set_pattern_priority(thread_id=1, pattern_id=first.pattern_id, priority=9)
+    pattern_repository.set_pattern_priority(thread_id=1, pattern_id=second.pattern_id, priority=0)
+
+    assert resolver.build_index_map(1) == {first.pattern_id: 1, second.pattern_id: 2}
 
 
 @pytest.mark.asyncio

@@ -306,7 +306,7 @@ class InMemoryPatternRepository(PatternRepository):
         rows = [pattern for pattern in self.patterns if pattern.thread_id == thread_id]
         if is_regex is not None:
             rows = [pattern for pattern in rows if pattern.is_regex == is_regex]
-        return sorted(rows, key=lambda pattern: (-pattern.priority, pattern.pattern_id))
+        return sorted(rows, key=lambda pattern: pattern.pattern_id)
 
     def count_channel_scope_references(self, *, thread_id: int, twitch_channel_id: str) -> int:
         return sum(1 for pattern in self.patterns if pattern.thread_id == thread_id and twitch_channel_id in pattern.channel_scope_ids)
