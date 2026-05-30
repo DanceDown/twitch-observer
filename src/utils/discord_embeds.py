@@ -57,7 +57,7 @@ def build_tracking_embed(
         text=localizer.text(
             "discord.tracking_embed.footer_channel",
             language=language,
-            CHANNEL=escape_discord_text(channel_display_name or event.channel_login),
+            CHANNEL=(channel_display_name or event.channel_login),
         ),
     )
     if reply is not None:

@@ -1345,6 +1345,69 @@ async def test_reply_add_updates_pattern_reply_fields() -> None:
 
 
 @pytest.mark.asyncio
+async def test_reply_add_does_not_escape_parentheses_in_message_preview() -> None:
+    bus = SimpleNamespace()
+    thread_repository = InMemoryThreadRepository()
+    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    pattern_repository = InMemoryPatternRepository(
+        patterns=[
+            PatternRecord(
+                thread_id=thread.thread_id,
+                pattern_id=1,
+                regex="hello",
+                channel_scope_mode="all_tracked",
+                channel_scope_ids=(),
+                user_scope_mode="all_users",
+                user_scope_ids=(),
+                sub_state="all",
+                offline_state="both",
+                is_regex=False,
+                case_sensitive=False,
+                color=None,
+                disabled=False,
+                notify=True,
+                reply_message=None,
+                reply_as_reply=False,
+                priority=0,
+            )
+        ]
+    )
+    reply_repository = InMemoryReplyRepository()
+    account_repository = InMemoryAccountRepository()
+    account = account_repository.create_account(
+        discord_user_id=200,
+        twitch_user_id="77",
+        twitch_login="dancedown",
+        client_id="client-123",
+        access_token="oauth:test-token",
+        refresh_token=None,
+        expires_at=None,
+        scope=("user:write:chat",),
+        token_type="bearer",
+    )
+    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    bus.reply = ReplyCommandService(
+        thread_repository=thread_repository,
+        pattern_repository=pattern_repository,
+        reply_repository=reply_repository,
+        account_repository=account_repository,
+    )
+
+    result = await dispatch_reply_command(
+        bus,
+        discord_channel_id=100,
+        requester_id=200,
+        action="add",
+        pattern_id=1,
+        message="Test (automatische Antwort)",
+        reply_as_reply=False,
+    )
+
+    assert result.style == DiscordResultStyle.SUCCESS
+    assert "Nachricht: `Test (automatische Antwort)`" in result.message
+
+
+@pytest.mark.asyncio
 async def test_reply_add_rejects_overwriting_existing_auto_reply() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
