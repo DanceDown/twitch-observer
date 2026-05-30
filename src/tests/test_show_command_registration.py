@@ -42,7 +42,18 @@ class FakeInteraction:
 
 
 @pytest.mark.asyncio
-async def test_show_command_section_path_passes_item_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(
+    ("section_value", "item_prefix_key"),
+    [
+        ("pings", "show.pattern.pagination.item_prefix"),
+        ("stream_pings", "show.channel_event.pagination.item_prefix"),
+    ],
+)
+async def test_show_command_section_path_passes_item_prefix(
+    monkeypatch: pytest.MonkeyPatch,
+    section_value: str,
+    item_prefix_key: str,
+) -> None:
     client = discord.Client(intents=discord.Intents.default())
     tree = discord.app_commands.CommandTree(client)
     localizer = Localizer.from_directory()
@@ -84,7 +95,7 @@ async def test_show_command_section_path_passes_item_prefix(monkeypatch: pytest.
     show_command = next(command for command in tree.get_commands() if command.name == "show")
     interaction = FakeInteraction()
 
-    await show_command.callback(interaction, section=discord.app_commands.Choice(name="pings", value="pings"))
+    await show_command.callback(interaction, section=discord.app_commands.Choice(name=section_value, value=section_value))
 
-    assert captured["item_prefix"] == localizer.text("show.pattern.pagination.item_prefix", language="german")
+    assert captured["item_prefix"] == localizer.text(item_prefix_key, language="german")
     assert interaction.response.ephemeral is True

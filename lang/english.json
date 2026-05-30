@@ -608,27 +608,27 @@
       },
       "notification_added": {
         "title": "Notification Added",
-        "body": "{RAW:USER} added the `{CODE:STATE}` notification for `{CODE:CHANNEL}` <:Binoculars:1497727665283662077>",
+        "body": "{RAW:USER} added {CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` <:Binoculars:1497727665283662077>",
         "footer": ""
       },
       "notification_removed": {
         "title": "Notification Removed",
-        "body": "{RAW:USER} removed the `{CODE:STATE}` notification for `{CODE:CHANNEL}` <:ApuApproved:1497724288256446465>",
+        "body": "{RAW:USER} removed {CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` <:ApuApproved:1497724288256446465>",
         "footer": ""
       },
       "notification_disabled": {
         "title": "Notification Disabled",
-        "body": "{RAW:USER} disabled the `{CODE:STATE}` notification for `{CODE:CHANNEL}` <:ApuApproved:1497724288256446465>",
+        "body": "{RAW:USER} disabled {CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` <:ApuApproved:1497724288256446465>",
         "footer": ""
       },
       "notification_enabled": {
         "title": "Notification Enabled",
-        "body": "{RAW:USER} enabled the `{CODE:STATE}` notification for `{CODE:CHANNEL}` <a:yes:1497686393369919559>",
+        "body": "{RAW:USER} enabled {CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` <a:yes:1497686393369919559>",
         "footer": ""
       },
       "already_configured": {
         "title": "Already Configured",
-        "body": "The `{CODE:STATE}` notification for `{CODE:CHANNEL}` is already configured <:oopsie:1497720439810687006>",
+        "body": "{CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` is already configured <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "none_configured": {
@@ -638,12 +638,12 @@
       },
       "already_disabled": {
         "title": "Already Disabled",
-        "body": "The `{CODE:STATE}` notification for `{CODE:CHANNEL}` is already disabled <a:Lurk:1497684902135463986>",
+        "body": "{CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` is already disabled <a:Lurk:1497684902135463986>",
         "footer": ""
       },
       "already_enabled": {
         "title": "Already Enabled",
-        "body": "The `{CODE:STATE}` notification for `{CODE:CHANNEL}` is already active <a:yes:1497686393369919559>",
+        "body": "{CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` is already active <a:yes:1497686393369919559>",
         "footer": ""
       },
       "went_live": {
@@ -1094,18 +1094,6 @@
   "show": {
     "channel": {
       "custom_color": "Custom color: `{CODE:COLOR}`",
-      "live_state": "Live state: `{CODE:STATE}`",
-      "notifications": {
-        "template": "Notifications: {RAW:STATES}",
-        "placeholders": {
-          "STATES": {
-            "list": {
-              "item_format": "{RAW:LIST_ITEM}",
-              "separator": ", "
-            }
-          }
-        }
-      },
       "details": {
         "template": "\n{RAW:ITEMS}",
         "placeholders": {
@@ -1134,6 +1122,41 @@
       },
       "section": "**Twitch channels I'm watching**\n{RAW:SECTION_BODY}",
       "empty": "I'm not watching any channels yet <a:OhNo:1497685055948980306>"
+    },
+    "channel_event": {
+      "line": "- Ping #`{CODE:ID}`",
+      "channel": "Channel: [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
+      "trigger": "Trigger: `{CODE:STATE}`",
+      "live_state": "Live state: `{CODE:STATE}`",
+      "disabled": "Disabled",
+      "details": {
+        "template": "\n{RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": {
+              "item_format": "  - {RAW:LIST_ITEM}",
+              "separator": "\n"
+            }
+          }
+        }
+      },
+      "row": "{RAW:HEAD}{RAW:DETAILS}",
+      "pagination": {
+        "item_prefix": "- Ping #`"
+      },
+      "rows": {
+        "template": "{RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": {
+              "item_format": "{RAW:LIST_ITEM}",
+              "separator": "\n"
+            }
+          }
+        }
+      },
+      "section": "**Live and Offline Pings**\n{RAW:SECTION_BODY}",
+      "empty": "There are no live or offline pings yet <a:OhNo:1497685055948980306>"
     },
     "pattern": {
       "type": {
@@ -1551,7 +1574,7 @@
         "enable_title": "Enable Live Ping",
         "notification_label": "Live or Offline Ping",
         "notification_description": "Choose which Discord notification should change.",
-        "notification_option": "{CHANNEL} - {STATE}"
+        "notification_option": "Ping #`{CODE:ID}` - {CHANNEL} - {STATE}"
       },
       "modal": {
         "channel_label": "Twitch Channel",
@@ -1620,6 +1643,7 @@
         "section_option": {
           "pings": "Pings",
           "auto_replies": "Auto-Replies",
+          "stream_pings": "Live and Offline Pings",
           "channels": "Twitch channels I'm watching",
           "users": "Users I know",
           "permissions": "Permissions",
@@ -1701,7 +1725,7 @@
           "placeholders": {
             "ITEMS": {
               "list": {
-                "item_format": "{RAW:LIST_ITEM}",
+                "item_format": "`{CODE:LIST_ITEM}`",
                 "separator": ", "
               }
             }
@@ -1713,7 +1737,7 @@
           "placeholders": {
             "ITEMS": {
               "list": {
-                "item_format": "{RAW:LIST_ITEM}",
+                "item_format": "`{CODE:LIST_ITEM}`",
                 "separator": ", "
               }
             }
@@ -1727,7 +1751,7 @@
           "placeholders": {
             "ITEMS": {
               "list": {
-                "item_format": "{RAW:LIST_ITEM}",
+                "item_format": "`{CODE:LIST_ITEM}`",
                 "separator": ", "
               }
             }
@@ -1739,7 +1763,7 @@
           "placeholders": {
             "ITEMS": {
               "list": {
-                "item_format": "{RAW:LIST_ITEM}",
+                "item_format": "`{CODE:LIST_ITEM}`",
                 "separator": ", "
               }
             }
@@ -1751,7 +1775,7 @@
           "placeholders": {
             "ITEMS": {
               "list": {
-                "item_format": "{RAW:LIST_ITEM}",
+                "item_format": "`{CODE:LIST_ITEM}`",
                 "separator": ", "
               }
             }

@@ -25,6 +25,7 @@ def register_show_commands(
     section_choices = [
         discord.app_commands.Choice(name="pings", value="pings"),
         discord.app_commands.Choice(name="auto_replies", value="auto_replies"),
+        discord.app_commands.Choice(name="stream_pings", value="stream_pings"),
         discord.app_commands.Choice(name="channels", value="channels"),
         discord.app_commands.Choice(name="users", value="users"),
         discord.app_commands.Choice(name="permissions", value="permissions"),

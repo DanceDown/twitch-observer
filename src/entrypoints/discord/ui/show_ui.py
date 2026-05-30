@@ -235,6 +235,10 @@ class ShowSectionModal(discord.ui.Modal):
                         value="auto_replies",
                     ),
                     discord.RadioGroupOption(
+                        label=localizer.text("discord.show_ui.modal.section_option.stream_pings", language=language),
+                        value="stream_pings",
+                    ),
+                    discord.RadioGroupOption(
                         label=localizer.text("discord.show_ui.modal.section_option.channels", language=language),
                         value="channels",
                         default=True,
@@ -291,6 +295,7 @@ def _show_section_item_prefix(*, localizer: Localizer, language: str, section: s
     """Resolve the caller-owned row prefix for one `/show` section paginator."""
     key_by_section = {
         "channels": "show.channel.pagination.item_prefix",
+        "stream_pings": "show.channel_event.pagination.item_prefix",
         "pings": "show.pattern.pagination.item_prefix",
         "auto_replies": "show.auto_replies.pagination.item_prefix",
         "users": "show.tracked_users.pagination.item_prefix",

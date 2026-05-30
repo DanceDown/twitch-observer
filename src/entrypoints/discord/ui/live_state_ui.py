@@ -156,6 +156,7 @@ def _notification_label(
     return localizer.text(
         "discord.live_state_ui.action.notification_option",
         language=language,
+        ID=item.display_index or item.event.event.event_id,
         CHANNEL=item.event.channel.display_name,
         STATE=state,
     )[:100]

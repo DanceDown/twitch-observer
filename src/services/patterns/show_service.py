@@ -93,6 +93,8 @@ class ShowCommandService:
             language = self.localizer.language_for_thread(thread)
             if "channels" in sections:
                 lines.append(await self._renderer.render_channels_section(thread))
+            if "stream_pings" in sections:
+                lines.append(await self._renderer.render_channel_events_section(thread))
             if "pings" in sections:
                 lines.append(await self._renderer.render_patterns_section(thread))
             if "auto_replies" in sections:
@@ -122,7 +124,7 @@ class ShowCommandService:
         if not raw_sections:
             return ("channels",)
 
-        allowed = {"channels", "pings", "auto_replies", "users", "permissions", "account"}
+        allowed = {"channels", "stream_pings", "pings", "auto_replies", "users", "permissions", "account"}
         normalized = tuple(section for section in raw_sections if section in allowed)
         if normalized:
             return normalized

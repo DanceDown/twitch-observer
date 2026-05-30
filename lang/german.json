@@ -608,27 +608,27 @@
       },
       "notification_added": {
         "title": "Benachrichtigung hinzugefügt",
-        "body": "{RAW:USER} hat die `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` hinzugefügt <:Binoculars:1497727665283662077>",
+        "body": "{RAW:USER} hat {CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` hinzugefügt <:Binoculars:1497727665283662077>",
         "footer": ""
       },
       "notification_removed": {
         "title": "Benachrichtigung entfernt",
-        "body": "{RAW:USER} hat die `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` entfernt <:ApuApproved:1497724288256446465>",
+        "body": "{RAW:USER} hat {CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` entfernt <:ApuApproved:1497724288256446465>",
         "footer": ""
       },
       "notification_disabled": {
         "title": "Benachrichtigung deaktiviert",
-        "body": "{RAW:USER} hat die `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` deaktiviert <:ApuApproved:1497724288256446465>",
+        "body": "{RAW:USER} hat {CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` deaktiviert <:ApuApproved:1497724288256446465>",
         "footer": ""
       },
       "notification_enabled": {
         "title": "Benachrichtigung aktiviert",
-        "body": "{RAW:USER} hat die `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` aktiviert <a:yes:1497686393369919559>",
+        "body": "{RAW:USER} hat {CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` aktiviert <a:yes:1497686393369919559>",
         "footer": ""
       },
       "already_configured": {
         "title": "Schon eingerichtet",
-        "body": "Die `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` ist schon eingerichtet <:oopsie:1497720439810687006>",
+        "body": "{CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` ist schon eingerichtet <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "none_configured": {
@@ -638,12 +638,12 @@
       },
       "already_disabled": {
         "title": "Bereits deaktiviert",
-        "body": "Die `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` ist schon deaktiviert <a:Lurk:1497684902135463986>",
+        "body": "{CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` ist schon deaktiviert <a:Lurk:1497684902135463986>",
         "footer": ""
       },
       "already_enabled": {
         "title": "Bereits aktiviert",
-        "body": "Die `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` ist schon aktiv <a:yes:1497686393369919559>",
+        "body": "{CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` ist schon aktiv <a:yes:1497686393369919559>",
         "footer": ""
       },
       "went_live": {
@@ -1094,18 +1094,6 @@
   "show": {
     "channel": {
       "custom_color": "Eigene Farbe: `{CODE:COLOR}`",
-      "live_state": "Live-Status: `{CODE:STATE}`",
-      "notifications": {
-        "template": "Benachrichtigungen: {RAW:STATES}",
-        "placeholders": {
-          "STATES": {
-            "list": {
-              "item_format": "{RAW:LIST_ITEM}",
-              "separator": ", "
-            }
-          }
-        }
-      },
       "details": {
         "template": "\n{RAW:ITEMS}",
         "placeholders": {
@@ -1134,6 +1122,41 @@
       },
       "section": "**Twitch-Kanäle, die ich beobachte**\n{RAW:SECTION_BODY}",
       "empty": "Ich beobachte noch keine Kanäle <a:OhNo:1497685055948980306>"
+    },
+    "channel_event": {
+      "line": "- Ping #`{CODE:ID}`",
+      "channel": "Kanal: [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
+      "trigger": "Auslöser: `{CODE:STATE}`",
+      "live_state": "Live-Status: `{CODE:STATE}`",
+      "disabled": "Deaktiviert",
+      "details": {
+        "template": "\n{RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": {
+              "item_format": "  - {RAW:LIST_ITEM}",
+              "separator": "\n"
+            }
+          }
+        }
+      },
+      "row": "{RAW:HEAD}{RAW:DETAILS}",
+      "pagination": {
+        "item_prefix": "- Ping #`"
+      },
+      "rows": {
+        "template": "{RAW:ITEMS}",
+        "placeholders": {
+          "ITEMS": {
+            "list": {
+              "item_format": "{RAW:LIST_ITEM}",
+              "separator": "\n"
+            }
+          }
+        }
+      },
+      "section": "**Live- und Offline-Pings**\n{RAW:SECTION_BODY}",
+      "empty": "Es gibt noch keine Live- oder Offline-Pings <a:OhNo:1497685055948980306>"
     },
     "pattern": {
       "scope": {
@@ -1547,7 +1570,7 @@
         "enable_title": "Live-Ping aktivieren",
         "notification_label": "Live- oder Offline-Ping",
         "notification_description": "Wähle aus, welche Discord-Benachrichtigung geändert werden soll.",
-        "notification_option": "{CHANNEL} - {STATE}"
+        "notification_option": "Ping #`{CODE:ID}` - {CHANNEL} - {STATE}"
       },
       "modal": {
         "channel_label": "Twitch-Kanal",
@@ -1616,6 +1639,7 @@
         "section_option": {
           "pings": "Pings",
           "auto_replies": "Auto-Antworten",
+          "stream_pings": "Live- und Offline-Pings",
           "channels": "Twitch-Kanäle, die ich beobachte",
           "users": "Nutzer, die ich kenne",
           "permissions": "Berechtigungen",
@@ -1697,7 +1721,7 @@
           "placeholders": {
             "ITEMS": {
               "list": {
-                "item_format": "{RAW:LIST_ITEM}",
+                "item_format": "`{CODE:LIST_ITEM}`",
                 "separator": ", "
               }
             }
@@ -1709,7 +1733,7 @@
           "placeholders": {
             "ITEMS": {
               "list": {
-                "item_format": "{RAW:LIST_ITEM}",
+                "item_format": "`{CODE:LIST_ITEM}`",
                 "separator": ", "
               }
             }
@@ -1723,7 +1747,7 @@
           "placeholders": {
             "ITEMS": {
               "list": {
-                "item_format": "{RAW:LIST_ITEM}",
+                "item_format": "`{CODE:LIST_ITEM}`",
                 "separator": ", "
               }
             }
@@ -1735,7 +1759,7 @@
           "placeholders": {
             "ITEMS": {
               "list": {
-                "item_format": "{RAW:LIST_ITEM}",
+                "item_format": "`{CODE:LIST_ITEM}`",
                 "separator": ", "
               }
             }
@@ -1747,7 +1771,7 @@
           "placeholders": {
             "ITEMS": {
               "list": {
-                "item_format": "{RAW:LIST_ITEM}",
+                "item_format": "`{CODE:LIST_ITEM}`",
                 "separator": ", "
               }
             }

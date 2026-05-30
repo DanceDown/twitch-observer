@@ -565,19 +565,32 @@ async def test_channel_event_command_manages_live_and_offline_notifications() ->
     thread = thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     channel_repository.add_channel(thread.thread_id, "42")
+    channel_repository.set_live_state_for_twitch_channel(twitch_channel_id="42", is_live=True, changed_at="now")
     adapter_event_repository = InMemoryAdapterEventRepository()
     adapter_event_action_repository = InMemoryAdapterEventActionRepository(event_repository=adapter_event_repository)
+    twitch_api = FakeTwitchAPI(
+        users_by_id={
+            "42": TwitchUser(user_id="42", login="example", display_name="ExampleChannel"),
+        },
+        cached_users_by_id={
+            "42": TwitchUser(user_id="42", login="example", display_name="ExampleChannel"),
+        },
+    )
     bus.channel_event = ChannelEventCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         adapter_event_repository=adapter_event_repository,
         adapter_event_action_repository=adapter_event_action_repository,
-        twitch_api=FakeTwitchAPI(
-            users_by_id={},
-            cached_users_by_id={
-                "42": TwitchUser(user_id="42", login="example", display_name="ExampleChannel"),
-            },
-        ),  # type: ignore[arg-type]
+        twitch_api=twitch_api,  # type: ignore[arg-type]
+    )
+    bus.show = ShowCommandService(
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        pattern_repository=InMemoryPatternRepository(),
+        reply_repository=InMemoryReplyRepository(),
+        twitch_api=twitch_api,  # type: ignore[arg-type]
+        adapter_event_repository=adapter_event_repository,
+        adapter_event_action_repository=adapter_event_action_repository,
     )
 
     add_result = await dispatch_channel_event_command(
@@ -598,6 +611,18 @@ async def test_channel_event_command_manages_live_and_offline_notifications() ->
     assert event is not None
     assert add_result.style == DiscordResultStyle.SUCCESS
     assert "ExampleChannel" in add_result.message
+    assert "#`1`" in add_result.message
+
+    second_add_result = await dispatch_channel_event_command(
+        bus,
+        discord_channel_id=100,
+        requester_id=200,
+        action="add",
+        twitch_channel_id="42",
+        event_key="stream.online",
+    )
+    assert second_add_result.style == DiscordResultStyle.SUCCESS
+    assert "#`2`" in second_add_result.message
 
     disable_result = await dispatch_channel_event_command(
         bus,
@@ -612,6 +637,7 @@ async def test_channel_event_command_manages_live_and_offline_notifications() ->
         action_type="discord_notify",
     )
     assert disable_result.style == DiscordResultStyle.SUCCESS
+    assert "#`1`" in disable_result.message
     assert disabled_action is not None
     assert disabled_action.disabled is True
 
@@ -628,6 +654,7 @@ async def test_channel_event_command_manages_live_and_offline_notifications() ->
         action_type="discord_notify",
     )
     assert enable_result.style == DiscordResultStyle.SUCCESS
+    assert "#`1`" in enable_result.message
     assert enabled_action is not None
     assert enabled_action.disabled is False
 
@@ -640,7 +667,31 @@ async def test_channel_event_command_manages_live_and_offline_notifications() ->
         event_key="stream.offline",
     )
     assert remove_result.style == DiscordResultStyle.SUCCESS
+    assert "#`1`" in remove_result.message
     assert adapter_event_action_repository.get_action(event_id=event.event_id, action_type="discord_notify") is None
+
+    stream_pings_result = await dispatch_show_command(
+        bus,
+        discord_channel_id=100,
+        requester_id=200,
+        sections=("stream_pings",),
+    )
+    assert stream_pings_result.style == DiscordResultStyle.INFO
+    assert stream_pings_result.ephemeral is True
+    assert "#`1`" in stream_pings_result.message
+    assert "#`2`" not in stream_pings_result.message
+    assert "https://www.twitch.tv/example" in stream_pings_result.message
+
+    channels_result = await dispatch_show_command(
+        bus,
+        discord_channel_id=100,
+        requester_id=200,
+        sections=("channels",),
+    )
+    assert channels_result.style == DiscordResultStyle.INFO
+    assert channels_result.ephemeral is True
+    assert "https://www.twitch.tv/example" in channels_result.message
+    assert "#`1`" not in channels_result.message
 
 
 @dataclass
@@ -1404,7 +1455,7 @@ async def test_reply_add_does_not_escape_parentheses_in_message_preview() -> Non
     )
 
     assert result.style == DiscordResultStyle.SUCCESS
-    assert "Nachricht: `Test (automatische Antwort)`" in result.message
+    assert "`Test (automatische Antwort)`" in result.message
 
 
 @pytest.mark.asyncio

@@ -21,6 +21,8 @@ from src.database.connection import (
     TrackedUserRepository,
 )
 from src.gateways.twitch_api import TwitchUser
+from src.services.channel_event_display_index import ChannelEventDisplayIndexResolver
+from src.services.twitch_runtime import DISCORD_NOTIFY_ACTION
 from src.services.twitch_gateways import TwitchDirectoryGateway
 
 
@@ -58,6 +60,7 @@ class AdapterEventPresentation:
 class AdapterEventActionPresentation:
     event: AdapterEventPresentation
     action: AdapterEventActionRecord
+    display_index: int | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -254,6 +257,42 @@ class AdapterEventQueryService:
             presentations.append(AdapterEventPresentation(event=event, channel=channel))
         return presentations
 
+    async def list_adapter_event_actions(self, discord_channel_id: int) -> list[AdapterEventActionPresentation]:
+        thread = self.get_thread(discord_channel_id)
+        if thread is None or self.adapter_event_repository is None or self.adapter_event_action_repository is None:
+            return []
+
+        event_map = {item.event.event_id: item for item in await self.list_adapter_events(discord_channel_id)}
+        display_index_map = ChannelEventDisplayIndexResolver(self.adapter_event_action_repository).build_index_map(thread.thread_id)
+        presentations: list[AdapterEventActionPresentation] = []
+        for event_record, action_record in self.adapter_event_action_repository.list_actions_for_thread(
+            thread.thread_id,
+            include_disabled=True,
+        ):
+            event = event_map.get(event_record.event_id)
+            if event is None:
+                continue
+            presentations.append(
+                AdapterEventActionPresentation(
+                    event=event,
+                    action=action_record,
+                    display_index=(
+                        display_index_map.get(event_record.event_id)
+                        if action_record.action_type == DISCORD_NOTIFY_ACTION
+                        else None
+                    ),
+                )
+            )
+        presentations.sort(
+            key=lambda item: (
+                item.display_index is None,
+                item.display_index or 0,
+                item.event.event.event_id,
+                item.action.action_type,
+            )
+        )
+        return presentations
+
 
 @dataclass(slots=True)
 class WriteQueryService:
@@ -298,21 +337,6 @@ class WriteQueryService:
         candidates.sort(key=lambda item: item.timestamp, reverse=True)
         return candidates[:limit]
 
-    async def list_adapter_event_actions(self, discord_channel_id: int) -> list[AdapterEventActionPresentation]:
-        thread = self.get_thread(discord_channel_id)
-        if thread is None or self.adapter_event_repository is None or self.adapter_event_action_repository is None:
-            return []
-
-        event_map = {item.event.event_id: item for item in await self.list_adapter_events(discord_channel_id)}
-        presentations: list[AdapterEventActionPresentation] = []
-        for event_record, action_record in self.adapter_event_action_repository.list_actions_for_thread(
-            thread.thread_id, include_disabled=True
-        ):
-            event = event_map.get(event_record.event_id)
-            if event is None:
-                continue
-            presentations.append(AdapterEventActionPresentation(event=event, action=action_record))
-        return presentations
 
 
 @dataclass(slots=True)
