@@ -74,7 +74,7 @@ async def test_ui_flow_guard_returns_not_joined_before_opening_ui() -> None:
         permission_repository=EmptyPermissionRepository(),
     )
 
-    decision = service.decide(
+    decision = await service.decide(
         RequestUIFlowCommand(
             discord_channel_id=100,
             requester_id=200,
@@ -101,7 +101,7 @@ async def test_ui_flow_guard_prioritizes_permission_over_empty_ping_state() -> N
         permission_repository=EmptyPermissionRepository(),
     )
 
-    decision = service.decide(
+    decision = await service.decide(
         RequestUIFlowCommand(
             discord_channel_id=100,
             requester_id=201,
@@ -128,7 +128,7 @@ async def test_ui_flow_guard_allows_owner_to_open_leave_modal() -> None:
         permission_repository=EmptyPermissionRepository(),
     )
 
-    decision = service.decide(
+    decision = await service.decide(
         RequestUIFlowCommand(
             discord_channel_id=100,
             requester_id=200,
@@ -154,7 +154,7 @@ async def test_ui_flow_guard_blocks_thread_color_modal_without_permission() -> N
         permission_repository=EmptyPermissionRepository(),
     )
 
-    decision = service.decide(
+    decision = await service.decide(
         RequestUIFlowCommand(
             discord_channel_id=100,
             requester_id=201,
@@ -181,7 +181,7 @@ async def test_ui_flow_guard_blocks_show_modal_without_view_permission() -> None
         permission_repository=EmptyPermissionRepository(),
     )
 
-    decision = service.decide(
+    decision = await service.decide(
         RequestUIFlowCommand(
             discord_channel_id=100,
             requester_id=201,
@@ -208,7 +208,7 @@ async def test_ui_flow_guard_blocks_reply_add_modal_without_linked_account() -> 
         permission_repository=EmptyPermissionRepository(),
     )
 
-    decision = service.decide(
+    decision = await service.decide(
         RequestUIFlowCommand(
             discord_channel_id=100,
             requester_id=200,

@@ -14,6 +14,7 @@ from src.database.connection import ChannelRepository
 from src.events.event_types import TwitchChannelLiveStateChangedEvent
 from src.services.twitch_gateways import TwitchLiveMonitorGateway
 from src.services.twitch_runtime import safe_get_twitch_user_by_id
+from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ class TwitchLiveMonitorService:
 
     async def sync_once(self, *, notify_transitions: bool) -> None:
         """Refresh the live state for all tracked channels."""
-        tracked_channels = self.channel_repository.list_distinct_channel_states()
+        tracked_channels = await resolve_awaitable(self.channel_repository.list_distinct_channel_states())
         if not tracked_channels:
             logger.debug("Skipping live monitor sync because no Twitch channels are tracked.")
             return

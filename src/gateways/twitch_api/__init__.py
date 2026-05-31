@@ -168,10 +168,43 @@ class TwitchAPIClient:
             raise TwitchChannelNotFoundError(f"Twitch user ID `{normalized_user_id}` does not exist.")
 
         user = data[0]
+        return self._build_user(user)
+
+    async def get_users_by_ids(self, user_ids: tuple[str, ...]) -> tuple[TwitchUser, ...]:
+        """Resolve up to 100 Twitch user IDs in one Helix Get Users request."""
+        normalized_user_ids = tuple(user_id.strip() for user_id in user_ids if user_id.strip())
+        if not normalized_user_ids:
+            return ()
+        if len(normalized_user_ids) > 100:
+            raise TwitchAPIError("Twitch Get Users supports at most 100 user IDs per request.")
+
+        await self.start()
+        token = await self._get_app_access_token()
+        session = self._require_session()
+
+        params: list[tuple[str, str]] = [("id", user_id) for user_id in normalized_user_ids]
+        async with session.get(
+            f"{self._config.twitch_api_base_url}/users",
+            params=params,
+            headers={
+                "Client-Id": self._config.twitch_client_id,
+                "Authorization": f"Bearer {token}",
+            },
+        ) as response:
+            payload = await response.json()
+
+        if response.status >= 400:
+            message = payload.get("message", "Twitch API request failed.")
+            raise TwitchAPIError(message)
+
+        return tuple(self._build_user(user) for user in payload.get("data", []))
+
+    @staticmethod
+    def _build_user(user: dict[str, object]) -> TwitchUser:
         return TwitchUser(
-            user_id=user["id"],
-            login=user["login"],
-            display_name=user["display_name"],
+            user_id=str(user["id"]),
+            login=str(user["login"]),
+            display_name=str(user["display_name"]),
             profile_image_url=user.get("profile_image_url"),
         )
 

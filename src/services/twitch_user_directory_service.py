@@ -5,12 +5,12 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
 import asyncio
 
-from src.gateways.twitch_api import TwitchAPIClient, TwitchAPIError, TwitchUser
 from src.database.connection import TwitchUserCacheRecord, TwitchUserCacheRepository
 from src.events.event_types import TwitchChatMessageEvent
+from src.gateways.twitch_api import TwitchAPIClient, TwitchUser
+from src.utils.async_utils import resolve_awaitable
 
 
 def _record_to_twitch_user(record: TwitchUserCacheRecord) -> TwitchUser:
@@ -47,38 +47,35 @@ class TwitchUserDirectoryService:
         if not normalized_login:
             return None
         cached = self._get_record_from_memory_by_login(normalized_login)
-        if cached is not None:
-            return _record_to_twitch_user(cached)
-        record = self.repository.get_by_login(normalized_login)
-        if record is None:
-            return None
-        self._remember_record(record)
-        return _record_to_twitch_user(record)
+        return None if cached is None else _record_to_twitch_user(cached)
 
     def get_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
         normalized_user_id = user_id.strip()
         if not normalized_user_id:
             return None
         cached = self._get_record_from_memory_by_id(normalized_user_id)
-        if cached is not None:
-            return _record_to_twitch_user(cached)
-        record = self.repository.get_by_user_id(normalized_user_id)
-        if record is None:
+        return None if cached is None else _record_to_twitch_user(cached)
+
+    async def load_cached_user_by_login(self, login: str) -> TwitchUser | None:
+        normalized_login = login.strip().lower()
+        if not normalized_login:
             return None
-        self._remember_record(record)
-        return _record_to_twitch_user(record)
+        record = await self._get_or_load_record_by_login(normalized_login)
+        return None if record is None else _record_to_twitch_user(record)
+
+    async def load_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
+        normalized_user_id = user_id.strip()
+        if not normalized_user_id:
+            return None
+        record = await self._get_or_load_record_by_id(normalized_user_id)
+        return None if record is None else _record_to_twitch_user(record)
 
     async def get_user_by_login(self, login: str) -> TwitchUser:
         normalized_login = login.strip().lower()
         if not normalized_login:
             return await self.refresh_user_by_login(login)
-        cached = self._get_or_load_record_by_login(normalized_login)
+        cached = await self._get_or_load_record_by_login(normalized_login)
         if cached is not None:
-            if self._should_refresh_from_api(cached, refresh_interval_seconds=self.api_refresh_interval_seconds):
-                try:
-                    return await self.refresh_user_by_login(normalized_login)
-                except TwitchAPIError:
-                    return _record_to_twitch_user(cached)
             return _record_to_twitch_user(cached)
         return await self.refresh_user_by_login(login)
 
@@ -95,13 +92,8 @@ class TwitchUserDirectoryService:
         normalized_user_id = user_id.strip()
         if not normalized_user_id:
             return await self.refresh_user_by_id(user_id)
-        cached = self._get_or_load_record_by_id(normalized_user_id)
+        cached = await self._get_or_load_record_by_id(normalized_user_id)
         if cached is not None:
-            if self._should_refresh_from_api(cached, refresh_interval_seconds=self.api_refresh_interval_seconds):
-                try:
-                    return await self.refresh_user_by_id(normalized_user_id)
-                except TwitchAPIError:
-                    return _record_to_twitch_user(cached)
             return _record_to_twitch_user(cached)
         return await self.refresh_user_by_id(user_id)
 
@@ -109,13 +101,8 @@ class TwitchUserDirectoryService:
         normalized_user_id = user_id.strip()
         if not normalized_user_id:
             return await self.refresh_user_by_id(user_id)
-        cached = self._get_or_load_record_by_id(normalized_user_id)
+        cached = await self._get_or_load_record_by_id(normalized_user_id)
         if cached is not None:
-            if self._should_refresh_from_api(cached, refresh_interval_seconds=self.channel_api_refresh_interval_seconds):
-                try:
-                    return await self.refresh_user_by_id(normalized_user_id)
-                except TwitchAPIError:
-                    return _record_to_twitch_user(cached)
             return _record_to_twitch_user(cached)
         return await self.refresh_user_by_id(user_id)
 
@@ -123,6 +110,28 @@ class TwitchUserDirectoryService:
         normalized_user_id = user_id.strip()
         key = normalized_user_id or user_id
         return await self._run_singleflight_user_id(key, lambda: self._refresh_user_by_id_uncached(user_id))
+
+    async def get_users_by_ids(self, user_ids: tuple[str, ...]) -> tuple[TwitchUser, ...]:
+        normalized_ids = tuple(dict.fromkeys(user_id.strip() for user_id in user_ids if user_id.strip()))
+        if not normalized_ids:
+            return ()
+        users = await self.twitch_api.get_users_by_ids(normalized_ids)
+        self._remember_api_users(users)
+        return users
+
+    async def list_cached_users(self) -> tuple[TwitchUserCacheRecord, ...]:
+        records = await resolve_awaitable(self.repository.list_all())
+        for record in records:
+            self._remember_record(record)
+        return tuple(records)
+
+    def upsert_users_from_api(self, users: tuple[TwitchUser, ...]) -> None:
+        records = tuple(
+            (user.user_id, user.login, user.display_name, user.profile_image_url)
+            for user in users
+        )
+        self.repository.upsert_many_from_api(records)
+        self._remember_api_users(users)
 
     def observe_chat_message(self, event: TwitchChatMessageEvent) -> None:
         """Warm the cache from IRC metadata without touching the Twitch API."""
@@ -142,21 +151,21 @@ class TwitchUserDirectoryService:
             )
             self._remember_record(record)
 
-    def _get_or_load_record_by_login(self, login: str) -> TwitchUserCacheRecord | None:
+    async def _get_or_load_record_by_login(self, login: str) -> TwitchUserCacheRecord | None:
         cached = self._get_record_from_memory_by_login(login)
         if cached is not None:
             return cached
-        record = self.repository.get_by_login(login)
+        record = await resolve_awaitable(self.repository.get_by_login(login))
         if record is None:
             return None
         self._remember_record(record)
         return record
 
-    def _get_or_load_record_by_id(self, user_id: str) -> TwitchUserCacheRecord | None:
+    async def _get_or_load_record_by_id(self, user_id: str) -> TwitchUserCacheRecord | None:
         cached = self._get_record_from_memory_by_id(user_id)
         if cached is not None:
             return cached
-        record = self.repository.get_by_user_id(user_id)
+        record = await resolve_awaitable(self.repository.get_by_user_id(user_id))
         if record is None:
             return None
         self._remember_record(record)
@@ -184,23 +193,18 @@ class TwitchUserDirectoryService:
         self._user_ids_by_login[record.twitch_login] = record.twitch_user_id
         self._trim_memory_cache()
 
-    def _should_refresh_from_api(
-        self,
-        record: TwitchUserCacheRecord,
-        *,
-        refresh_interval_seconds: int,
-    ) -> bool:
-        if not record.profile_image_url:
-            return True
-        if refresh_interval_seconds <= 0:
-            return False
-        if not record.last_api_refresh_at:
-            return True
-        try:
-            last_refresh = datetime.fromisoformat(record.last_api_refresh_at)
-        except ValueError:
-            return True
-        return datetime.now(UTC) >= last_refresh + timedelta(seconds=refresh_interval_seconds)
+    def _remember_api_users(self, users: tuple[TwitchUser, ...]) -> None:
+        for user in users:
+            self._remember_record(
+                TwitchUserCacheRecord(
+                    twitch_user_id=user.user_id,
+                    twitch_login=user.login,
+                    display_name=user.display_name,
+                    profile_image_url=user.profile_image_url,
+                    updated_at="",
+                    last_api_refresh_at="",
+                )
+            )
 
     def _trim_memory_cache(self) -> None:
         while len(self._users_by_id) > max(1, self.memory_cache_size):

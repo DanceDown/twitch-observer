@@ -21,6 +21,7 @@ from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.services.authz import thread_has_permission
 from src.utils.permissions import ObserverPermission
+from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +45,8 @@ class ThreadCommandGuards:
     localizer: Localizer
     not_joined_key: str
 
-    def require_thread(self, command: ThreadScopedCommand) -> ThreadRecord | DiscordCommandResult:
-        thread = self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
+    async def require_thread(self, command: ThreadScopedCommand) -> ThreadRecord | DiscordCommandResult:
+        thread = await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(command.discord_channel_id))
         if thread is None:
             return build_result(
                 self.localizer,
@@ -55,17 +56,17 @@ class ThreadCommandGuards:
             )
         return thread
 
-    def require_permission(
+    async def require_permission(
         self,
         command: ThreadScopedCommand,
         *,
         permission: ObserverPermission,
         denial_key: str,
     ) -> ThreadRecord | DiscordCommandResult:
-        thread = self.require_thread(command)
+        thread = await self.require_thread(command)
         if isinstance(thread, DiscordCommandResult):
             return thread
-        if not thread_has_permission(
+        if not await thread_has_permission(
             thread=thread,
             requester_id=command.requester_id,
             permission_repository=self.permission_repository,
@@ -80,13 +81,13 @@ class ThreadCommandGuards:
             )
         return thread
 
-    def require_owner(
+    async def require_owner(
         self,
         command: ThreadScopedCommand,
         *,
         denial_key: str,
     ) -> ThreadRecord | DiscordCommandResult:
-        thread = self.require_thread(command)
+        thread = await self.require_thread(command)
         if isinstance(thread, DiscordCommandResult):
             return thread
         if thread.owner_id != command.requester_id:
@@ -99,7 +100,7 @@ class ThreadCommandGuards:
             )
         return thread
 
-    def require_linked_account(
+    async def require_linked_account(
         self,
         thread: ThreadRecord,
         *,
@@ -113,7 +114,7 @@ class ThreadCommandGuards:
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
-        account = self.account_repository.get_by_account_id(thread.account_id)
+        account = await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
         if account is None or not account.access_token:
             return build_thread_result(
                 self.localizer,
@@ -124,14 +125,14 @@ class ThreadCommandGuards:
             )
         return account
 
-    def require_tracked_channels(
+    async def require_tracked_channels(
         self,
         thread: ThreadRecord,
         *,
-        channel_count_lookup: Callable[[int], int],
+        channel_count_lookup: Callable[[int], Awaitable[int]],
         denial_key: str,
     ) -> DiscordCommandResult | None:
-        if channel_count_lookup(thread.thread_id) > 0:
+        if await resolve_awaitable(channel_count_lookup(thread.thread_id)) > 0:
             return None
         return build_thread_result(
             self.localizer,
@@ -149,7 +150,7 @@ class CommandExecutionRunner:
         self,
         *,
         localizer: Localizer,
-        resolve_thread: Callable[[object], ThreadRecord | None],
+        resolve_thread: Callable[[object], Awaitable[ThreadRecord | None]],
         validation_error_key: str,
         twitch_api_error_key: str,
         unexpected_error_key: str,
@@ -179,7 +180,7 @@ class CommandExecutionRunner:
             if hasattr(result, "__await__"):
                 result = await result
         except validation_exceptions as error:
-            result = self._thread_result(
+            result = await self._thread_result(
                 command,
                 self._validation_error_key,
                 style=DiscordResultStyle.ERROR,
@@ -187,7 +188,7 @@ class CommandExecutionRunner:
                 DETAIL=str(error),
             )
         except TwitchAPIError as error:
-            result = self._thread_result(
+            result = await self._thread_result(
                 command,
                 self._twitch_api_error_key,
                 style=DiscordResultStyle.ERROR,
@@ -196,7 +197,7 @@ class CommandExecutionRunner:
             )
         except DatabasePoolExhaustedError as error:
             logger_.error("Database pool exhausted while handling %s.", command.__class__.__name__)
-            result = self._thread_result(
+            result = await self._thread_result(
                 command,
                 self._unexpected_error_key,
                 style=DiscordResultStyle.ERROR,
@@ -205,7 +206,7 @@ class CommandExecutionRunner:
             )
         except Exception as error:
             logger_.exception("Unexpected error while handling %s.", command.__class__.__name__)
-            result = self._thread_result(
+            result = await self._thread_result(
                 command,
                 self._unexpected_error_key,
                 style=DiscordResultStyle.ERROR,
@@ -214,7 +215,7 @@ class CommandExecutionRunner:
             )
         return result
 
-    def _thread_result(
+    async def _thread_result(
         self,
         command: object,
         key: str,
@@ -223,7 +224,7 @@ class CommandExecutionRunner:
         ephemeral: bool,
         **placeholders: object,
     ) -> DiscordCommandResult:
-        thread = self._resolve_thread(command)
+        thread = await resolve_awaitable(self._resolve_thread(command))
         return build_thread_result(
             self._localizer,
             key,

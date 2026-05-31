@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     from src.services.account_polling_service import DeviceFlowPollingService
     from src.services.discord_presence_service import DiscordPresenceService
     from src.services.irc_bootstrap_service import IRCBootstrapService
+    from src.services.twitch_metadata_refresh_service import TwitchMetadataRefreshService
     from src.services.twitch_live_monitor_service import TwitchLiveMonitorService
 
 
@@ -100,6 +101,7 @@ class ApplicationEntrypoints:
 @dataclass(slots=True)
 class ApplicationRuntime:
     live_monitor_service: TwitchLiveMonitorService
+    metadata_refresh_service: TwitchMetadataRefreshService
     irc_bootstrap_service: IRCBootstrapService
     device_flow_poller: DeviceFlowPollingService
     presence_service: DiscordPresenceService

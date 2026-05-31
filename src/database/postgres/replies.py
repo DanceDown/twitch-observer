@@ -15,9 +15,9 @@ class PostgresReplyRepository(ReplyRepository):
 
     database: PostgresDatabase
 
-    def get_by_pattern(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def get_by_pattern(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT thread_id, pattern_id, reply_message, reply_as_reply, disabled
                 FROM reply
@@ -25,7 +25,7 @@ class PostgresReplyRepository(ReplyRepository):
                 """,
                 (thread_id, pattern_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return self._build_reply_record(row)
@@ -84,10 +84,10 @@ class PostgresReplyRepository(ReplyRepository):
             return None
         return self._build_reply_record(row)
 
-    def list_replies_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[ReplyRecord]:
-        with self.database.cursor() as cursor:
+    async def list_replies_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[ReplyRecord]:
+        async with self.database.read_cursor() as cursor:
             if include_disabled:
-                cursor.execute(
+                await cursor.execute(
                     """
                     SELECT thread_id, pattern_id, reply_message, reply_as_reply, disabled
                     FROM reply
@@ -97,7 +97,7 @@ class PostgresReplyRepository(ReplyRepository):
                     (thread_id,),
                 )
             else:
-                cursor.execute(
+                await cursor.execute(
                     """
                     SELECT thread_id, pattern_id, reply_message, reply_as_reply, disabled
                     FROM reply
@@ -106,7 +106,7 @@ class PostgresReplyRepository(ReplyRepository):
                     """,
                     (thread_id,),
                 )
-            rows = cursor.fetchall()
+            rows = await cursor.fetchall()
         return [self._build_reply_record(row) for row in rows]
 
     def disable_replies_for_thread(self, thread_id: int) -> int:

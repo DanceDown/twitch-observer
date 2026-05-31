@@ -38,6 +38,12 @@ class TwitchServiceBundle:
     def get_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
         return self.directory.get_cached_user_by_id(user_id)
 
+    async def load_cached_user_by_login(self, login: str) -> TwitchUser | None:
+        return await self.directory.load_cached_user_by_login(login)
+
+    async def load_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
+        return await self.directory.load_cached_user_by_id(user_id)
+
     async def get_user_by_login(self, login: str) -> TwitchUser:
         return await self.directory.get_user_by_login(login)
 
@@ -55,6 +61,9 @@ class TwitchServiceBundle:
 
     async def refresh_user_by_id(self, user_id: str) -> TwitchUser:
         return await self.directory.refresh_user_by_id(user_id)
+
+    async def get_users_by_ids(self, user_ids: tuple[str, ...]) -> tuple[TwitchUser, ...]:
+        return await self.directory.get_users_by_ids(user_ids)
 
     async def validate_user_access_token(self, access_token: str) -> TwitchValidatedToken:
         return await self.auth.validate_user_access_token(access_token)

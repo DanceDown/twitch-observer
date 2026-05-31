@@ -17,9 +17,9 @@ class PostgresThreadRepository(ThreadRepository):
 
     database: PostgresDatabase
 
-    def get_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def get_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
                 FROM thread
@@ -27,7 +27,7 @@ class PostgresThreadRepository(ThreadRepository):
                 """,
                 (discord_channel_id,),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return ThreadRecord(
@@ -40,9 +40,9 @@ class PostgresThreadRepository(ThreadRepository):
             account_id=row[6],
         )
 
-    def list_by_owner_id(self, owner_id: int) -> list[ThreadRecord]:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def list_by_owner_id(self, owner_id: int) -> list[ThreadRecord]:
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
                 FROM thread
@@ -51,7 +51,7 @@ class PostgresThreadRepository(ThreadRepository):
                 """,
                 (owner_id,),
             )
-            rows = cursor.fetchall()
+            rows = await cursor.fetchall()
         return [
             ThreadRecord(
                 thread_id=row[0],
@@ -65,9 +65,9 @@ class PostgresThreadRepository(ThreadRepository):
             for row in rows
         ]
 
-    def get_by_thread_id(self, thread_id: int) -> ThreadRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def get_by_thread_id(self, thread_id: int) -> ThreadRecord | None:
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
                 FROM thread
@@ -75,7 +75,7 @@ class PostgresThreadRepository(ThreadRepository):
                 """,
                 (thread_id,),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return ThreadRecord(
@@ -236,9 +236,9 @@ class PostgresChannelRepository(ChannelRepository):
 
     database: PostgresDatabase
 
-    def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT thread_id, twitch_channel_id, color, is_live, last_live_status_at
                 FROM channel
@@ -246,7 +246,7 @@ class PostgresChannelRepository(ChannelRepository):
                 """,
                 (thread_id, twitch_channel_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return ChannelRecord(
@@ -320,9 +320,9 @@ class PostgresChannelRepository(ChannelRepository):
             )
             return cursor.rowcount
 
-    def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT COUNT(*)
                 FROM channel
@@ -330,13 +330,13 @@ class PostgresChannelRepository(ChannelRepository):
                 """,
                 (twitch_channel_id,),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         row = require_row(row, operation="channel.count_threads_by_twitch_channel_id")
         return int(row[0])
 
-    def list_thread_ids_by_twitch_channel_id(self, twitch_channel_id: str) -> list[int]:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def list_thread_ids_by_twitch_channel_id(self, twitch_channel_id: str) -> list[int]:
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT thread_id
                 FROM channel
@@ -344,12 +344,12 @@ class PostgresChannelRepository(ChannelRepository):
                 """,
                 (twitch_channel_id,),
             )
-            rows = cursor.fetchall()
+            rows = await cursor.fetchall()
         return [int(row[0]) for row in rows]
 
-    def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT thread_id, twitch_channel_id, color, is_live, last_live_status_at
                 FROM channel
@@ -358,7 +358,7 @@ class PostgresChannelRepository(ChannelRepository):
                 """,
                 (thread_id,),
             )
-            rows = cursor.fetchall()
+            rows = await cursor.fetchall()
         return [
             ChannelRecord(
                 thread_id=row[0],
@@ -370,21 +370,21 @@ class PostgresChannelRepository(ChannelRepository):
             for row in rows
         ]
 
-    def list_all_twitch_channel_ids(self) -> list[str]:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def list_all_twitch_channel_ids(self) -> list[str]:
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT DISTINCT twitch_channel_id
                 FROM channel
                 ORDER BY twitch_channel_id
                 """
             )
-            rows = cursor.fetchall()
+            rows = await cursor.fetchall()
         return [str(row[0]) for row in rows]
 
-    def list_distinct_channel_states(self) -> list[TrackedChannelStateRecord]:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def list_distinct_channel_states(self) -> list[TrackedChannelStateRecord]:
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT twitch_channel_id,
                        BOOL_OR(is_live) FILTER (WHERE is_live IS NOT NULL),
@@ -394,7 +394,7 @@ class PostgresChannelRepository(ChannelRepository):
                 ORDER BY twitch_channel_id
                 """
             )
-            rows = cursor.fetchall()
+            rows = await cursor.fetchall()
         return [
             TrackedChannelStateRecord(
                 twitch_channel_id=str(row[0]),
@@ -411,9 +411,9 @@ class PostgresTrackedUserRepository(TrackedUserRepository):
 
     database: PostgresDatabase
 
-    def get_by_thread_and_twitch_user(self, thread_id: int, twitch_user_id: str) -> TrackedUserRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def get_by_thread_and_twitch_user(self, thread_id: int, twitch_user_id: str) -> TrackedUserRecord | None:
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT thread_id, twitch_user_id
                 FROM tracked_user
@@ -421,7 +421,7 @@ class PostgresTrackedUserRepository(TrackedUserRepository):
                 """,
                 (thread_id, twitch_user_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return TrackedUserRecord(thread_id=row[0], twitch_user_id=row[1])
@@ -447,9 +447,9 @@ class PostgresTrackedUserRepository(TrackedUserRepository):
                 (thread_id, twitch_user_id),
             )
 
-    def list_users_for_thread(self, thread_id: int) -> list[TrackedUserRecord]:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def list_users_for_thread(self, thread_id: int) -> list[TrackedUserRecord]:
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT thread_id, twitch_user_id
                 FROM tracked_user
@@ -458,12 +458,12 @@ class PostgresTrackedUserRepository(TrackedUserRepository):
                 """,
                 (thread_id,),
             )
-            rows = cursor.fetchall()
+            rows = await cursor.fetchall()
         return [TrackedUserRecord(thread_id=row[0], twitch_user_id=row[1]) for row in rows]
 
-    def count_pattern_scope_references(self, *, thread_id: int, twitch_user_id: str) -> int:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def count_pattern_scope_references(self, *, thread_id: int, twitch_user_id: str) -> int:
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT COUNT(*)
                 FROM pattern_user_scope
@@ -471,6 +471,6 @@ class PostgresTrackedUserRepository(TrackedUserRepository):
                 """,
                 (thread_id, twitch_user_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         row = require_row(row, operation="tracked_user.count_pattern_scope_references")
         return int(row[0])

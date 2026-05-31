@@ -27,6 +27,7 @@ from src.services.patterns.show_renderer import ShowSectionRenderer
 from src.services.authz import thread_has_permission
 from src.services.twitch_gateways import TwitchDirectoryGateway
 from src.utils.permissions import ObserverPermission
+from src.utils.async_utils import resolve_awaitable
 
 
 @dataclass(slots=True)
@@ -64,7 +65,7 @@ class ShowCommandService:
 
     async def handle_command(self, command: ShowConfigurationCommand) -> DiscordCommandResult:
         """Create an overview embed body for the selected sections."""
-        thread = self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
+        thread = await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(command.discord_channel_id))
         if thread is None:
             result = build_result(
                 self.localizer,
@@ -74,7 +75,8 @@ class ShowCommandService:
                 ephemeral=True,
             )
         else:
-            if not thread_has_permission(
+            self._renderer.reset_resolution_cache()
+            if not await thread_has_permission(
                 thread=thread,
                 requester_id=command.requester_id,
                 permission_repository=self.permission_repository,
@@ -102,7 +104,7 @@ class ShowCommandService:
             if "users" in sections:
                 lines.append(await self._renderer.render_users_section(thread))
             if "permissions" in sections:
-                lines.append(self._renderer.render_permissions_section(thread))
+                lines.append(await self._renderer.render_permissions_section(thread))
             thumbnail_url = None
             if "account" in sections:
                 account_section, thumbnail_url = await self._renderer.render_account_section(thread)

@@ -31,6 +31,8 @@ from src.services.twitch_runtime import (
     TWITCH_SEND_MESSAGE_ACTION,
 )
 from src.utils.permissions import explicit_permission_labels
+from src.gateways.twitch_api import TwitchUser
+from src.utils.async_utils import resolve_awaitable
 
 
 @dataclass(slots=True)
@@ -48,11 +50,18 @@ class ShowSectionRenderer:
     permission_repository: UserPermissionRepository | None = None
     account_repository: TwitchAccountRepository | None = None
     device_flow_repository: TwitchDeviceFlowRepository | None = None
+    _channel_resolution_cache: dict[str, TwitchUser] = field(default_factory=dict, init=False, repr=False)
+    _user_resolution_cache: dict[str, TwitchUser] = field(default_factory=dict, init=False, repr=False)
+
+    def reset_resolution_cache(self) -> None:
+        """Clear one render-pass memoization cache."""
+        self._channel_resolution_cache.clear()
+        self._user_resolution_cache.clear()
 
     async def render_channels_section(self, thread: ThreadRecord) -> str:
         """Render the tracked Twitch channels for one Discord configuration root."""
         language = self.localizer.language_for_thread(thread)
-        channels = self.channel_repository.list_channels_for_thread(thread.thread_id)
+        channels = await resolve_awaitable(self.channel_repository.list_channels_for_thread(thread.thread_id))
         if not channels:
             return self.render_section("show.channel.section", self.localizer.text("show.channel.empty", language=language), language=language)
 
@@ -89,10 +98,13 @@ class ShowSectionRenderer:
         if self.adapter_event_action_repository is None:
             return self.render_section("show.channel_event.section", self.localizer.text("show.channel_event.empty", language=language), language=language)
 
-        channel_by_id = {channel.twitch_channel_id: channel for channel in self.channel_repository.list_channels_for_thread(thread.thread_id)}
+        channel_by_id = {
+            channel.twitch_channel_id: channel
+            for channel in await resolve_awaitable(self.channel_repository.list_channels_for_thread(thread.thread_id))
+        }
         rows: list[str] = []
-        display_index_map = ChannelEventDisplayIndexResolver(self.adapter_event_action_repository).build_index_map(thread.thread_id)
-        for event, action in self._channel_notification_actions(thread.thread_id):
+        display_index_map = await ChannelEventDisplayIndexResolver(self.adapter_event_action_repository).build_index_map(thread.thread_id)
+        for event, action in await self._channel_notification_actions(thread.thread_id):
             display_index = display_index_map.get(event.event_id)
             if display_index is None:
                 continue
@@ -149,10 +161,10 @@ class ShowSectionRenderer:
     async def render_patterns_section(self, thread: ThreadRecord) -> str:
         """Render all stored pings with dense display IDs."""
         language = self.localizer.language_for_thread(thread)
-        patterns = self.pattern_repository.list_patterns_for_thread(
+        patterns = await resolve_awaitable(self.pattern_repository.list_patterns_for_thread(
             thread.thread_id,
             is_regex=None,
-        )
+        ))
         if not patterns:
             return self.render_section("show.pattern.section", self.localizer.text("show.pattern.empty", language=language), language=language)
         rows = [
@@ -164,20 +176,20 @@ class ShowSectionRenderer:
     async def render_auto_replies_section(self, thread: ThreadRecord) -> str:
         """Render all patterns and event-actions that currently send auto-replies."""
         language = self.localizer.language_for_thread(thread)
-        replies = self.reply_repository.list_replies_for_thread(
+        replies = await resolve_awaitable(self.reply_repository.list_replies_for_thread(
             thread.thread_id,
             include_disabled=True,
-        )
+        ))
         adapter_event_actions = (
             []
             if self.adapter_event_action_repository is None or self.adapter_event_repository is None
             else [
                 (event_record, action_record)
                 for event_record, action_record in (
-                    self.adapter_event_action_repository.list_actions_for_thread(
+                    await resolve_awaitable(self.adapter_event_action_repository.list_actions_for_thread(
                         thread.thread_id,
                         include_disabled=True,
-                    )
+                    ))
                 )
                 if action_record.action_type == TWITCH_SEND_MESSAGE_ACTION
             ]
@@ -189,15 +201,15 @@ class ShowSectionRenderer:
         pattern_display_indices = {
             pattern.pattern_id: display_index
             for display_index, pattern in enumerate(
-                self.pattern_repository.list_patterns_for_thread(thread.thread_id),
+                await resolve_awaitable(self.pattern_repository.list_patterns_for_thread(thread.thread_id)),
                 start=1,
             )
         }
         for reply in replies:
-            pattern = self.pattern_repository.get_pattern_by_id(
+            pattern = await resolve_awaitable(self.pattern_repository.get_pattern_by_id(
                 thread_id=thread.thread_id,
                 pattern_id=reply.pattern_id,
-            )
+            ))
             if pattern is None:
                 continue
             display_index = pattern_display_indices.get(pattern.pattern_id, pattern.pattern_id)
@@ -230,7 +242,7 @@ class ShowSectionRenderer:
             rows.append({"DISPLAY_NAME": twitch_user.display_name, "LOGIN": twitch_user.login})
         return self.render_section("show.tracked_users.section", self.localizer.text("show.tracked_users.rows", language=language, ITEMS=tuple(rows)), language=language)
 
-    def render_permissions_section(self, thread: ThreadRecord) -> str:
+    async def render_permissions_section(self, thread: ThreadRecord) -> str:
         """Render the permission overview for one Discord context."""
         language = self.localizer.language_for_thread(thread)
         user_entries: list[str] = []
@@ -266,7 +278,7 @@ class ShowSectionRenderer:
                 language=language,
             )
 
-        grants = self.permission_repository.list_for_thread(thread_id=thread.thread_id)
+        grants = await resolve_awaitable(self.permission_repository.list_for_thread(thread_id=thread.thread_id))
         for grant in grants:
             labels = explicit_permission_labels(grant.permissions)
             rendered = (
@@ -304,7 +316,7 @@ class ShowSectionRenderer:
         account = (
             None
             if self.account_repository is None or thread.account_id is None
-            else self.account_repository.get_by_account_id(thread.account_id)
+            else await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
         )
         if account is not None:
             twitch_user = await self.resolve_user_by_id(account.twitch_user_id)
@@ -331,7 +343,7 @@ class ShowSectionRenderer:
         pending = (
             None
             if self.device_flow_repository is None
-            else self.device_flow_repository.get_by_discord_channel_id(thread.discord_channel_id)
+            else await resolve_awaitable(self.device_flow_repository.get_by_discord_channel_id(thread.discord_channel_id))
         )
         if pending is not None:
             rows.append(
@@ -513,15 +525,15 @@ class ShowSectionRenderer:
             details.append(self.localizer.text("show.pattern.disabled", language=language))
         return details
 
-    def _channel_notification_actions(self, thread_id: int) -> list[tuple[AdapterEventRecord, AdapterEventActionRecord]]:
+    async def _channel_notification_actions(self, thread_id: int) -> list[tuple[AdapterEventRecord, AdapterEventActionRecord]]:
         if self.adapter_event_action_repository is None:
             return []
         rows = [
             (event, action)
-            for event, action in self.adapter_event_action_repository.list_actions_for_thread(
+            for event, action in await resolve_awaitable(self.adapter_event_action_repository.list_actions_for_thread(
                 thread_id,
                 include_disabled=True,
-            )
+            ))
             if action.action_type == DISCORD_NOTIFY_ACTION
             and event.adapter_key == TWITCH_ADAPTER_KEY
             and event.subject_type == CHANNEL_SUBJECT_TYPE
@@ -593,13 +605,30 @@ class ShowSectionRenderer:
 
     async def resolve_channel_by_id(self, user_id: str):
         """Resolve one Twitch channel subject by Twitch ID."""
-        return await self.twitch_api.get_channel_by_id(user_id)
+        normalized_user_id = user_id.strip()
+        if normalized_user_id in self._channel_resolution_cache:
+            return self._channel_resolution_cache[normalized_user_id]
+        cached_loader = getattr(self.twitch_api, "load_cached_user_by_id", None)
+        if normalized_user_id and callable(cached_loader):
+            cached = await resolve_awaitable(cached_loader(normalized_user_id))
+        else:
+            cached = None if not normalized_user_id else self.twitch_api.get_cached_user_by_id(normalized_user_id)
+        resolved = cached if cached is not None else await self.twitch_api.get_channel_by_id(user_id)
+        if normalized_user_id:
+            self._channel_resolution_cache[normalized_user_id] = resolved
+        return resolved
 
     async def resolve_user_by_id(self, user_id: str):
         """Resolve one Twitch user by Twitch ID, preferring cached metadata."""
         normalized_user_id = user_id.strip()
+        if normalized_user_id in self._user_resolution_cache:
+            return self._user_resolution_cache[normalized_user_id]
+        cached_loader = getattr(self.twitch_api, "load_cached_user_by_id", None)
+        if normalized_user_id and callable(cached_loader):
+            cached = await resolve_awaitable(cached_loader(normalized_user_id))
+        else:
+            cached = None if not normalized_user_id else self.twitch_api.get_cached_user_by_id(normalized_user_id)
+        resolved = cached if cached is not None else await self.twitch_api.get_user_by_id(user_id)
         if normalized_user_id:
-            cached = self.twitch_api.get_cached_user_by_id(normalized_user_id)
-            if cached is not None:
-                return cached
-        return await self.twitch_api.get_user_by_id(user_id)
+            self._user_resolution_cache[normalized_user_id] = resolved
+        return resolved

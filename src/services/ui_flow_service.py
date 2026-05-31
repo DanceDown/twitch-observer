@@ -24,6 +24,7 @@ from src.events.event_types import (
 )
 from src.localization import Localizer
 from src.services.authz import thread_has_permission
+from src.utils.async_utils import resolve_awaitable
 from src.utils.permissions import ObserverPermission
 
 
@@ -39,11 +40,13 @@ class DiscordUIFlowGuardService:
     permission_repository: UserPermissionRepository | None = None
     localizer: Localizer = field(default_factory=Localizer.from_directory)
 
-    def decide(self, event: RequestUIFlowCommand) -> DiscordUIFlowDecision:
-        return self._decide(event)
+    async def decide(self, event: RequestUIFlowCommand) -> DiscordUIFlowDecision:
+        return await self._decide(event)
 
-    def _decide(self, event: RequestUIFlowCommand) -> DiscordUIFlowDecision:
-        thread = None if event.discord_channel_id is None else self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+    async def _decide(self, event: RequestUIFlowCommand) -> DiscordUIFlowDecision:
+        thread = None if event.discord_channel_id is None else await resolve_awaitable(
+            self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+        )
         if thread is None:
             return self._blocked(
                 event,
@@ -51,7 +54,7 @@ class DiscordUIFlowGuardService:
             )
 
         required = self._required_permission(event.flow, event.step)
-        if required and not self._has_any_permission(thread, event.requester_id, required):
+        if required and not await self._has_any_permission(thread, event.requester_id, required):
             return self._blocked(event, self._permission_result(thread, event.flow, event.step))
 
         if event.flow is UIFlowKind.ACCOUNT and event.requester_id != thread.owner_id:
@@ -66,8 +69,8 @@ class DiscordUIFlowGuardService:
                 ),
             )
 
-        if event.flow in {UIFlowKind.LIVE, UIFlowKind.WRITE} and not self.channel_repository.list_channels_for_thread(
-            thread.thread_id
+        if event.flow in {UIFlowKind.LIVE, UIFlowKind.WRITE} and not await resolve_awaitable(
+            self.channel_repository.list_channels_for_thread(thread.thread_id)
         ):
             key = "discord.write_ui.errors.no_channels" if event.flow is UIFlowKind.WRITE else "discord.live_state_ui.errors.no_channels"
             return self._blocked(
@@ -76,7 +79,11 @@ class DiscordUIFlowGuardService:
             )
 
         if event.flow is UIFlowKind.REPLY and event.step in {UIFlowStep.ADD_PATTERN, UIFlowStep.ADD_EVENT}:
-            account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
+            account = (
+                await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
+                if thread.account_id is not None
+                else None
+            )
             if account is None or not account.access_token:
                 return self._blocked(
                     event,
@@ -90,7 +97,11 @@ class DiscordUIFlowGuardService:
                 )
 
         if event.flow is UIFlowKind.WRITE:
-            account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
+            account = (
+                await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
+                if thread.account_id is not None
+                else None
+            )
             if account is None or not account.access_token:
                 return self._blocked(
                     event,
@@ -180,21 +191,21 @@ class DiscordUIFlowGuardService:
             )
         return build_thread_result(self.localizer, key, thread=thread, style=DiscordResultStyle.ERROR, ephemeral=True)
 
-    def _has_any_permission(
+    async def _has_any_permission(
         self,
         thread: ThreadRecord,
         requester_id: int,
         permissions: tuple[ObserverPermission, ...],
     ) -> bool:
-        return any(
-            thread_has_permission(
+        for permission in permissions:
+            if await thread_has_permission(
                 thread=thread,
                 requester_id=requester_id,
                 permission_repository=self.permission_repository,
                 required_permission=permission,
-            )
-            for permission in permissions
-        )
+            ):
+                return True
+        return False
 
     @staticmethod
     def _blocked(event: RequestUIFlowCommand, result: DiscordCommandResult) -> DiscordUIFlowDecision:

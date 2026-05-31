@@ -40,7 +40,7 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
         row = require_row(row, operation="adapter_event.upsert_event")
         return self._build_record(row)
 
-    def get_event(
+    async def get_event(
         self,
         *,
         thread_id: int,
@@ -49,8 +49,8 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
         subject_id: str,
         event_key: str,
     ) -> AdapterEventRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
                 FROM adapter_event
@@ -62,15 +62,15 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
                 """,
                 (thread_id, adapter_key, subject_type, subject_id, event_key),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return self._build_record(row)
 
-    def list_events_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[AdapterEventRecord]:
-        with self.database.cursor() as cursor:
+    async def list_events_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[AdapterEventRecord]:
+        async with self.database.read_cursor() as cursor:
             if include_disabled:
-                cursor.execute(
+                await cursor.execute(
                     """
                     SELECT event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
                     FROM adapter_event
@@ -80,7 +80,7 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
                     (thread_id,),
                 )
             else:
-                cursor.execute(
+                await cursor.execute(
                     """
                     SELECT event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
                     FROM adapter_event
@@ -89,10 +89,10 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
                     """,
                     (thread_id,),
                 )
-            rows = cursor.fetchall()
+            rows = await cursor.fetchall()
         return [self._build_record(row) for row in rows]
 
-    def list_matching_events(
+    async def list_matching_events(
         self,
         *,
         adapter_key: str,
@@ -101,9 +101,9 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
         event_key: str,
         include_disabled: bool = False,
     ) -> list[AdapterEventRecord]:
-        with self.database.cursor() as cursor:
+        async with self.database.read_cursor() as cursor:
             if include_disabled:
-                cursor.execute(
+                await cursor.execute(
                     """
                     SELECT event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
                     FROM adapter_event
@@ -116,7 +116,7 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
                     (adapter_key, subject_type, subject_id, event_key),
                 )
             else:
-                cursor.execute(
+                await cursor.execute(
                     """
                     SELECT event_id, thread_id, adapter_key, subject_type, subject_id, event_key, disabled
                     FROM adapter_event
@@ -129,7 +129,7 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
                     """,
                     (adapter_key, subject_type, subject_id, event_key),
                 )
-            rows = cursor.fetchall()
+            rows = await cursor.fetchall()
         return [self._build_record(row) for row in rows]
 
     @staticmethod

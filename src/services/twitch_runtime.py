@@ -15,6 +15,7 @@ from src.database.connection import (
     TwitchAccountRepository,
 )
 from src.services.twitch_gateways import TwitchAuthGateway, TwitchUserLookup
+from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +125,7 @@ async def safe_get_twitch_user_by_id(twitch_lookup: TwitchUserLookup, user_id: s
         return None
 
 
-def expand_pattern_for_tracked_users(
+async def expand_pattern_for_tracked_users(
     pattern: PatternRecord,
     *,
     thread_id: int,
@@ -137,7 +138,10 @@ def expand_pattern_for_tracked_users(
     if tracked_user_repository is None:
         tracked_user_ids: tuple[str, ...] = ()
     else:
-        tracked_user_ids = tuple(user.twitch_user_id for user in tracked_user_repository.list_users_for_thread(thread_id))
+        tracked_user_ids = tuple(
+            user.twitch_user_id
+            for user in await resolve_awaitable(tracked_user_repository.list_users_for_thread(thread_id))
+        )
     if pattern.user_scope_mode == "all_tracked_except_selected":
         excluded_user_ids = set(pattern.user_scope_ids)
         tracked_user_ids = tuple(user_id for user_id in tracked_user_ids if user_id not in excluded_user_ids)

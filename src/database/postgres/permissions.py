@@ -16,9 +16,9 @@ class PostgresUserPermissionRepository(UserPermissionRepository):
 
     database: PostgresDatabase
 
-    def get_by_user_and_thread(self, *, discord_user_id: int, thread_id: int) -> UserPermissionRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def get_by_user_and_thread(self, *, discord_user_id: int, thread_id: int) -> UserPermissionRecord | None:
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT discord_user_id, thread_id, permissions
                 FROM user_permissions
@@ -26,7 +26,7 @@ class PostgresUserPermissionRepository(UserPermissionRepository):
                 """,
                 (discord_user_id, thread_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return UserPermissionRecord(discord_user_id=int(row[0]), thread_id=int(row[1]), permissions=int(row[2]))
@@ -66,9 +66,9 @@ class PostgresUserPermissionRepository(UserPermissionRepository):
             row = cursor.fetchone()
         return row is not None
 
-    def list_for_thread(self, *, thread_id: int) -> list[UserPermissionRecord]:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def list_for_thread(self, *, thread_id: int) -> list[UserPermissionRecord]:
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT discord_user_id, thread_id, permissions
                 FROM user_permissions
@@ -77,5 +77,5 @@ class PostgresUserPermissionRepository(UserPermissionRepository):
                 """,
                 (thread_id,),
             )
-            rows = cursor.fetchall()
+            rows = await cursor.fetchall()
         return [UserPermissionRecord(discord_user_id=int(row[0]), thread_id=int(row[1]), permissions=int(row[2])) for row in rows]

@@ -34,6 +34,7 @@ from src.services.twitch_runtime import (
     safe_get_twitch_user_by_id,
 )
 from src.utils.discord_embeds import build_channel_event_auto_reply_embed
+from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -57,13 +58,13 @@ class ChannelEventAutoReplyService:
         event: TwitchChannelLiveStateChangedEvent,
     ) -> None:
         event_key = STREAM_ONLINE_EVENT_KEY if event.is_live else STREAM_OFFLINE_EVENT_KEY
-        configured_events = self.adapter_event_repository.list_matching_events(
+        configured_events = await resolve_awaitable(self.adapter_event_repository.list_matching_events(
             adapter_key=TWITCH_ADAPTER_KEY,
             subject_type=CHANNEL_SUBJECT_TYPE,
             subject_id=event.twitch_channel_id,
             event_key=event_key,
             include_disabled=False,
-        )
+        ))
         if not configured_events:
             return
 
@@ -75,27 +76,27 @@ class ChannelEventAutoReplyService:
         channel_name = (event.twitch_channel_login if channel_user is None else channel_user.display_name) or event.twitch_channel_id
         event_state = STREAM_EVENT_KEY_TO_STATE[event_key]
         for configured_event in configured_events:
-            reply = self.adapter_event_action_repository.get_action(
+            reply = await resolve_awaitable(self.adapter_event_action_repository.get_action(
                 event_id=configured_event.event_id,
                 action_type=TWITCH_SEND_MESSAGE_ACTION,
-            )
+            ))
             if reply is None or reply.disabled or not reply.message_template:
                 continue
-            thread = self.thread_repository.get_by_thread_id(configured_event.thread_id)
+            thread = await resolve_awaitable(self.thread_repository.get_by_thread_id(configured_event.thread_id))
             if thread is None or not thread.enabled:
                 continue
-            account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
+            account = await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id)) if thread.account_id is not None else None
             if account is None or not account.access_token:
                 continue
-            source_channel = self.channel_repository.get_by_thread_and_twitch_channel(
+            source_channel = await resolve_awaitable(self.channel_repository.get_by_thread_and_twitch_channel(
                 thread.thread_id,
                 event.twitch_channel_id,
-            )
-            notify_action = self.adapter_event_action_repository.get_action(
+            ))
+            notify_action = await resolve_awaitable(self.adapter_event_action_repository.get_action(
                 event_id=configured_event.event_id,
                 action_type=DISCORD_NOTIFY_ACTION,
-            )
-            display_index = ChannelEventDisplayIndexResolver(self.adapter_event_action_repository).resolve(
+            ))
+            display_index = await ChannelEventDisplayIndexResolver(self.adapter_event_action_repository).resolve(
                 thread_id=thread.thread_id,
                 event_id=configured_event.event_id,
             ) or configured_event.event_id

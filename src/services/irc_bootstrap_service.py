@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import ChannelRepository
 from src.services.twitch_gateways import TwitchChannelLookup, TwitchIRCConnectionGateway
+from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ class IRCBootstrapService:
 
     async def sync_persisted_channels(self) -> None:
         """Load all stored channels from the DB and join them on IRC."""
-        channel_ids = self.channel_repository.list_all_twitch_channel_ids()
+        channel_ids = await resolve_awaitable(self.channel_repository.list_all_twitch_channel_ids())
         if not channel_ids:
             logger.debug("No persisted Twitch channels found for IRC startup sync.")
             return

@@ -280,7 +280,7 @@ async def test_directory_cache_only_lookup_does_not_fall_back_to_helix() -> None
 
 
 @pytest.mark.asyncio
-async def test_directory_refreshes_missing_profile_image_from_api() -> None:
+async def test_directory_returns_missing_profile_image_from_cached_record_until_explicit_refresh() -> None:
     repository = InMemoryTwitchUserCacheRepository(
         by_id={
             "42": TwitchUserCacheRecord(
@@ -313,13 +313,13 @@ async def test_directory_refreshes_missing_profile_image_from_api() -> None:
 
     user = await directory.get_user_by_id("42")
 
-    assert user.profile_image_url == "https://cdn.example/avatar.png"
-    assert twitch_api.id_requests == ["42"]
-    assert repository.get_by_user_id("42").profile_image_url == "https://cdn.example/avatar.png"
+    assert user.profile_image_url is None
+    assert twitch_api.id_requests == []
+    assert repository.get_by_user_id("42").profile_image_url is None
 
 
 @pytest.mark.asyncio
-async def test_directory_refreshes_stale_api_cache_based_on_configured_interval() -> None:
+async def test_directory_returns_stale_user_cache_without_implicit_refresh() -> None:
     repository = InMemoryTwitchUserCacheRepository(
         by_id={
             "42": TwitchUserCacheRecord(
@@ -352,12 +352,12 @@ async def test_directory_refreshes_stale_api_cache_based_on_configured_interval(
 
     user = await directory.get_user_by_id("42")
 
-    assert user.profile_image_url == "https://cdn.example/new.png"
-    assert twitch_api.id_requests == ["42"]
+    assert user.profile_image_url == "https://cdn.example/old.png"
+    assert twitch_api.id_requests == []
 
 
 @pytest.mark.asyncio
-async def test_directory_uses_separate_channel_refresh_interval() -> None:
+async def test_directory_returns_stale_channel_cache_without_implicit_refresh() -> None:
     repository = InMemoryTwitchUserCacheRepository(
         by_id={
             "42": TwitchUserCacheRecord(
@@ -390,8 +390,8 @@ async def test_directory_uses_separate_channel_refresh_interval() -> None:
 
     user = await directory.get_channel_by_id("42")
 
-    assert user.profile_image_url == "https://cdn.example/new.png"
-    assert twitch_api.id_requests == ["42"]
+    assert user.profile_image_url == "https://cdn.example/old.png"
+    assert twitch_api.id_requests == []
 
 
 @pytest.mark.asyncio

@@ -13,6 +13,7 @@ from src.database.connection import (
 from src.events.event_types import ChannelScopeMode, UserScopeMode
 from src.localization import Localizer
 from src.services.twitch_gateways import TwitchDirectoryGateway
+from src.utils.async_utils import resolve_awaitable
 
 
 @dataclass(slots=True)
@@ -50,10 +51,10 @@ class PatternFilterResolver:
         scoped_channels = []
         for channel_login in twitch_channel_logins:
             channel_user = await self._resolve_user_by_login(channel_login)
-            existing_channel = self.channel_repository.get_by_thread_and_twitch_channel(
+            existing_channel = await resolve_awaitable(self.channel_repository.get_by_thread_and_twitch_channel(
                 thread.thread_id,
                 channel_user.user_id,
-            )
+            ))
             if existing_channel is None:
                 raise ValueError(
                     self._text(
@@ -96,10 +97,10 @@ class PatternFilterResolver:
             existing_user = (
                 None
                 if self.tracked_user_repository is None
-                else self.tracked_user_repository.get_by_thread_and_twitch_user(
+                else await resolve_awaitable(self.tracked_user_repository.get_by_thread_and_twitch_user(
                     thread.thread_id,
                     resolved_user.user_id,
-                )
+                ))
             )
             if self.tracked_user_repository is not None and existing_user is None:
                 raise ValueError(

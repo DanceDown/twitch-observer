@@ -13,6 +13,7 @@ from src.entrypoints.twitch_irc import TwitchIRCEntrypoint
 from src.services.account_polling_service import DeviceFlowPollingService
 from src.services.discord_presence_service import DiscordPresenceService
 from src.services.irc_bootstrap_service import IRCBootstrapService
+from src.services.twitch_metadata_refresh_service import TwitchMetadataRefreshService
 from src.services.twitch_live_monitor_service import TwitchLiveMonitorService
 
 from .models import ApplicationCore, ApplicationEntrypoints, ApplicationGateways, ApplicationRuntime, ApplicationServices
@@ -56,6 +57,14 @@ def build_runtime(
         connect_timeout_seconds=core.config.irc_bootstrap_connect_timeout_seconds,
         resync_interval_seconds=core.config.irc_channel_resync_interval_seconds,
     )
+    metadata_refresh_service = TwitchMetadataRefreshService(
+        directory=core.twitch_directory,
+        refresh_interval_seconds=float(
+            max(1, min(core.config.twitch_user_cache_api_refresh_seconds, core.config.twitch_channel_cache_api_refresh_seconds))
+        ),
+        request_spacing_seconds=max(0.0, core.config.twitch_metadata_refresh_request_spacing_seconds),
+        batch_size=max(1, core.config.twitch_metadata_refresh_batch_size),
+    )
     device_flow_poller = DeviceFlowPollingService(
         device_flow_repository=core.device_flow_repository,
         account_repository=core.account_repository,
@@ -75,6 +84,7 @@ def build_runtime(
     )
     return ApplicationRuntime(
         live_monitor_service=live_monitor_service,
+        metadata_refresh_service=metadata_refresh_service,
         irc_bootstrap_service=irc_bootstrap_service,
         device_flow_poller=device_flow_poller,
         presence_service=presence_service,
@@ -101,6 +111,7 @@ async def start_runtime(
         runtime.twitch_irc_task.add_done_callback(task_failure_callback)
         runtime.discord_task.add_done_callback(task_failure_callback)
     await runtime.live_monitor_service.start()
+    await runtime.metadata_refresh_service.start()
     await runtime.irc_bootstrap_service.sync_persisted_channels()
     await runtime.irc_bootstrap_service.start_periodic_sync()
     await runtime.device_flow_poller.start()
@@ -119,10 +130,12 @@ async def stop_runtime(core: ApplicationCore, entrypoints: ApplicationEntrypoint
             await runtime.discord_task
         runtime.discord_task = None
     await runtime.live_monitor_service.stop()
+    await runtime.metadata_refresh_service.stop()
     await runtime.irc_bootstrap_service.stop_periodic_sync()
     await runtime.device_flow_poller.stop()
     await runtime.presence_service.stop()
     await core.twitch_bundle.close()
     await entrypoints.discord.stop()
     await entrypoints.twitch_irc.stop()
+    await core.database.close_async()
     core.database.close()

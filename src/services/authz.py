@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from src.database.connection import ThreadRecord, UserPermissionRepository
 from src.utils.permissions import ObserverPermission, has_permission
+from src.utils.async_utils import resolve_awaitable
 
 
-def thread_has_permission(
+async def thread_has_permission(
     *,
     thread: ThreadRecord,
     requester_id: int,
@@ -18,10 +19,10 @@ def thread_has_permission(
         return True
     if permission_repository is None:
         return False
-    record = permission_repository.get_by_user_and_thread(
+    record = await resolve_awaitable(permission_repository.get_by_user_and_thread(
         discord_user_id=requester_id,
         thread_id=thread.thread_id,
-    )
+    ))
     if record is None:
         return False
     return has_permission(record.permissions, required_permission)

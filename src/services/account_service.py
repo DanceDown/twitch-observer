@@ -27,6 +27,7 @@ from src.services.account_support import AccountNotificationSender, format_accou
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
 from src.services.twitch_gateways import TwitchAccountGateway
 from src.utils.permissions import ObserverPermission
+from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 __all__ = ("AccountCommandService", "AccountNotificationSender")
@@ -69,11 +70,11 @@ class AccountCommandService:
         return await self._runner.run(command, lambda: self._unlink_account(command), logger_=logger)
 
     async def _start_link(self, command: StartAccountLinkCommand) -> DiscordCommandResult:
-        thread = self._require_owner_thread(command=command)
+        thread = await self._require_owner_thread(command=command)
         if isinstance(thread, DiscordCommandResult):
             return thread
         if thread.account_id is not None:
-            account = self.account_repository.get_by_account_id(thread.account_id)
+            account = await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
             account_name = await self._display_name_for_account(account) if account is not None else None
             return build_thread_result(
                 self.localizer,
@@ -84,7 +85,7 @@ class AccountCommandService:
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
-        existing_pending = self.device_flow_repository.get_by_discord_channel_id(thread.discord_channel_id)
+        existing_pending = await resolve_awaitable(self.device_flow_repository.get_by_discord_channel_id(thread.discord_channel_id))
         if existing_pending is not None and existing_pending.status == "pending":
             return build_thread_result(
                 self.localizer,
@@ -120,14 +121,14 @@ class AccountCommandService:
         )
 
     async def _unlink_account(self, command: UnlinkAccountCommand) -> DiscordCommandResult:
-        thread = self._require_owner_thread(command=command)
+        thread = await self._require_owner_thread(command=command)
         if isinstance(thread, DiscordCommandResult):
             return thread
 
         removed_account = False
         account_name = None
         if thread.account_id is not None:
-            account = self.account_repository.get_by_account_id(thread.account_id)
+            account = await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
             account_name = await self._display_name_for_account(account) if account is not None else None
             removed_account = self.account_repository.remove_by_account_id(thread.account_id)
             self.thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
@@ -151,7 +152,7 @@ class AccountCommandService:
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
         )
 
-    def _require_thread_with_permission(
+    async def _require_thread_with_permission(
         self,
         *,
         command: AccountCommand,
@@ -165,7 +166,7 @@ class AccountCommandService:
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
-        return self._guards.require_permission(
+        return await self._guards.require_permission(
             _AccountScopedCommand(
                 discord_channel_id=command.discord_channel_id,
                 requester_id=command.requester_id,
@@ -174,8 +175,8 @@ class AccountCommandService:
             denial_key=denial_key,
         )
 
-    def _require_owner_thread(self, *, command: AccountCommand) -> ThreadRecord | DiscordCommandResult:
-        thread = self._require_thread_with_permission(
+    async def _require_owner_thread(self, *, command: AccountCommand) -> ThreadRecord | DiscordCommandResult:
+        thread = await self._require_thread_with_permission(
             command=command,
             required_permission=ObserverPermission.CONTROL_OBSERVER,
             denial_key="results.account.permission_denied",
@@ -201,10 +202,10 @@ class AccountCommandService:
             return account.twitch_login
         return user.display_name
 
-    def _resolve_thread(self, command: AccountCommand) -> ThreadRecord | None:
+    async def _resolve_thread(self, command: AccountCommand) -> ThreadRecord | None:
         if command.discord_channel_id is None:
             return None
-        return self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
+        return await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(command.discord_channel_id))
 
 
 @dataclass(slots=True, frozen=True)

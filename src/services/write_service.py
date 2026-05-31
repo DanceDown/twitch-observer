@@ -15,6 +15,7 @@ from src.services.command_execution import CommandExecutionRunner, ThreadCommand
 from src.services.twitch_gateways import TwitchAuthGateway, TwitchChannelLookup, TwitchChatGateway
 from src.services.twitch_runtime import ensure_fresh_linked_account, refresh_linked_account
 from src.utils.permissions import ObserverPermission
+from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ class TwitchWriteCommandService:
         return await self._runner.run(command, lambda: self._send_message(command), logger_=logger)
 
     async def _send_message(self, command: SendTwitchMessageCommand) -> DiscordCommandResult:
-        thread = self._guards.require_permission(
+        thread = await self._guards.require_permission(
             command,
             permission=ObserverPermission.SEND_TWITCH_MESSAGES,
             denial_key="results.write.permission_denied",
@@ -73,7 +74,7 @@ class TwitchWriteCommandService:
         if len(message) > 500:
             raise ValueError(self.localizer.text("results.write.message_too_long", language=thread.language))
         twitch_channel = await self.twitch_api.refresh_channel_by_login(command.twitch_channel_login)
-        tracked_channel = self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_channel.user_id)
+        tracked_channel = await resolve_awaitable(self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_channel.user_id))
         if tracked_channel is None:
             return build_thread_result(
                 self.localizer,
@@ -85,7 +86,7 @@ class TwitchWriteCommandService:
                 ephemeral=True,
             )
 
-        account = self._guards.require_linked_account(thread, denial_key="results.write.no_linked_account")
+        account = await self._guards.require_linked_account(thread, denial_key="results.write.no_linked_account")
         if isinstance(account, DiscordCommandResult):
             return account
 

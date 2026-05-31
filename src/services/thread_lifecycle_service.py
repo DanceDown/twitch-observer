@@ -24,6 +24,7 @@ from src.services.command_execution import CommandExecutionRunner, ThreadCommand
 from src.services.runtime_coordinator import TrackedChannelsChangedNotifier
 from src.services.twitch_gateways import TwitchDirectoryGateway, TwitchIRCChannelGateway
 from src.utils.permissions import ObserverPermission
+from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ class ThreadLifecycleService:
         return await self._runner.run(command, lambda: self._set_context_language(command), logger_=logger)
 
     async def _join_context(self, command: JoinThreadCommand) -> DiscordCommandResult:
-        existing = self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
+        existing = await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(command.discord_channel_id))
         if existing is not None:
             if existing.owner_id == command.requester_id:
                 return build_thread_result(
@@ -111,7 +112,7 @@ class ThreadLifecycleService:
         )
 
     async def _leave_context(self, command: LeaveThreadCommand) -> DiscordCommandResult:
-        thread = self._guards.require_permission(
+        thread = await self._guards.require_permission(
             command,
             permission=ObserverPermission.LEAVE_CONTEXT,
             denial_key="results.thread.leave_denied",
@@ -120,11 +121,14 @@ class ThreadLifecycleService:
             return thread
 
         removed_channel_ids = sorted(
-            {channel.twitch_channel_id for channel in self.channel_repository.list_channels_for_thread(thread.thread_id)}
+            {
+                channel.twitch_channel_id
+                for channel in await resolve_awaitable(self.channel_repository.list_channels_for_thread(thread.thread_id))
+            }
         )
         part_candidate_channel_ids: list[str] = []
         for twitch_channel_id in removed_channel_ids:
-            remaining_thread_ids = set(self.channel_repository.list_thread_ids_by_twitch_channel_id(twitch_channel_id))
+            remaining_thread_ids = set(await resolve_awaitable(self.channel_repository.list_thread_ids_by_twitch_channel_id(twitch_channel_id)))
             remaining_thread_ids.discard(thread.thread_id)
             if not remaining_thread_ids:
                 part_candidate_channel_ids.append(twitch_channel_id)
@@ -171,8 +175,8 @@ class ThreadLifecycleService:
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
         )
 
-    def _set_context_enabled(self, command: SetThreadEnabledCommand) -> DiscordCommandResult:
-        thread = self._guards.require_permission(
+    async def _set_context_enabled(self, command: SetThreadEnabledCommand) -> DiscordCommandResult:
+        thread = await self._guards.require_permission(
             command,
             permission=ObserverPermission.CONTROL_OBSERVER,
             denial_key="results.thread.enable_denied",
@@ -203,8 +207,8 @@ class ThreadLifecycleService:
             USER=discord_user_mention(self.localizer, command.requester_id, language=updated.language),
         )
 
-    def _set_context_color(self, command: SetThreadColorCommand) -> DiscordCommandResult:
-        thread = self._guards.require_permission(
+    async def _set_context_color(self, command: SetThreadColorCommand) -> DiscordCommandResult:
+        thread = await self._guards.require_permission(
             command,
             permission=ObserverPermission.CONTROL_OBSERVER,
             denial_key="results.thread.color_denied",
@@ -250,8 +254,8 @@ class ThreadLifecycleService:
             USER=discord_user_mention(self.localizer, command.requester_id, language=updated.language),
         )
 
-    def _set_context_language(self, command: SetThreadLanguageCommand) -> DiscordCommandResult:
-        thread = self._guards.require_permission(
+    async def _set_context_language(self, command: SetThreadLanguageCommand) -> DiscordCommandResult:
+        thread = await self._guards.require_permission(
             command,
             permission=ObserverPermission.CONTROL_OBSERVER,
             denial_key="results.thread.language_denied",

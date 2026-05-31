@@ -1708,7 +1708,8 @@ async def test_show_command_lists_patterns_in_creation_order() -> None:
     assert result.message.index("general") < result.message.index("specific")
 
 
-def test_display_index_stays_stable_when_pattern_priority_changes() -> None:
+@pytest.mark.asyncio
+async def test_display_index_stays_stable_when_pattern_priority_changes() -> None:
     pattern_repository = InMemoryPatternRepository()
     first = pattern_repository.add_pattern(
         thread_id=1,
@@ -1742,12 +1743,12 @@ def test_display_index_stays_stable_when_pattern_priority_changes() -> None:
     )
     resolver = PatternDisplayIndexResolver(pattern_repository)
 
-    assert resolver.build_index_map(1) == {first.pattern_id: 1, second.pattern_id: 2}
+    assert await resolver.build_index_map(1) == {first.pattern_id: 1, second.pattern_id: 2}
 
     pattern_repository.set_pattern_priority(thread_id=1, pattern_id=first.pattern_id, priority=9)
     pattern_repository.set_pattern_priority(thread_id=1, pattern_id=second.pattern_id, priority=0)
 
-    assert resolver.build_index_map(1) == {first.pattern_id: 1, second.pattern_id: 2}
+    assert await resolver.build_index_map(1) == {first.pattern_id: 1, second.pattern_id: 2}
 
 
 @pytest.mark.asyncio

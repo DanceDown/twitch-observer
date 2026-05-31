@@ -17,6 +17,7 @@ from src.events.event_types import (
 from src.localization import Localizer
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
 from src.utils.permissions import ObserverPermission, permissions_mask_from_values
+from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +57,8 @@ class PermissionCommandService:
     async def handle_clear(self, command: ClearPermissionsCommand) -> DiscordCommandResult:
         return await self._runner.run(command, lambda: self._clear(command), logger_=logger)
 
-    def _require_manage_permissions(self, command) -> tuple[object, DiscordCommandResult | None]:
-        thread = self._guards.require_permission(
+    async def _require_manage_permissions(self, command) -> tuple[object, DiscordCommandResult | None]:
+        thread = await self._guards.require_permission(
             command,
             permission=ObserverPermission.MANAGE_PERMISSIONS,
             denial_key="results.permission.permission_denied",
@@ -74,8 +75,8 @@ class PermissionCommandService:
             )
         return thread, None
 
-    def _clear(self, command: ClearPermissionsCommand) -> DiscordCommandResult:
-        thread, denied = self._require_manage_permissions(command)
+    async def _clear(self, command: ClearPermissionsCommand) -> DiscordCommandResult:
+        thread, denied = await self._require_manage_permissions(command)
         if denied is not None:
             return denied
         removed = self.permission_repository.remove_by_user_and_thread(
@@ -92,18 +93,18 @@ class PermissionCommandService:
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
         )
 
-    def _grant(self, command: GrantPermissionsCommand) -> DiscordCommandResult:
-        thread, denied = self._require_manage_permissions(command)
+    async def _grant(self, command: GrantPermissionsCommand) -> DiscordCommandResult:
+        thread, denied = await self._require_manage_permissions(command)
         if denied is not None:
             return denied
         if not command.permissions:
             raise ValueError(self.localizer.text("results.permission.grant_empty_selection", language=thread.language))
         requested_permissions = tuple(dict.fromkeys(command.permissions))
         permission_mask = permissions_mask_from_values(requested_permissions)
-        current = self.permission_repository.get_by_user_and_thread(
+        current = await resolve_awaitable(self.permission_repository.get_by_user_and_thread(
             discord_user_id=command.target_user_id,
             thread_id=thread.thread_id,
-        )
+        ))
         current_mask = 0 if current is None else current.permissions
         updated = self.permission_repository.upsert_permissions(
             discord_user_id=command.target_user_id,
@@ -121,18 +122,18 @@ class PermissionCommandService:
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
         )
 
-    def _revoke(self, command: RevokePermissionsCommand) -> DiscordCommandResult:
-        thread, denied = self._require_manage_permissions(command)
+    async def _revoke(self, command: RevokePermissionsCommand) -> DiscordCommandResult:
+        thread, denied = await self._require_manage_permissions(command)
         if denied is not None:
             return denied
         if not command.permissions:
             raise ValueError(self.localizer.text("results.permission.revoke_empty_selection", language=thread.language))
         requested_permissions = tuple(dict.fromkeys(command.permissions))
         permission_mask = permissions_mask_from_values(requested_permissions)
-        current = self.permission_repository.get_by_user_and_thread(
+        current = await resolve_awaitable(self.permission_repository.get_by_user_and_thread(
             discord_user_id=command.target_user_id,
             thread_id=thread.thread_id,
-        )
+        ))
         current_mask = 0 if current is None else current.permissions
         matched_mask = current_mask & permission_mask
         if not matched_mask:

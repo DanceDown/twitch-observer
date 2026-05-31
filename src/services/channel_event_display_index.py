@@ -12,6 +12,7 @@ from src.services.twitch_runtime import (
     STREAM_ONLINE_EVENT_KEY,
     TWITCH_ADAPTER_KEY,
 )
+from src.utils.async_utils import resolve_awaitable
 
 
 @dataclass(slots=True)
@@ -20,13 +21,13 @@ class ChannelEventDisplayIndexResolver:
 
     adapter_event_action_repository: AdapterEventActionRepository
 
-    def build_index_map(self, thread_id: int) -> dict[int, int]:
+    async def build_index_map(self, thread_id: int) -> dict[int, int]:
         rows = [
             (event, action)
-            for event, action in self.adapter_event_action_repository.list_actions_for_thread(
+            for event, action in await resolve_awaitable(self.adapter_event_action_repository.list_actions_for_thread(
                 thread_id,
                 include_disabled=True,
-            )
+            ))
             if action.action_type == DISCORD_NOTIFY_ACTION
             and event.adapter_key == TWITCH_ADAPTER_KEY
             and event.subject_type == CHANNEL_SUBJECT_TYPE
@@ -35,5 +36,5 @@ class ChannelEventDisplayIndexResolver:
         rows.sort(key=lambda item: item[0].event_id)
         return {event.event_id: display_index for display_index, (event, _) in enumerate(rows, start=1)}
 
-    def resolve(self, *, thread_id: int, event_id: int) -> int | None:
-        return self.build_index_map(thread_id).get(event_id)
+    async def resolve(self, *, thread_id: int, event_id: int) -> int | None:
+        return (await self.build_index_map(thread_id)).get(event_id)

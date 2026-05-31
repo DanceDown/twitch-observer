@@ -38,6 +38,7 @@ from src.services.twitch_runtime import (
     TWITCH_SEND_MESSAGE_ACTION,
 )
 from src.utils.permissions import ObserverPermission
+from src.utils.async_utils import resolve_awaitable
 
 PatternReplyCommand = AddPatternReplyCommand | RemovePatternReplyCommand | SetPatternReplyEnabledCommand
 EventReplyCommand = AddChannelEventReplyCommand | RemoveChannelEventReplyCommand | SetChannelEventReplyEnabledCommand
@@ -145,7 +146,7 @@ class ReplyCommandService:
             required_permission = ObserverPermission.TOGGLE_REPLIES
             denial_key = "results.reply.toggle_permission_denied"
 
-        thread = self._ensure_thread_permission(
+        thread = await self._ensure_thread_permission(
             command.discord_channel_id,
             command.requester_id,
             required_permission=required_permission,
@@ -154,7 +155,7 @@ class ReplyCommandService:
         if isinstance(thread, DiscordCommandResult):
             return thread
 
-        pattern = self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id)
+        pattern = await resolve_awaitable(self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id))
         if pattern is None:
             return build_thread_result(
                 self.localizer,
@@ -164,9 +165,9 @@ class ReplyCommandService:
                 ephemeral=True,
             )
 
-        display_id = self._display_index(thread.thread_id, pattern.pattern_id) or pattern.pattern_id
+        display_id = await self._display_index(thread.thread_id, pattern.pattern_id) or pattern.pattern_id
         if action == "add":
-            linked_account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
+            linked_account = await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id)) if thread.account_id is not None else None
             if linked_account is None:
                 return build_thread_result(
                     self.localizer,
@@ -181,7 +182,7 @@ class ReplyCommandService:
                 raise ValueError(self.localizer.text("results.reply.pattern_add_empty_message", language=thread.language))
             if len(message) > 500:
                 raise ValueError(self.localizer.text("results.reply.pattern_add_message_too_long", language=thread.language))
-            existing_reply = self.reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=pattern.pattern_id)
+            existing_reply = await resolve_awaitable(self.reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=pattern.pattern_id))
             if existing_reply is not None:
                 return build_thread_result(
                     self.localizer,
@@ -215,7 +216,7 @@ class ReplyCommandService:
                 USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
             )
 
-        existing_reply = self.reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=pattern.pattern_id)
+        existing_reply = await resolve_awaitable(self.reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=pattern.pattern_id))
         if existing_reply is None:
             return build_thread_result(
                 self.localizer,
@@ -309,7 +310,7 @@ class ReplyCommandService:
             required_permission = ObserverPermission.TOGGLE_REPLIES
             denial_key = "results.reply.toggle_permission_denied"
 
-        thread = self._ensure_thread_permission(
+        thread = await self._ensure_thread_permission(
             command.discord_channel_id,
             command.requester_id,
             required_permission=required_permission,
@@ -325,10 +326,10 @@ class ReplyCommandService:
         adapter_event = next(
             (
                 item
-                for item in event_configuration.adapter_event_repository.list_events_for_thread(
+                for item in await resolve_awaitable(event_configuration.adapter_event_repository.list_events_for_thread(
                     thread.thread_id,
                     include_disabled=True,
-                )
+                ))
                 if item.event_id == command.adapter_event_id
             ),
             None,
@@ -358,13 +359,13 @@ class ReplyCommandService:
         except TwitchAPIError:
             channel_name = adapter_event.subject_id
 
-        existing_reply = event_configuration.adapter_event_action_repository.get_action(
+        existing_reply = await resolve_awaitable(event_configuration.adapter_event_action_repository.get_action(
             event_id=adapter_event.event_id,
             action_type=TWITCH_SEND_MESSAGE_ACTION,
-        )
+        ))
 
         if action == "add":
-            linked_account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
+            linked_account = await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id)) if thread.account_id is not None else None
             if linked_account is None:
                 return build_thread_result(
                     self.localizer,
@@ -482,7 +483,7 @@ class ReplyCommandService:
 
         raise ValueError(self.localizer.text("results.reply.event_action_unsupported", language=thread.language))
 
-    def _ensure_thread_permission(
+    async def _ensure_thread_permission(
         self,
         discord_channel_id: int,
         requester_id: int,
@@ -490,17 +491,17 @@ class ReplyCommandService:
         required_permission: ObserverPermission,
         denial_key: str,
     ) -> ThreadRecord | DiscordCommandResult:
-        return self._guards.require_permission(
+        return await self._guards.require_permission(
             _ReplyPermissionCommand(discord_channel_id=discord_channel_id, requester_id=requester_id),
             permission=required_permission,
             denial_key=denial_key,
         )
 
-    def _display_index(self, thread_id: int, pattern_id: int) -> int | None:
-        return PatternDisplayIndexResolver(self.pattern_repository).resolve(
+    async def _display_index(self, thread_id: int, pattern_id: int) -> int | None:
+        return await PatternDisplayIndexResolver(self.pattern_repository).resolve(
             thread_id=thread_id,
             pattern_id=pattern_id,
         )
 
-    def _resolve_thread(self, command: ReplyCommand) -> ThreadRecord | None:
-        return self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
+    async def _resolve_thread(self, command: ReplyCommand) -> ThreadRecord | None:
+        return await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(command.discord_channel_id))

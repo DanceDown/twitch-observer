@@ -36,6 +36,7 @@ from src.services.twitch_runtime import (
 )
 from src.utils.discord_embeds import build_auto_reply_embed
 from src.utils.pattern_matching import matches_pattern
+from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +76,9 @@ class AutoReplyService:
             )
             return
 
-        thread_ids = self.channel_repository.list_thread_ids_by_twitch_channel_id(
+        thread_ids = await resolve_awaitable(self.channel_repository.list_thread_ids_by_twitch_channel_id(
             event.broadcaster_id,
-        )
+        ))
         if not thread_ids:
             logger.debug(
                 "No configured threads for broadcaster_id=%s when evaluating auto-replies.",
@@ -86,7 +87,7 @@ class AutoReplyService:
             return
 
         for thread_id in thread_ids:
-            thread = self.thread_repository.get_by_thread_id(thread_id)
+            thread = await resolve_awaitable(self.thread_repository.get_by_thread_id(thread_id))
             if thread is None:
                 logger.debug(
                     "Skipping missing thread_id=%s during auto-reply evaluation.",
@@ -100,17 +101,17 @@ class AutoReplyService:
                 )
                 continue
 
-            account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
+            account = await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id)) if thread.account_id is not None else None
             if account is None or not account.access_token:
                 logger.debug(
                     "Skipping auto-replies for thread_id=%s because no account is linked.",
                     thread.thread_id,
                 )
                 continue
-            source_channel = self.channel_repository.get_by_thread_and_twitch_channel(
+            source_channel = await resolve_awaitable(self.channel_repository.get_by_thread_and_twitch_channel(
                 thread.thread_id,
                 event.broadcaster_id,
-            )
+            ))
             live_status = None if source_channel is None else source_channel.is_live
             match = await self._find_matching_reply_pattern(
                 thread,
@@ -270,10 +271,10 @@ class AutoReplyService:
         live_status: bool | None,
         linked_twitch_user_id: str,
     ) -> tuple[PatternRecord, ReplyRecord] | None:
-        for pattern in self.pattern_repository.list_active_patterns_for_thread(
+        for pattern in await resolve_awaitable(self.pattern_repository.list_active_patterns_for_thread(
             thread.thread_id,
-        ):
-            effective_pattern = expand_pattern_for_tracked_users(
+        )):
+            effective_pattern = await expand_pattern_for_tracked_users(
                 pattern,
                 thread_id=thread.thread_id,
                 tracked_user_repository=self.tracked_user_repository,
@@ -300,10 +301,10 @@ class AutoReplyService:
                     current_live_status,
                 )
                 continue
-            reply = self.reply_repository.get_by_pattern(
+            reply = await resolve_awaitable(self.reply_repository.get_by_pattern(
                 thread_id=thread.thread_id,
                 pattern_id=effective_pattern.pattern_id,
-            )
+            ))
             if reply is None or reply.disabled:
                 logger.debug(
                     "Pattern %s matched first but has no enabled auto-reply attached.",
@@ -324,10 +325,10 @@ class AutoReplyService:
         channel_display_name: str | None = None,
         channel_login: str | None = None,
     ) -> None:
-        source_channel = self.channel_repository.get_by_thread_and_twitch_channel(
+        source_channel = await resolve_awaitable(self.channel_repository.get_by_thread_and_twitch_channel(
             thread.thread_id,
             event.broadcaster_id or "",
-        )
+        ))
         await self.tracking_notifier.send_tracking_embed(
             thread.discord_channel_id,
             build_auto_reply_embed(

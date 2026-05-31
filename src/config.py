@@ -58,6 +58,10 @@ class AppConfig:
     twitch_channel_cache_api_refresh_seconds: int = field(
         default_factory=lambda: _get_int("TWITCH_CHANNEL_CACHE_API_REFRESH_SECONDS", "43200")
     )
+    twitch_metadata_refresh_request_spacing_seconds: float = field(
+        default_factory=lambda: _get_float("TWITCH_METADATA_REFRESH_REQUEST_SPACING_SECONDS", "0")
+    )
+    twitch_metadata_refresh_batch_size: int = field(default_factory=lambda: _get_int("TWITCH_METADATA_REFRESH_BATCH_SIZE", "100"))
     twitch_live_monitor_poll_interval_seconds: float = field(
         default_factory=lambda: _get_float("TWITCH_LIVE_MONITOR_POLL_INTERVAL_SECONDS", "30")
     )

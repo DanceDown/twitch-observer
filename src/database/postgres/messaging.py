@@ -56,10 +56,10 @@ class PostgresMessageRepository(MessageRepository):
                 ),
             )
 
-    def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
+    async def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
         """Load recent Twitch messages for presence updates or lightweight recency-based features."""
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT message_id, twitch_channel_id, username, content, timestamp
                 FROM message
@@ -69,7 +69,7 @@ class PostgresMessageRepository(MessageRepository):
                 """,
                 (since, limit),
             )
-            rows = cursor.fetchall()
+            rows = await cursor.fetchall()
         return [
             RecentMessageRecord(
                 message_id=str(row[0]),
@@ -81,7 +81,7 @@ class PostgresMessageRepository(MessageRepository):
             for row in rows
         ]
 
-    def list_recent_messages_for_channel(
+    async def list_recent_messages_for_channel(
         self,
         *,
         twitch_channel_id: str,
@@ -89,8 +89,8 @@ class PostgresMessageRepository(MessageRepository):
         limit: int,
     ) -> list[RecentMessageRecord]:
         """Load recent Twitch messages for one tracked channel."""
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT message_id, twitch_channel_id, username, content, timestamp
                 FROM message
@@ -101,7 +101,7 @@ class PostgresMessageRepository(MessageRepository):
                 """,
                 (twitch_channel_id, since, limit),
             )
-            rows = cursor.fetchall()
+            rows = await cursor.fetchall()
         return [
             RecentMessageRecord(
                 message_id=str(row[0]),

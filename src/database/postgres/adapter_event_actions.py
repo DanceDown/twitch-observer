@@ -43,9 +43,9 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
         row = require_row(row, operation="adapter_event_action.upsert_action")
         return self._build_record(row)
 
-    def get_action(self, *, event_id: int, action_type: str) -> AdapterEventActionRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def get_action(self, *, event_id: int, action_type: str) -> AdapterEventActionRecord | None:
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
                 """
                 SELECT event_id, action_type, message_template, reply_as_reply, color, disabled
                 FROM adapter_event_action
@@ -53,7 +53,7 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
                 """,
                 (event_id, action_type),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return self._build_record(row)
@@ -117,15 +117,15 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
             return None
         return self._build_record(row)
 
-    def list_actions_for_event(
+    async def list_actions_for_event(
         self,
         event_id: int,
         *,
         include_disabled: bool = True,
     ) -> list[AdapterEventActionRecord]:
-        with self.database.cursor() as cursor:
+        async with self.database.read_cursor() as cursor:
             if include_disabled:
-                cursor.execute(
+                await cursor.execute(
                     """
                     SELECT event_id, action_type, message_template, reply_as_reply, color, disabled
                     FROM adapter_event_action
@@ -135,7 +135,7 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
                     (event_id,),
                 )
             else:
-                cursor.execute(
+                await cursor.execute(
                     """
                     SELECT event_id, action_type, message_template, reply_as_reply, color, disabled
                     FROM adapter_event_action
@@ -144,18 +144,18 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
                     """,
                     (event_id,),
                 )
-            rows = cursor.fetchall()
+            rows = await cursor.fetchall()
         return [self._build_record(row) for row in rows]
 
-    def list_actions_for_thread(
+    async def list_actions_for_thread(
         self,
         thread_id: int,
         *,
         include_disabled: bool = True,
     ) -> list[tuple[AdapterEventRecord, AdapterEventActionRecord]]:
-        with self.database.cursor() as cursor:
+        async with self.database.read_cursor() as cursor:
             if include_disabled:
-                cursor.execute(
+                await cursor.execute(
                     """
                     SELECT ae.event_id, ae.thread_id, ae.adapter_key, ae.subject_type, ae.subject_id, ae.event_key, ae.disabled,
                            aea.event_id, aea.action_type, aea.message_template, aea.reply_as_reply, aea.color, aea.disabled
@@ -167,7 +167,7 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
                     (thread_id,),
                 )
             else:
-                cursor.execute(
+                await cursor.execute(
                     """
                     SELECT ae.event_id, ae.thread_id, ae.adapter_key, ae.subject_type, ae.subject_id, ae.event_key, ae.disabled,
                            aea.event_id, aea.action_type, aea.message_template, aea.reply_as_reply, aea.color, aea.disabled
@@ -180,7 +180,7 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
                     """,
                     (thread_id,),
                 )
-            rows = cursor.fetchall()
+            rows = await cursor.fetchall()
         results: list[tuple[AdapterEventRecord, AdapterEventActionRecord]] = []
         for row in rows:
             event_record = PostgresAdapterEventRepository._build_record(row[:7])
