@@ -278,8 +278,12 @@
       "already_linked": {
         "title": "Account Already Linked",
         "body": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is already connected here. Disconnect it before linking another Twitch account <:oopsie:1497720439810687006>",
-        "footer": "",
-        "fallback_display_name": "an existing Twitch account"
+        "footer": ""
+      },
+      "already_linked_broken_state": {
+        "title": "Account Data Missing",
+        "body": "I still had an account link stored here, but the actual Twitch account record is missing. I removed the stale reference. Please try again now <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "login_pending": {
         "title": "Login Already Pending",
@@ -299,8 +303,12 @@
       "unlinked": {
         "title": "Twitch Account Unlinked",
         "body": "{RAW:USER} disconnected [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}). Auto-replies stay saved and will work again once an account is linked <:ApuApproved:1497724288256446465>",
-        "footer": "",
-        "fallback_display_name": "an existing Twitch account"
+        "footer": ""
+      },
+      "unlinked_broken_state": {
+        "title": "Account Data Missing",
+        "body": "I still had an account link stored here, but the actual Twitch account record is missing. I removed the stale reference <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "login_expired": {
         "title": "Twitch Login Expired",
@@ -1731,7 +1739,7 @@
             }
           }
         },
-        "channel_scope_only_fallback": "Only selected channels",
+        "channel_scope_only_invalid": "Invalid until at least one channel is selected",
         "channel_scope_except": {
           "template": "All except {RAW:ITEMS}",
           "placeholders": {
@@ -1743,7 +1751,7 @@
             }
           }
         },
-        "channel_scope_except_fallback": "All except selected channels",
+        "channel_scope_except_invalid": "Invalid until at least one channel is selected",
         "user_scope_everyone": "Everyone",
         "user_scope_all_tracked": "All known Twitch users",
         "user_scope_all_tracked_except": {
@@ -1757,7 +1765,7 @@
             }
           }
         },
-        "user_scope_all_tracked_except_fallback": "All known except selected Twitch names",
+        "user_scope_all_tracked_except_invalid": "Invalid until at least one Twitch user is selected",
         "user_scope_only": {
           "template": "Only {RAW:ITEMS}",
           "placeholders": {
@@ -1769,7 +1777,7 @@
             }
           }
         },
-        "user_scope_only_fallback": "Only selected Twitch names",
+        "user_scope_only_invalid": "Invalid until at least one Twitch user is selected",
         "user_scope_except": {
           "template": "Everyone except {RAW:ITEMS}",
           "placeholders": {
@@ -1781,7 +1789,7 @@
             }
           }
         },
-        "user_scope_except_fallback": "Everyone except selected Twitch names",
+        "user_scope_except_invalid": "Invalid until at least one Twitch user is selected",
         "sub_state_all": "Everyone",
         "sub_state_subs": "Subscribers only",
         "sub_state_non_subs": "Non-subscribers only",
@@ -1869,6 +1877,16 @@
         "invalid_priority": {
           "title": "Invalid Priority",
           "body": "Priority must be a whole number between `0` and `9` <:oopsie:1497720439810687006>",
+          "footer": ""
+        },
+        "missing_selected_channels": {
+          "title": "Channels Missing",
+          "body": "Pick at least one channel for this scope first <:Binoculars:1497727665283662077>",
+          "footer": ""
+        },
+        "missing_selected_users": {
+          "title": "Users Missing",
+          "body": "Pick at least one Twitch user for this scope first <a:peepoSmart:1497731090704498781>",
           "footer": ""
         }
       },

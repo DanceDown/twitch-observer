@@ -75,13 +75,22 @@ class AccountCommandService:
             return thread
         if thread.account_id is not None:
             account = await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
+            if account is None:
+                self.thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
+                return build_thread_result(
+                    self.localizer,
+                    "results.account.already_linked_broken_state",
+                    thread=thread,
+                    style=DiscordResultStyle.ERROR,
+                    ephemeral=True,
+                )
             account_name = await self._display_name_for_account(account) if account is not None else None
             return build_thread_result(
                 self.localizer,
                 "results.account.already_linked",
                 thread=thread,
-                DISPLAY_NAME=account_name or self.localizer.text("results.account.already_linked.fallback_display_name", language=thread.language),
-                LOGIN=account.twitch_login if account is not None else "",
+                DISPLAY_NAME=account_name or account.twitch_login,
+                LOGIN=account.twitch_login,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -127,9 +136,19 @@ class AccountCommandService:
 
         removed_account = False
         account_name = None
+        account = None
         if thread.account_id is not None:
             account = await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
-            account_name = await self._display_name_for_account(account) if account is not None else None
+            if account is None:
+                self.thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
+                return build_thread_result(
+                    self.localizer,
+                    "results.account.unlinked_broken_state",
+                    thread=thread,
+                    style=DiscordResultStyle.ERROR,
+                    ephemeral=True,
+                )
+            account_name = await self._display_name_for_account(account)
             removed_account = self.account_repository.remove_by_account_id(thread.account_id)
             self.thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
         removed_pending = self.device_flow_repository.remove_by_discord_channel_id(thread.discord_channel_id)
@@ -145,8 +164,8 @@ class AccountCommandService:
             self.localizer,
             "results.account.unlinked",
             thread=thread,
-            DISPLAY_NAME=account_name or self.localizer.text("results.account.unlinked.fallback_display_name", language=thread.language),
-            LOGIN=account.twitch_login if account is not None else "",
+            DISPLAY_NAME=account_name or account.twitch_login,
+            LOGIN=account.twitch_login,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),

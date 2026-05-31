@@ -13,13 +13,13 @@ def channel_scope_text(localizer: Localizer, language: str, mode: str, selected:
         return (
             localizer.text("discord.pattern_ui.summary.channel_scope_only", language=language, ITEMS=selected)
             if selected
-            else localizer.text("discord.pattern_ui.summary.channel_scope_only_fallback", language=language)
+            else localizer.text("discord.pattern_ui.summary.channel_scope_only_invalid", language=language)
         )
     if mode == "all_except_selected":
         return (
             localizer.text("discord.pattern_ui.summary.channel_scope_except", language=language, ITEMS=selected)
             if selected
-            else localizer.text("discord.pattern_ui.summary.channel_scope_except_fallback", language=language)
+            else localizer.text("discord.pattern_ui.summary.channel_scope_except_invalid", language=language)
         )
     return mode
 
@@ -34,19 +34,19 @@ def user_scope_text(localizer: Localizer, language: str, mode: str, selected: li
         return (
             localizer.text("discord.pattern_ui.summary.user_scope_all_tracked_except", language=language, ITEMS=selected)
             if selected
-            else localizer.text("discord.pattern_ui.summary.user_scope_all_tracked_except_fallback", language=language)
+            else localizer.text("discord.pattern_ui.summary.user_scope_all_tracked_except_invalid", language=language)
         )
     if mode == "only_selected":
         return (
             localizer.text("discord.pattern_ui.summary.user_scope_only", language=language, ITEMS=selected)
             if selected
-            else localizer.text("discord.pattern_ui.summary.user_scope_only_fallback", language=language)
+            else localizer.text("discord.pattern_ui.summary.user_scope_only_invalid", language=language)
         )
     if mode == "all_except_selected":
         return (
             localizer.text("discord.pattern_ui.summary.user_scope_except", language=language, ITEMS=selected)
             if selected
-            else localizer.text("discord.pattern_ui.summary.user_scope_except_fallback", language=language)
+            else localizer.text("discord.pattern_ui.summary.user_scope_except_invalid", language=language)
         )
     return mode
 

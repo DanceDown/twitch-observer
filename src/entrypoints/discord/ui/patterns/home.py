@@ -194,6 +194,18 @@ class PatternHomeView(BaseFormView):
             discord_channel_id=self._discord_channel_id,
         ):
             return
+        if self.state.channel_scope_mode in {"only_selected", "all_except_selected"} and not self.state.selected_channels:
+            await self.finish_with_interaction(
+                interaction,
+                self.result("discord.pattern_ui.errors.missing_selected_channels", style=DiscordResultStyle.ERROR, ephemeral=True),
+            )
+            return
+        if self.state.user_scope_mode in {"only_selected", "all_except_selected", "all_tracked_except_selected"} and not self.state.selected_users:
+            await self.finish_with_interaction(
+                interaction,
+                self.result("discord.pattern_ui.errors.missing_selected_users", style=DiscordResultStyle.ERROR, ephemeral=True),
+            )
+            return
         if self.mode is PatternEditorMode.ADD:
             result = await dispatch_add_pattern(
                 self._services,

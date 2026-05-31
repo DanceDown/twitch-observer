@@ -278,8 +278,12 @@
       "already_linked": {
         "title": "Konto bereits verknüpft",
         "body": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) ist hier schon verbunden. Trenne es zuerst, bevor du ein neues Twitch-Konto verbindest <:oopsie:1497720439810687006>",
-        "footer": "",
-        "fallback_display_name": "ein bestehendes Twitch-Konto"
+        "footer": ""
+      },
+      "already_linked_broken_state": {
+        "title": "Kontodaten fehlen",
+        "body": "Ich hatte hier noch eine Kontoverknüpfung gespeichert, aber das eigentliche Twitch-Konto fehlt. Ich habe die alte Referenz entfernt. Bitte versuche es jetzt noch einmal <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "login_pending": {
         "title": "Login wartet schon",
@@ -299,8 +303,12 @@
       "unlinked": {
         "title": "Twitch-Konto getrennt",
         "body": "{RAW:USER} hat [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) getrennt. Auto-Antworten bleiben gespeichert und funktionieren wieder, sobald ein Konto verbunden ist <:ApuApproved:1497724288256446465>",
-        "footer": "",
-        "fallback_display_name": "ein bestehendes Twitch-Konto"
+        "footer": ""
+      },
+      "unlinked_broken_state": {
+        "title": "Kontodaten fehlen",
+        "body": "Ich hatte hier noch eine Kontoverknüpfung gespeichert, aber das eigentliche Twitch-Konto fehlt. Ich habe die alte Referenz entfernt <:oopsie:1497720439810687006>",
+        "footer": ""
       },
       "login_expired": {
         "title": "Twitch-Login abgelaufen",
@@ -1727,7 +1735,7 @@
             }
           }
         },
-        "channel_scope_only_fallback": "Nur ausgewählte Kanäle",
+        "channel_scope_only_invalid": "Ungültig, wähle zuerst mindestens einen Kanal aus",
         "channel_scope_except": {
           "template": "Alle außer {RAW:ITEMS}",
           "placeholders": {
@@ -1739,7 +1747,7 @@
             }
           }
         },
-        "channel_scope_except_fallback": "Alle außer ausgewählte Kanäle",
+        "channel_scope_except_invalid": "Ungültig, wähle zuerst mindestens einen Kanal aus",
         "user_scope_everyone": "Alle",
         "user_scope_all_tracked": "Alle bekannten Twitch-Nutzer",
         "user_scope_all_tracked_except": {
@@ -1753,7 +1761,7 @@
             }
           }
         },
-        "user_scope_all_tracked_except_fallback": "Alle bekannten außer ausgewählte Twitch-Namen",
+        "user_scope_all_tracked_except_invalid": "Ungültig, wähle zuerst mindestens einen Twitch-Nutzer aus",
         "user_scope_only": {
           "template": "Nur {RAW:ITEMS}",
           "placeholders": {
@@ -1765,7 +1773,7 @@
             }
           }
         },
-        "user_scope_only_fallback": "Nur ausgewählte Twitch-Namen",
+        "user_scope_only_invalid": "Ungültig, wähle zuerst mindestens einen Twitch-Nutzer aus",
         "user_scope_except": {
           "template": "Alle außer {RAW:ITEMS}",
           "placeholders": {
@@ -1777,7 +1785,7 @@
             }
           }
         },
-        "user_scope_except_fallback": "Alle außer ausgewählte Twitch-Namen",
+        "user_scope_except_invalid": "Ungültig, wähle zuerst mindestens einen Twitch-Nutzer aus",
         "sub_state_all": "Alle",
         "sub_state_subs": "Nur Abonnenten",
         "sub_state_non_subs": "Nur Nicht-Abonnenten",
@@ -1865,6 +1873,16 @@
         "invalid_priority": {
           "title": "Ungültige Priorität",
           "body": "Die Priorität muss eine ganze Zahl zwischen `0` und `9` sein <:oopsie:1497720439810687006>",
+          "footer": ""
+        },
+        "missing_selected_channels": {
+          "title": "Kanäle fehlen",
+          "body": "Wähle für diesen Bereich zuerst mindestens einen Kanal aus <:Binoculars:1497727665283662077>",
+          "footer": ""
+        },
+        "missing_selected_users": {
+          "title": "Nutzer fehlen",
+          "body": "Wähle für diesen Bereich zuerst mindestens einen Twitch-Nutzer aus <a:peepoSmart:1497731090704498781>",
           "footer": ""
         }
       },
