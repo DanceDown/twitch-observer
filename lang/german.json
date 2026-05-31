@@ -1594,7 +1594,7 @@
         "color_title": "Live-Ping-Farbe",
         "notification_label": "Live- oder Offline-Ping",
         "notification_description": "Wähle aus, welche Discord-Benachrichtigung geändert werden soll.",
-        "notification_option": "Ping #`{CODE:ID}` - {CHANNEL} - {STATE}",
+        "notification_option": "Ping #{CODE:ID} - {CHANNEL} - {STATE}",
         "color_label": "Farbe",
         "color_placeholder": "z. B. #9146FF"
       },
