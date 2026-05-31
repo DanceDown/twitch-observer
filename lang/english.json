@@ -617,11 +617,6 @@
         "body": "{RAW:USER} removed {CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` <:ApuApproved:1497724288256446465>",
         "footer": ""
       },
-      "notification_disabled": {
-        "title": "Notification Disabled",
-        "body": "{RAW:USER} disabled {CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` <:ApuApproved:1497724288256446465>",
-        "footer": ""
-      },
       "notification_enabled": {
         "title": "Notification Enabled",
         "body": "{RAW:USER} enabled {CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` <a:yes:1497686393369919559>",
@@ -635,16 +630,6 @@
       "none_configured": {
         "title": "Not Configured",
         "body": "There is no `{CODE:STATE}` notification for `{CODE:CHANNEL}` yet <:oopsie:1497720439810687006>",
-        "footer": ""
-      },
-      "already_disabled": {
-        "title": "Already Disabled",
-        "body": "{CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` is already disabled <a:Lurk:1497684902135463986>",
-        "footer": ""
-      },
-      "already_enabled": {
-        "title": "Already Enabled",
-        "body": "{CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` is already active <a:yes:1497686393369919559>",
         "footer": ""
       },
       "color_updated": {
@@ -1578,11 +1563,8 @@
         "footer": ""
       },
       "actions": {
-        "add_live": "Add Live Ping",
-        "add_offline": "Add Offline Ping",
+        "add": "Add Ping",
         "remove": "Remove",
-        "disable": "Disable",
-        "enable": "Enable",
         "color": "Color"
       },
       "states": {
@@ -1592,27 +1574,24 @@
         }
       },
       "action": {
-        "remove_title": "Remove Live Ping",
-        "disable_title": "Disable Live Ping",
-        "enable_title": "Enable Live Ping",
-        "color_title": "Live Ping Color",
-        "notification_label": "Live or Offline Ping",
+        "remove_title": "Remove Ping",
+        "color_title": "Ping Color",
+        "notification_label": "Ping",
         "notification_description": "Choose which Discord notification should change.",
         "notification_option": "Ping #{CODE:ID} - {CHANNEL} - {STATE}",
         "color_label": "Color",
         "color_placeholder": "e.g. #9146FF"
       },
       "modal": {
+        "add_title": "Add Ping",
+        "state_label": "State",
+        "state_description": "Choose whether this should create a live or offline ping.",
+        "state_option": {
+          "online": "Live",
+          "offline": "Offline"
+        },
         "channel_label": "Twitch Channel",
-        "channel_description": "Choose the Twitch channel that should trigger a Discord notification when it goes {STATE}.",
-        "stream": {
-          "online": {
-            "title": "Add Live Notification"
-          },
-          "offline": {
-            "title": "Add Offline Notification"
-          }
-        }
+        "channel_description": "Choose the Twitch channel that should trigger a Discord notification."
       },
       "errors": {
         "command_unavailable": {
@@ -1633,16 +1612,6 @@
         "no_remove_actions": {
           "title": "No Live Pings",
           "body": "There are no live or offline pings to remove yet <:oopsie:1497720439810687006>",
-          "footer": ""
-        },
-        "no_disable_actions": {
-          "title": "No Active Live Pings",
-          "body": "There are no active live or offline pings to disable <:oopsie:1497720439810687006>",
-          "footer": ""
-        },
-        "no_enable_actions": {
-          "title": "No Disabled Live Pings",
-          "body": "There are no disabled live or offline pings to enable <:oopsie:1497720439810687006>",
           "footer": ""
         }
       }

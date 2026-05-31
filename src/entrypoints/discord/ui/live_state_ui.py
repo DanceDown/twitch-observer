@@ -10,8 +10,6 @@ from src.localization import Localizer
 from ..helpers import normalize_optional_text
 from ..dispatch import (
     dispatch_add_channel_event,
-    dispatch_disable_channel_event,
-    dispatch_enable_channel_event,
     dispatch_remove_channel_event,
     dispatch_set_channel_event_color,
 )
@@ -30,26 +28,41 @@ class ChannelEventModal(discord.ui.Modal):
         discord_channel_id: int,
         requester_id: int,
         tracked_channels: list[TrackedChannelPresentation],
-        event_key: str,
         localizer: Localizer,
         language: str,
         default_channel_id: str | None = None,
+        default_event_key: str | None = None,
         bound_message: discord.InteractionMessage | None = None,
     ) -> None:
         super().__init__(title=title, timeout=300)
         self._services = services
         self._discord_channel_id = discord_channel_id
         self._requester_id = requester_id
-        self._event_key = event_key
         self._bound_message = bound_message
-        state_text = localizer.text(f"discord.live_state_ui.states.{event_key}", language=language)
+        self.state = discord.ui.Label(
+            text=localizer.text("discord.live_state_ui.modal.state_label", language=language),
+            description=localizer.text("discord.live_state_ui.modal.state_description", language=language),
+            component=discord.ui.Select(
+                options=[
+                    discord.SelectOption(
+                        label=localizer.text("discord.live_state_ui.modal.state_option.online", language=language),
+                        value=StreamEventKind.ONLINE.value,
+                        default=default_event_key == StreamEventKind.ONLINE.value,
+                    ),
+                    discord.SelectOption(
+                        label=localizer.text("discord.live_state_ui.modal.state_option.offline", language=language),
+                        value=StreamEventKind.OFFLINE.value,
+                        default=default_event_key == StreamEventKind.OFFLINE.value,
+                    ),
+                ],
+                min_values=1,
+                max_values=1,
+            ),
+        )
+        self.add_item(self.state)
         self.channel = discord.ui.Label(
             text=localizer.text("discord.live_state_ui.modal.channel_label", language=language),
-            description=localizer.text(
-                "discord.live_state_ui.modal.channel_description",
-                language=language,
-                STATE=state_text,
-            ),
+            description=localizer.text("discord.live_state_ui.modal.channel_description", language=language),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
@@ -72,13 +85,13 @@ class ChannelEventModal(discord.ui.Modal):
             discord_channel_id=self._discord_channel_id,
             requester_id=self._requester_id,
             twitch_channel_id=self.channel.component.values[0],
-            event_kind=StreamEventKind(self._event_key),
+            event_kind=StreamEventKind(self.state.component.values[0]),
         )
         await complete_bound_result(interaction, bound_message=self._bound_message, result=result)
 
 
 class ChannelEventActionModal(discord.ui.Modal):
-    """Remove, disable, or enable one configured live/offline notification."""
+    """Remove one configured live/offline notification."""
 
     def __init__(
         self,
@@ -119,31 +132,15 @@ class ChannelEventActionModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         twitch_channel_id, event_key = self.notification.component.values[0].split(":", 1)
-        event_kind = StreamEventKind(event_key)
-        if self._action == "remove":
-            result = await dispatch_remove_channel_event(
-                self._services,
-                discord_channel_id=self._discord_channel_id,
-                requester_id=self._requester_id,
-                twitch_channel_id=twitch_channel_id,
-                event_kind=event_kind,
-            )
-        elif self._action == "disable":
-            result = await dispatch_disable_channel_event(
-                self._services,
-                discord_channel_id=self._discord_channel_id,
-                requester_id=self._requester_id,
-                twitch_channel_id=twitch_channel_id,
-                event_kind=event_kind,
-            )
-        else:
-            result = await dispatch_enable_channel_event(
-                self._services,
-                discord_channel_id=self._discord_channel_id,
-                requester_id=self._requester_id,
-                twitch_channel_id=twitch_channel_id,
-                event_kind=event_kind,
-            )
+        if self._action != "remove":
+            raise ValueError(f"Unsupported live ping action `{self._action}`.")
+        result = await dispatch_remove_channel_event(
+            self._services,
+            discord_channel_id=self._discord_channel_id,
+            requester_id=self._requester_id,
+            twitch_channel_id=twitch_channel_id,
+            event_kind=StreamEventKind(event_key),
+        )
         await complete_bound_result(interaction, bound_message=self._bound_message, result=result)
 
 

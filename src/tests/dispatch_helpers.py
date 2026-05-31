@@ -11,13 +11,11 @@ from src.entrypoints.discord.dispatch import (
     dispatch_add_pattern_reply,
     dispatch_add_tracked_channel,
     dispatch_clear_permissions,
-    dispatch_disable_channel_event,
     dispatch_disable_channel_event_reply,
     dispatch_disable_pattern,
     dispatch_disable_pattern_reply,
     dispatch_disable_thread,
     dispatch_edit_pattern,
-    dispatch_enable_channel_event,
     dispatch_enable_channel_event_reply,
     dispatch_enable_pattern,
     dispatch_enable_pattern_reply,
@@ -391,22 +389,6 @@ async def dispatch_channel_event_command(
         )
     if action == "remove":
         return await dispatch_remove_channel_event(
-            services,
-            discord_channel_id=discord_channel_id,
-            requester_id=requester_id,
-            twitch_channel_id=twitch_channel_id,
-            event_kind=event_kind,
-        )
-    if action == "disable":
-        return await dispatch_disable_channel_event(
-            services,
-            discord_channel_id=discord_channel_id,
-            requester_id=requester_id,
-            twitch_channel_id=twitch_channel_id,
-            event_kind=event_kind,
-        )
-    if action == "enable":
-        return await dispatch_enable_channel_event(
             services,
             discord_channel_id=discord_channel_id,
             requester_id=requester_id,

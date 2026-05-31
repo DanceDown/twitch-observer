@@ -675,40 +675,6 @@ async def test_channel_event_command_manages_live_and_offline_notifications() ->
     assert second_action is not None
     assert second_action.color == "#123456"
 
-    disable_result = await dispatch_channel_event_command(
-        bus,
-        discord_channel_id=100,
-        requester_id=200,
-        action="disable",
-        twitch_channel_id="42",
-        event_key="stream.offline",
-    )
-    disabled_action = adapter_event_action_repository.get_action(
-        event_id=event.event_id,
-        action_type="discord_notify",
-    )
-    assert disable_result.style == DiscordResultStyle.SUCCESS
-    assert "#`1`" in disable_result.message
-    assert disabled_action is not None
-    assert disabled_action.disabled is True
-
-    enable_result = await dispatch_channel_event_command(
-        bus,
-        discord_channel_id=100,
-        requester_id=200,
-        action="enable",
-        twitch_channel_id="42",
-        event_key="stream.offline",
-    )
-    enabled_action = adapter_event_action_repository.get_action(
-        event_id=event.event_id,
-        action_type="discord_notify",
-    )
-    assert enable_result.style == DiscordResultStyle.SUCCESS
-    assert "#`1`" in enable_result.message
-    assert enabled_action is not None
-    assert enabled_action.disabled is False
-
     remove_result = await dispatch_channel_event_command(
         bus,
         discord_channel_id=100,

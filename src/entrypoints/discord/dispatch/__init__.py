@@ -4,8 +4,6 @@ from .account import dispatch_start_account_link, dispatch_unlink_account
 from .channel import dispatch_add_tracked_channel, dispatch_remove_tracked_channel, dispatch_set_tracked_channel_color
 from .channel_events import (
     dispatch_add_channel_event,
-    dispatch_disable_channel_event,
-    dispatch_enable_channel_event,
     dispatch_remove_channel_event,
     dispatch_set_channel_event_color,
 )
@@ -48,13 +46,11 @@ __all__ = [
     "dispatch_add_tracked_channel",
     "dispatch_add_tracked_user",
     "dispatch_clear_permissions",
-    "dispatch_disable_channel_event",
     "dispatch_disable_channel_event_reply",
     "dispatch_disable_pattern",
     "dispatch_disable_pattern_reply",
     "dispatch_disable_thread",
     "dispatch_edit_pattern",
-    "dispatch_enable_channel_event",
     "dispatch_enable_channel_event_reply",
     "dispatch_enable_pattern",
     "dispatch_enable_pattern_reply",

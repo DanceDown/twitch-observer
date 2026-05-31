@@ -28,7 +28,8 @@ def test_action_commands_remove_open_subcommands_and_make_ui_entry_fields_option
     register_account_commands(tree, object(), object(), localizer)
 
     command_names = {command.name for command in tree.get_commands()}
-    assert {"channel", "user", "ping", "reply", "liveping", "offlineping", "permission", "account"} <= command_names
+    assert {"channel", "user", "ping", "reply", "liveping", "permission", "account"} <= command_names
+    assert "offlineping" not in command_names
 
     channel_group = _group_command(tree, "channel")
     assert [command.name for command in channel_group.commands] == ["add", "remove", "color"]
@@ -61,18 +62,10 @@ def test_action_commands_remove_open_subcommands_and_make_ui_entry_fields_option
     assert not _subcommand(reply_event_group, "remove").parameters[0].required
 
     liveping_group = _group_command(tree, "liveping")
-    assert [command.name for command in liveping_group.commands] == ["add", "remove", "disable", "enable"]
-    assert not _subcommand(liveping_group, "add").parameters[0].required
-    assert not _subcommand(liveping_group, "remove").parameters[0].required
-    assert not _subcommand(liveping_group, "disable").parameters[0].required
-    assert not _subcommand(liveping_group, "enable").parameters[0].required
-
-    offlineping_group = _group_command(tree, "offlineping")
-    assert [command.name for command in offlineping_group.commands] == ["add", "remove", "disable", "enable"]
-    assert not _subcommand(offlineping_group, "add").parameters[0].required
-    assert not _subcommand(offlineping_group, "remove").parameters[0].required
-    assert not _subcommand(offlineping_group, "disable").parameters[0].required
-    assert not _subcommand(offlineping_group, "enable").parameters[0].required
+    assert [command.name for command in liveping_group.commands] == ["add", "remove", "color"]
+    assert _subcommand(liveping_group, "add").parameters == []
+    assert _subcommand(liveping_group, "remove").parameters == []
+    assert _subcommand(liveping_group, "color").parameters == []
 
     permission_group = _group_command(tree, "permission")
     assert "open" not in {command.name for command in permission_group.commands}

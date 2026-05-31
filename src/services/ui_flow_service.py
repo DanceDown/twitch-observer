@@ -66,7 +66,7 @@ class DiscordUIFlowGuardService:
                 ),
             )
 
-        if event.flow in {UIFlowKind.LIVE, UIFlowKind.OFFLINE, UIFlowKind.WRITE} and not self.channel_repository.list_channels_for_thread(
+        if event.flow in {UIFlowKind.LIVE, UIFlowKind.WRITE} and not self.channel_repository.list_channels_for_thread(
             thread.thread_id
         ):
             key = "discord.write_ui.errors.no_channels" if event.flow is UIFlowKind.WRITE else "discord.live_state_ui.errors.no_channels"
@@ -122,7 +122,7 @@ class DiscordUIFlowGuardService:
             return (ObserverPermission.MANAGE_PERMISSIONS,)
         if flow is UIFlowKind.ACCOUNT:
             return (ObserverPermission.CONTROL_OBSERVER,)
-        if flow in {UIFlowKind.LIVE, UIFlowKind.OFFLINE}:
+        if flow is UIFlowKind.LIVE:
             return (ObserverPermission.MANAGE_CHANNELS,)
         if flow is UIFlowKind.WRITE:
             return (ObserverPermission.SEND_TWITCH_MESSAGES,)
@@ -156,7 +156,6 @@ class DiscordUIFlowGuardService:
             UIFlowKind.PERMISSION: "results.permission.permission_denied",
             UIFlowKind.ACCOUNT: "results.account.permission_denied",
             UIFlowKind.LIVE: "results.channel_event.permission_denied",
-            UIFlowKind.OFFLINE: "results.channel_event.permission_denied",
         }.get(flow)
         if flow is UIFlowKind.PATTERN:
             key = (

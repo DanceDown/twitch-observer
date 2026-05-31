@@ -617,11 +617,6 @@
         "body": "{RAW:USER} hat {CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` entfernt <:ApuApproved:1497724288256446465>",
         "footer": ""
       },
-      "notification_disabled": {
-        "title": "Benachrichtigung deaktiviert",
-        "body": "{RAW:USER} hat {CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` deaktiviert <:ApuApproved:1497724288256446465>",
-        "footer": ""
-      },
       "notification_enabled": {
         "title": "Benachrichtigung aktiviert",
         "body": "{RAW:USER} hat {CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` aktiviert <a:yes:1497686393369919559>",
@@ -635,16 +630,6 @@
       "none_configured": {
         "title": "Nicht eingerichtet",
         "body": "Es gibt noch keine `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` <:oopsie:1497720439810687006>",
-        "footer": ""
-      },
-      "already_disabled": {
-        "title": "Bereits deaktiviert",
-        "body": "{CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` ist schon deaktiviert <a:Lurk:1497684902135463986>",
-        "footer": ""
-      },
-      "already_enabled": {
-        "title": "Bereits aktiviert",
-        "body": "{CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` ist schon aktiv <a:yes:1497686393369919559>",
         "footer": ""
       },
       "color_updated": {
@@ -1574,11 +1559,8 @@
         "footer": ""
       },
       "actions": {
-        "add_live": "Live-Ping hinzufügen",
-        "add_offline": "Offline-Ping hinzufügen",
+        "add": "Ping hinzufügen",
         "remove": "Entfernen",
-        "disable": "Deaktivieren",
-        "enable": "Aktivieren",
         "color": "Farbe"
       },
       "states": {
@@ -1588,27 +1570,24 @@
         }
       },
       "action": {
-        "remove_title": "Live-Ping entfernen",
-        "disable_title": "Live-Ping deaktivieren",
-        "enable_title": "Live-Ping aktivieren",
-        "color_title": "Live-Ping-Farbe",
-        "notification_label": "Live- oder Offline-Ping",
+        "remove_title": "Ping entfernen",
+        "color_title": "Ping-Farbe",
+        "notification_label": "Ping",
         "notification_description": "Wähle aus, welche Discord-Benachrichtigung geändert werden soll.",
         "notification_option": "Ping #{CODE:ID} - {CHANNEL} - {STATE}",
         "color_label": "Farbe",
         "color_placeholder": "z. B. #9146FF"
       },
       "modal": {
+        "add_title": "Ping hinzufügen",
+        "state_label": "Status",
+        "state_description": "Wähle aus, ob ein Live- oder Offline-Ping erstellt werden soll.",
+        "state_option": {
+          "online": "Live",
+          "offline": "Offline"
+        },
         "channel_label": "Twitch-Kanal",
-        "channel_description": "Wähle den Twitch-Kanal aus, der eine Discord-Benachrichtigung auslösen soll, wenn er {STATE}.",
-        "stream": {
-          "online": {
-            "title": "Live-Benachrichtigung hinzufügen"
-          },
-          "offline": {
-            "title": "Offline-Benachrichtigung hinzufügen"
-          }
-        }
+        "channel_description": "Wähle den Twitch-Kanal aus, der eine Discord-Benachrichtigung auslösen soll."
       },
       "errors": {
         "command_unavailable": {
@@ -1629,16 +1608,6 @@
         "no_remove_actions": {
           "title": "Keine Live-Pings",
           "body": "Es gibt noch keine Live- oder Offline-Pings zum Entfernen <:oopsie:1497720439810687006>",
-          "footer": ""
-        },
-        "no_disable_actions": {
-          "title": "Keine aktiven Live-Pings",
-          "body": "Es gibt keine aktiven Live- oder Offline-Pings zum Deaktivieren <:oopsie:1497720439810687006>",
-          "footer": ""
-        },
-        "no_enable_actions": {
-          "title": "Keine deaktivierten Live-Pings",
-          "body": "Es gibt keine deaktivierten Live- oder Offline-Pings zum Aktivieren <:oopsie:1497720439810687006>",
           "footer": ""
         }
       }

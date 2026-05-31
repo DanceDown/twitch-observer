@@ -21,7 +21,6 @@ from src.events.event_types import (
     DiscordResultStyle,
     RemoveChannelEventCommand,
     SetChannelEventColorCommand,
-    SetChannelEventEnabledCommand,
 )
 from src.localization import Localizer
 from src.normalization import normalize_optional_color
@@ -39,7 +38,7 @@ from src.utils.permissions import ObserverPermission
 
 logger = logging.getLogger(__name__)
 
-ChannelEventCommand = AddChannelEventCommand | RemoveChannelEventCommand | SetChannelEventEnabledCommand | SetChannelEventColorCommand
+ChannelEventCommand = AddChannelEventCommand | RemoveChannelEventCommand | SetChannelEventColorCommand
 
 
 @dataclass(slots=True, frozen=True)
@@ -84,13 +83,6 @@ class ChannelEventCommandService:
     async def handle_remove_command(self, command: RemoveChannelEventCommand) -> DiscordCommandResult:
         return await self._runner.run(command, lambda: self._handle_action(command, action="remove"), logger_=logger)
 
-    async def handle_set_enabled_command(self, command: SetChannelEventEnabledCommand) -> DiscordCommandResult:
-        return await self._runner.run(
-            command,
-            lambda: self._handle_action(command, action="enable" if command.enabled else "disable"),
-            logger_=logger,
-        )
-
     async def handle_set_color_command(self, command: SetChannelEventColorCommand) -> DiscordCommandResult:
         return await self._runner.run(command, lambda: self._set_color(command), logger_=logger)
 
@@ -115,7 +107,7 @@ class ChannelEventCommandService:
         channel_name = await self._channel_display_name(command.twitch_channel_id)
         if action == "add":
             return self._add_notification(command, thread, channel_name)
-        if action in {"remove", "disable", "enable"}:
+        if action == "remove":
             return self._update_notification(command, action=action, thread=thread, channel_name=channel_name)
         raise ValueError(self.localizer.text("results.channel_event.unsupported_action", language=thread.language))
 
@@ -208,53 +200,12 @@ class ChannelEventCommandService:
                 ephemeral=True,
             )
 
-        if action == "remove":
-            display_id = self._display_index(thread.thread_id, adapter_event.event_id) or adapter_event.event_id
-            self.adapter_event_action_repository.remove_action(
-                event_id=adapter_event.event_id,
-                action_type=DISCORD_NOTIFY_ACTION,
-            )
-            key = "results.channel_event.notification_removed"
-        elif action == "disable":
-            if existing_action.disabled:
-                display_id = self._display_index(thread.thread_id, adapter_event.event_id) or adapter_event.event_id
-                return build_thread_result(
-                    self.localizer,
-                    "results.channel_event.already_disabled",
-                    thread=thread,
-                    ID=display_id,
-                    STATE=self._state_label(command.event_kind.value, thread),
-                    CHANNEL=channel_name,
-                    style=DiscordResultStyle.INFO,
-                    ephemeral=True,
-                )
-            self.adapter_event_action_repository.set_action_disabled(
-                event_id=adapter_event.event_id,
-                action_type=DISCORD_NOTIFY_ACTION,
-                disabled=True,
-            )
-            display_id = self._display_index(thread.thread_id, adapter_event.event_id) or adapter_event.event_id
-            key = "results.channel_event.notification_disabled"
-        else:
-            if not existing_action.disabled:
-                display_id = self._display_index(thread.thread_id, adapter_event.event_id) or adapter_event.event_id
-                return build_thread_result(
-                    self.localizer,
-                    "results.channel_event.already_enabled",
-                    thread=thread,
-                    ID=display_id,
-                    STATE=self._state_label(command.event_kind.value, thread),
-                    CHANNEL=channel_name,
-                    style=DiscordResultStyle.INFO,
-                    ephemeral=True,
-                )
-            self.adapter_event_action_repository.set_action_disabled(
-                event_id=adapter_event.event_id,
-                action_type=DISCORD_NOTIFY_ACTION,
-                disabled=False,
-            )
-            display_id = self._display_index(thread.thread_id, adapter_event.event_id) or adapter_event.event_id
-            key = "results.channel_event.notification_enabled"
+        display_id = self._display_index(thread.thread_id, adapter_event.event_id) or adapter_event.event_id
+        self.adapter_event_action_repository.remove_action(
+            event_id=adapter_event.event_id,
+            action_type=DISCORD_NOTIFY_ACTION,
+        )
+        key = "results.channel_event.notification_removed"
 
         return build_thread_result(
             self.localizer,

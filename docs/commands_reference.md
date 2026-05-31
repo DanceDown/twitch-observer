@@ -129,29 +129,19 @@ Behavior:
 
 ### `/liveping`
 
-Manage live notification triggers for tracked Twitch channels.
-
-Actions:
-
-- `Remove`
-- `Disable`
-- `Enable`
-- `Add`
-
-### `/offlineping`
-
-Manage offline notification triggers for tracked Twitch channels.
+Manage live and offline notification triggers for tracked Twitch channels.
 
 Actions:
 
 - `Add`
 - `Remove`
-- `Disable`
-- `Enable`
+- `Color`
 
 Behavior:
 
 - stores event-trigger configuration in adapter-event tables
+- `Add` opens one shared modal where the user chooses both the tracked Twitch channel and whether the ping should be `Live` or `Offline`
+- `Remove` and `Color` show one combined list of both live and offline pings using the shared displayed IDs
 - does not control whether channels are monitored globally
 
 ### `/permission`
@@ -210,6 +200,7 @@ Sections:
 
 - `Pings`
 - `Auto-Replies`
+- `Live and Offline Pings`
 - `Tracked Channels`
 - `Tracked Users`
 - `Permissions`

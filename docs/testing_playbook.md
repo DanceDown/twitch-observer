@@ -146,14 +146,13 @@ In a fresh Discord context, run each command once before `/join`:
 4. `/language`
 5. `/channel`
 6. `/liveping`
-7. `/offlineping`
-8. `/ping`
-9. `/reply`
-10. `/account`
-11. `/permission`
-12. `/write`
-13. `/show`
-14. `/user`
+7. `/ping`
+8. `/reply`
+9. `/account`
+10. `/permission`
+11. `/write`
+12. `/show`
+13. `/user`
 
 Expected result:
 
@@ -285,7 +284,7 @@ Pattern replies:
 
 Event replies:
 
-1. Configure `/liveping` or `/offlineping` trigger first (section 3.9).
+1. Configure a `/liveping` trigger first (section 3.9).
 2. Add event auto-reply.
 3. Disable/enable/remove event auto-reply.
 
@@ -332,21 +331,16 @@ Failure-path checks (intentionally induced):
 ## 3.9 Live/offline notification flow
 
 1. Ensure at least one tracked channel exists.
-2. Run `/liveping add` for `channel_a`.
-3. Add same live notification again.
-4. Disable notification, disable again.
-5. Enable notification, enable again.
-6. Remove notification, remove again.
-7. Add offline notification with `/offlineping add` for `channel_a`, then remove it again.
+2. Run `/liveping add` and choose `Live` plus `channel_a`.
+3. Add the same live ping again.
+4. Run `/liveping add` again and choose `Offline` plus `channel_a`.
+5. Remove one configured ping with `/liveping remove`.
+6. Remove the same kind again to hit the empty/not-configured path if needed.
 
 Expected message families:
 
 - `results.channel_event.notification_added.*`
 - `results.channel_event.already_configured.*`
-- `results.channel_event.notification_disabled.*`
-- `results.channel_event.already_disabled.*`
-- `results.channel_event.notification_enabled.*`
-- `results.channel_event.already_enabled.*`
 - `results.channel_event.notification_removed.*`
 - `results.channel_event.none_configured.*`
 
@@ -354,8 +348,6 @@ UI empty-state checks:
 
 - `discord.live_state_ui.errors.no_channels.*`
 - `discord.live_state_ui.errors.no_remove_actions.*`
-- `discord.live_state_ui.errors.no_disable_actions.*`
-- `discord.live_state_ui.errors.no_enable_actions.*`
 
 Runtime event notifications:
 

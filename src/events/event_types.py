@@ -66,7 +66,6 @@ class UIFlowKind(StrEnum):
     PERMISSION = "permission"
     ACCOUNT = "account"
     LIVE = "live"
-    OFFLINE = "offline"
     WRITE = "write"
     PATTERN = "ping"
     REPLY = "reply"
@@ -411,17 +410,6 @@ class RemoveChannelEventCommand:
     requester_id: int
     twitch_channel_id: str
     event_kind: StreamEventKind
-
-
-@dataclass(slots=True, frozen=True)
-class SetChannelEventEnabledCommand:
-    """Enable or disable one tracked live/offline event configuration."""
-
-    discord_channel_id: int
-    requester_id: int
-    twitch_channel_id: str
-    event_kind: StreamEventKind
-    enabled: bool
 
 
 @dataclass(slots=True, frozen=True)
