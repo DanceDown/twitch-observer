@@ -602,6 +602,7 @@
       },
       "unsupported_event": "I don't know that Twitch event <a:peepoConfused:1497729266266275840>",
       "unsupported_action": "This action is not supported <:oopsie:1497720439810687006>",
+      "invalid_color": "That color looks suspicious. Please use something like `#9146FF` <:d_:1497685665960165417>",
       "state": {
         "live": "Live",
         "offline": "Offline"
@@ -644,6 +645,21 @@
       "already_enabled": {
         "title": "Already Enabled",
         "body": "{CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` is already active <a:yes:1497686393369919559>",
+        "footer": ""
+      },
+      "color_updated": {
+        "title": "Ping Color Set",
+        "body": "{RAW:USER} set the color of {CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` to `{CODE:COLOR}` <a:yes:1497686393369919559>",
+        "footer": ""
+      },
+      "color_cleared": {
+        "title": "Ping Color Cleared",
+        "body": "{RAW:USER} cleared the color of {CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` <:ApuApproved:1497724288256446465>",
+        "footer": ""
+      },
+      "already_color": {
+        "title": "Color Already Set",
+        "body": "{CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` already uses `{CODE:COLOR}` <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "went_live": {
@@ -1128,6 +1144,7 @@
       "channel": "Channel: [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
       "trigger": "Trigger: `{CODE:STATE}`",
       "live_state": "Live state: `{CODE:STATE}`",
+      "custom_color": "Custom color: `{CODE:COLOR}`",
       "disabled": "Disabled",
       "details": {
         "template": "\n{RAW:ITEMS}",
@@ -1413,6 +1430,11 @@
       "footer_channel": "Channel: {CHANNEL}",
       "reply_field": "Reply"
     },
+    "channel_event_reply_embed": {
+      "description": "{CODE:STATE} ping #`{CODE:ID}` sent an auto-reply.",
+      "footer": "Channel: {CHANNEL}",
+      "reply_field": "Reply"
+    },
     "shared": {
       "form_locked": {
         "title": "Form Locked",
@@ -1560,7 +1582,8 @@
         "add_offline": "Add Offline Ping",
         "remove": "Remove",
         "disable": "Disable",
-        "enable": "Enable"
+        "enable": "Enable",
+        "color": "Color"
       },
       "states": {
         "stream": {
@@ -1572,9 +1595,12 @@
         "remove_title": "Remove Live Ping",
         "disable_title": "Disable Live Ping",
         "enable_title": "Enable Live Ping",
+        "color_title": "Live Ping Color",
         "notification_label": "Live or Offline Ping",
         "notification_description": "Choose which Discord notification should change.",
-        "notification_option": "Ping #`{CODE:ID}` - {CHANNEL} - {STATE}"
+        "notification_option": "Ping #`{CODE:ID}` - {CHANNEL} - {STATE}",
+        "color_label": "Color",
+        "color_placeholder": "e.g. #9146FF"
       },
       "modal": {
         "channel_label": "Twitch Channel",
@@ -1597,6 +1623,11 @@
         "no_channels": {
           "title": "No Channels Available",
           "body": "You need to add a channel first <:oopsie:1497720439810687006>",
+          "footer": ""
+        },
+        "no_color_actions": {
+          "title": "No Pings Available",
+          "body": "There are no live or offline pings whose color could be changed <:oopsie:1497720439810687006>",
           "footer": ""
         },
         "no_remove_actions": {

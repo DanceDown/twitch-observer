@@ -15,9 +15,10 @@ from ..dispatch import (
     dispatch_disable_channel_event,
     dispatch_enable_channel_event,
     dispatch_remove_channel_event,
+    dispatch_set_channel_event_color,
 )
 from ..helpers import command_unavailable_result, ensure_ui_flow_allowed, send_initial_result
-from ..ui.live_state_ui import ChannelEventActionModal, ChannelEventModal
+from ..ui.live_state_ui import ChannelEventActionModal, ChannelEventColorModal, ChannelEventModal
 from ..ui_data import AdapterEventActionPresentation, DiscordUIDataProvider
 
 
@@ -149,6 +150,29 @@ def _register_live_state_group(
             twitch_channel_id=twitch_channel_id,
         )
 
+    @group.command(name="color", description="Set or clear the color for one notification.")
+    @discord.app_commands.describe(
+        twitch_channel_login="Tracked Twitch channel login.",
+        twitch_channel_id="Tracked Twitch channel ID (optional alternative to login).",
+        color="Hex color (leave empty to clear).",
+    )
+    async def live_color(
+        interaction: discord.Interaction,
+        twitch_channel_login: str | None = None,
+        twitch_channel_id: str | None = None,
+        color: str | None = None,
+    ) -> None:
+        await _handle_live_color(
+            interaction,
+            services=services,
+            ui_data_provider=ui_data_provider,
+            localizer=localizer,
+            state=state,
+            twitch_channel_login=twitch_channel_login,
+            twitch_channel_id=twitch_channel_id,
+            color=color,
+        )
+
     tree.add_command(group)
 
 
@@ -167,7 +191,8 @@ async def _handle_live_action(
     if interaction.channel_id is None:
         await send_initial_result(interaction, command_unavailable_result())
         return
-    if not await ensure_ui_flow_allowed(interaction, services, flow=UIFlowKind.LIVE, step=step):
+    flow = UIFlowKind.LIVE if state is StreamEventKind.ONLINE else UIFlowKind.OFFLINE
+    if not await ensure_ui_flow_allowed(interaction, services, flow=flow, step=step):
         return
 
     normalized_login = (twitch_channel_login or "").strip().lower()
@@ -292,6 +317,72 @@ async def _open_live_action_modal(
             language=_language(interaction, ui_data_provider, localizer),
         )
     )
+
+
+async def _handle_live_color(
+    interaction: discord.Interaction,
+    *,
+    services: DiscordServiceBundle,
+    ui_data_provider: DiscordUIDataProvider,
+    localizer: Localizer,
+    state: StreamEventKind,
+    twitch_channel_login: str | None,
+    twitch_channel_id: str | None,
+    color: str | None,
+) -> None:
+    if interaction.channel_id is None:
+        await send_initial_result(interaction, command_unavailable_result())
+        return
+    flow = UIFlowKind.LIVE if state is StreamEventKind.ONLINE else UIFlowKind.OFFLINE
+    if not await ensure_ui_flow_allowed(interaction, services, flow=flow, step=UIFlowStep.COLOR):
+        return
+
+    normalized_login = (twitch_channel_login or "").strip().lower()
+    normalized_id = (twitch_channel_id or "").strip()
+    normalized_color = color.strip() if color is not None else None
+    if not normalized_login and not normalized_id:
+        actions = [
+            item
+            for item in await ui_data_provider.list_adapter_event_actions(interaction.channel_id)
+            if item.action.action_type == DISCORD_NOTIFY_ACTION and item.event.event.event_key == state.value
+        ]
+        if not actions:
+            await send_initial_result(
+                interaction,
+                _live_result(interaction, ui_data_provider, localizer, "discord.live_state_ui.errors.no_color_actions"),
+            )
+            return
+        await interaction.response.send_modal(
+            ChannelEventColorModal(
+                title=localizer.text(
+                    "discord.live_state_ui.action.color_title",
+                    language=_language(interaction, ui_data_provider, localizer),
+                ),
+                services=services,
+                discord_channel_id=interaction.channel_id,
+                requester_id=interaction.user.id,
+                actions=actions,
+                localizer=localizer,
+                language=_language(interaction, ui_data_provider, localizer),
+            )
+        )
+        return
+
+    resolved_channel_id = normalized_id
+    if not resolved_channel_id:
+        tracked_channels = await ui_data_provider.list_tracked_channels(interaction.channel_id)
+        id_by_login = {item.login.lower(): item.user_id for item in tracked_channels}
+        resolved_channel_id = id_by_login.get(normalized_login, normalized_login)
+
+    result = await dispatch_set_channel_event_color(
+        services,
+        discord_channel_id=interaction.channel_id,
+        requester_id=interaction.user.id,
+        twitch_channel_id=resolved_channel_id,
+        event_kind=state,
+        color=normalized_color or None,
+    )
+    await send_initial_result(interaction, result)
 
 
 def _language(

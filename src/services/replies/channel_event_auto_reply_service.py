@@ -3,22 +3,27 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from src.gateways.twitch_api import TwitchAPIError, TwitchAuthenticationError
 from src.database.connection import (
+    ChannelRecord,
     AdapterEventActionRepository,
     AdapterEventRepository,
     ChannelRepository,
     ThreadRepository,
     TwitchAccountRepository,
 )
+from src.localization import Localizer
 from src.events.event_types import (
     TwitchChannelLiveStateChangedEvent,
 )
+from src.services.channel_event_display_index import ChannelEventDisplayIndexResolver
+from src.services.patterns import TrackingNotificationSender
 from src.services.twitch_gateways import TwitchReplyGateway
 from src.services.twitch_runtime import (
     CHANNEL_SUBJECT_TYPE,
+    DISCORD_NOTIFY_ACTION,
     STREAM_EVENT_KEY_TO_STATE,
     STREAM_OFFLINE_EVENT_KEY,
     STREAM_ONLINE_EVENT_KEY,
@@ -28,6 +33,7 @@ from src.services.twitch_runtime import (
     refresh_linked_account,
     safe_get_twitch_user_by_id,
 )
+from src.utils.discord_embeds import build_channel_event_auto_reply_embed
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +48,9 @@ class ChannelEventAutoReplyService:
     adapter_event_action_repository: AdapterEventActionRepository
     account_repository: TwitchAccountRepository
     twitch_api: TwitchReplyGateway
+    tracking_notifier: TrackingNotificationSender
     token_refresh_skew_seconds: int
+    localizer: Localizer = field(default_factory=Localizer.from_directory)
 
     async def handle_channel_live_state_changed(
         self,
@@ -79,6 +87,18 @@ class ChannelEventAutoReplyService:
             account = self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
             if account is None or not account.access_token:
                 continue
+            source_channel = self.channel_repository.get_by_thread_and_twitch_channel(
+                thread.thread_id,
+                event.twitch_channel_id,
+            )
+            notify_action = self.adapter_event_action_repository.get_action(
+                event_id=configured_event.event_id,
+                action_type=DISCORD_NOTIFY_ACTION,
+            )
+            display_index = ChannelEventDisplayIndexResolver(self.adapter_event_action_repository).resolve(
+                thread_id=thread.thread_id,
+                event_id=configured_event.event_id,
+            ) or configured_event.event_id
             account = (
                 await ensure_fresh_linked_account(
                     account=account,
@@ -103,6 +123,17 @@ class ChannelEventAutoReplyService:
                     broadcaster_id=event.twitch_channel_id,
                     message=rendered_message,
                 )
+                await self._notify_auto_reply(
+                    thread=thread,
+                    source_channel=source_channel,
+                    display_index=display_index,
+                    channel_display_name=channel_name,
+                    channel_login=channel_login,
+                    channel_icon_url=None if channel_user is None else channel_user.profile_image_url,
+                    state=event_state,
+                    reply_message=rendered_message,
+                    event_color=None if notify_action is None else notify_action.color,
+                )
             except TwitchAuthenticationError:
                 refreshed = await refresh_linked_account(
                     account=account,
@@ -119,6 +150,17 @@ class ChannelEventAutoReplyService:
                     sender_id=refreshed.twitch_user_id,
                     broadcaster_id=event.twitch_channel_id,
                     message=rendered_message,
+                )
+                await self._notify_auto_reply(
+                    thread=thread,
+                    source_channel=source_channel,
+                    display_index=display_index,
+                    channel_display_name=channel_name,
+                    channel_login=channel_login,
+                    channel_icon_url=None if channel_user is None else channel_user.profile_image_url,
+                    state=event_state,
+                    reply_message=rendered_message,
+                    event_color=None if notify_action is None else notify_action.color,
                 )
             except TwitchAPIError as error:
                 logger.warning(
@@ -139,3 +181,36 @@ class ChannelEventAutoReplyService:
     ) -> str:
         rendered = template.replace("{CHANNEL}", channel_name)
         return rendered.replace("{STATE}", state)
+
+    async def _notify_auto_reply(
+        self,
+        *,
+        thread,
+        source_channel: ChannelRecord | None,
+        display_index: int,
+        channel_display_name: str,
+        channel_login: str | None,
+        channel_icon_url: str | None,
+        state: str,
+        reply_message: str,
+        event_color: str | None,
+    ) -> None:
+        await self.tracking_notifier.send_tracking_embed(
+            thread.discord_channel_id,
+            build_channel_event_auto_reply_embed(
+                thread=thread,
+                localizer=self.localizer,
+                display_index=display_index,
+                channel_display_name=channel_display_name,
+                channel_login=channel_login,
+                state=self.localizer.text(
+                    f"discord.live_state_ui.states.stream.{state}",
+                    language=thread.language,
+                ),
+                reply_message=reply_message,
+                channel=source_channel,
+                event_color=event_color,
+                channel_icon_url=channel_icon_url,
+            ),
+            channel_login=channel_login,
+        )

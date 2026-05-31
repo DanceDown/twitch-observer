@@ -20,9 +20,11 @@ from src.events.event_types import (
     DiscordCommandResult,
     DiscordResultStyle,
     RemoveChannelEventCommand,
+    SetChannelEventColorCommand,
     SetChannelEventEnabledCommand,
 )
 from src.localization import Localizer
+from src.normalization import normalize_optional_color
 from src.services.channel_event_display_index import ChannelEventDisplayIndexResolver
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
 from src.services.twitch_gateways import TwitchChannelStateLookup
@@ -37,7 +39,7 @@ from src.utils.permissions import ObserverPermission
 
 logger = logging.getLogger(__name__)
 
-ChannelEventCommand = AddChannelEventCommand | RemoveChannelEventCommand | SetChannelEventEnabledCommand
+ChannelEventCommand = AddChannelEventCommand | RemoveChannelEventCommand | SetChannelEventEnabledCommand | SetChannelEventColorCommand
 
 
 @dataclass(slots=True, frozen=True)
@@ -88,6 +90,9 @@ class ChannelEventCommandService:
             lambda: self._handle_action(command, action="enable" if command.enabled else "disable"),
             logger_=logger,
         )
+
+    async def handle_set_color_command(self, command: SetChannelEventColorCommand) -> DiscordCommandResult:
+        return await self._runner.run(command, lambda: self._set_color(command), logger_=logger)
 
     async def _handle_action(self, command: ChannelEventCommand, *, action: str) -> DiscordCommandResult:
         thread = self._ensure_permission(command)
@@ -276,6 +281,107 @@ class ChannelEventCommandService:
         state_key = "live" if event_key == STREAM_ONLINE_EVENT_KEY else "offline"
         return self.localizer.text(f"results.channel_event.state.{state_key}", language=thread.language)
 
+    def _set_color(self, command: SetChannelEventColorCommand) -> DiscordCommandResult:
+        thread = self._ensure_permission(command)
+        if isinstance(thread, DiscordCommandResult):
+            return thread
+
+        tracked_channel = self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, command.twitch_channel_id)
+        if tracked_channel is None:
+            return build_thread_result(
+                self.localizer,
+                "results.channel_event.channel_not_tracked",
+                thread=thread,
+                style=DiscordResultStyle.ERROR,
+                ephemeral=True,
+            )
+
+        adapter_event = self.adapter_event_repository.get_event(
+            thread_id=thread.thread_id,
+            adapter_key=TWITCH_ADAPTER_KEY,
+            subject_type=CHANNEL_SUBJECT_TYPE,
+            subject_id=command.twitch_channel_id,
+            event_key=command.event_kind.value,
+        )
+        notify_action = (
+            None
+            if adapter_event is None
+            else self.adapter_event_action_repository.get_action(
+                event_id=adapter_event.event_id,
+                action_type=DISCORD_NOTIFY_ACTION,
+            )
+        )
+        channel_name = self._cached_channel_display_name(command.twitch_channel_id)
+        if adapter_event is None or notify_action is None:
+            return build_thread_result(
+                self.localizer,
+                "results.channel_event.none_configured",
+                thread=thread,
+                STATE=self._state_label(command.event_kind.value, thread),
+                CHANNEL=channel_name,
+                style=DiscordResultStyle.ERROR,
+                ephemeral=True,
+            )
+
+        display_id = self._display_index(thread.thread_id, adapter_event.event_id) or adapter_event.event_id
+        try:
+            normalized_color = normalize_optional_color(command.color)
+        except ValueError as error:
+            raise ValueError(self.localizer.text("results.channel_event.invalid_color", language=thread.language)) from error
+
+        if normalized_color is None:
+            updated = self.adapter_event_action_repository.set_action_color(
+                event_id=adapter_event.event_id,
+                action_type=DISCORD_NOTIFY_ACTION,
+                color=None,
+            )
+            if updated is None:
+                raise RuntimeError("Adapter event action repository returned no row for clear color.")
+            return build_thread_result(
+                self.localizer,
+                "results.channel_event.color_cleared",
+                thread=thread,
+                ID=display_id,
+                STATE=self._state_label(command.event_kind.value, thread),
+                CHANNEL=channel_name,
+                style=DiscordResultStyle.SUCCESS,
+                ephemeral=False,
+                USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            )
+
+        if notify_action.color == normalized_color:
+            return build_thread_result(
+                self.localizer,
+                "results.channel_event.already_color",
+                thread=thread,
+                ID=display_id,
+                STATE=self._state_label(command.event_kind.value, thread),
+                CHANNEL=channel_name,
+                COLOR=normalized_color,
+                style=DiscordResultStyle.INFO,
+                ephemeral=True,
+            )
+
+        updated = self.adapter_event_action_repository.set_action_color(
+            event_id=adapter_event.event_id,
+            action_type=DISCORD_NOTIFY_ACTION,
+            color=normalized_color,
+        )
+        if updated is None:
+            raise RuntimeError("Adapter event action repository returned no row for set color.")
+        return build_thread_result(
+            self.localizer,
+            "results.channel_event.color_updated",
+            thread=thread,
+            ID=display_id,
+            STATE=self._state_label(command.event_kind.value, thread),
+            CHANNEL=channel_name,
+            COLOR=updated.color or "",
+            style=DiscordResultStyle.SUCCESS,
+            ephemeral=False,
+            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+        )
+
     def _ensure_permission(
         self,
         command: ChannelEventCommand,
@@ -297,3 +403,9 @@ class ChannelEventCommandService:
             thread_id=thread_id,
             event_id=event_id,
         )
+
+    def _cached_channel_display_name(self, twitch_channel_id: str) -> str:
+        cached = self.twitch_api.get_cached_user_by_id(twitch_channel_id.strip())
+        if cached is not None:
+            return cached.display_name
+        return twitch_channel_id

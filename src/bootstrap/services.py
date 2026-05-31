@@ -218,7 +218,9 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         adapter_event_action_repository=core.adapter_event_action_repository,
         account_repository=core.account_repository,
         twitch_api=core.twitch_bundle,
+        tracking_notifier=runtime_coordinator.tracking,
         token_refresh_skew_seconds=core.config.twitch_account_token_refresh_skew_seconds,
+        localizer=core.localizer,
     )
     chat_pipeline = ChatMessageProcessingService(
         message_ingest=message_ingest,

@@ -114,6 +114,7 @@ class DiscordCommandResult:
     style: DiscordResultStyle = DiscordResultStyle.INFO
     ephemeral: bool = False
     thumbnail_url: str | None = None
+    color: str | None = None
     language: str | None = None
 
 
@@ -421,6 +422,17 @@ class SetChannelEventEnabledCommand:
     twitch_channel_id: str
     event_kind: StreamEventKind
     enabled: bool
+
+
+@dataclass(slots=True, frozen=True)
+class SetChannelEventColorCommand:
+    """Set or clear the Discord embed color for one tracked live/offline ping."""
+
+    discord_channel_id: int
+    requester_id: int
+    twitch_channel_id: str
+    event_kind: StreamEventKind
+    color: str | None
 
 
 @dataclass(slots=True, frozen=True)

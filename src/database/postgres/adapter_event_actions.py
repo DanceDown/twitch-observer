@@ -28,14 +28,14 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
         with self.database.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO adapter_event_action (event_id, action_type, message_template, reply_as_reply, disabled)
-                VALUES (%s, %s, %s, %s, FALSE)
+                INSERT INTO adapter_event_action (event_id, action_type, message_template, reply_as_reply, color, disabled)
+                VALUES (%s, %s, %s, %s, NULL, FALSE)
                 ON CONFLICT (event_id, action_type)
                 DO UPDATE SET
                     message_template = EXCLUDED.message_template,
                     reply_as_reply = EXCLUDED.reply_as_reply,
                     disabled = FALSE
-                RETURNING event_id, action_type, message_template, reply_as_reply, disabled
+                RETURNING event_id, action_type, message_template, reply_as_reply, color, disabled
                 """,
                 (event_id, action_type, message_template, reply_as_reply),
             )
@@ -47,7 +47,7 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
         with self.database.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT event_id, action_type, message_template, reply_as_reply, disabled
+                SELECT event_id, action_type, message_template, reply_as_reply, color, disabled
                 FROM adapter_event_action
                 WHERE event_id = %s AND action_type = %s
                 """,
@@ -64,7 +64,7 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
                 """
                 DELETE FROM adapter_event_action
                 WHERE event_id = %s AND action_type = %s
-                RETURNING event_id, action_type, message_template, reply_as_reply, disabled
+                RETURNING event_id, action_type, message_template, reply_as_reply, color, disabled
                 """,
                 (event_id, action_type),
             )
@@ -86,9 +86,31 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
                 UPDATE adapter_event_action
                 SET disabled = %s
                 WHERE event_id = %s AND action_type = %s
-                RETURNING event_id, action_type, message_template, reply_as_reply, disabled
+                RETURNING event_id, action_type, message_template, reply_as_reply, color, disabled
                 """,
                 (disabled, event_id, action_type),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return self._build_record(row)
+
+    def set_action_color(
+        self,
+        *,
+        event_id: int,
+        action_type: str,
+        color: str | None,
+    ) -> AdapterEventActionRecord | None:
+        with self.database.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE adapter_event_action
+                SET color = %s
+                WHERE event_id = %s AND action_type = %s
+                RETURNING event_id, action_type, message_template, reply_as_reply, color, disabled
+                """,
+                (color, event_id, action_type),
             )
             row = cursor.fetchone()
         if row is None:
@@ -105,7 +127,7 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
             if include_disabled:
                 cursor.execute(
                     """
-                    SELECT event_id, action_type, message_template, reply_as_reply, disabled
+                    SELECT event_id, action_type, message_template, reply_as_reply, color, disabled
                     FROM adapter_event_action
                     WHERE event_id = %s
                     ORDER BY action_type
@@ -115,7 +137,7 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
             else:
                 cursor.execute(
                     """
-                    SELECT event_id, action_type, message_template, reply_as_reply, disabled
+                    SELECT event_id, action_type, message_template, reply_as_reply, color, disabled
                     FROM adapter_event_action
                     WHERE event_id = %s AND disabled = FALSE
                     ORDER BY action_type
@@ -136,7 +158,7 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
                 cursor.execute(
                     """
                     SELECT ae.event_id, ae.thread_id, ae.adapter_key, ae.subject_type, ae.subject_id, ae.event_key, ae.disabled,
-                           aea.event_id, aea.action_type, aea.message_template, aea.reply_as_reply, aea.disabled
+                           aea.event_id, aea.action_type, aea.message_template, aea.reply_as_reply, aea.color, aea.disabled
                     FROM adapter_event ae
                     JOIN adapter_event_action aea ON aea.event_id = ae.event_id
                     WHERE ae.thread_id = %s
@@ -148,7 +170,7 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
                 cursor.execute(
                     """
                     SELECT ae.event_id, ae.thread_id, ae.adapter_key, ae.subject_type, ae.subject_id, ae.event_key, ae.disabled,
-                           aea.event_id, aea.action_type, aea.message_template, aea.reply_as_reply, aea.disabled
+                           aea.event_id, aea.action_type, aea.message_template, aea.reply_as_reply, aea.color, aea.disabled
                     FROM adapter_event ae
                     JOIN adapter_event_action aea ON aea.event_id = ae.event_id
                     WHERE ae.thread_id = %s
@@ -173,5 +195,6 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
             action_type=str(row[1]),
             message_template=None if row[2] is None else str(row[2]),
             reply_as_reply=bool(row[3]),
-            disabled=bool(row[4]),
+            color=None if row[4] is None else str(row[4]),
+            disabled=bool(row[5]),
         )

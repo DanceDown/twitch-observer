@@ -7,6 +7,7 @@ from .channel_events import (
     dispatch_disable_channel_event,
     dispatch_enable_channel_event,
     dispatch_remove_channel_event,
+    dispatch_set_channel_event_color,
 )
 from .patterns import (
     dispatch_add_pattern,
@@ -69,6 +70,7 @@ __all__ = [
     "dispatch_remove_tracked_user",
     "dispatch_revoke_permissions",
     "dispatch_send_twitch_message",
+    "dispatch_set_channel_event_color",
     "dispatch_set_thread_color",
     "dispatch_set_thread_language",
     "dispatch_set_tracked_channel_color",

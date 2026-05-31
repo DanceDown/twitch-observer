@@ -15,6 +15,7 @@ def build_result(
     style: DiscordResultStyle = DiscordResultStyle.INFO,
     ephemeral: bool = False,
     thumbnail_url: str | None = None,
+    color: str | None = None,
     **placeholders: object,
 ) -> DiscordCommandResult:
     """Build one Discord command result from a localized `title`/`body`/`footer` object."""
@@ -51,6 +52,7 @@ def build_result(
         style=style,
         ephemeral=ephemeral,
         thumbnail_url=thumbnail_url,
+        color=color,
         language=localizer.resolve_language(language),
     )
 
@@ -63,6 +65,7 @@ def build_thread_result(
     style: DiscordResultStyle = DiscordResultStyle.INFO,
     ephemeral: bool = False,
     thumbnail_url: str | None = None,
+    color: str | None = None,
     **placeholders: object,
 ) -> DiscordCommandResult:
     """Build one Discord command result using the language configured on a thread."""
@@ -73,6 +76,7 @@ def build_thread_result(
         style=style,
         ephemeral=ephemeral,
         thumbnail_url=thumbnail_url,
+        color=color,
         **placeholders,
     )
 

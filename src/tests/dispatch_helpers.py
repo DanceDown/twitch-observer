@@ -32,6 +32,7 @@ from src.entrypoints.discord.dispatch import (
     dispatch_remove_tracked_channel,
     dispatch_revoke_permissions,
     dispatch_send_twitch_message,
+    dispatch_set_channel_event_color,
     dispatch_set_thread_color,
     dispatch_set_thread_language,
     dispatch_set_tracked_channel_color,
@@ -377,6 +378,7 @@ async def dispatch_channel_event_command(
     action: str = "add",
     twitch_channel_id: str,
     event_key: str,
+    color: str | None = None,
 ):
     event_kind = StreamEventKind(event_key)
     if action == "add":
@@ -410,6 +412,15 @@ async def dispatch_channel_event_command(
             requester_id=requester_id,
             twitch_channel_id=twitch_channel_id,
             event_kind=event_kind,
+        )
+    if action == "color":
+        return await dispatch_set_channel_event_color(
+            services,
+            discord_channel_id=discord_channel_id,
+            requester_id=requester_id,
+            twitch_channel_id=twitch_channel_id,
+            event_kind=event_kind,
+            color=color,
         )
     raise ValueError(f"Unsupported channel-event action `{action}`.")
 

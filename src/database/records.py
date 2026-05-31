@@ -147,6 +147,7 @@ class AdapterEventActionRecord:
     action_type: str
     message_template: str | None
     reply_as_reply: bool
+    color: str | None
     disabled: bool
 
 

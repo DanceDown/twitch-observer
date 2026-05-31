@@ -119,6 +119,14 @@ class ShowSectionRenderer:
                         STATE=self.stream_state_label("online" if tracked_channel.is_live else "offline", language=language),
                     )
                 )
+            if action.color:
+                details.append(
+                    self.localizer.text(
+                        "show.channel_event.custom_color",
+                        language=language,
+                        COLOR=action.color,
+                    )
+                )
             if action.disabled:
                 details.append(self.localizer.text("show.channel_event.disabled", language=language))
             rows.append(

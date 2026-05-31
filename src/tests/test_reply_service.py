@@ -500,11 +500,13 @@ class InMemoryAdapterEventActionRepository(AdapterEventActionRepository):
         message_template: str | None,
         reply_as_reply: bool,
     ) -> AdapterEventActionRecord:
+        existing = self.actions.get((event_id, action_type))
         record = AdapterEventActionRecord(
             event_id=event_id,
             action_type=action_type,
             message_template=message_template,
             reply_as_reply=reply_as_reply,
+            color=None if existing is None else existing.color,
             disabled=False,
         )
         self.actions[(event_id, action_type)] = record
@@ -532,7 +534,30 @@ class InMemoryAdapterEventActionRepository(AdapterEventActionRepository):
             action_type=existing.action_type,
             message_template=existing.message_template,
             reply_as_reply=existing.reply_as_reply,
+            color=existing.color,
             disabled=disabled,
+        )
+        self.actions[key] = updated
+        return updated
+
+    def set_action_color(
+        self,
+        *,
+        event_id: int,
+        action_type: str,
+        color: str | None,
+    ) -> AdapterEventActionRecord | None:
+        key = (event_id, action_type)
+        existing = self.actions.get(key)
+        if existing is None:
+            return None
+        updated = AdapterEventActionRecord(
+            event_id=existing.event_id,
+            action_type=existing.action_type,
+            message_template=existing.message_template,
+            reply_as_reply=existing.reply_as_reply,
+            color=color,
+            disabled=existing.disabled,
         )
         self.actions[key] = updated
         return updated
@@ -623,6 +648,32 @@ async def test_channel_event_command_manages_live_and_offline_notifications() ->
     )
     assert second_add_result.style == DiscordResultStyle.SUCCESS
     assert "#`2`" in second_add_result.message
+    second_event = adapter_event_repository.get_event(
+        thread_id=thread.thread_id,
+        adapter_key="twitch",
+        subject_type="channel",
+        subject_id="42",
+        event_key="stream.online",
+    )
+    assert second_event is not None
+
+    color_result = await dispatch_channel_event_command(
+        bus,
+        discord_channel_id=100,
+        requester_id=200,
+        action="color",
+        twitch_channel_id="42",
+        event_key="stream.online",
+        color="#123456",
+    )
+    second_action = adapter_event_action_repository.get_action(
+        event_id=second_event.event_id,
+        action_type="discord_notify",
+    )
+    assert color_result.style == DiscordResultStyle.SUCCESS
+    assert "#123456" in color_result.message
+    assert second_action is not None
+    assert second_action.color == "#123456"
 
     disable_result = await dispatch_channel_event_command(
         bus,
@@ -681,6 +732,7 @@ async def test_channel_event_command_manages_live_and_offline_notifications() ->
     assert "#`1`" in stream_pings_result.message
     assert "#`2`" not in stream_pings_result.message
     assert "https://www.twitch.tv/example" in stream_pings_result.message
+    assert "#123456" in stream_pings_result.message
 
     channels_result = await dispatch_show_command(
         bus,
@@ -2199,6 +2251,17 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
     )
     adapter_event_action_repository.upsert_action(
         event_id=adapter_event.event_id,
+        action_type="discord_notify",
+        message_template=None,
+        reply_as_reply=False,
+    )
+    adapter_event_action_repository.set_action_color(
+        event_id=adapter_event.event_id,
+        action_type="discord_notify",
+        color="#123456",
+    )
+    adapter_event_action_repository.upsert_action(
+        event_id=adapter_event.event_id,
         action_type="twitch_send_message",
         message_template="YIPPIE {CHANNEL} is {STATE}",
         reply_as_reply=False,
@@ -2221,6 +2284,7 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
             "42": TwitchUser(user_id="42", login="example", display_name="ExampleChannel"),
         }
     )
+    notifier = FakeNotifier()
     service = ChannelEventAutoReplyService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
@@ -2228,6 +2292,7 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
         adapter_event_action_repository=adapter_event_action_repository,
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
+        tracking_notifier=notifier,
         token_refresh_skew_seconds=30,
     )
 
@@ -2242,3 +2307,7 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
     assert len(twitch_api.sent_messages) == 1
     assert twitch_api.sent_messages[0]["broadcaster_id"] == "42"
     assert twitch_api.sent_messages[0]["message"] == "YIPPIE ExampleChannel is online"
+    assert len(notifier.tracking_embeds) == 1
+    tracking_embed = notifier.tracking_embeds[0][1]
+    assert tracking_embed.color.value == 0x123456
+    assert any(field.value == "YIPPIE ExampleChannel is online" for field in tracking_embed.fields)

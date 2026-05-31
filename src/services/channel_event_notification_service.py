@@ -91,6 +91,7 @@ class ChannelEventNotificationService:
                     "results.channel_event.went_live" if event.is_live else "results.channel_event.went_offline",
                     thread=thread,
                     CHANNEL=channel_name,
+                    color=notify_action.color,
                     style=DiscordResultStyle.INFO,
                     ephemeral=False,
                 ),

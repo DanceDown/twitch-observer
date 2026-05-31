@@ -565,6 +565,15 @@ class AdapterEventActionRepository:
     ) -> AdapterEventActionRecord | None:  # pragma: no cover
         raise NotImplementedError
 
+    def set_action_color(
+        self,
+        *,
+        event_id: int,
+        action_type: str,
+        color: str | None,
+    ) -> AdapterEventActionRecord | None:  # pragma: no cover
+        raise NotImplementedError
+
     def list_actions_for_event(
         self,
         event_id: int,

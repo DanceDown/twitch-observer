@@ -217,10 +217,13 @@ CREATE TABLE adapter_event_action (
     action_type         TEXT NOT NULL,
     message_template    TEXT,
     reply_as_reply      BOOLEAN NOT NULL DEFAULT FALSE,
+    color               TEXT,
     disabled            BOOLEAN NOT NULL DEFAULT FALSE,
     PRIMARY KEY (event_id, action_type),
     CONSTRAINT chk_adapter_event_action_type
-        CHECK (action_type <> '')
+        CHECK (action_type <> ''),
+    CONSTRAINT chk_adapter_event_action_color_format
+        CHECK (color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$')
 );
 
 CREATE INDEX idx_adapter_event_action_lookup
