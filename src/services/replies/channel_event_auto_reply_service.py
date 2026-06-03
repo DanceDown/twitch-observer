@@ -18,7 +18,6 @@ from src.localization import Localizer
 from src.events.event_types import (
     TwitchChannelLiveStateChangedEvent,
 )
-from src.services.channel_event_display_index import ChannelEventDisplayIndexResolver
 from src.services.patterns import TrackingNotificationSender
 from src.services.twitch_gateways import TwitchReplyGateway
 from src.services.twitch_runtime import (
@@ -97,10 +96,6 @@ class ChannelEventAutoReplyService:
                 event_id=configured_event.event_id,
                 action_type=DISCORD_NOTIFY_ACTION,
             ))
-            display_index = await ChannelEventDisplayIndexResolver(self.adapter_event_action_repository).resolve(
-                thread_id=thread.thread_id,
-                event_id=configured_event.event_id,
-            ) or configured_event.event_id
             account = (
                 await ensure_fresh_linked_account(
                     account=account,
@@ -128,7 +123,6 @@ class ChannelEventAutoReplyService:
                 await self._notify_auto_reply(
                     thread=thread,
                     source_channel=source_channel,
-                    display_index=display_index,
                     channel_display_name=channel_name,
                     channel_login=channel_login,
                     channel_icon_url=None if channel_user is None else channel_user.profile_image_url,
@@ -157,7 +151,6 @@ class ChannelEventAutoReplyService:
                 await self._notify_auto_reply(
                     thread=thread,
                     source_channel=source_channel,
-                    display_index=display_index,
                     channel_display_name=channel_name,
                     channel_login=channel_login,
                     channel_icon_url=None if channel_user is None else channel_user.profile_image_url,
@@ -192,7 +185,6 @@ class ChannelEventAutoReplyService:
         *,
         thread,
         source_channel: ChannelRecord | None,
-        display_index: int,
         channel_display_name: str,
         channel_login: str | None,
         channel_icon_url: str | None,
@@ -205,7 +197,6 @@ class ChannelEventAutoReplyService:
             build_channel_event_auto_reply_embed(
                 thread=thread,
                 localizer=self.localizer,
-                display_index=display_index,
                 channel_display_name=channel_display_name,
                 channel_login=channel_login or channel_display_name,
                 state=state,

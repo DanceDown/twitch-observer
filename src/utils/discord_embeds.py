@@ -97,7 +97,6 @@ def build_channel_event_auto_reply_embed(
     *,
     thread: ThreadRecord,
     localizer: Localizer,
-    display_index: int,
     channel_display_name: str,
     channel_login: str | None,
     state: str,
@@ -114,7 +113,10 @@ def build_channel_event_auto_reply_embed(
         else "discord.channel_event_reply_embed.description_offline"
     )
     embed = discord.Embed(
-        title="",
+        title=localizer.text(
+            "discord.channel_event_reply_embed.title",
+            language=language,
+        ),
         description=localizer.text(
             description_key,
             language=language,
@@ -126,6 +128,15 @@ def build_channel_event_auto_reply_embed(
             channel=channel,
             thread=thread,
         ),
+    )
+    embed.set_author(
+        name=localizer.text(
+            "discord.channel_event_reply_embed.author_name",
+            language=language,
+            DISPLAY_NAME=channel_display_name,
+        ),
+        url=None if not channel_login else f"https://www.twitch.tv/{channel_login}",
+        icon_url=channel_icon_url,
     )
     if channel_icon_url:
         embed.set_thumbnail(url=channel_icon_url)
