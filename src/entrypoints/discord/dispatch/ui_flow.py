@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from src.events.event_types import DiscordUIFlowDecision, RequestUIFlowCommand, UIFlowKind, UIFlowStep
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
+from src.utils.async_utils import resolve_awaitable
 
 
 async def dispatch_ui_flow_decision(
@@ -15,11 +16,11 @@ async def dispatch_ui_flow_decision(
     step: UIFlowStep,
 ) -> DiscordUIFlowDecision:
     """Ask services whether a Discord UI step may be rendered."""
-    return services.ui_flow_guard.decide(
+    return await resolve_awaitable(services.ui_flow_guard.decide(
         RequestUIFlowCommand(
             discord_channel_id=discord_channel_id,
             requester_id=requester_id,
             flow=flow,
             step=step,
         ),
-    )
+    ))
