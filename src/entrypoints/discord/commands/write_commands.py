@@ -59,7 +59,7 @@ def register_write_commands(
             await send_initial_result(interaction, result)
             return
 
-        language = resolve_context_language(
+        language = await resolve_context_language(
             localizer=localizer,
             data_provider=ui_data_provider,
             discord_channel_id=interaction.channel_id,

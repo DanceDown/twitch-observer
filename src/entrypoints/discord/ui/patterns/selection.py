@@ -11,7 +11,7 @@ from src.localization import Localizer
 from src.utils.discord_embeds import build_result_embed
 
 from ...ui_data import DiscordUIDataProvider, PatternPresentation
-from ..shared import BaseFormView, resolve_context_language
+from ..shared import BaseFormView
 from .home import PatternHomeView
 from .state import PatternEditorMode, PatternFormState
 
@@ -23,6 +23,7 @@ class PatternPickerView(BaseFormView):
         self,
         *,
         owner_id: int,
+        language: str,
         services: DiscordServiceBundle,
         data_provider: DiscordUIDataProvider,
         discord_channel_id: int,
@@ -32,11 +33,7 @@ class PatternPickerView(BaseFormView):
         super().__init__(
             owner_id=owner_id,
             localizer=localizer,
-            language=resolve_context_language(
-                localizer=localizer,
-                data_provider=data_provider,
-                discord_channel_id=discord_channel_id,
-            ),
+            language=language,
         )
         self._services = services
         self._data_provider = data_provider
@@ -93,6 +90,7 @@ class PatternPickerView(BaseFormView):
             _merge_state_overrides(state, self._state_overrides)
         view = PatternHomeView(
             owner_id=self.owner_id,
+            language=self.language,
             services=self._services,
             data_provider=self._data_provider,
             discord_channel_id=self._discord_channel_id,

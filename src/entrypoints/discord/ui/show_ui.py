@@ -14,8 +14,6 @@ from src.utils.discord_embeds import build_result_embed
 
 from ..dispatch import dispatch_show_configuration
 from ..helpers import send_initial_result
-from ..ui_data import DiscordUIDataProvider
-from .shared import resolve_context_language
 
 SHOW_EMBED_DESCRIPTION_LIMIT = 4096
 
@@ -205,17 +203,12 @@ class ShowSectionModal(discord.ui.Modal):
     def __init__(
         self,
         *,
+        language: str,
         services: DiscordServiceBundle,
         discord_channel_id: int,
         requester_id: int,
-        ui_data_provider: DiscordUIDataProvider,
         localizer: Localizer,
     ) -> None:
-        language = resolve_context_language(
-            localizer=localizer,
-            data_provider=ui_data_provider,
-            discord_channel_id=discord_channel_id,
-        )
         super().__init__(title=localizer.text("discord.show_ui.modal.title", language=language), timeout=300)
         self._services = services
         self._discord_channel_id = discord_channel_id

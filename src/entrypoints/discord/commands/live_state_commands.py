@@ -73,10 +73,11 @@ async def _open_live_add_modal(
         return
 
     tracked_channels = await ui_data_provider.list_tracked_channels(interaction.channel_id)
+    language = await _language(interaction, ui_data_provider, localizer)
     if not tracked_channels:
         await send_initial_result(
             interaction,
-            _live_result(interaction, ui_data_provider, localizer, "discord.live_state_ui.errors.no_channels"),
+            _live_result(localizer, language, "discord.live_state_ui.errors.no_channels"),
         )
         return
 
@@ -84,14 +85,14 @@ async def _open_live_add_modal(
         ChannelEventModal(
             title=localizer.text(
                 "discord.live_state_ui.modal.add_title",
-                language=_language(interaction, ui_data_provider, localizer),
+                language=language,
             ),
             services=services,
             discord_channel_id=interaction.channel_id,
             requester_id=interaction.user.id,
             tracked_channels=tracked_channels,
             localizer=localizer,
-            language=_language(interaction, ui_data_provider, localizer),
+            language=language,
         )
     )
 
@@ -111,22 +112,18 @@ async def _open_live_action_modal(
         return
 
     actions = await _list_notification_actions(interaction.channel_id, ui_data_provider=ui_data_provider)
+    language = await _language(interaction, ui_data_provider, localizer)
     if not actions:
         await send_initial_result(
             interaction,
-            _live_result(
-                interaction,
-                ui_data_provider,
-                localizer,
-                f"discord.live_state_ui.errors.no_{action}_actions",
-            ),
+            _live_result(localizer, language, f"discord.live_state_ui.errors.no_{action}_actions"),
         )
         return
     await interaction.response.send_modal(
         ChannelEventActionModal(
             title=localizer.text(
                 f"discord.live_state_ui.action.{action}_title",
-                language=_language(interaction, ui_data_provider, localizer),
+                language=language,
             ),
             services=services,
             discord_channel_id=interaction.channel_id,
@@ -134,7 +131,7 @@ async def _open_live_action_modal(
             action=action,
             actions=actions,
             localizer=localizer,
-            language=_language(interaction, ui_data_provider, localizer),
+            language=language,
         )
     )
 
@@ -153,10 +150,11 @@ async def _open_live_color_modal(
         return
 
     actions = await _list_notification_actions(interaction.channel_id, ui_data_provider=ui_data_provider)
+    language = await _language(interaction, ui_data_provider, localizer)
     if not actions:
         await send_initial_result(
             interaction,
-            _live_result(interaction, ui_data_provider, localizer, "discord.live_state_ui.errors.no_color_actions"),
+            _live_result(localizer, language, "discord.live_state_ui.errors.no_color_actions"),
         )
         return
 
@@ -164,14 +162,14 @@ async def _open_live_color_modal(
         ChannelEventColorModal(
             title=localizer.text(
                 "discord.live_state_ui.action.color_title",
-                language=_language(interaction, ui_data_provider, localizer),
+                language=language,
             ),
             services=services,
             discord_channel_id=interaction.channel_id,
             requester_id=interaction.user.id,
             actions=actions,
             localizer=localizer,
-            language=_language(interaction, ui_data_provider, localizer),
+            language=language,
         )
     )
 
@@ -188,24 +186,23 @@ async def _list_notification_actions(
     ]
 
 
-def _language(
+async def _language(
     interaction: discord.Interaction,
     ui_data_provider: DiscordUIDataProvider,
     localizer: Localizer,
 ) -> str:
-    return localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id))
+    return localizer.resolve_language(await ui_data_provider.get_thread_language(interaction.channel_id))
 
 
 def _live_result(
-    interaction: discord.Interaction,
-    ui_data_provider: DiscordUIDataProvider,
     localizer: Localizer,
+    language: str,
     key: str,
 ):
     return build_result(
         localizer,
         key,
-        language=_language(interaction, ui_data_provider, localizer),
+        language=language,
         style=DiscordResultStyle.ERROR,
         ephemeral=True,
     )

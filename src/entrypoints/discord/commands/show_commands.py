@@ -54,7 +54,7 @@ def register_show_commands(
             if result.style != DiscordResultStyle.INFO or not result.ephemeral:
                 await send_initial_result(interaction, result)
                 return
-            language = ui_data_provider.get_thread_language(interaction.channel_id) or localizer.default_language
+            language = await ui_data_provider.get_thread_language(interaction.channel_id) or localizer.default_language
             view = ShowPaginationView(
                 owner_id=interaction.user.id,
                 result=result,
@@ -71,10 +71,10 @@ def register_show_commands(
             return
         await interaction.response.send_modal(
             ShowSectionModal(
+                language=await ui_data_provider.get_thread_language(interaction.channel_id) or localizer.default_language,
                 services=services,
                 discord_channel_id=interaction.channel_id,
                 requester_id=interaction.user.id,
-                ui_data_provider=ui_data_provider,
                 localizer=localizer,
             )
         )

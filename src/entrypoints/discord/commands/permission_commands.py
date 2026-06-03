@@ -155,18 +155,19 @@ async def _open_permission_modal(
     default_user_id: int | None = None,
     default_permissions: tuple[str, ...] = (),
 ) -> None:
+    language = await ui_data_provider.get_thread_language(interaction.channel_id) or localizer.default_language
     await interaction.response.send_modal(
         PermissionModal(
             title=localizer.text(
                 f"discord.permission_ui.modal.{action}.title",
-                language=localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id)),
+                language=localizer.resolve_language(language),
             ),
             services=services,
             discord_channel_id=interaction.channel_id,
             requester_id=interaction.user.id,
             action=action,
             localizer=localizer,
-            language=localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id)),
+            language=localizer.resolve_language(language),
             default_user_id=default_user_id,
             default_permissions=default_permissions,
         )

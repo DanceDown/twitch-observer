@@ -10,7 +10,7 @@ from src.localization import Localizer
 
 from ...dispatch import dispatch_disable_pattern, dispatch_enable_pattern, dispatch_remove_pattern
 from ...ui_data import DiscordUIDataProvider, PatternPresentation
-from ..shared import BaseFormView, resolve_context_language
+from ..shared import BaseFormView
 from .state import PatternActionKind
 
 
@@ -21,6 +21,7 @@ class PatternIdActionView(BaseFormView):
         self,
         *,
         owner_id: int,
+        language: str,
         services: DiscordServiceBundle,
         data_provider: DiscordUIDataProvider,
         discord_channel_id: int,
@@ -30,11 +31,7 @@ class PatternIdActionView(BaseFormView):
         super().__init__(
             owner_id=owner_id,
             localizer=localizer,
-            language=resolve_context_language(
-                localizer=localizer,
-                data_provider=data_provider,
-                discord_channel_id=discord_channel_id,
-            ),
+            language=language,
         )
         self._services = services
         self._data_provider = data_provider

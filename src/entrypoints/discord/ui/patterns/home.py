@@ -18,7 +18,7 @@ from src.localization import Localizer
 
 from ...dispatch import dispatch_add_pattern, dispatch_edit_pattern
 from ...ui_data import DiscordUIDataProvider
-from ..shared import COLOR_PICKER_URL, BaseFormView, resolve_context_language
+from ..shared import COLOR_PICKER_URL, BaseFormView
 from .basics_modal import PatternBasicsModal
 from .channels_modal import PatternChannelsModal
 from .options_modal import PatternOptionsModal
@@ -34,6 +34,7 @@ class PatternHomeView(BaseFormView):
         self,
         *,
         owner_id: int,
+        language: str,
         services: DiscordServiceBundle,
         data_provider: DiscordUIDataProvider,
         discord_channel_id: int,
@@ -44,11 +45,7 @@ class PatternHomeView(BaseFormView):
         super().__init__(
             owner_id=owner_id,
             localizer=localizer,
-            language=resolve_context_language(
-                localizer=localizer,
-                data_provider=data_provider,
-                discord_channel_id=discord_channel_id,
-            ),
+            language=language,
         )
         self._services = services
         self._data_provider = data_provider

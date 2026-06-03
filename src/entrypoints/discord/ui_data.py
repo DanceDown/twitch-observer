@@ -22,8 +22,8 @@ class DiscordUIDataProvider:
 
     queries: DiscordUIQueryBundle
 
-    def get_thread_language(self, discord_channel_id: int) -> str | None:
-        return self.queries.channels.get_thread_language(discord_channel_id)
+    async def get_thread_language(self, discord_channel_id: int) -> str | None:
+        return await self.queries.channels.get_thread_language(discord_channel_id)
 
     async def list_tracked_channels(self, discord_channel_id: int) -> list[TrackedChannelPresentation]:
         return await self.queries.channels.list_tracked_channels(discord_channel_id)

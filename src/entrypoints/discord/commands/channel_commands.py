@@ -36,6 +36,7 @@ def register_channel_commands(
             return
         normalized_login = twitch_channel_login.strip() if twitch_channel_login is not None else ""
         if not normalized_login:
+            language = await ui_data_provider.get_thread_language(interaction.channel_id) or localizer.default_language
             await interaction.response.send_modal(
                 ChannelNameModal(
                     services=services,
@@ -43,7 +44,7 @@ def register_channel_commands(
                     requester_id=interaction.user.id,
                     action="add",
                     localizer=localizer,
-                    language=localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id)),
+                    language=localizer.resolve_language(language),
                 )
             )
             return
@@ -132,13 +133,14 @@ async def _open_channel_selection_modal(
     default_color: str | None = None,
 ) -> None:
     tracked_channels = await ui_data_provider.list_tracked_channels(interaction.channel_id)
+    language = await ui_data_provider.get_thread_language(interaction.channel_id) or localizer.default_language
     if not tracked_channels:
         await send_initial_result(
             interaction,
             build_result(
                 localizer,
                 "discord.channel_ui.errors.no_channels",
-                language=localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id)),
+                language=localizer.resolve_language(language),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             ),
@@ -152,7 +154,7 @@ async def _open_channel_selection_modal(
             action=action,
             tracked_channels=tracked_channels,
             localizer=localizer,
-            language=localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id)),
+            language=localizer.resolve_language(language),
             default_login=default_login,
             default_color=default_color,
         )

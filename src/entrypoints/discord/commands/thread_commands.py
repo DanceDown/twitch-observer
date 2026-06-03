@@ -75,10 +75,10 @@ def register_thread_commands(
         )
         await interaction.response.send_modal(
             LeaveConfirmationModal(
+                language=await ui_data_provider.get_thread_language(interaction.channel_id) or localizer.default_language,
                 services=services,
                 discord_channel_id=interaction.channel_id,
                 requester_id=interaction.user.id,
-                data_provider=ui_data_provider,
                 localizer=localizer,
             )
         )
@@ -100,10 +100,10 @@ def register_thread_commands(
             return
         await interaction.response.send_modal(
             ThreadColorModal(
+                language=await ui_data_provider.get_thread_language(interaction.channel_id) or localizer.default_language,
                 services=services,
                 discord_channel_id=interaction.channel_id,
                 requester_id=interaction.user.id,
-                data_provider=ui_data_provider,
                 localizer=localizer,
             ),
         )

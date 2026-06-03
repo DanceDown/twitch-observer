@@ -38,7 +38,7 @@ async def start_form(
     view.bound_message = await interaction.original_response()
 
 
-def resolve_context_language(
+async def resolve_context_language(
     *,
     localizer: Localizer,
     data_provider: DiscordUIDataProvider | None = None,
@@ -47,7 +47,7 @@ def resolve_context_language(
     """Resolve the active UI language for one Discord context."""
     if data_provider is None or discord_channel_id is None:
         return localizer.default_language
-    return localizer.resolve_language(data_provider.get_thread_language(discord_channel_id))
+    return localizer.resolve_language(await data_provider.get_thread_language(discord_channel_id))
 
 
 class BaseFormView(discord.ui.View):

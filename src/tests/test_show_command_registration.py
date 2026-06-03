@@ -15,7 +15,7 @@ from src.localization import Localizer
 class FakeUIDataProvider:
     language: str = "german"
 
-    def get_thread_language(self, _discord_channel_id: int) -> str:
+    async def get_thread_language(self, _discord_channel_id: int) -> str:
         return self.language
 
 

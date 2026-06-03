@@ -314,10 +314,12 @@ async def _open_ping_add_flow(
     localizer: Localizer,
     initial_state: PatternFormState | None = None,
 ) -> None:
+    language = await data_provider.get_thread_language(interaction.channel_id) or localizer.default_language
     await start_form(
         interaction,
         view=PatternHomeView(
             owner_id=interaction.user.id,
+            language=localizer.resolve_language(language),
             services=services,
             data_provider=data_provider,
             discord_channel_id=interaction.channel_id,
@@ -337,6 +339,7 @@ async def _open_ping_edit_flow(
     pattern_id: int | None,
     state_overrides: dict[str, object] | None,
 ) -> None:
+    language = await data_provider.get_thread_language(interaction.channel_id) or localizer.default_language
     if pattern_id is not None:
         resolved_pattern_id = await _resolve_pattern_identifier(data_provider, interaction.channel_id, pattern_id)
         pattern = await data_provider.get_pattern(interaction.channel_id, resolved_pattern_id)
@@ -346,7 +349,7 @@ async def _open_ping_edit_flow(
                 build_result(
                     localizer,
                     "discord.pattern_ui.errors.not_found",
-                    language=localizer.resolve_language(data_provider.get_thread_language(interaction.channel_id)),
+                    language=localizer.resolve_language(language),
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 ),
@@ -356,6 +359,7 @@ async def _open_ping_edit_flow(
             interaction,
             view=PatternHomeView(
                 owner_id=interaction.user.id,
+                language=localizer.resolve_language(language),
                 services=services,
                 data_provider=data_provider,
                 discord_channel_id=interaction.channel_id,
@@ -383,6 +387,7 @@ async def _open_ping_edit_flow(
 
     view = PatternPickerView(
         owner_id=interaction.user.id,
+        language=localizer.resolve_language(language),
         services=services,
         data_provider=data_provider,
         discord_channel_id=interaction.channel_id,
@@ -398,7 +403,7 @@ async def _open_ping_edit_flow(
             parent=view,
             patterns=view._patterns,
             localizer=localizer,
-            language=localizer.resolve_language(data_provider.get_thread_language(interaction.channel_id)),
+            language=localizer.resolve_language(language),
         )
     )
 
@@ -419,8 +424,10 @@ async def _handle_ping_state_action(
     if not await ensure_ui_flow_allowed(interaction, services, flow=UIFlowKind.PATTERN, step=step):
         return
     if pattern_id is None:
+        language = await ui_data_provider.get_thread_language(interaction.channel_id) or localizer.default_language
         view = PatternIdActionView(
             owner_id=interaction.user.id,
+            language=localizer.resolve_language(language),
             services=services,
             data_provider=ui_data_provider,
             discord_channel_id=interaction.channel_id,
@@ -436,21 +443,21 @@ async def _handle_ping_state_action(
                 title={
                     PatternActionKind.REMOVE: localizer.text(
                         "discord.pattern_ui.action.remove_title",
-                        language=localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id)),
+                        language=localizer.resolve_language(language),
                     ),
                     PatternActionKind.DISABLE: localizer.text(
                         "discord.pattern_ui.action.disable_title",
-                        language=localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id)),
+                        language=localizer.resolve_language(language),
                     ),
                     PatternActionKind.ENABLE: localizer.text(
                         "discord.pattern_ui.action.enable_title",
-                        language=localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id)),
+                        language=localizer.resolve_language(language),
                     ),
                 }[action],
                 parent=view,
                 patterns=view._patterns,
                 localizer=localizer,
-                language=localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id)),
+                language=localizer.resolve_language(language),
             )
         )
         return

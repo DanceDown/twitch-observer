@@ -36,6 +36,7 @@ def register_user_commands(
             return
         normalized_login = twitch_user_login.strip() if twitch_user_login is not None else ""
         if not normalized_login:
+            language = await ui_data_provider.get_thread_language(interaction.channel_id) or localizer.default_language
             await interaction.response.send_modal(
                 UserNameModal(
                     services=services,
@@ -43,7 +44,7 @@ def register_user_commands(
                     requester_id=interaction.user.id,
                     action="add",
                     localizer=localizer,
-                    language=localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id)),
+                    language=localizer.resolve_language(language),
                 )
             )
             return
@@ -65,6 +66,7 @@ def register_user_commands(
             return
         normalized_login = twitch_user_login.strip() if twitch_user_login is not None else ""
         if not normalized_login:
+            language = await ui_data_provider.get_thread_language(interaction.channel_id) or localizer.default_language
             tracked_users = await ui_data_provider.list_tracked_users(interaction.channel_id)
             if not tracked_users:
                 await send_initial_result(
@@ -72,7 +74,7 @@ def register_user_commands(
                     build_result(
                         localizer,
                         "discord.user_ui.errors.no_users",
-                        language=localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id)),
+                        language=localizer.resolve_language(language),
                         style=DiscordResultStyle.ERROR,
                         ephemeral=True,
                     ),
@@ -85,7 +87,7 @@ def register_user_commands(
                     requester_id=interaction.user.id,
                     tracked_users=tracked_users,
                     localizer=localizer,
-                    language=localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id)),
+                    language=localizer.resolve_language(language),
                 )
             )
             return

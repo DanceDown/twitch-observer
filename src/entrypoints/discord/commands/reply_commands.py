@@ -221,6 +221,7 @@ async def _handle_pattern_reply_action(
     if not await ensure_ui_flow_allowed(interaction, services, flow=UIFlowKind.REPLY, step=step):
         return
     if pattern_id is None:
+        language = await _language(interaction, ui_data_provider, localizer)
         replies = list(await ui_data_provider.list_replies(interaction.channel_id))
         if action == "disable":
             replies = [reply for reply in replies if not reply.reply.disabled]
@@ -229,19 +230,19 @@ async def _handle_pattern_reply_action(
         if not replies:
             await send_initial_result(
                 interaction,
-                _reply_result(interaction, ui_data_provider, localizer, "discord.reply_ui.errors.no_replies"),
+                _reply_result(localizer, language, "discord.reply_ui.errors.no_replies"),
             )
             return
         await interaction.response.send_modal(
             ReplyActionModal(
-                title=_localized_reply_action_title(interaction, ui_data_provider, localizer, action),
+                title=_localized_reply_action_title(localizer, language, action),
                 services=services,
                 discord_channel_id=interaction.channel_id,
                 requester_id=interaction.user.id,
                 action=action,
                 replies=replies,
                 localizer=localizer,
-                language=_language(interaction, ui_data_provider, localizer),
+                language=language,
             )
         )
         return
@@ -286,6 +287,7 @@ async def _handle_event_reply_action(
     if not await ensure_ui_flow_allowed(interaction, services, flow=UIFlowKind.REPLY, step=step):
         return
     if event_id is None:
+        language = await _language(interaction, ui_data_provider, localizer)
         replies = [
             reply
             for reply in await ui_data_provider.list_adapter_event_actions(interaction.channel_id)
@@ -298,19 +300,19 @@ async def _handle_event_reply_action(
         if not replies:
             await send_initial_result(
                 interaction,
-                _reply_result(interaction, ui_data_provider, localizer, "discord.reply_ui.errors.no_replies"),
+                _reply_result(localizer, language, "discord.reply_ui.errors.no_replies"),
             )
             return
         await interaction.response.send_modal(
             ReplyActionModal(
-                title=_localized_reply_action_title(interaction, ui_data_provider, localizer, action),
+                title=_localized_reply_action_title(localizer, language, action),
                 services=services,
                 discord_channel_id=interaction.channel_id,
                 requester_id=interaction.user.id,
                 action=action,
                 replies=replies,
                 localizer=localizer,
-                language=_language(interaction, ui_data_provider, localizer),
+                language=language,
             )
         )
         return
@@ -364,10 +366,11 @@ async def _open_pattern_reply_add_modal(
     default_reply_as_reply: bool = False,
 ) -> None:
     patterns = await ui_data_provider.list_patterns(interaction.channel_id)
+    language = await _language(interaction, ui_data_provider, localizer)
     if not patterns:
         await send_initial_result(
             interaction,
-            _reply_result(interaction, ui_data_provider, localizer, "discord.reply_ui.errors.no_patterns"),
+            _reply_result(localizer, language, "discord.reply_ui.errors.no_patterns"),
         )
         return
     resolved_pattern_id = None
@@ -380,7 +383,7 @@ async def _open_pattern_reply_add_modal(
             requester_id=interaction.user.id,
             patterns=patterns,
             localizer=localizer,
-            language=_language(interaction, ui_data_provider, localizer),
+            language=language,
             default_pattern_id=resolved_pattern_id,
             default_message=default_message,
             default_reply_as_reply=default_reply_as_reply,
@@ -398,10 +401,11 @@ async def _open_event_reply_add_modal(
     default_message: str | None = None,
 ) -> None:
     adapter_events = await ui_data_provider.list_adapter_events(interaction.channel_id)
+    language = await _language(interaction, ui_data_provider, localizer)
     if not adapter_events:
         await send_initial_result(
             interaction,
-            _reply_result(interaction, ui_data_provider, localizer, "discord.reply_ui.errors.no_event_triggers"),
+            _reply_result(localizer, language, "discord.reply_ui.errors.no_event_triggers"),
         )
         return
     await interaction.response.send_modal(
@@ -411,43 +415,41 @@ async def _open_event_reply_add_modal(
             requester_id=interaction.user.id,
             adapter_events=adapter_events,
             localizer=localizer,
-            language=_language(interaction, ui_data_provider, localizer),
+            language=language,
             default_event_id=default_event_id,
             default_message=default_message,
         )
     )
 
 
-def _language(
+async def _language(
     interaction: discord.Interaction,
     ui_data_provider: DiscordUIDataProvider,
     localizer: Localizer,
 ) -> str:
-    return localizer.resolve_language(ui_data_provider.get_thread_language(interaction.channel_id))
+    return localizer.resolve_language(await ui_data_provider.get_thread_language(interaction.channel_id))
 
 
 def _localized_reply_action_title(
-    interaction: discord.Interaction,
-    ui_data_provider: DiscordUIDataProvider,
     localizer: Localizer,
+    language: str,
     action: str,
 ) -> str:
     return localizer.text(
         f"discord.reply_ui.action.{action}_title",
-        language=_language(interaction, ui_data_provider, localizer),
+        language=language,
     )
 
 
 def _reply_result(
-    interaction: discord.Interaction,
-    ui_data_provider: DiscordUIDataProvider,
     localizer: Localizer,
+    language: str,
     key: str,
 ):
     return build_result(
         localizer,
         key,
-        language=_language(interaction, ui_data_provider, localizer),
+        language=language,
         style=DiscordResultStyle.ERROR,
         ephemeral=True,
     )

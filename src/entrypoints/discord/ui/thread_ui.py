@@ -13,7 +13,6 @@ from src.localization import Localizer
 
 from ..dispatch import dispatch_leave_thread, dispatch_set_thread_color
 from ..helpers import normalize_optional_text, send_initial_result
-from ..ui_data import DiscordUIDataProvider
 
 
 class LeaveConfirmationModal(discord.ui.Modal):
@@ -22,13 +21,12 @@ class LeaveConfirmationModal(discord.ui.Modal):
     def __init__(
         self,
         *,
+        language: str,
         services: DiscordServiceBundle,
         discord_channel_id: int,
         requester_id: int,
-        data_provider: DiscordUIDataProvider,
         localizer: Localizer,
     ) -> None:
-        language = localizer.resolve_language(data_provider.get_thread_language(discord_channel_id))
         super().__init__(
             title=localizer.text("discord.thread_modal.confirm_leave_title", language=language),
             timeout=300,
@@ -82,13 +80,12 @@ class ThreadColorModal(discord.ui.Modal):
     def __init__(
         self,
         *,
+        language: str,
         services: DiscordServiceBundle,
         discord_channel_id: int,
         requester_id: int,
-        data_provider: DiscordUIDataProvider,
         localizer: Localizer,
     ) -> None:
-        language = localizer.resolve_language(data_provider.get_thread_language(discord_channel_id))
         super().__init__(
             title=localizer.text("discord.thread_modal.observer_color_title", language=language),
             timeout=300,
