@@ -108,13 +108,18 @@ def build_channel_event_auto_reply_embed(
 ) -> discord.Embed:
     """Render one live/offline ping auto-reply notification for Discord tracking."""
     language = localizer.language_for_thread(thread)
+    description_key = (
+        "discord.channel_event_reply_embed.description_online"
+        if state == "online"
+        else "discord.channel_event_reply_embed.description_offline"
+    )
     embed = discord.Embed(
         title="",
         description=localizer.text(
-            "discord.channel_event_reply_embed.description",
+            description_key,
             language=language,
-            ID=display_index,
-            STATE=state,
+            DISPLAY_NAME=channel_display_name,
+            LOGIN=channel_login,
         ),
         color=resolve_channel_event_color(
             event_color=event_color,
@@ -122,22 +127,8 @@ def build_channel_event_auto_reply_embed(
             thread=thread,
         ),
     )
-    author_name = escape_discord_text(channel_display_name)
-    if channel_login:
-        embed.set_author(
-            name=author_name,
-            url=f"https://www.twitch.tv/{channel_login}",
-            icon_url=channel_icon_url,
-        )
-    else:
-        embed.set_author(name=author_name, icon_url=channel_icon_url)
-    embed.set_footer(
-        text=localizer.text(
-            "discord.channel_event_reply_embed.footer",
-            language=language,
-            CHANNEL=channel_display_name,
-        ),
-    )
+    if channel_icon_url:
+        embed.set_thumbnail(url=channel_icon_url)
     embed.add_field(
         name=localizer.text("discord.channel_event_reply_embed.reply_field", language=language),
         value=escape_discord_preserving_links(reply_message),

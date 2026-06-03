@@ -347,17 +347,14 @@ class ReplyCommandService:
         if adapter_event.adapter_key != TWITCH_ADAPTER_KEY or adapter_event.subject_type != CHANNEL_SUBJECT_TYPE or state_label is None:
             raise ValueError(self.localizer.text("results.reply.unsupported_event", language=thread.language))
 
-        channel_name = adapter_event.subject_id
-        try:
-            cached = event_configuration.twitch_api.get_cached_user_by_id(adapter_event.subject_id.strip())
-            twitch_channel = (
-                cached
-                if cached is not None
-                else await event_configuration.twitch_api.get_channel_by_id(adapter_event.subject_id)
-            )
-            channel_name = twitch_channel.display_name
-        except TwitchAPIError:
-            channel_name = adapter_event.subject_id
+        cached = event_configuration.twitch_api.get_cached_user_by_id(adapter_event.subject_id.strip())
+        twitch_channel = (
+            cached
+            if cached is not None
+            else await event_configuration.twitch_api.get_channel_by_id(adapter_event.subject_id)
+        )
+        channel_display_name = twitch_channel.display_name
+        channel_login = twitch_channel.login
 
         existing_reply = await resolve_awaitable(event_configuration.adapter_event_action_repository.get_action(
             event_id=adapter_event.event_id,
@@ -389,7 +386,8 @@ class ReplyCommandService:
                 self.localizer,
                 "results.reply.added_event",
                 thread=thread,
-                CHANNEL=channel_name,
+                DISPLAY_NAME=channel_display_name,
+                LOGIN=channel_login,
                 STATE=state_label,
                 MESSAGE=created.message_template or "",
                 style=DiscordResultStyle.SUCCESS,
@@ -417,7 +415,8 @@ class ReplyCommandService:
                 self.localizer,
                 "results.reply.removed_event",
                 thread=thread,
-                CHANNEL=channel_name,
+                DISPLAY_NAME=channel_display_name,
+                LOGIN=channel_login,
                 STATE=state_label,
                 MESSAGE=existing_reply.message_template or "",
                 style=DiscordResultStyle.SUCCESS,
@@ -445,7 +444,8 @@ class ReplyCommandService:
                 self.localizer,
                 "results.reply.disabled_event",
                 thread=thread,
-                CHANNEL=channel_name,
+                DISPLAY_NAME=channel_display_name,
+                LOGIN=channel_login,
                 STATE=state_label,
                 MESSAGE=disabled_reply.message_template or "",
                 style=DiscordResultStyle.SUCCESS,
@@ -473,7 +473,8 @@ class ReplyCommandService:
                 self.localizer,
                 "results.reply.enabled_event",
                 thread=thread,
-                CHANNEL=channel_name,
+                DISPLAY_NAME=channel_display_name,
+                LOGIN=channel_login,
                 STATE=state_label,
                 MESSAGE=enabled_reply.message_template or "",
                 style=DiscordResultStyle.SUCCESS,

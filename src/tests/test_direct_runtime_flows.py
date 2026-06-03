@@ -58,7 +58,12 @@ class _LivePersistence:
 class _LiveNotification:
     recorder: _Recorder
 
-    async def handle_change(self, event: TwitchChannelLiveStateChangedEvent) -> None:
+    async def handle_change(
+        self,
+        event: TwitchChannelLiveStateChangedEvent,
+        *,
+        suppressed_events: set[tuple[int, int]] | None = None,
+    ) -> None:
         self.recorder.calls.append(f"notify:{event.twitch_channel_id}")
 
 
@@ -66,8 +71,9 @@ class _LiveNotification:
 class _LiveAutoReply:
     recorder: _Recorder
 
-    async def handle_channel_live_state_changed(self, event: TwitchChannelLiveStateChangedEvent) -> None:
+    async def handle_channel_live_state_changed(self, event: TwitchChannelLiveStateChangedEvent) -> set[tuple[int, int]]:
         self.recorder.calls.append(f"auto-reply:{event.changed_at}")
+        return set()
 
 
 @pytest.mark.asyncio
@@ -117,6 +123,6 @@ async def test_live_state_orchestrator_runs_in_explicit_order() -> None:
 
     assert recorder.calls == [
         "persist:42:True",
-        "notify:42",
         "auto-reply:now",
+        "notify:42",
     ]

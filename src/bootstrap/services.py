@@ -208,6 +208,8 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         thread_repository=core.thread_repository,
         adapter_event_repository=core.adapter_event_repository,
         adapter_event_action_repository=core.adapter_event_action_repository,
+        channel_repository=core.channel_repository,
+        twitch_api=core.twitch_bundle,
         notifier=runtime_coordinator.channel_results,
         localizer=core.localizer,
     )

@@ -1046,6 +1046,7 @@ class FakeTwitchAPI:
 class FakeNotifier(AccountNotificationSender):
     sent: list[tuple[int, DiscordCommandResult]] = field(default_factory=list)
     tracking_embeds: list[tuple[int, object]] = field(default_factory=list)
+    channel_results: list[tuple[int, DiscordCommandResult]] = field(default_factory=list)
 
     async def send_account_result(
         self,
@@ -1057,6 +1058,9 @@ class FakeNotifier(AccountNotificationSender):
 
     async def send_tracking_embed(self, discord_channel_id: int, embed, *, channel_login: str | None = None) -> None:
         self.tracking_embeds.append((discord_channel_id, embed))
+
+    async def send_channel_result(self, discord_channel_id: int, result: DiscordCommandResult) -> None:
+        self.channel_results.append((discord_channel_id, result))
 
 
 @pytest.mark.asyncio
@@ -2262,7 +2266,7 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
         token_refresh_skew_seconds=30,
     )
 
-    await service.handle_channel_live_state_changed(
+    suppressed = await service.handle_channel_live_state_changed(
         TwitchChannelLiveStateChangedEvent(
             twitch_channel_id="42",
             twitch_channel_login="example",
@@ -2270,10 +2274,13 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
         )
     )
 
+    assert suppressed == {(thread.thread_id, adapter_event.event_id)}
     assert len(twitch_api.sent_messages) == 1
     assert twitch_api.sent_messages[0]["broadcaster_id"] == "42"
     assert twitch_api.sent_messages[0]["message"] == "YIPPIE ExampleChannel is online"
     assert len(notifier.tracking_embeds) == 1
     tracking_embed = notifier.tracking_embeds[0][1]
     assert tracking_embed.color.value == 0x123456
+    assert "https://www.twitch.tv/example" in tracking_embed.description
+    assert "Ping" not in tracking_embed.description
     assert any(field.value == "YIPPIE ExampleChannel is online" for field in tracking_embed.fields)

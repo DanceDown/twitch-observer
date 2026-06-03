@@ -547,7 +547,7 @@
       "unsupported_event": "Nur Live- und Offline-Events von beobachteten Twitch-Kanälen passen hier <:oopsie:1497720439810687006>",
       "added_event": {
         "title": "Auto-Antwort hinzugefügt",
-        "body": "{RAW:USER} hat eine Auto-Antwort für `{CODE:CHANNEL}` bei `{CODE:STATE}` hinzugefügt <a:yo:1497686448717959369>\nNachricht: `{CODE:MESSAGE}`",
+        "body": "{RAW:USER} hat eine Auto-Antwort für [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) bei `{CODE:STATE}` hinzugefügt <a:yo:1497686448717959369>\nNachricht: `{CODE:MESSAGE}`",
         "footer": ""
       },
       "none_configured_event": {
@@ -557,17 +557,17 @@
       },
       "removed_event": {
         "title": "Auto-Antwort entfernt",
-        "body": "{RAW:USER} hat die `{CODE:STATE}`-Auto-Antwort für `{CODE:CHANNEL}` entfernt <:ApuApproved:1497724288256446465>\nNachricht: `{CODE:MESSAGE}`",
+        "body": "{RAW:USER} hat die `{CODE:STATE}`-Auto-Antwort für [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) entfernt <:ApuApproved:1497724288256446465>\nNachricht: `{CODE:MESSAGE}`",
         "footer": ""
       },
       "disabled_event": {
         "title": "Auto-Antwort deaktiviert",
-        "body": "{RAW:USER} hat die `{CODE:STATE}`-Auto-Antwort für `{CODE:CHANNEL}` deaktiviert <a:yes:1497686393369919559>\nNachricht: {RAW:MESSAGE}",
+        "body": "{RAW:USER} hat die `{CODE:STATE}`-Auto-Antwort für [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) deaktiviert <a:yes:1497686393369919559>\nNachricht: {RAW:MESSAGE}",
         "footer": ""
       },
       "enabled_event": {
         "title": "Auto-Antwort aktiviert",
-        "body": "{RAW:USER} hat die `{CODE:STATE}`-Auto-Antwort für `{CODE:CHANNEL}` aktiviert <a:yes:1497686393369919559>\nNachricht: {RAW:MESSAGE}",
+        "body": "{RAW:USER} hat die `{CODE:STATE}`-Auto-Antwort für [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) aktiviert <a:yes:1497686393369919559>\nNachricht: {RAW:MESSAGE}",
         "footer": ""
       },
       "not_joined": {
@@ -617,52 +617,52 @@
       },
       "notification_added": {
         "title": "Benachrichtigung hinzugefügt",
-        "body": "{RAW:USER} hat {CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` hinzugefügt <:Binoculars:1497727665283662077>",
+        "body": "{RAW:USER} hat {CODE:STATE}-Ping #`{CODE:ID}` für [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) hinzugefügt <:Binoculars:1497727665283662077>",
         "footer": ""
       },
       "notification_removed": {
         "title": "Benachrichtigung entfernt",
-        "body": "{RAW:USER} hat {CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` entfernt <:ApuApproved:1497724288256446465>",
+        "body": "{RAW:USER} hat {CODE:STATE}-Ping #`{CODE:ID}` für [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) entfernt <:ApuApproved:1497724288256446465>",
         "footer": ""
       },
       "notification_enabled": {
         "title": "Benachrichtigung aktiviert",
-        "body": "{RAW:USER} hat {CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` aktiviert <a:yes:1497686393369919559>",
+        "body": "{RAW:USER} hat {CODE:STATE}-Ping #`{CODE:ID}` für [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) aktiviert <a:yes:1497686393369919559>",
         "footer": ""
       },
       "already_configured": {
         "title": "Schon eingerichtet",
-        "body": "{CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` ist schon eingerichtet <:oopsie:1497720439810687006>",
+        "body": "{CODE:STATE}-Ping #`{CODE:ID}` für [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) ist schon eingerichtet <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "none_configured": {
         "title": "Nicht eingerichtet",
-        "body": "Es gibt noch keine `{CODE:STATE}`-Benachrichtigung für `{CODE:CHANNEL}` <:oopsie:1497720439810687006>",
+        "body": "Es gibt noch keine `{CODE:STATE}`-Benachrichtigung für [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "color_updated": {
         "title": "Ping-Farbe gesetzt",
-        "body": "{RAW:USER} hat die Farbe von {CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` auf `{CODE:COLOR}` gesetzt <a:yes:1497686393369919559>",
+        "body": "{RAW:USER} hat die Farbe von {CODE:STATE}-Ping #`{CODE:ID}` für [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) auf `{CODE:COLOR}` gesetzt <a:yes:1497686393369919559>",
         "footer": ""
       },
       "color_cleared": {
         "title": "Ping-Farbe entfernt",
-        "body": "{RAW:USER} hat die Farbe von {CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` entfernt <:ApuApproved:1497724288256446465>",
+        "body": "{RAW:USER} hat die Farbe von {CODE:STATE}-Ping #`{CODE:ID}` für [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) entfernt <:ApuApproved:1497724288256446465>",
         "footer": ""
       },
       "already_color": {
         "title": "Farbe schon gesetzt",
-        "body": "{CODE:STATE}-Ping #`{CODE:ID}` für `{CODE:CHANNEL}` nutzt schon `{CODE:COLOR}` <:oopsie:1497720439810687006>",
+        "body": "{CODE:STATE}-Ping #`{CODE:ID}` für [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) nutzt schon `{CODE:COLOR}` <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "went_live": {
         "title": "Kanal ist live",
-        "body": "`{CODE:CHANNEL}` ist jetzt live <:Binoculars:1497727665283662077>",
+        "body": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) ist jetzt live <:Binoculars:1497727665283662077>",
         "footer": ""
       },
       "went_offline": {
         "title": "Kanal ist offline",
-        "body": "`{CODE:CHANNEL}` ist jetzt offline <a:Lurk:1497684902135463986>",
+        "body": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) ist jetzt offline <a:Lurk:1497684902135463986>",
         "footer": ""
       },
       "not_joined": {
@@ -1420,8 +1420,8 @@
       "reply_field": "Antwort"
     },
     "channel_event_reply_embed": {
-      "description": "{CODE:STATE}-Ping #`{CODE:ID}` hat eine Auto-Antwort gesendet.",
-      "footer": "Kanal: {CHANNEL}",
+      "description_online": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) ist jetzt live <:Binoculars:1497727665283662077>",
+      "description_offline": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) ist jetzt offline <a:Lurk:1497684902135463986>",
       "reply_field": "Antwort"
     },
     "shared": {

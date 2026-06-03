@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import (
     AdapterEventActionRepository,
     AdapterEventRepository,
@@ -105,18 +104,25 @@ class ChannelEventCommandService:
         if event_key not in {STREAM_ONLINE_EVENT_KEY, STREAM_OFFLINE_EVENT_KEY}:
             raise ValueError(self.localizer.text("results.channel_event.unsupported_event", language=thread.language))
 
-        channel_name = await self._channel_display_name(command.twitch_channel_id)
+        channel_display_name, channel_login = await self._channel_identity(command.twitch_channel_id)
         if action == "add":
-            return await self._add_notification(command, thread, channel_name)
+            return await self._add_notification(command, thread, channel_display_name, channel_login)
         if action == "remove":
-            return await self._update_notification(command, action=action, thread=thread, channel_name=channel_name)
+            return await self._update_notification(
+                command,
+                action=action,
+                thread=thread,
+                channel_display_name=channel_display_name,
+                channel_login=channel_login,
+            )
         raise ValueError(self.localizer.text("results.channel_event.unsupported_action", language=thread.language))
 
     async def _add_notification(
         self,
         command: ChannelEventCommand,
         thread: ThreadRecord,
-        channel_name: str,
+        channel_display_name: str,
+        channel_login: str,
     ) -> DiscordCommandResult:
         adapter_event = self.adapter_event_repository.upsert_event(
             thread_id=thread.thread_id,
@@ -161,7 +167,8 @@ class ChannelEventCommandService:
             thread=thread,
             ID=display_id,
             STATE=self._state_label(command.event_kind.value, thread),
-            CHANNEL=channel_name,
+            DISPLAY_NAME=channel_display_name,
+            LOGIN=channel_login,
             style=style,
             ephemeral=ephemeral,
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
@@ -173,7 +180,8 @@ class ChannelEventCommandService:
         *,
         action: str,
         thread: ThreadRecord,
-        channel_name: str,
+        channel_display_name: str,
+        channel_login: str,
     ) -> DiscordCommandResult:
         adapter_event = await resolve_awaitable(self.adapter_event_repository.get_event(
             thread_id=thread.thread_id,
@@ -196,7 +204,8 @@ class ChannelEventCommandService:
                 "results.channel_event.none_configured",
                 thread=thread,
                 STATE=self._state_label(command.event_kind.value, thread),
-                CHANNEL=channel_name,
+                DISPLAY_NAME=channel_display_name,
+                LOGIN=channel_login,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -214,20 +223,17 @@ class ChannelEventCommandService:
             thread=thread,
             ID=display_id,
             STATE=self._state_label(command.event_kind.value, thread),
-            CHANNEL=channel_name,
+            DISPLAY_NAME=channel_display_name,
+            LOGIN=channel_login,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
         )
 
-    async def _channel_display_name(self, twitch_channel_id: str) -> str:
-        try:
-            cached = self.twitch_api.get_cached_user_by_id(twitch_channel_id.strip())
-            if cached is not None:
-                return cached.display_name
-            return (await self.twitch_api.get_channel_by_id(twitch_channel_id)).display_name
-        except TwitchAPIError:
-            return twitch_channel_id
+    async def _channel_identity(self, twitch_channel_id: str) -> tuple[str, str]:
+        cached = self.twitch_api.get_cached_user_by_id(twitch_channel_id.strip())
+        twitch_user = cached if cached is not None else await self.twitch_api.get_channel_by_id(twitch_channel_id)
+        return twitch_user.display_name, twitch_user.login
 
     def _state_label(self, event_key: str, thread: ThreadRecord) -> str:
         state_key = "live" if event_key == STREAM_ONLINE_EVENT_KEY else "offline"
@@ -263,14 +269,15 @@ class ChannelEventCommandService:
                 action_type=DISCORD_NOTIFY_ACTION,
             ))
         )
-        channel_name = self._cached_channel_display_name(command.twitch_channel_id)
+        channel_display_name, channel_login = await self._channel_identity(command.twitch_channel_id)
         if adapter_event is None or notify_action is None:
             return build_thread_result(
                 self.localizer,
                 "results.channel_event.none_configured",
                 thread=thread,
                 STATE=self._state_label(command.event_kind.value, thread),
-                CHANNEL=channel_name,
+                DISPLAY_NAME=channel_display_name,
+                LOGIN=channel_login,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
@@ -295,7 +302,8 @@ class ChannelEventCommandService:
                 thread=thread,
                 ID=display_id,
                 STATE=self._state_label(command.event_kind.value, thread),
-                CHANNEL=channel_name,
+                DISPLAY_NAME=channel_display_name,
+                LOGIN=channel_login,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
                 USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
@@ -308,7 +316,8 @@ class ChannelEventCommandService:
                 thread=thread,
                 ID=display_id,
                 STATE=self._state_label(command.event_kind.value, thread),
-                CHANNEL=channel_name,
+                DISPLAY_NAME=channel_display_name,
+                LOGIN=channel_login,
                 COLOR=normalized_color,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
@@ -327,7 +336,8 @@ class ChannelEventCommandService:
             thread=thread,
             ID=display_id,
             STATE=self._state_label(command.event_kind.value, thread),
-            CHANNEL=channel_name,
+            DISPLAY_NAME=channel_display_name,
+            LOGIN=channel_login,
             COLOR=updated.color or "",
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
@@ -355,9 +365,3 @@ class ChannelEventCommandService:
             thread_id=thread_id,
             event_id=event_id,
         )
-
-    def _cached_channel_display_name(self, twitch_channel_id: str) -> str:
-        cached = self.twitch_api.get_cached_user_by_id(twitch_channel_id.strip())
-        if cached is not None:
-            return cached.display_name
-        return twitch_channel_id

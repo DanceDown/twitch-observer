@@ -56,7 +56,7 @@ class ChannelEventAutoReplyService:
     async def handle_channel_live_state_changed(
         self,
         event: TwitchChannelLiveStateChangedEvent,
-    ) -> None:
+    ) -> set[tuple[int, int]]:
         event_key = STREAM_ONLINE_EVENT_KEY if event.is_live else STREAM_OFFLINE_EVENT_KEY
         configured_events = await resolve_awaitable(self.adapter_event_repository.list_matching_events(
             adapter_key=TWITCH_ADAPTER_KEY,
@@ -66,7 +66,7 @@ class ChannelEventAutoReplyService:
             include_disabled=False,
         ))
         if not configured_events:
-            return
+            return set()
 
         channel_user = await safe_get_twitch_user_by_id(
             self.twitch_api,
@@ -75,6 +75,7 @@ class ChannelEventAutoReplyService:
         channel_login = event.twitch_channel_login or (None if channel_user is None else channel_user.login)
         channel_name = (event.twitch_channel_login if channel_user is None else channel_user.display_name) or event.twitch_channel_id
         event_state = STREAM_EVENT_KEY_TO_STATE[event_key]
+        sent_event_keys: set[tuple[int, int]] = set()
         for configured_event in configured_events:
             reply = await resolve_awaitable(self.adapter_event_action_repository.get_action(
                 event_id=configured_event.event_id,
@@ -135,6 +136,7 @@ class ChannelEventAutoReplyService:
                     reply_message=rendered_message,
                     event_color=None if notify_action is None else notify_action.color,
                 )
+                sent_event_keys.add((thread.thread_id, configured_event.event_id))
             except TwitchAuthenticationError:
                 refreshed = await refresh_linked_account(
                     account=account,
@@ -163,6 +165,7 @@ class ChannelEventAutoReplyService:
                     reply_message=rendered_message,
                     event_color=None if notify_action is None else notify_action.color,
                 )
+                sent_event_keys.add((thread.thread_id, configured_event.event_id))
             except TwitchAPIError as error:
                 logger.warning(
                     "Failed to send channel-event auto-reply thread_id=%s twitch_channel_id=%s state=%s channel_login=%s: %s",
@@ -172,6 +175,7 @@ class ChannelEventAutoReplyService:
                     channel_login,
                     error,
                 )
+        return sent_event_keys
 
     @staticmethod
     def _render_channel_event_reply(
@@ -203,11 +207,8 @@ class ChannelEventAutoReplyService:
                 localizer=self.localizer,
                 display_index=display_index,
                 channel_display_name=channel_display_name,
-                channel_login=channel_login,
-                state=self.localizer.text(
-                    f"discord.live_state_ui.states.stream.{state}",
-                    language=thread.language,
-                ),
+                channel_login=channel_login or channel_display_name,
+                state=state,
                 reply_message=reply_message,
                 channel=source_channel,
                 event_color=event_color,

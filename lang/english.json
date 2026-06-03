@@ -547,7 +547,7 @@
       "unsupported_event": "Only live and offline events from watched Twitch channels fit here <:oopsie:1497720439810687006>",
       "added_event": {
         "title": "Auto-Reply Added",
-        "body": "{RAW:USER} added an auto-reply for `{CODE:CHANNEL}` on `{CODE:STATE}` <a:yo:1497686448717959369>\nMessage: `{CODE:MESSAGE}`",
+        "body": "{RAW:USER} added an auto-reply for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) on `{CODE:STATE}` <a:yo:1497686448717959369>\nMessage: `{CODE:MESSAGE}`",
         "footer": ""
       },
       "none_configured_event": {
@@ -557,17 +557,17 @@
       },
       "removed_event": {
         "title": "Auto-Reply Removed",
-        "body": "{RAW:USER} removed the `{CODE:STATE}` auto-reply for `{CODE:CHANNEL}` <:ApuApproved:1497724288256446465>\nMessage: `{CODE:MESSAGE}`",
+        "body": "{RAW:USER} removed the `{CODE:STATE}` auto-reply for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:ApuApproved:1497724288256446465>\nMessage: `{CODE:MESSAGE}`",
         "footer": ""
       },
       "disabled_event": {
         "title": "Auto-Reply Disabled",
-        "body": "{RAW:USER} disabled the `{CODE:STATE}` auto-reply for `{CODE:CHANNEL}` <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}",
+        "body": "{RAW:USER} disabled the `{CODE:STATE}` auto-reply for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}",
         "footer": ""
       },
       "enabled_event": {
         "title": "Auto-Reply Enabled",
-        "body": "{RAW:USER} enabled the `{CODE:STATE}` auto-reply for `{CODE:CHANNEL}` <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}",
+        "body": "{RAW:USER} enabled the `{CODE:STATE}` auto-reply for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <a:yes:1497686393369919559>\nMessage: {RAW:MESSAGE}",
         "footer": ""
       },
       "not_joined": {
@@ -617,52 +617,52 @@
       },
       "notification_added": {
         "title": "Notification Added",
-        "body": "{RAW:USER} added {CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` <:Binoculars:1497727665283662077>",
+        "body": "{RAW:USER} added {CODE:STATE} ping #`{CODE:ID}` for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:Binoculars:1497727665283662077>",
         "footer": ""
       },
       "notification_removed": {
         "title": "Notification Removed",
-        "body": "{RAW:USER} removed {CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` <:ApuApproved:1497724288256446465>",
+        "body": "{RAW:USER} removed {CODE:STATE} ping #`{CODE:ID}` for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:ApuApproved:1497724288256446465>",
         "footer": ""
       },
       "notification_enabled": {
         "title": "Notification Enabled",
-        "body": "{RAW:USER} enabled {CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` <a:yes:1497686393369919559>",
+        "body": "{RAW:USER} enabled {CODE:STATE} ping #`{CODE:ID}` for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <a:yes:1497686393369919559>",
         "footer": ""
       },
       "already_configured": {
         "title": "Already Configured",
-        "body": "{CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` is already configured <:oopsie:1497720439810687006>",
+        "body": "{CODE:STATE} ping #`{CODE:ID}` for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is already configured <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "none_configured": {
         "title": "Not Configured",
-        "body": "There is no `{CODE:STATE}` notification for `{CODE:CHANNEL}` yet <:oopsie:1497720439810687006>",
+        "body": "There is no `{CODE:STATE}` notification for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) yet <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "color_updated": {
         "title": "Ping Color Set",
-        "body": "{RAW:USER} set the color of {CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` to `{CODE:COLOR}` <a:yes:1497686393369919559>",
+        "body": "{RAW:USER} set the color of {CODE:STATE} ping #`{CODE:ID}` for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) to `{CODE:COLOR}` <a:yes:1497686393369919559>",
         "footer": ""
       },
       "color_cleared": {
         "title": "Ping Color Cleared",
-        "body": "{RAW:USER} cleared the color of {CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` <:ApuApproved:1497724288256446465>",
+        "body": "{RAW:USER} cleared the color of {CODE:STATE} ping #`{CODE:ID}` for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) <:ApuApproved:1497724288256446465>",
         "footer": ""
       },
       "already_color": {
         "title": "Color Already Set",
-        "body": "{CODE:STATE} ping #`{CODE:ID}` for `{CODE:CHANNEL}` already uses `{CODE:COLOR}` <:oopsie:1497720439810687006>",
+        "body": "{CODE:STATE} ping #`{CODE:ID}` for [`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) already uses `{CODE:COLOR}` <:oopsie:1497720439810687006>",
         "footer": ""
       },
       "went_live": {
         "title": "Channel Is Live",
-        "body": "`{CODE:CHANNEL}` is now live <:Binoculars:1497727665283662077>",
+        "body": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is now live <:Binoculars:1497727665283662077>",
         "footer": ""
       },
       "went_offline": {
         "title": "Channel Is Offline",
-        "body": "`{CODE:CHANNEL}` is now offline <a:Lurk:1497684902135463986>",
+        "body": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is now offline <a:Lurk:1497684902135463986>",
         "footer": ""
       },
       "not_joined": {
@@ -1424,8 +1424,8 @@
       "reply_field": "Reply"
     },
     "channel_event_reply_embed": {
-      "description": "{CODE:STATE} ping #`{CODE:ID}` sent an auto-reply.",
-      "footer": "Channel: {CHANNEL}",
+      "description_online": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is now live <:Binoculars:1497727665283662077>",
+      "description_offline": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is now offline <a:Lurk:1497684902135463986>",
       "reply_field": "Reply"
     },
     "shared": {
