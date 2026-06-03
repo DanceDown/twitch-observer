@@ -15,4 +15,3 @@ class IRCMessage:
     params: list[str]
     trailing: str | None
     raw: str
-

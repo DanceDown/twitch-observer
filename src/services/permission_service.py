@@ -101,10 +101,12 @@ class PermissionCommandService:
             raise ValueError(self.localizer.text("results.permission.grant_empty_selection", language=thread.language))
         requested_permissions = tuple(dict.fromkeys(command.permissions))
         permission_mask = permissions_mask_from_values(requested_permissions)
-        current = await resolve_awaitable(self.permission_repository.get_by_user_and_thread(
-            discord_user_id=command.target_user_id,
-            thread_id=thread.thread_id,
-        ))
+        current = await resolve_awaitable(
+            self.permission_repository.get_by_user_and_thread(
+                discord_user_id=command.target_user_id,
+                thread_id=thread.thread_id,
+            )
+        )
         current_mask = 0 if current is None else current.permissions
         updated = self.permission_repository.upsert_permissions(
             discord_user_id=command.target_user_id,
@@ -116,7 +118,9 @@ class PermissionCommandService:
             "results.permission.granted",
             thread=thread,
             TARGET=f"<@{updated.discord_user_id}>",
-            PERMISSIONS=[self._permission_label("results.permission.granted", value, language=thread.language) for value in requested_permissions],
+            PERMISSIONS=[
+                self._permission_label("results.permission.granted", value, language=thread.language) for value in requested_permissions
+            ],
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
@@ -130,10 +134,12 @@ class PermissionCommandService:
             raise ValueError(self.localizer.text("results.permission.revoke_empty_selection", language=thread.language))
         requested_permissions = tuple(dict.fromkeys(command.permissions))
         permission_mask = permissions_mask_from_values(requested_permissions)
-        current = await resolve_awaitable(self.permission_repository.get_by_user_and_thread(
-            discord_user_id=command.target_user_id,
-            thread_id=thread.thread_id,
-        ))
+        current = await resolve_awaitable(
+            self.permission_repository.get_by_user_and_thread(
+                discord_user_id=command.target_user_id,
+                thread_id=thread.thread_id,
+            )
+        )
         current_mask = 0 if current is None else current.permissions
         matched_mask = current_mask & permission_mask
         if not matched_mask:
@@ -166,7 +172,9 @@ class PermissionCommandService:
             "results.permission.revoked",
             thread=thread,
             TARGET=f"<@{command.target_user_id}>",
-            PERMISSIONS=[self._permission_label("results.permission.revoked", value, language=thread.language) for value in requested_permissions],
+            PERMISSIONS=[
+                self._permission_label("results.permission.revoked", value, language=thread.language) for value in requested_permissions
+            ],
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
             USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),

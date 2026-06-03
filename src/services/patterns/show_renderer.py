@@ -63,7 +63,9 @@ class ShowSectionRenderer:
         language = self.localizer.language_for_thread(thread)
         channels = await resolve_awaitable(self.channel_repository.list_channels_for_thread(thread.thread_id))
         if not channels:
-            return self.render_section("show.channel.section", self.localizer.text("show.channel.empty", language=language), language=language)
+            return self.render_section(
+                "show.channel.section", self.localizer.text("show.channel.empty", language=language), language=language
+            )
 
         rows: list[str] = []
         for channel in channels:
@@ -83,20 +85,20 @@ class ShowSectionRenderer:
                     language=language,
                     DISPLAY_NAME=twitch_user.display_name,
                     LOGIN=twitch_user.login,
-                    DETAILS=(
-                        ""
-                        if not details
-                        else self.localizer.text("show.channel.details", language=language, ITEMS=tuple(details))
-                    ),
+                    DETAILS=("" if not details else self.localizer.text("show.channel.details", language=language, ITEMS=tuple(details))),
                 )
             )
-        return self.render_section("show.channel.section", self.localizer.text("show.channel.rows", language=language, ITEMS=tuple(rows)), language=language)
+        return self.render_section(
+            "show.channel.section", self.localizer.text("show.channel.rows", language=language, ITEMS=tuple(rows)), language=language
+        )
 
     async def render_channel_events_section(self, thread: ThreadRecord) -> str:
         """Render configured live/offline notification pings with compact display IDs."""
         language = self.localizer.language_for_thread(thread)
         if self.adapter_event_action_repository is None:
-            return self.render_section("show.channel_event.section", self.localizer.text("show.channel_event.empty", language=language), language=language)
+            return self.render_section(
+                "show.channel_event.section", self.localizer.text("show.channel_event.empty", language=language), language=language
+            )
 
         channel_by_id = {
             channel.twitch_channel_id: channel
@@ -151,7 +153,9 @@ class ShowSectionRenderer:
                 )
             )
         if not rows:
-            return self.render_section("show.channel_event.section", self.localizer.text("show.channel_event.empty", language=language), language=language)
+            return self.render_section(
+                "show.channel_event.section", self.localizer.text("show.channel_event.empty", language=language), language=language
+            )
         return self.render_section(
             "show.channel_event.section",
             self.localizer.text("show.channel_event.rows", language=language, ITEMS=tuple(rows)),
@@ -161,35 +165,45 @@ class ShowSectionRenderer:
     async def render_patterns_section(self, thread: ThreadRecord) -> str:
         """Render all stored pings with dense display IDs."""
         language = self.localizer.language_for_thread(thread)
-        patterns = await resolve_awaitable(self.pattern_repository.list_patterns_for_thread(
-            thread.thread_id,
-            is_regex=None,
-        ))
+        patterns = await resolve_awaitable(
+            self.pattern_repository.list_patterns_for_thread(
+                thread.thread_id,
+                is_regex=None,
+            )
+        )
         if not patterns:
-            return self.render_section("show.pattern.section", self.localizer.text("show.pattern.empty", language=language), language=language)
+            return self.render_section(
+                "show.pattern.section", self.localizer.text("show.pattern.empty", language=language), language=language
+            )
         rows = [
             await self.format_pattern_row(pattern, display_index=display_index, language=language)
             for display_index, pattern in enumerate(patterns, start=1)
         ]
-        return self.render_section("show.pattern.section", self.localizer.text("show.pattern.rows", language=language, ITEMS=tuple(rows)), language=language)
+        return self.render_section(
+            "show.pattern.section", self.localizer.text("show.pattern.rows", language=language, ITEMS=tuple(rows)), language=language
+        )
 
     async def render_auto_replies_section(self, thread: ThreadRecord) -> str:
         """Render all patterns and event-actions that currently send auto-replies."""
         language = self.localizer.language_for_thread(thread)
-        replies = await resolve_awaitable(self.reply_repository.list_replies_for_thread(
-            thread.thread_id,
-            include_disabled=True,
-        ))
+        replies = await resolve_awaitable(
+            self.reply_repository.list_replies_for_thread(
+                thread.thread_id,
+                include_disabled=True,
+            )
+        )
         adapter_event_actions = (
             []
             if self.adapter_event_action_repository is None or self.adapter_event_repository is None
             else [
                 (event_record, action_record)
                 for event_record, action_record in (
-                    await resolve_awaitable(self.adapter_event_action_repository.list_actions_for_thread(
-                        thread.thread_id,
-                        include_disabled=True,
-                    ))
+                    await resolve_awaitable(
+                        self.adapter_event_action_repository.list_actions_for_thread(
+                            thread.thread_id,
+                            include_disabled=True,
+                        )
+                    )
                 )
                 if action_record.action_type == TWITCH_SEND_MESSAGE_ACTION
             ]
@@ -206,10 +220,12 @@ class ShowSectionRenderer:
             )
         }
         for reply in replies:
-            pattern = await resolve_awaitable(self.pattern_repository.get_pattern_by_id(
-                thread_id=thread.thread_id,
-                pattern_id=reply.pattern_id,
-            ))
+            pattern = await resolve_awaitable(
+                self.pattern_repository.get_pattern_by_id(
+                    thread_id=thread.thread_id,
+                    pattern_id=reply.pattern_id,
+                )
+            )
             if pattern is None:
                 continue
             display_index = pattern_display_indices.get(pattern.pattern_id, pattern.pattern_id)
@@ -225,7 +241,11 @@ class ShowSectionRenderer:
             rows.append(await self.format_adapter_event_action_row(adapter_event, action, language=language))
         if not rows:
             return self.render_section("show.auto_replies.section", empty_text, language=language)
-        return self.render_section("show.auto_replies.section", self.localizer.text("show.auto_replies.rows", language=language, ITEMS=tuple(rows)), language=language)
+        return self.render_section(
+            "show.auto_replies.section",
+            self.localizer.text("show.auto_replies.rows", language=language, ITEMS=tuple(rows)),
+            language=language,
+        )
 
     async def render_users_section(self, thread: ThreadRecord) -> str:
         """Render the tracked Twitch users for one Discord configuration root."""
@@ -240,7 +260,11 @@ class ShowSectionRenderer:
         for tracked_user in tracked_users:
             twitch_user = await self.resolve_user_by_id(tracked_user.twitch_user_id)
             rows.append({"DISPLAY_NAME": twitch_user.display_name, "LOGIN": twitch_user.login})
-        return self.render_section("show.tracked_users.section", self.localizer.text("show.tracked_users.rows", language=language, ITEMS=tuple(rows)), language=language)
+        return self.render_section(
+            "show.tracked_users.section",
+            self.localizer.text("show.tracked_users.rows", language=language, ITEMS=tuple(rows)),
+            language=language,
+        )
 
     async def render_permissions_section(self, thread: ThreadRecord) -> str:
         """Render the permission overview for one Discord context."""
@@ -530,10 +554,12 @@ class ShowSectionRenderer:
             return []
         rows = [
             (event, action)
-            for event, action in await resolve_awaitable(self.adapter_event_action_repository.list_actions_for_thread(
-                thread_id,
-                include_disabled=True,
-            ))
+            for event, action in await resolve_awaitable(
+                self.adapter_event_action_repository.list_actions_for_thread(
+                    thread_id,
+                    include_disabled=True,
+                )
+            )
             if action.action_type == DISCORD_NOTIFY_ACTION
             and event.adapter_key == TWITCH_ADAPTER_KEY
             and event.subject_type == CHANNEL_SUBJECT_TYPE
@@ -582,11 +608,7 @@ class ShowSectionRenderer:
             row_key,
             language=language,
             HEAD=head,
-            DETAILS=(
-                ""
-                if not details
-                else self.localizer.text(details_key, language=language, ITEMS=tuple(details))
-            ),
+            DETAILS=("" if not details else self.localizer.text(details_key, language=language, ITEMS=tuple(details))),
         )
 
     @staticmethod

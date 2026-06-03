@@ -34,6 +34,7 @@ __all__ = ("AccountCommandService", "AccountNotificationSender")
 
 AccountCommand = StartAccountLinkCommand | UnlinkAccountCommand
 
+
 @dataclass(slots=True)
 class AccountCommandService:
     """Handle `/account` commands using Twitch's Device Code Flow."""

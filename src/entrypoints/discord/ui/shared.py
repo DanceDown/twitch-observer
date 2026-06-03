@@ -23,9 +23,7 @@ COLOR_PICKER_URL = "https://htmlcolorcodes.com/color-picker/"
 
 def build_form_embed(result: DiscordCommandResult) -> discord.Embed:
     """Render one neutral configuration embed used by interactive command forms."""
-    return build_result_embed(
-        result
-    )
+    return build_result_embed(result)
 
 
 async def start_form(

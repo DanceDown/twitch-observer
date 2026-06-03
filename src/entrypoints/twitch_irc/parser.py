@@ -97,4 +97,3 @@ def _normalize_irc_chat_content(content: str) -> str:
     if content.startswith("\x01ACTION ") and content.endswith("\x01"):
         return content[8:-1]
     return content
-

@@ -192,18 +192,20 @@ class PatternCommandService:
             thread=thread,
         )
 
-        existing = await resolve_awaitable(self.pattern_repository.find_exact_pattern(
-            thread_id=thread.thread_id,
-            regex=text,
-            channel_scope_mode=command.channel_scope_mode.value,
-            channel_scope_ids=tuple(channel.user_id for channel in scoped_channels),
-            user_scope_mode=command.user_scope_mode.value,
-            user_scope_ids=tuple(user.user_id for user in scoped_users),
-            sub_state=command.sub_state.value,
-            offline_state=command.offline_state.value,
-            is_regex=command.is_regex,
-            case_sensitive=command.case_sensitive,
-        ))
+        existing = await resolve_awaitable(
+            self.pattern_repository.find_exact_pattern(
+                thread_id=thread.thread_id,
+                regex=text,
+                channel_scope_mode=command.channel_scope_mode.value,
+                channel_scope_ids=tuple(channel.user_id for channel in scoped_channels),
+                user_scope_mode=command.user_scope_mode.value,
+                user_scope_ids=tuple(user.user_id for user in scoped_users),
+                sub_state=command.sub_state.value,
+                offline_state=command.offline_state.value,
+                is_regex=command.is_regex,
+                case_sensitive=command.case_sensitive,
+            )
+        )
         if existing is not None:
             display_id = self._display_index(thread.thread_id, existing.pattern_id) or existing.pattern_id
             return build_thread_result(
@@ -272,7 +274,9 @@ class PatternCommandService:
         thread: ThreadRecord,
     ) -> DiscordCommandResult:
         logger.debug("Removing pattern request: %r", command)
-        pattern = await resolve_awaitable(self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id))
+        pattern = await resolve_awaitable(
+            self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id)
+        )
         if pattern is None:
             return build_thread_result(
                 self.localizer,
@@ -308,7 +312,9 @@ class PatternCommandService:
             return thread
 
         logger.debug("Disabling pattern request: %r", command)
-        pattern = await resolve_awaitable(self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id))
+        pattern = await resolve_awaitable(
+            self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id)
+        )
         if pattern is None:
             return build_thread_result(
                 self.localizer,
@@ -358,7 +364,9 @@ class PatternCommandService:
             return thread
 
         logger.debug("Enabling pattern request: %r", command)
-        pattern = await resolve_awaitable(self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id))
+        pattern = await resolve_awaitable(
+            self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id)
+        )
         if pattern is None:
             return build_thread_result(
                 self.localizer,
@@ -407,7 +415,9 @@ class PatternCommandService:
         if isinstance(thread, DiscordCommandResult):
             return thread
 
-        pattern = await resolve_awaitable(self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id))
+        pattern = await resolve_awaitable(
+            self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id)
+        )
         if pattern is None:
             return build_thread_result(
                 self.localizer,
@@ -451,18 +461,20 @@ class PatternCommandService:
             pattern=pattern,
         )
 
-        existing = await resolve_awaitable(self.pattern_repository.find_exact_pattern(
-            thread_id=thread.thread_id,
-            regex=new_text,
-            channel_scope_mode=new_channel_scope_mode,
-            channel_scope_ids=tuple(channel.user_id for channel in scoped_channels),
-            user_scope_mode=new_user_scope_mode,
-            user_scope_ids=tuple(user.user_id for user in scoped_users),
-            sub_state=new_sub_state,
-            offline_state=new_offline_state,
-            is_regex=new_is_regex,
-            case_sensitive=new_case_sensitive,
-        ))
+        existing = await resolve_awaitable(
+            self.pattern_repository.find_exact_pattern(
+                thread_id=thread.thread_id,
+                regex=new_text,
+                channel_scope_mode=new_channel_scope_mode,
+                channel_scope_ids=tuple(channel.user_id for channel in scoped_channels),
+                user_scope_mode=new_user_scope_mode,
+                user_scope_ids=tuple(user.user_id for user in scoped_users),
+                sub_state=new_sub_state,
+                offline_state=new_offline_state,
+                is_regex=new_is_regex,
+                case_sensitive=new_case_sensitive,
+            )
+        )
         if existing is not None and existing.pattern_id != pattern.pattern_id:
             display_id = await self._display_index(thread.thread_id, existing.pattern_id) or existing.pattern_id
             return build_thread_result(

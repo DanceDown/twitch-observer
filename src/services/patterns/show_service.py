@@ -92,7 +92,6 @@ class ShowCommandService:
                 return result
             lines = []
             sections = self._normalize_sections(command.sections)
-            language = self.localizer.language_for_thread(thread)
             if "channels" in sections:
                 lines.append(await self._renderer.render_channels_section(thread))
             if "stream_pings" in sections:

@@ -126,10 +126,7 @@ class TwitchUserDirectoryService:
         return tuple(records)
 
     def upsert_users_from_api(self, users: tuple[TwitchUser, ...]) -> None:
-        records = tuple(
-            (user.user_id, user.login, user.display_name, user.profile_image_url)
-            for user in users
-        )
+        records = tuple((user.user_id, user.login, user.display_name, user.profile_image_url) for user in users)
         self.repository.upsert_many_from_api(records)
         self._remember_api_users(users)
 

@@ -53,16 +53,12 @@ def register_permission_commands(
                 action="grant",
                 default_user_id=target_user.id if target_user is not None else None,
                 default_permissions=tuple(
-                    value.strip().lower()
-                    for value in split_csv_values(permissions)
-                    if value.strip().lower() in valid_permissions
+                    value.strip().lower() for value in split_csv_values(permissions) if value.strip().lower() in valid_permissions
                 ),
             )
             return
         parsed_permissions = tuple(
-            value.strip().lower()
-            for value in split_csv_values(permissions)
-            if value.strip().lower() in valid_permissions
+            value.strip().lower() for value in split_csv_values(permissions) if value.strip().lower() in valid_permissions
         )
         result = await dispatch_grant_permissions(
             services,
@@ -97,16 +93,12 @@ def register_permission_commands(
                 action="revoke",
                 default_user_id=target_user.id if target_user is not None else None,
                 default_permissions=tuple(
-                    value.strip().lower()
-                    for value in split_csv_values(permissions)
-                    if value.strip().lower() in valid_permissions
+                    value.strip().lower() for value in split_csv_values(permissions) if value.strip().lower() in valid_permissions
                 ),
             )
             return
         parsed_permissions = tuple(
-            value.strip().lower()
-            for value in split_csv_values(permissions)
-            if value.strip().lower() in valid_permissions
+            value.strip().lower() for value in split_csv_values(permissions) if value.strip().lower() in valid_permissions
         )
         result = await dispatch_revoke_permissions(
             services,

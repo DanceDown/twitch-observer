@@ -128,7 +128,9 @@ class ThreadLifecycleService:
         )
         part_candidate_channel_ids: list[str] = []
         for twitch_channel_id in removed_channel_ids:
-            remaining_thread_ids = set(await resolve_awaitable(self.channel_repository.list_thread_ids_by_twitch_channel_id(twitch_channel_id)))
+            remaining_thread_ids = set(
+                await resolve_awaitable(self.channel_repository.list_thread_ids_by_twitch_channel_id(twitch_channel_id))
+            )
             remaining_thread_ids.discard(thread.thread_id)
             if not remaining_thread_ids:
                 part_candidate_channel_ids.append(twitch_channel_id)

@@ -128,7 +128,9 @@ class PatternQueryService:
             return []
 
         presentations: list[PatternPresentation] = []
-        for display_index, pattern in enumerate(await resolve_awaitable(self.pattern_repository.list_patterns_for_thread(thread.thread_id)), start=1):
+        for display_index, pattern in enumerate(
+            await resolve_awaitable(self.pattern_repository.list_patterns_for_thread(thread.thread_id)), start=1
+        ):
             presentations.append(
                 PatternPresentation(
                     display_index=display_index,
@@ -249,7 +251,9 @@ class AdapterEventQueryService:
 
         channel_map = {item.user_id: item for item in await self.channel_queries.list_tracked_channels(discord_channel_id)}
         presentations: list[AdapterEventPresentation] = []
-        for event in await resolve_awaitable(self.adapter_event_repository.list_events_for_thread(thread.thread_id, include_disabled=False)):
+        for event in await resolve_awaitable(
+            self.adapter_event_repository.list_events_for_thread(thread.thread_id, include_disabled=False)
+        ):
             if event.adapter_key != "twitch" or event.subject_type != "channel":
                 continue
             channel = channel_map.get(event.subject_id)
@@ -266,10 +270,12 @@ class AdapterEventQueryService:
         event_map = {item.event.event_id: item for item in await self.list_adapter_events(discord_channel_id)}
         display_index_map = await ChannelEventDisplayIndexResolver(self.adapter_event_action_repository).build_index_map(thread.thread_id)
         presentations: list[AdapterEventActionPresentation] = []
-        for event_record, action_record in await resolve_awaitable(self.adapter_event_action_repository.list_actions_for_thread(
-            thread.thread_id,
-            include_disabled=True,
-        )):
+        for event_record, action_record in await resolve_awaitable(
+            self.adapter_event_action_repository.list_actions_for_thread(
+                thread.thread_id,
+                include_disabled=True,
+            )
+        ):
             event = event_map.get(event_record.event_id)
             if event is None:
                 continue
@@ -278,9 +284,7 @@ class AdapterEventQueryService:
                     event=event,
                     action=action_record,
                     display_index=(
-                        display_index_map.get(event_record.event_id)
-                        if action_record.action_type == DISCORD_NOTIFY_ACTION
-                        else None
+                        display_index_map.get(event_record.event_id) if action_record.action_type == DISCORD_NOTIFY_ACTION else None
                     ),
                 )
             )
@@ -320,11 +324,13 @@ class WriteQueryService:
         since = datetime.now(UTC) - timedelta(minutes=max_age_minutes)
         candidates: list[WriteReplyCandidatePresentation] = []
         for channel in await resolve_awaitable(self.channel_repository.list_channels_for_thread(thread.thread_id)):
-            rows = await resolve_awaitable(self.message_repository.list_recent_messages_for_channel(
-                twitch_channel_id=channel.twitch_channel_id,
-                since=since,
-                limit=limit,
-            ))
+            rows = await resolve_awaitable(
+                self.message_repository.list_recent_messages_for_channel(
+                    twitch_channel_id=channel.twitch_channel_id,
+                    since=since,
+                    limit=limit,
+                )
+            )
             for row in rows:
                 candidates.append(
                     WriteReplyCandidatePresentation(
@@ -337,7 +343,6 @@ class WriteQueryService:
                 )
         candidates.sort(key=lambda item: item.timestamp, reverse=True)
         return candidates[:limit]
-
 
 
 @dataclass(slots=True)

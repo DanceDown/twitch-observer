@@ -74,7 +74,9 @@ class TwitchWriteCommandService:
         if len(message) > 500:
             raise ValueError(self.localizer.text("results.write.message_too_long", language=thread.language))
         twitch_channel = await self.twitch_api.refresh_channel_by_login(command.twitch_channel_login)
-        tracked_channel = await resolve_awaitable(self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_channel.user_id))
+        tracked_channel = await resolve_awaitable(
+            self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_channel.user_id)
+        )
         if tracked_channel is None:
             return build_thread_result(
                 self.localizer,

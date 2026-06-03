@@ -44,8 +44,10 @@ class DiscordUIFlowGuardService:
         return await self._decide(event)
 
     async def _decide(self, event: RequestUIFlowCommand) -> DiscordUIFlowDecision:
-        thread = None if event.discord_channel_id is None else await resolve_awaitable(
-            self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+        thread = (
+            None
+            if event.discord_channel_id is None
+            else await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(event.discord_channel_id))
         )
         if thread is None:
             return self._blocked(

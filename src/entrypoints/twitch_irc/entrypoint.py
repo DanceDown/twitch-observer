@@ -60,4 +60,3 @@ class TwitchIRCEntrypoint:
             logger.warning("Dropping Twitch chat message because no chat pipeline is configured yet.")
             return
         await self._message_processor.process(event)
-

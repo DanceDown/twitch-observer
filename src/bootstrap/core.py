@@ -85,4 +85,3 @@ def build_core(config: AppConfig) -> ApplicationCore:
 
 def build_gateways(core: ApplicationCore) -> ApplicationGateways:
     return ApplicationGateways(twitch_irc=AnonymousTwitchIRCGateway(core.config))
-

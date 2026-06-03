@@ -133,7 +133,9 @@ class PatternEditSelectionModal(discord.ui.Modal):
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
-                        label=(item.pattern.regex or localizer.text("discord.pattern_ui.selection.edit_untitled_ping", language=language))[:100],
+                        label=(item.pattern.regex or localizer.text("discord.pattern_ui.selection.edit_untitled_ping", language=language))[
+                            :100
+                        ],
                         value=str(item.pattern.pattern_id),
                         description=localizer.text(
                             "discord.pattern_ui.selection.option_description",

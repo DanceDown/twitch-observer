@@ -96,7 +96,9 @@ class ChannelCommandService:
                 DISPLAY_NAME=twitch_user.display_name,
                 LOGIN=twitch_user.login,
             )
-        is_first_subscription = await resolve_awaitable(self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id)) == 0
+        is_first_subscription = (
+            await resolve_awaitable(self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id)) == 0
+        )
         if is_first_subscription:
             await self.irc_gateway.ensure_connected()
             await self.irc_gateway.join_channel(twitch_user.login)
@@ -194,10 +196,12 @@ class ChannelCommandService:
             )
 
         if (
-            await resolve_awaitable(self.pattern_repository.count_channel_scope_references(
-                thread_id=thread.thread_id,
-                twitch_channel_id=twitch_user.user_id,
-            ))
+            await resolve_awaitable(
+                self.pattern_repository.count_channel_scope_references(
+                    thread_id=thread.thread_id,
+                    twitch_channel_id=twitch_user.user_id,
+                )
+            )
             > 0
         ):
             return build_thread_result(

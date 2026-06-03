@@ -139,8 +139,7 @@ async def expand_pattern_for_tracked_users(
         tracked_user_ids: tuple[str, ...] = ()
     else:
         tracked_user_ids = tuple(
-            user.twitch_user_id
-            for user in await resolve_awaitable(tracked_user_repository.list_users_for_thread(thread_id))
+            user.twitch_user_id for user in await resolve_awaitable(tracked_user_repository.list_users_for_thread(thread_id))
         )
     if pattern.user_scope_mode == "all_tracked_except_selected":
         excluded_user_ids = set(pattern.user_scope_ids)

@@ -64,9 +64,7 @@ class PatternHomeView(BaseFormView):
             self.text(
                 "discord.pattern_ui.summary.mode",
                 PING_MODE=self.text(
-                    "discord.pattern_ui.summary.mode_regex"
-                    if self.state.is_regex
-                    else "discord.pattern_ui.summary.mode_word"
+                    "discord.pattern_ui.summary.mode_regex" if self.state.is_regex else "discord.pattern_ui.summary.mode_word"
                 ),
             ),
             self.text(
@@ -112,11 +110,7 @@ class PatternHomeView(BaseFormView):
                 VALUE=self.state.priority if self.state.priority is not None else self.text("discord.pattern_ui.summary.priority_auto"),
             ),
         ]
-        result_key = (
-            "discord.pattern_ui.create_embed"
-            if self.mode is PatternEditorMode.ADD
-            else "discord.pattern_ui.edit_embed"
-        )
+        result_key = "discord.pattern_ui.create_embed" if self.mode is PatternEditorMode.ADD else "discord.pattern_ui.edit_embed"
         return self.form_embed(result_key, SUMMARY_LINES=lines, COLOR_PICKER_URL=COLOR_PICKER_URL)
 
     @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
@@ -197,7 +191,10 @@ class PatternHomeView(BaseFormView):
                 self.result("discord.pattern_ui.errors.missing_selected_channels", style=DiscordResultStyle.ERROR, ephemeral=True),
             )
             return
-        if self.state.user_scope_mode in {"only_selected", "all_except_selected", "all_tracked_except_selected"} and not self.state.selected_users:
+        if (
+            self.state.user_scope_mode in {"only_selected", "all_except_selected", "all_tracked_except_selected"}
+            and not self.state.selected_users
+        ):
             await self.finish_with_interaction(
                 interaction,
                 self.result("discord.pattern_ui.errors.missing_selected_users", style=DiscordResultStyle.ERROR, ephemeral=True),

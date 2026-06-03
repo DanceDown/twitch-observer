@@ -24,10 +24,12 @@ class ChannelEventDisplayIndexResolver:
     async def build_index_map(self, thread_id: int) -> dict[int, int]:
         rows = [
             (event, action)
-            for event, action in await resolve_awaitable(self.adapter_event_action_repository.list_actions_for_thread(
-                thread_id,
-                include_disabled=True,
-            ))
+            for event, action in await resolve_awaitable(
+                self.adapter_event_action_repository.list_actions_for_thread(
+                    thread_id,
+                    include_disabled=True,
+                )
+            )
             if action.action_type == DISCORD_NOTIFY_ACTION
             and event.adapter_key == TWITCH_ADAPTER_KEY
             and event.subject_type == CHANNEL_SUBJECT_TYPE

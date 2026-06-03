@@ -56,30 +56,20 @@ class PatternCommandPresenter:
         if pattern.sub_state != "all":
             parts.append(
                 self.localizer.text(
-                    (
-                        f"{key_prefix}.subscribers_only"
-                        if pattern.sub_state == "subs"
-                        else f"{key_prefix}.non_subscribers_only"
-                    ),
+                    (f"{key_prefix}.subscribers_only" if pattern.sub_state == "subs" else f"{key_prefix}.non_subscribers_only"),
                     language=language,
                 )
             )
         if pattern.offline_state != "both":
             parts.append(
                 self.localizer.text(
-                    (
-                        f"{key_prefix}.only_while_live"
-                        if pattern.offline_state == "online"
-                        else f"{key_prefix}.only_while_offline"
-                    ),
+                    (f"{key_prefix}.only_while_live" if pattern.offline_state == "online" else f"{key_prefix}.only_while_offline"),
                     language=language,
                 )
             )
         parts.append(
             self.localizer.text(
-                f"{key_prefix}.case_sensitive_yes"
-                if pattern.case_sensitive
-                else f"{key_prefix}.case_sensitive_no",
+                f"{key_prefix}.case_sensitive_yes" if pattern.case_sensitive else f"{key_prefix}.case_sensitive_no",
                 language=language,
             )
         )

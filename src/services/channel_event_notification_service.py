@@ -72,33 +72,35 @@ class ChannelEventNotificationService:
         suppressed_events: set[tuple[int, int]] | None = None,
     ) -> None:
         event_key = STREAM_ONLINE_EVENT_KEY if event.is_live else STREAM_OFFLINE_EVENT_KEY
-        configured_events = await resolve_awaitable(self.adapter_event_repository.list_matching_events(
-            adapter_key=TWITCH_ADAPTER_KEY,
-            subject_type=CHANNEL_SUBJECT_TYPE,
-            subject_id=event.twitch_channel_id,
-            event_key=event_key,
-            include_disabled=False,
-        ))
+        configured_events = await resolve_awaitable(
+            self.adapter_event_repository.list_matching_events(
+                adapter_key=TWITCH_ADAPTER_KEY,
+                subject_type=CHANNEL_SUBJECT_TYPE,
+                subject_id=event.twitch_channel_id,
+                event_key=event_key,
+                include_disabled=False,
+            )
+        )
         if not configured_events:
             return
 
         channel_user = await safe_get_twitch_user_by_id(self.twitch_api, event.twitch_channel_id)
         channel_display_name = (
-            None if channel_user is None else channel_user.display_name
-        ) or event.twitch_channel_login or event.twitch_channel_id
-        channel_login = (
-            None if channel_user is None else channel_user.login
-        ) or event.twitch_channel_login or event.twitch_channel_id
+            (None if channel_user is None else channel_user.display_name) or event.twitch_channel_login or event.twitch_channel_id
+        )
+        channel_login = (None if channel_user is None else channel_user.login) or event.twitch_channel_login or event.twitch_channel_id
         for configured_event in configured_events:
             if suppressed_events and (configured_event.thread_id, configured_event.event_id) in suppressed_events:
                 continue
             thread = await resolve_awaitable(self.thread_repository.get_by_thread_id(configured_event.thread_id))
             if thread is None or not thread.enabled:
                 continue
-            notify_action = await resolve_awaitable(self.adapter_event_action_repository.get_action(
-                event_id=configured_event.event_id,
-                action_type=DISCORD_NOTIFY_ACTION,
-            ))
+            notify_action = await resolve_awaitable(
+                self.adapter_event_action_repository.get_action(
+                    event_id=configured_event.event_id,
+                    action_type=DISCORD_NOTIFY_ACTION,
+                )
+            )
             if notify_action is None or notify_action.disabled:
                 continue
             await self.notifier.send_channel_result(

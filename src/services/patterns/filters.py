@@ -51,10 +51,12 @@ class PatternFilterResolver:
         scoped_channels = []
         for channel_login in twitch_channel_logins:
             channel_user = await self._resolve_user_by_login(channel_login)
-            existing_channel = await resolve_awaitable(self.channel_repository.get_by_thread_and_twitch_channel(
-                thread.thread_id,
-                channel_user.user_id,
-            ))
+            existing_channel = await resolve_awaitable(
+                self.channel_repository.get_by_thread_and_twitch_channel(
+                    thread.thread_id,
+                    channel_user.user_id,
+                )
+            )
             if existing_channel is None:
                 raise ValueError(
                     self._text(
@@ -97,10 +99,12 @@ class PatternFilterResolver:
             existing_user = (
                 None
                 if self.tracked_user_repository is None
-                else await resolve_awaitable(self.tracked_user_repository.get_by_thread_and_twitch_user(
-                    thread.thread_id,
-                    resolved_user.user_id,
-                ))
+                else await resolve_awaitable(
+                    self.tracked_user_repository.get_by_thread_and_twitch_user(
+                        thread.thread_id,
+                        resolved_user.user_id,
+                    )
+                )
             )
             if self.tracked_user_repository is not None and existing_user is None:
                 raise ValueError(

@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import (
     AdapterEventActionRepository,
     AdapterEventRepository,
@@ -155,7 +154,9 @@ class ReplyCommandService:
         if isinstance(thread, DiscordCommandResult):
             return thread
 
-        pattern = await resolve_awaitable(self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id))
+        pattern = await resolve_awaitable(
+            self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id)
+        )
         if pattern is None:
             return build_thread_result(
                 self.localizer,
@@ -167,7 +168,11 @@ class ReplyCommandService:
 
         display_id = await self._display_index(thread.thread_id, pattern.pattern_id) or pattern.pattern_id
         if action == "add":
-            linked_account = await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id)) if thread.account_id is not None else None
+            linked_account = (
+                await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
+                if thread.account_id is not None
+                else None
+            )
             if linked_account is None:
                 return build_thread_result(
                     self.localizer,
@@ -182,7 +187,9 @@ class ReplyCommandService:
                 raise ValueError(self.localizer.text("results.reply.pattern_add_empty_message", language=thread.language))
             if len(message) > 500:
                 raise ValueError(self.localizer.text("results.reply.pattern_add_message_too_long", language=thread.language))
-            existing_reply = await resolve_awaitable(self.reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=pattern.pattern_id))
+            existing_reply = await resolve_awaitable(
+                self.reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=pattern.pattern_id)
+            )
             if existing_reply is not None:
                 return build_thread_result(
                     self.localizer,
@@ -205,9 +212,7 @@ class ReplyCommandService:
                 thread=thread,
                 ID=display_id,
                 MODE=self.localizer.text(
-                    "results.reply.added_pattern.mode.reply"
-                    if created.reply_as_reply
-                    else "results.reply.added_pattern.mode.message",
+                    "results.reply.added_pattern.mode.reply" if created.reply_as_reply else "results.reply.added_pattern.mode.message",
                     language=thread.language,
                 ),
                 MESSAGE=created.reply_message,
@@ -216,7 +221,9 @@ class ReplyCommandService:
                 USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
             )
 
-        existing_reply = await resolve_awaitable(self.reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=pattern.pattern_id))
+        existing_reply = await resolve_awaitable(
+            self.reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=pattern.pattern_id)
+        )
         if existing_reply is None:
             return build_thread_result(
                 self.localizer,
@@ -326,10 +333,12 @@ class ReplyCommandService:
         adapter_event = next(
             (
                 item
-                for item in await resolve_awaitable(event_configuration.adapter_event_repository.list_events_for_thread(
-                    thread.thread_id,
-                    include_disabled=True,
-                ))
+                for item in await resolve_awaitable(
+                    event_configuration.adapter_event_repository.list_events_for_thread(
+                        thread.thread_id,
+                        include_disabled=True,
+                    )
+                )
                 if item.event_id == command.adapter_event_id
             ),
             None,
@@ -348,21 +357,23 @@ class ReplyCommandService:
             raise ValueError(self.localizer.text("results.reply.unsupported_event", language=thread.language))
 
         cached = event_configuration.twitch_api.get_cached_user_by_id(adapter_event.subject_id.strip())
-        twitch_channel = (
-            cached
-            if cached is not None
-            else await event_configuration.twitch_api.get_channel_by_id(adapter_event.subject_id)
-        )
+        twitch_channel = cached if cached is not None else await event_configuration.twitch_api.get_channel_by_id(adapter_event.subject_id)
         channel_display_name = twitch_channel.display_name
         channel_login = twitch_channel.login
 
-        existing_reply = await resolve_awaitable(event_configuration.adapter_event_action_repository.get_action(
-            event_id=adapter_event.event_id,
-            action_type=TWITCH_SEND_MESSAGE_ACTION,
-        ))
+        existing_reply = await resolve_awaitable(
+            event_configuration.adapter_event_action_repository.get_action(
+                event_id=adapter_event.event_id,
+                action_type=TWITCH_SEND_MESSAGE_ACTION,
+            )
+        )
 
         if action == "add":
-            linked_account = await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id)) if thread.account_id is not None else None
+            linked_account = (
+                await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
+                if thread.account_id is not None
+                else None
+            )
             if linked_account is None:
                 return build_thread_result(
                     self.localizer,

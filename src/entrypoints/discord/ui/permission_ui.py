@@ -45,11 +45,7 @@ class PermissionModal(discord.ui.Modal):
             component=discord.ui.UserSelect(
                 min_values=1,
                 max_values=1,
-                default_values=(
-                    [discord.SelectDefaultValue.from_user(Object(id=default_user_id))]
-                    if default_user_id is not None
-                    else []
-                ),
+                default_values=([discord.SelectDefaultValue.from_user(Object(id=default_user_id))] if default_user_id is not None else []),
             ),
         )
         self.add_item(self.user)

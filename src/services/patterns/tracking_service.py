@@ -80,9 +80,11 @@ class PatternTrackingService:
             )
             return
 
-        thread_ids = await resolve_awaitable(self.channel_repository.list_thread_ids_by_twitch_channel_id(
-            event.broadcaster_id,
-        ))
+        thread_ids = await resolve_awaitable(
+            self.channel_repository.list_thread_ids_by_twitch_channel_id(
+                event.broadcaster_id,
+            )
+        )
         if not thread_ids:
             logger.debug("No Discord threads track broadcaster_id=%s", event.broadcaster_id)
             return
@@ -102,18 +104,22 @@ class PatternTrackingService:
                 )
                 continue
 
-            patterns = await resolve_awaitable(self.pattern_repository.list_active_patterns_for_thread(
-                thread.thread_id,
-            ))
+            patterns = await resolve_awaitable(
+                self.pattern_repository.list_active_patterns_for_thread(
+                    thread.thread_id,
+                )
+            )
             logger.debug(
                 "Thread %s has %d active pattern(s).",
                 thread.thread_id,
                 len(patterns),
             )
-            source_channel = await resolve_awaitable(self.channel_repository.get_by_thread_and_twitch_channel(
-                thread.thread_id,
-                event.broadcaster_id,
-            ))
+            source_channel = await resolve_awaitable(
+                self.channel_repository.get_by_thread_and_twitch_channel(
+                    thread.thread_id,
+                    event.broadcaster_id,
+                )
+            )
             live_status = None if source_channel is None else source_channel.is_live
             for pattern in patterns:
                 effective_pattern = await expand_pattern_for_tracked_users(
@@ -181,8 +187,10 @@ class PatternTrackingService:
     async def _has_enabled_reply(self, thread_id: int, pattern_id: int) -> bool:
         if self.reply_repository is None:
             return False
-        reply = await resolve_awaitable(self.reply_repository.get_by_pattern(
-            thread_id=thread_id,
-            pattern_id=pattern_id,
-        ))
+        reply = await resolve_awaitable(
+            self.reply_repository.get_by_pattern(
+                thread_id=thread_id,
+                pattern_id=pattern_id,
+            )
+        )
         return reply is not None and not reply.disabled

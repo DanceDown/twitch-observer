@@ -43,7 +43,9 @@ class InMemoryMessageRepository(MessageRepository):
         since: datetime,
         limit: int,
     ) -> list[RecentMessageRecord]:
-        rows = [row for row in self.list_recent_messages(since=since, limit=max(limit * 5, limit)) if row.twitch_channel_id == twitch_channel_id]
+        rows = [
+            row for row in self.list_recent_messages(since=since, limit=max(limit * 5, limit)) if row.twitch_channel_id == twitch_channel_id
+        ]
         return rows[:limit]
 
 

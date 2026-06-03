@@ -1,4 +1,5 @@
 """Shared database exports for records and repository contracts."""
+
 from .records import (
     AdapterEventActionRecord,
     AdapterEventRecord,

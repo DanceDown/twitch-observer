@@ -91,7 +91,9 @@ class ChannelEventCommandService:
         if isinstance(thread, DiscordCommandResult):
             return thread
 
-        tracked_channel = await resolve_awaitable(self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, command.twitch_channel_id))
+        tracked_channel = await resolve_awaitable(
+            self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, command.twitch_channel_id)
+        )
         if tracked_channel is None:
             return build_thread_result(
                 self.localizer,
@@ -131,10 +133,12 @@ class ChannelEventCommandService:
             subject_id=command.twitch_channel_id,
             event_key=command.event_kind.value,
         )
-        existing_action = await resolve_awaitable(self.adapter_event_action_repository.get_action(
-            event_id=adapter_event.event_id,
-            action_type=DISCORD_NOTIFY_ACTION,
-        ))
+        existing_action = await resolve_awaitable(
+            self.adapter_event_action_repository.get_action(
+                event_id=adapter_event.event_id,
+                action_type=DISCORD_NOTIFY_ACTION,
+            )
+        )
         action = self.adapter_event_action_repository.upsert_action(
             event_id=adapter_event.event_id,
             action_type=DISCORD_NOTIFY_ACTION,
@@ -183,20 +187,24 @@ class ChannelEventCommandService:
         channel_display_name: str,
         channel_login: str,
     ) -> DiscordCommandResult:
-        adapter_event = await resolve_awaitable(self.adapter_event_repository.get_event(
-            thread_id=thread.thread_id,
-            adapter_key=TWITCH_ADAPTER_KEY,
-            subject_type=CHANNEL_SUBJECT_TYPE,
-            subject_id=command.twitch_channel_id,
-            event_key=command.event_kind.value,
-        ))
+        adapter_event = await resolve_awaitable(
+            self.adapter_event_repository.get_event(
+                thread_id=thread.thread_id,
+                adapter_key=TWITCH_ADAPTER_KEY,
+                subject_type=CHANNEL_SUBJECT_TYPE,
+                subject_id=command.twitch_channel_id,
+                event_key=command.event_kind.value,
+            )
+        )
         existing_action = (
             None
             if adapter_event is None
-            else await resolve_awaitable(self.adapter_event_action_repository.get_action(
-                event_id=adapter_event.event_id,
-                action_type=DISCORD_NOTIFY_ACTION,
-            ))
+            else await resolve_awaitable(
+                self.adapter_event_action_repository.get_action(
+                    event_id=adapter_event.event_id,
+                    action_type=DISCORD_NOTIFY_ACTION,
+                )
+            )
         )
         if adapter_event is None or existing_action is None:
             return build_thread_result(
@@ -244,7 +252,9 @@ class ChannelEventCommandService:
         if isinstance(thread, DiscordCommandResult):
             return thread
 
-        tracked_channel = await resolve_awaitable(self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, command.twitch_channel_id))
+        tracked_channel = await resolve_awaitable(
+            self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, command.twitch_channel_id)
+        )
         if tracked_channel is None:
             return build_thread_result(
                 self.localizer,
@@ -254,20 +264,24 @@ class ChannelEventCommandService:
                 ephemeral=True,
             )
 
-        adapter_event = await resolve_awaitable(self.adapter_event_repository.get_event(
-            thread_id=thread.thread_id,
-            adapter_key=TWITCH_ADAPTER_KEY,
-            subject_type=CHANNEL_SUBJECT_TYPE,
-            subject_id=command.twitch_channel_id,
-            event_key=command.event_kind.value,
-        ))
+        adapter_event = await resolve_awaitable(
+            self.adapter_event_repository.get_event(
+                thread_id=thread.thread_id,
+                adapter_key=TWITCH_ADAPTER_KEY,
+                subject_type=CHANNEL_SUBJECT_TYPE,
+                subject_id=command.twitch_channel_id,
+                event_key=command.event_kind.value,
+            )
+        )
         notify_action = (
             None
             if adapter_event is None
-            else await resolve_awaitable(self.adapter_event_action_repository.get_action(
-                event_id=adapter_event.event_id,
-                action_type=DISCORD_NOTIFY_ACTION,
-            ))
+            else await resolve_awaitable(
+                self.adapter_event_action_repository.get_action(
+                    event_id=adapter_event.event_id,
+                    action_type=DISCORD_NOTIFY_ACTION,
+                )
+            )
         )
         channel_display_name, channel_login = await self._channel_identity(command.twitch_channel_id)
         if adapter_event is None or notify_action is None:

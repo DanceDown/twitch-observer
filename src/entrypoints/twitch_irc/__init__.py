@@ -10,4 +10,3 @@ __all__ = [
     "build_chat_message_event",
     "parse_irc_message",
 ]
-
