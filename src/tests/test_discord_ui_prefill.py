@@ -366,3 +366,47 @@ async def test_liveping_add_opens_prefilled_modal_when_partial(
 
     assert interaction.response.modal is not None
     assert captured["default_channel_id"] == "channel29"
+
+
+@pytest.mark.asyncio
+async def test_liveping_add_dispatches_directly_with_stream_event_choice(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = discord.Client(intents=discord.Intents.default())
+    tree = discord.app_commands.CommandTree(client)
+    localizer = Localizer.from_directory()
+    provider = _FakeLiveProvider(tracked_channels=_tracked_channels(5))
+    captured: dict[str, object] = {}
+
+    async def fake_ensure(*_args, **_kwargs) -> bool:
+        return True
+
+    async def fake_dispatch(*_args, **kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(ephemeral=True)
+
+    async def fake_send_initial_result(interaction, result) -> None:
+        interaction.sent_result = result
+
+    monkeypatch.setattr("src.entrypoints.discord.commands.live_state_commands.ensure_ui_flow_allowed", fake_ensure)
+    monkeypatch.setattr("src.entrypoints.discord.commands.live_state_commands.dispatch_add_channel_event", fake_dispatch)
+    monkeypatch.setattr("src.entrypoints.discord.commands.live_state_commands.send_initial_result", fake_send_initial_result)
+
+    register_live_state_commands(
+        tree,
+        services=object(),  # type: ignore[arg-type]
+        ui_data_provider=provider,  # type: ignore[arg-type]
+        localizer=localizer,
+    )
+    liveping_group = next(command for command in tree.get_commands() if command.name == "liveping")
+    add_command = next(command for command in liveping_group.commands if command.name == "add")
+    interaction = _FakeInteraction()
+
+    await add_command.callback(
+        interaction,
+        twitch_channel_login="channel3",
+        state=discord.app_commands.Choice(name="live", value="stream.online"),
+    )
+
+    assert captured["twitch_channel_id"] == "3"
+    assert captured["event_kind"].value == "stream.online"

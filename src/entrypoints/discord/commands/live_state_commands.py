@@ -29,8 +29,8 @@ def register_live_state_commands(
         description="Manage live and offline pings for this Discord channel.",
     )
     state_choices = [
-        discord.app_commands.Choice(name="live", value="online"),
-        discord.app_commands.Choice(name="offline", value="offline"),
+        discord.app_commands.Choice(name="live", value=StreamEventKind.ONLINE.value),
+        discord.app_commands.Choice(name="offline", value=StreamEventKind.OFFLINE.value),
     ]
 
     @group.command(name="add", description="Add one live or offline ping.")
