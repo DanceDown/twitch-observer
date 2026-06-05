@@ -10,8 +10,10 @@ from src.gateways.twitch_api import TwitchChannelNotFoundError, TwitchUser
 from src.database.connection import (
     ChannelRecord,
     ChannelRepository,
+    MessageRepository,
     PatternRecord,
     PatternRepository,
+    RecentMessageRecord,
     ReplyRecord,
     ReplyRepository,
     ThreadRecord,
@@ -393,6 +395,38 @@ class InMemoryTrackedUserRepository(TrackedUserRepository):
 
     def count_pattern_scope_references(self, *, thread_id: int, twitch_user_id: str) -> int:
         return 0
+
+
+@dataclass
+class InMemoryMessageRepository(MessageRepository):
+    matched_thread_ids: list[tuple[int, str | None]] = field(default_factory=list)
+
+    def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
+        return None
+
+    def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
+        return []
+
+    def list_recent_messages_for_channel(
+        self,
+        *,
+        twitch_channel_id: str,
+        since: datetime,
+        limit: int,
+    ) -> list[RecentMessageRecord]:
+        return []
+
+    def mark_message_matched_in_thread(self, *, thread_id: int, event: TwitchChatMessageEvent) -> None:
+        self.matched_thread_ids.append((thread_id, event.message_id))
+
+    def list_recent_messages_for_thread(
+        self,
+        *,
+        thread_id: int,
+        since: datetime,
+        limit: int,
+    ) -> list[RecentMessageRecord]:
+        return []
 
 
 @dataclass
@@ -1401,6 +1435,7 @@ async def test_tracking_service_sends_embed_for_matching_ping_with_pattern_color
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
+        message_repository=InMemoryMessageRepository(),
         twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
         notifier=notifier,
     )
@@ -1462,6 +1497,7 @@ async def test_tracking_service_refreshes_missing_author_profile_image_once() ->
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
+        message_repository=InMemoryMessageRepository(),
         twitch_api=twitch_api,  # type: ignore[arg-type]
         notifier=notifier,
     )
@@ -1511,6 +1547,7 @@ async def test_tracking_service_sends_embed_for_case_sensitive_ping_match() -> N
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
+        message_repository=InMemoryMessageRepository(),
         twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
         notifier=notifier,
     )
@@ -1573,6 +1610,7 @@ async def test_tracking_service_uses_highest_priority_match_and_stops_after_firs
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
+        message_repository=InMemoryMessageRepository(),
         twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
         notifier=notifier,
     )
@@ -1624,6 +1662,7 @@ async def test_tracking_service_skips_normal_embed_when_pattern_has_enabled_repl
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
+        message_repository=InMemoryMessageRepository(),
         twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
         notifier=notifier,
         reply_repository=reply_repository,
@@ -1778,6 +1817,7 @@ async def test_tracking_service_respects_all_except_selected_user_scope() -> Non
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
+        message_repository=InMemoryMessageRepository(),
         twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
         notifier=notifier,
     )
@@ -1830,6 +1870,7 @@ async def test_tracking_service_respects_all_tracked_except_selected_user_scope(
         channel_repository=channel_repository,
         tracked_user_repository=tracked_user_repository,
         pattern_repository=pattern_repository,
+        message_repository=InMemoryMessageRepository(),
         twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
         notifier=notifier,
     )
@@ -1879,6 +1920,7 @@ async def test_tracking_service_skips_disabled_thread() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
+        message_repository=InMemoryMessageRepository(),
         twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
         notifier=notifier,
     )
@@ -1928,6 +1970,7 @@ async def test_tracking_service_uses_persisted_channel_live_state_without_twitch
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
+        message_repository=InMemoryMessageRepository(),
         twitch_api=twitch_api,  # type: ignore[arg-type]
         notifier=notifier,
     )

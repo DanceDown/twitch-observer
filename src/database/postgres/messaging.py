@@ -20,6 +20,7 @@ class PostgresMessageRepository(MessageRepository):
 
     def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
         """Persist one incoming Twitch message if it has not been stored yet."""
+        message_id = self._resolve_message_id(event)
         with self.database.cursor() as cursor:
             cursor.execute(
                 """
@@ -46,7 +47,7 @@ class PostgresMessageRepository(MessageRepository):
                 ON CONFLICT (message_id) DO NOTHING
                 """,
                 (
-                    event.message_id or self._build_fallback_message_id(event),
+                    message_id,
                     event.broadcaster_id or event.channel_login,
                     event.sent_at,
                     event.author_id or event.author_login,
@@ -54,6 +55,25 @@ class PostgresMessageRepository(MessageRepository):
                     event.content,
                     event.reply_parent_message_id,
                 ),
+            )
+
+    def mark_message_matched_in_thread(
+        self,
+        *,
+        thread_id: int,
+        event: TwitchChatMessageEvent,
+    ) -> None:
+        """Persist that one stored Twitch message matched inside one Discord thread."""
+        with self.database.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO thread_message_match (thread_id, message_id)
+                SELECT %s, message_id
+                FROM message
+                WHERE message_id = %s
+                ON CONFLICT (thread_id, message_id) DO NOTHING
+                """,
+                (thread_id, self._resolve_message_id(event)),
             )
 
     async def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
@@ -113,8 +133,45 @@ class PostgresMessageRepository(MessageRepository):
             for row in rows
         ]
 
+    async def list_recent_messages_for_thread(
+        self,
+        *,
+        thread_id: int,
+        since: datetime,
+        limit: int,
+    ) -> list[RecentMessageRecord]:
+        """Load recent Twitch messages that matched inside one Discord thread."""
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
+                """
+                SELECT m.message_id, m.twitch_channel_id, m.username, m.content, m.timestamp
+                FROM thread_message_match AS tmm
+                JOIN message AS m ON m.message_id = tmm.message_id
+                WHERE tmm.thread_id = %s
+                  AND m.timestamp >= %s
+                ORDER BY m.timestamp DESC
+                LIMIT %s
+                """,
+                (thread_id, since, limit),
+            )
+            rows = await cursor.fetchall()
+        return [
+            RecentMessageRecord(
+                message_id=str(row[0]),
+                twitch_channel_id=str(row[1]),
+                username=str(row[2]),
+                content=str(row[3]),
+                timestamp=row[4],
+            )
+            for row in rows
+        ]
+
     @staticmethod
     def _build_fallback_message_id(event: TwitchChatMessageEvent) -> str:
         """Build a deterministic fallback ID when Twitch did not provide one."""
         timestamp = event.sent_at.isoformat()
         return f"{event.channel_login}:{event.author_login}:{timestamp}:{hash(event.content)}"
+
+    @classmethod
+    def _resolve_message_id(cls, event: TwitchChatMessageEvent) -> str:
+        return event.message_id or cls._build_fallback_message_id(event)

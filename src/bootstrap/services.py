@@ -66,7 +66,6 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
     )
     write_queries = WriteQueryService(
         thread_repository=core.thread_repository,
-        channel_repository=core.channel_repository,
         message_repository=core.message_repository,
     )
     ui_queries = DiscordUIQueryBundle(
@@ -186,6 +185,7 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         channel_repository=core.channel_repository,
         tracked_user_repository=core.tracked_user_repository,
         pattern_repository=core.pattern_repository,
+        message_repository=core.message_repository,
         reply_repository=core.reply_repository,
         twitch_api=core.twitch_bundle,
         notifier=runtime_coordinator.tracking,
@@ -197,6 +197,7 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         tracked_user_repository=core.tracked_user_repository,
         pattern_repository=core.pattern_repository,
         reply_repository=core.reply_repository,
+        message_repository=core.message_repository,
         account_repository=core.account_repository,
         twitch_api=core.twitch_bundle,
         tracking_notifier=runtime_coordinator.tracking,

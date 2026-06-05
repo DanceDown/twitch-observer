@@ -26,8 +26,10 @@ from src.database.connection import (
     AdapterEventRepository,
     ChannelRecord,
     ChannelRepository,
+    MessageRepository,
     PatternRecord,
     PatternRepository,
+    RecentMessageRecord,
     ReplyRecord,
     ReplyRepository,
     ThreadRecord,
@@ -189,6 +191,38 @@ class InMemoryChannelRepository(ChannelRepository):
 
     def list_all_twitch_channel_ids(self) -> list[str]:
         return sorted({record.twitch_channel_id for record in self.channels_by_thread.values()})
+
+
+@dataclass
+class InMemoryMessageRepository(MessageRepository):
+    matched_thread_ids: list[tuple[int, str | None]] = field(default_factory=list)
+
+    def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
+        return None
+
+    def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
+        return []
+
+    def list_recent_messages_for_channel(
+        self,
+        *,
+        twitch_channel_id: str,
+        since: datetime,
+        limit: int,
+    ) -> list[RecentMessageRecord]:
+        return []
+
+    def mark_message_matched_in_thread(self, *, thread_id: int, event: TwitchChatMessageEvent) -> None:
+        self.matched_thread_ids.append((thread_id, event.message_id))
+
+    def list_recent_messages_for_thread(
+        self,
+        *,
+        thread_id: int,
+        since: datetime,
+        limit: int,
+    ) -> list[RecentMessageRecord]:
+        return []
 
 
 @dataclass
@@ -1787,6 +1821,7 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         reply_repository=reply_repository,
+        message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
         token_refresh_skew_seconds=30,
@@ -1864,6 +1899,7 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         reply_repository=reply_repository,
+        message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
         token_refresh_skew_seconds=30,
@@ -1938,6 +1974,7 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         reply_repository=reply_repository,
+        message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
         token_refresh_skew_seconds=30,
@@ -2013,6 +2050,7 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         reply_repository=reply_repository,
+        message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
         token_refresh_skew_seconds=30,
@@ -2104,6 +2142,7 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         reply_repository=reply_repository,
+        message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
         token_refresh_skew_seconds=30,
@@ -2179,6 +2218,7 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         reply_repository=reply_repository,
+        message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
         token_refresh_skew_seconds=30,

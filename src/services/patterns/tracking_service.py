@@ -9,6 +9,7 @@ import discord
 
 from src.database.connection import (
     ChannelRepository,
+    MessageRepository,
     PatternRepository,
     ReplyRepository,
     ThreadRepository,
@@ -50,6 +51,7 @@ class PatternTrackingService:
     thread_repository: ThreadRepository
     channel_repository: ChannelRepository
     pattern_repository: PatternRepository
+    message_repository: MessageRepository
     twitch_api: TwitchUserLookup
     notifier: TrackingNotificationSender
     localizer: Localizer = field(default_factory=Localizer.from_directory)
@@ -169,6 +171,7 @@ class PatternTrackingService:
                     effective_pattern.pattern_id,
                     thread.discord_channel_id,
                 )
+                self.message_repository.mark_message_matched_in_thread(thread_id=thread.thread_id, event=event)
                 await self.notifier.send_tracking_embed(
                     thread.discord_channel_id,
                     build_tracking_embed(

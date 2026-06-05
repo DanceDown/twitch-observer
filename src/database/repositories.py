@@ -46,6 +46,23 @@ class MessageRepository:
     ) -> list[RecentMessageRecord]:  # pragma: no cover - interface
         raise NotImplementedError
 
+    def mark_message_matched_in_thread(
+        self,
+        *,
+        thread_id: int,
+        event: TwitchChatMessageEvent,
+    ) -> None:  # pragma: no cover - interface
+        raise NotImplementedError
+
+    async def list_recent_messages_for_thread(
+        self,
+        *,
+        thread_id: int,
+        since: datetime,
+        limit: int,
+    ) -> list[RecentMessageRecord]:  # pragma: no cover - interface
+        raise NotImplementedError
+
 
 class ThreadRepository:
     """Persistence interface for Discord thread/channel configuration roots."""

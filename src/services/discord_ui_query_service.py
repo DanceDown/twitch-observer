@@ -302,7 +302,6 @@ class AdapterEventQueryService:
 @dataclass(slots=True)
 class WriteQueryService:
     thread_repository: ThreadRepository
-    channel_repository: ChannelRepository
     message_repository: MessageRepository
 
     async def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
@@ -322,27 +321,23 @@ class WriteQueryService:
             return []
 
         since = datetime.now(UTC) - timedelta(minutes=max_age_minutes)
-        candidates: list[WriteReplyCandidatePresentation] = []
-        for channel in await resolve_awaitable(self.channel_repository.list_channels_for_thread(thread.thread_id)):
-            rows = await resolve_awaitable(
-                self.message_repository.list_recent_messages_for_channel(
-                    twitch_channel_id=channel.twitch_channel_id,
-                    since=since,
-                    limit=limit,
-                )
+        rows = await resolve_awaitable(
+            self.message_repository.list_recent_messages_for_thread(
+                thread_id=thread.thread_id,
+                since=since,
+                limit=limit,
             )
-            for row in rows:
-                candidates.append(
-                    WriteReplyCandidatePresentation(
-                        message_id=row.message_id,
-                        twitch_channel_id=row.twitch_channel_id,
-                        username=row.username,
-                        content=row.content,
-                        timestamp=row.timestamp,
-                    )
-                )
-        candidates.sort(key=lambda item: item.timestamp, reverse=True)
-        return candidates[:limit]
+        )
+        return [
+            WriteReplyCandidatePresentation(
+                message_id=row.message_id,
+                twitch_channel_id=row.twitch_channel_id,
+                username=row.username,
+                content=row.content,
+                timestamp=row.timestamp,
+            )
+            for row in rows
+        ]
 
 
 @dataclass(slots=True)

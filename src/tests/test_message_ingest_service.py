@@ -7,9 +7,10 @@ from contextlib import contextmanager
 
 import pytest
 
-from src.database.connection import MessageRepository, RecentMessageRecord
+from src.database.connection import MessageRepository, RecentMessageRecord, ThreadRecord
 from src.database.postgres import PostgresMessageRepository
 from src.events.event_types import TwitchChatMessageEvent
+from src.services.discord_ui_query_service import WriteQueryService
 from src.services.discord_presence_service import DiscordPresenceService, DiscordPresenceStatusSender
 from src.services.message_ingest_service import MessageIngestService
 
@@ -17,6 +18,7 @@ from src.services.message_ingest_service import MessageIngestService
 @dataclass
 class InMemoryMessageRepository(MessageRepository):
     messages: list[TwitchChatMessageEvent] = field(default_factory=list)
+    matched_by_thread_id: dict[int, list[str]] = field(default_factory=dict)
 
     def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
         self.messages.append(event)
@@ -47,6 +49,40 @@ class InMemoryMessageRepository(MessageRepository):
             row for row in self.list_recent_messages(since=since, limit=max(limit * 5, limit)) if row.twitch_channel_id == twitch_channel_id
         ]
         return rows[:limit]
+
+    def mark_message_matched_in_thread(
+        self,
+        *,
+        thread_id: int,
+        event: TwitchChatMessageEvent,
+    ) -> None:
+        message_id = event.message_id or f"{event.channel_login}:{event.author_login}:{event.sent_at.isoformat()}"
+        thread_matches = self.matched_by_thread_id.setdefault(thread_id, [])
+        if message_id not in thread_matches:
+            thread_matches.append(message_id)
+
+    def list_recent_messages_for_thread(
+        self,
+        *,
+        thread_id: int,
+        since: datetime,
+        limit: int,
+    ) -> list[RecentMessageRecord]:
+        matched_message_ids = set(self.matched_by_thread_id.get(thread_id, []))
+        rows = [
+            row
+            for row in self.list_recent_messages(since=since, limit=max(limit * 10, limit))
+            if row.message_id in matched_message_ids
+        ]
+        return rows[:limit]
+
+
+@dataclass
+class StaticThreadRepository:
+    thread: ThreadRecord | None
+
+    def get_by_discord_channel_id(self, _discord_channel_id: int) -> ThreadRecord | None:
+        return self.thread
 
 
 @dataclass
@@ -158,3 +194,51 @@ def test_postgres_message_repository_uses_null_reply_reference_when_parent_is_mi
         "reply body",
         "missing-parent",
     )
+
+
+@pytest.mark.asyncio
+async def test_write_query_service_only_returns_messages_matched_in_thread() -> None:
+    repository = InMemoryMessageRepository()
+    ingest_service = MessageIngestService(message_repository=repository)
+    query_service = WriteQueryService(
+        thread_repository=StaticThreadRepository(
+            ThreadRecord(
+                thread_id=7,
+                owner_id=1,
+                discord_channel_id=42,
+                enabled=True,
+                color=None,
+                language="german",
+            )
+        ),
+        message_repository=repository,
+    )
+
+    matched_event = TwitchChatMessageEvent(
+        channel_login="chan-a",
+        author_login="alice",
+        author_display_name="Alice",
+        broadcaster_id="channel-a",
+        message_id="msg-matched",
+        content="matched text",
+    )
+    unrelated_event = TwitchChatMessageEvent(
+        channel_login="chan-b",
+        author_login="bob",
+        author_display_name="Bob",
+        broadcaster_id="channel-b",
+        message_id="msg-unrelated",
+        content="unrelated text",
+    )
+
+    ingest_service.handle_chat_message(matched_event)
+    ingest_service.handle_chat_message(unrelated_event)
+    repository.mark_message_matched_in_thread(thread_id=7, event=matched_event)
+
+    candidates = await query_service.list_recent_reply_candidates(
+        discord_channel_id=42,
+        max_age_minutes=5,
+        limit=10,
+    )
+
+    assert [candidate.message_id for candidate in candidates] == ["msg-matched"]

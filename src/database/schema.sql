@@ -253,6 +253,12 @@ CREATE TABLE message (
     is_bot             BOOLEAN NOT NULL DEFAULT FALSE
 );
 
+CREATE TABLE thread_message_match (
+    thread_id          BIGINT NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,
+    message_id         TEXT NOT NULL REFERENCES message(message_id) ON DELETE CASCADE,
+    PRIMARY KEY (thread_id, message_id)
+);
+
 CREATE INDEX idx_message_username
     ON message(username);
 

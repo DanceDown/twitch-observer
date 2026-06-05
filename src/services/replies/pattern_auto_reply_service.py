@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from src.gateways.twitch_api import TwitchAPIError, TwitchAuthenticationError
 from src.database.connection import (
     ChannelRepository,
+    MessageRepository,
     PatternRecord,
     PatternRepository,
     ReplyRecord,
@@ -49,6 +50,7 @@ class AutoReplyService:
     channel_repository: ChannelRepository
     pattern_repository: PatternRepository
     reply_repository: ReplyRepository
+    message_repository: MessageRepository
     account_repository: TwitchAccountRepository
     twitch_api: TwitchReplyGateway
     token_refresh_skew_seconds: int
@@ -134,6 +136,7 @@ class AutoReplyService:
                 )
                 continue
             matching_pattern, matching_reply = match
+            self.message_repository.mark_message_matched_in_thread(thread_id=thread.thread_id, event=event)
             channel_user = await safe_get_twitch_user_by_id(
                 self.twitch_api,
                 event.broadcaster_id,
