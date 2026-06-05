@@ -17,7 +17,6 @@ from src.events.event_types import (
 from src.localization import Localizer
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
 from src.utils.permissions import ObserverPermission, permissions_mask_from_values
-from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -79,12 +78,11 @@ class PermissionCommandService:
         thread, denied = await self._require_manage_permissions(command)
         if denied is not None:
             return denied
-        removed = await resolve_awaitable(
-            self.permission_repository.remove_by_user_and_thread(
+        removed = await self.permission_repository.remove_by_user_and_thread(
                 discord_user_id=command.target_user_id,
                 thread_id=thread.thread_id,
             )
-        )
+        
         return build_thread_result(
             self.localizer,
             "results.permission.cleared" if removed else "results.permission.none_found",
@@ -103,20 +101,18 @@ class PermissionCommandService:
             raise ValueError(self.localizer.text("results.permission.grant_empty_selection", language=thread.language))
         requested_permissions = tuple(dict.fromkeys(command.permissions))
         permission_mask = permissions_mask_from_values(requested_permissions)
-        current = await resolve_awaitable(
-            self.permission_repository.get_by_user_and_thread(
+        current = await self.permission_repository.get_by_user_and_thread(
                 discord_user_id=command.target_user_id,
                 thread_id=thread.thread_id,
             )
-        )
+        
         current_mask = 0 if current is None else current.permissions
-        updated = await resolve_awaitable(
-            self.permission_repository.upsert_permissions(
+        updated = await self.permission_repository.upsert_permissions(
                 discord_user_id=command.target_user_id,
                 thread_id=thread.thread_id,
                 permissions=current_mask | permission_mask,
             )
-        )
+        
         return build_thread_result(
             self.localizer,
             "results.permission.granted",
@@ -138,12 +134,11 @@ class PermissionCommandService:
             raise ValueError(self.localizer.text("results.permission.revoke_empty_selection", language=thread.language))
         requested_permissions = tuple(dict.fromkeys(command.permissions))
         permission_mask = permissions_mask_from_values(requested_permissions)
-        current = await resolve_awaitable(
-            self.permission_repository.get_by_user_and_thread(
+        current = await self.permission_repository.get_by_user_and_thread(
                 discord_user_id=command.target_user_id,
                 thread_id=thread.thread_id,
             )
-        )
+        
         current_mask = 0 if current is None else current.permissions
         matched_mask = current_mask & permission_mask
         if not matched_mask:
@@ -161,20 +156,18 @@ class PermissionCommandService:
             )
         new_mask = current_mask & ~permission_mask
         if new_mask == 0:
-            await resolve_awaitable(
-                self.permission_repository.remove_by_user_and_thread(
+            await self.permission_repository.remove_by_user_and_thread(
                     discord_user_id=command.target_user_id,
                     thread_id=thread.thread_id,
                 )
-            )
+            
         else:
-            await resolve_awaitable(
-                self.permission_repository.upsert_permissions(
+            await self.permission_repository.upsert_permissions(
                     discord_user_id=command.target_user_id,
                     thread_id=thread.thread_id,
                     permissions=new_mask,
                 )
-            )
+            
         return build_thread_result(
             self.localizer,
             "results.permission.revoked",

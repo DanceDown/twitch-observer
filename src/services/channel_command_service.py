@@ -21,7 +21,6 @@ from src.services.command_execution import CommandExecutionRunner, ThreadCommand
 from src.services.runtime_coordinator import TrackedChannelsChangedNotifier
 from src.services.twitch_gateways import TwitchChannelLookup, TwitchIRCChannelGateway
 from src.utils.permissions import ObserverPermission
-from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +84,7 @@ class ChannelCommandService:
             return denied
 
         twitch_user = await self._resolve_channel(command.twitch_channel_login)
-        existing = await resolve_awaitable(self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_user.user_id))
+        existing = await self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_user.user_id)
         if existing is not None:
             return build_thread_result(
                 self.localizer,
@@ -97,12 +96,12 @@ class ChannelCommandService:
                 LOGIN=twitch_user.login,
             )
         is_first_subscription = (
-            await resolve_awaitable(self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id)) == 0
+            await self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id) == 0
         )
         if is_first_subscription:
             await self.irc_gateway.ensure_connected()
             await self.irc_gateway.join_channel(twitch_user.login)
-        await resolve_awaitable(self.channel_repository.add_channel(thread.thread_id, twitch_user.user_id))
+        await self.channel_repository.add_channel(thread.thread_id, twitch_user.user_id)
         logger.debug(
             "Added tracked channel thread_id=%s twitch_channel_id=%s twitch_login=%s",
             thread.thread_id,
@@ -127,7 +126,7 @@ class ChannelCommandService:
             return denied
 
         twitch_user = await self._resolve_channel(command.twitch_channel_login)
-        existing = await resolve_awaitable(self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_user.user_id))
+        existing = await self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_user.user_id)
         if existing is None:
             return build_thread_result(
                 self.localizer,
@@ -141,13 +140,12 @@ class ChannelCommandService:
 
         normalized_color = normalize_optional_color(command.color)
         if normalized_color is None:
-            updated = await resolve_awaitable(
-                self.channel_repository.set_color(
+            updated = await self.channel_repository.set_color(
                     thread_id=thread.thread_id,
                     twitch_channel_id=twitch_user.user_id,
                     color=None,
                 )
-            )
+            
             if updated is None:
                 raise ApplicationInvariantError("Tracked channel color clear returned no row.")
             return build_thread_result(
@@ -160,13 +158,12 @@ class ChannelCommandService:
                 LOGIN=twitch_user.login,
                 USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
             )
-        updated = await resolve_awaitable(
-            self.channel_repository.set_color(
+        updated = await self.channel_repository.set_color(
                 thread_id=thread.thread_id,
                 twitch_channel_id=twitch_user.user_id,
                 color=normalized_color,
             )
-        )
+        
         if updated is None:
             raise ApplicationInvariantError("Tracked channel color update returned no row.")
         return build_thread_result(
@@ -187,7 +184,7 @@ class ChannelCommandService:
             return denied
 
         twitch_user = await self._resolve_channel(command.twitch_channel_login)
-        existing = await resolve_awaitable(self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_user.user_id))
+        existing = await self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_user.user_id)
         if existing is None:
             return build_thread_result(
                 self.localizer,
@@ -200,12 +197,11 @@ class ChannelCommandService:
             )
 
         if (
-            await resolve_awaitable(
-                self.pattern_repository.count_channel_scope_references(
+            await self.pattern_repository.count_channel_scope_references(
                     thread_id=thread.thread_id,
                     twitch_channel_id=twitch_user.user_id,
                 )
-            )
+            
             > 0
         ):
             return build_thread_result(
@@ -218,11 +214,11 @@ class ChannelCommandService:
                 LOGIN=twitch_user.login,
             )
 
-        is_last_subscription = await resolve_awaitable(self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id)) == 1
+        is_last_subscription = await self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id) == 1
         if is_last_subscription:
             await self.irc_gateway.ensure_connected()
             await self.irc_gateway.leave_channel(twitch_user.login)
-        await resolve_awaitable(self.channel_repository.remove_channel(thread.thread_id, twitch_user.user_id))
+        await self.channel_repository.remove_channel(thread.thread_id, twitch_user.user_id)
         logger.debug(
             "Removed tracked channel thread_id=%s twitch_channel_id=%s twitch_login=%s",
             thread.thread_id,

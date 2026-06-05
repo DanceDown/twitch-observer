@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import discord
 
@@ -17,16 +18,13 @@ from src.database.connection import (
 )
 from src.events.event_types import TwitchChatMessageEvent
 from src.localization import Localizer
+from src.services.chat import ChatPatternMatcher
 from src.services.twitch_gateways import TwitchUserLookup
-from src.services.twitch_runtime import (
-    expand_pattern_for_tracked_users,
-    offline_state_allows,
-    safe_get_twitch_user_by_id,
-    safe_get_twitch_user_by_login,
-)
+from src.services.twitch_runtime import safe_get_twitch_user_by_id, safe_get_twitch_user_by_login
 from src.utils.discord_embeds import build_tracking_embed
-from src.utils.pattern_matching import matches_pattern
-from src.utils.async_utils import resolve_awaitable
+
+if TYPE_CHECKING:
+    from src.services.chat import ChatPatternMatch
 
 logger = logging.getLogger(__name__)
 
@@ -82,118 +80,56 @@ class PatternTrackingService:
             )
             return
 
-        thread_ids = await resolve_awaitable(
-            self.channel_repository.list_thread_ids_by_twitch_channel_id(
-                event.broadcaster_id,
-            )
-        )
-        if not thread_ids:
-            logger.debug("No Discord threads track broadcaster_id=%s", event.broadcaster_id)
+        matches = await self._matcher().find_matches(event)
+        if not matches:
+            logger.debug("No tracking match produced for broadcaster_id=%s", event.broadcaster_id)
             return
 
-        for thread_id in thread_ids:
-            thread = await resolve_awaitable(self.thread_repository.get_by_thread_id(thread_id))
-            if thread is None:
+        for match in matches:
+            if match.reply is not None:
                 logger.debug(
-                    "Skipping missing thread_id=%s referenced by channel repository.",
-                    thread_id,
+                    "Pattern %s matched for thread_id=%s but notification is delegated to auto-reply handling.",
+                    match.pattern.pattern_id,
+                    match.thread.thread_id,
                 )
                 continue
-            if not thread.enabled:
-                logger.debug(
-                    "Skipping disabled thread_id=%s during tracking evaluation.",
-                    thread.thread_id,
-                )
-                continue
+            await self.handle_match(event, match)
 
-            patterns = await resolve_awaitable(
-                self.pattern_repository.list_active_patterns_for_thread(
-                    thread.thread_id,
-                )
-            )
-            logger.debug(
-                "Thread %s has %d active pattern(s).",
-                thread.thread_id,
-                len(patterns),
-            )
-            source_channel = await resolve_awaitable(
-                self.channel_repository.get_by_thread_and_twitch_channel(
-                    thread.thread_id,
-                    event.broadcaster_id,
-                )
-            )
-            live_status = None if source_channel is None else source_channel.is_live
-            for pattern in patterns:
-                effective_pattern = await expand_pattern_for_tracked_users(
-                    pattern,
-                    thread_id=thread.thread_id,
-                    tracked_user_repository=self.tracked_user_repository,
-                )
-                if not matches_pattern(effective_pattern, event):
-                    logger.debug(
-                        "Pattern %s did not match message. regex=%r channel_filter=%s user_filter=%s sub=%s offline=%s is_regex=%s",
-                        effective_pattern.pattern_id,
-                        effective_pattern.regex,
-                        effective_pattern.channel_scope_ids,
-                        effective_pattern.user_scope_ids,
-                        effective_pattern.sub_state,
-                        effective_pattern.offline_state,
-                        effective_pattern.is_regex,
-                    )
-                    continue
-                if not offline_state_allows(effective_pattern, live_status):
-                    logger.debug(
-                        "Pattern %s matched text but was filtered by offline_state=%s live_status=%s",
-                        effective_pattern.pattern_id,
-                        effective_pattern.offline_state,
-                        live_status,
-                    )
-                    continue
-
-                if await self._has_enabled_reply(thread.thread_id, effective_pattern.pattern_id):
-                    logger.debug(
-                        "Pattern %s matched for thread_id=%s but notification is delegated to auto-reply handling.",
-                        effective_pattern.pattern_id,
-                        thread.thread_id,
-                    )
-                    break
-
-                author_user = await safe_get_twitch_user_by_login(
-                    self.twitch_api,
-                    event.author_login,
-                )
-                channel_user = await safe_get_twitch_user_by_id(
-                    self.twitch_api,
-                    event.broadcaster_id,
-                )
-                logger.info(
-                    "Pattern %s matched. Sending tracking embed to discord_channel_id=%s",
-                    effective_pattern.pattern_id,
-                    thread.discord_channel_id,
-                )
-                await resolve_awaitable(self.message_repository.mark_message_matched_in_thread(thread_id=thread.thread_id, event=event))
-                await self.notifier.send_tracking_embed(
-                    thread.discord_channel_id,
-                    build_tracking_embed(
-                        event=event,
-                        pattern=effective_pattern,
-                        thread=thread,
-                        localizer=self.localizer,
-                        channel=source_channel,
-                        author_icon_url=(None if author_user is None else author_user.profile_image_url),
-                        channel_display_name=(None if channel_user is None else channel_user.display_name),
-                    ),
-                    channel_login=None if channel_user is None else channel_user.login,
-                )
-                break
-
-    async def _has_enabled_reply(self, thread_id: int, pattern_id: int) -> bool:
-        if self.reply_repository is None:
-            return False
-        reply = await resolve_awaitable(
-            self.reply_repository.get_by_pattern(
-                thread_id=thread_id,
-                pattern_id=pattern_id,
-            )
+    async def handle_match(self, event: TwitchChatMessageEvent, match: ChatPatternMatch) -> None:
+        """Send the Discord tracking notification for one prepared match."""
+        author_user = await safe_get_twitch_user_by_login(
+            self.twitch_api,
+            event.author_login,
         )
-        return reply is not None and not reply.disabled
+        channel_user = await safe_get_twitch_user_by_id(
+            self.twitch_api,
+            event.broadcaster_id,
+        )
+        logger.info(
+            "Pattern %s matched. Sending tracking embed to discord_channel_id=%s",
+            match.pattern.pattern_id,
+            match.thread.discord_channel_id,
+        )
+        await self.message_repository.mark_message_matched_in_thread(thread_id=match.thread.thread_id, event=event)
+        await self.notifier.send_tracking_embed(
+            match.thread.discord_channel_id,
+            build_tracking_embed(
+                event=event,
+                pattern=match.pattern,
+                thread=match.thread,
+                localizer=self.localizer,
+                channel=match.source_channel,
+                author_icon_url=(None if author_user is None else author_user.profile_image_url),
+                channel_display_name=(None if channel_user is None else channel_user.display_name),
+            ),
+            channel_login=None if channel_user is None else channel_user.login,
+        )
+
+    def _matcher(self) -> ChatPatternMatcher:
+        return ChatPatternMatcher(
+            thread_repository=self.thread_repository,
+            channel_repository=self.channel_repository,
+            pattern_repository=self.pattern_repository,
+            reply_repository=self.reply_repository,
+            tracked_user_repository=self.tracked_user_repository,
+        )

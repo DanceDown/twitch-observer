@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 import pytest
 
 from src.events.event_types import TwitchChannelLiveStateChangedEvent, TwitchChatMessageEvent
+from src.services.chat import ChatMessageReactionService
 from src.services.chat_pipeline import ChatMessageProcessingService
 from src.services.live_state_orchestrator import LiveStateChangeOrchestrator
 
@@ -18,7 +19,7 @@ class _Recorder:
 class _MessageIngest:
     recorder: _Recorder
 
-    def handle_chat_message(self, message: TwitchChatMessageEvent) -> None:
+    async def handle_chat_message(self, message: TwitchChatMessageEvent) -> None:
         self.recorder.calls.append(f"ingest:{message.content}")
 
 
@@ -26,31 +27,23 @@ class _MessageIngest:
 class _UserObserver:
     recorder: _Recorder
 
-    def handle_chat_message(self, message: TwitchChatMessageEvent) -> None:
+    async def handle_chat_message(self, message: TwitchChatMessageEvent) -> None:
         self.recorder.calls.append(f"user:{message.author_login}")
 
 
 @dataclass
-class _PatternTracking:
+class _ChatReactions:
     recorder: _Recorder
 
     async def handle_chat_message(self, message: TwitchChatMessageEvent) -> None:
-        self.recorder.calls.append(f"pattern:{message.channel_login}")
-
-
-@dataclass
-class _AutoReply:
-    recorder: _Recorder
-
-    async def handle_chat_message(self, message: TwitchChatMessageEvent) -> None:
-        self.recorder.calls.append(f"reply:{message.message_id}")
+        self.recorder.calls.append(f"react:{message.channel_login}:{message.message_id}")
 
 
 @dataclass
 class _LivePersistence:
     recorder: _Recorder
 
-    def handle_change(self, event: TwitchChannelLiveStateChangedEvent) -> None:
+    async def handle_change(self, event: TwitchChannelLiveStateChangedEvent) -> None:
         self.recorder.calls.append(f"persist:{event.twitch_channel_id}:{event.is_live}")
 
 
@@ -82,8 +75,7 @@ async def test_chat_pipeline_runs_in_explicit_order() -> None:
     pipeline = ChatMessageProcessingService(
         message_ingest=_MessageIngest(recorder),
         user_observer=_UserObserver(recorder),
-        pattern_tracking=_PatternTracking(recorder),
-        auto_reply=_AutoReply(recorder),
+        reactions=_ChatReactions(recorder),  # type: ignore[arg-type]
     )
 
     await pipeline.process(
@@ -98,8 +90,7 @@ async def test_chat_pipeline_runs_in_explicit_order() -> None:
     assert recorder.calls == [
         "ingest:hello",
         "user:alice",
-        "pattern:example",
-        "reply:m-1",
+        "react:example:m-1",
     ]
 
 

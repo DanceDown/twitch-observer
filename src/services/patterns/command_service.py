@@ -36,7 +36,6 @@ from src.services.patterns.presentation import PatternCommandPresenter
 from src.services.twitch_gateways import TwitchDirectoryGateway
 from src.utils.permissions import ObserverPermission
 from src.discord_results import discord_user_mention
-from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -192,8 +191,7 @@ class PatternCommandService:
             thread=thread,
         )
 
-        existing = await resolve_awaitable(
-            self.pattern_repository.find_exact_pattern(
+        existing = await self.pattern_repository.find_exact_pattern(
                 thread_id=thread.thread_id,
                 regex=text,
                 channel_scope_mode=command.channel_scope_mode.value,
@@ -205,7 +203,7 @@ class PatternCommandService:
                 is_regex=command.is_regex,
                 case_sensitive=command.case_sensitive,
             )
-        )
+        
         if existing is not None:
             display_id = self._display_index(thread.thread_id, existing.pattern_id) or existing.pattern_id
             return build_thread_result(
@@ -217,8 +215,7 @@ class PatternCommandService:
                 ephemeral=True,
             )
 
-        created = await resolve_awaitable(
-            self.pattern_repository.add_pattern(
+        created = await self.pattern_repository.add_pattern(
                 thread_id=thread.thread_id,
                 regex=text,
                 channel_scope_mode=command.channel_scope_mode.value,
@@ -242,7 +239,7 @@ class PatternCommandService:
                     )
                 ),
             )
-        )
+        
         display_id = await self._display_index(thread.thread_id, created.pattern_id) or created.pattern_id
         logger.debug(
             "Added ping thread_id=%s pattern_id=%s regex=%r is_regex=%s channel_filter=%s user_filter=%s",
@@ -276,9 +273,8 @@ class PatternCommandService:
         thread: ThreadRecord,
     ) -> DiscordCommandResult:
         logger.debug("Removing pattern request: %r", command)
-        pattern = await resolve_awaitable(
-            self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id)
-        )
+        pattern = await self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id)
+        
         if pattern is None:
             return build_thread_result(
                 self.localizer,
@@ -289,7 +285,7 @@ class PatternCommandService:
             )
 
         display_id = await self._display_index(thread.thread_id, pattern.pattern_id) or pattern.pattern_id
-        await resolve_awaitable(self.pattern_repository.remove_pattern(thread_id=pattern.thread_id, pattern_id=pattern.pattern_id))
+        await self.pattern_repository.remove_pattern(thread_id=pattern.thread_id, pattern_id=pattern.pattern_id)
         logger.debug("Removed pattern thread_id=%s pattern_id=%s regex=%r", pattern.thread_id, pattern.pattern_id, pattern.regex)
         return build_thread_result(
             self.localizer,
@@ -314,9 +310,8 @@ class PatternCommandService:
             return thread
 
         logger.debug("Disabling pattern request: %r", command)
-        pattern = await resolve_awaitable(
-            self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id)
-        )
+        pattern = await self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id)
+        
         if pattern is None:
             return build_thread_result(
                 self.localizer,
@@ -335,13 +330,12 @@ class PatternCommandService:
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
             )
-        updated = await resolve_awaitable(
-            self.pattern_repository.set_pattern_disabled(
+        updated = await self.pattern_repository.set_pattern_disabled(
                 thread_id=pattern.thread_id,
                 pattern_id=pattern.pattern_id,
                 disabled=True,
             )
-        )
+        
         if updated is None:
             raise RuntimeError("Pattern repository returned no row for disable.")
         display_id = await self._display_index(thread.thread_id, updated.pattern_id) or updated.pattern_id
@@ -368,9 +362,8 @@ class PatternCommandService:
             return thread
 
         logger.debug("Enabling pattern request: %r", command)
-        pattern = await resolve_awaitable(
-            self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id)
-        )
+        pattern = await self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id)
+        
         if pattern is None:
             return build_thread_result(
                 self.localizer,
@@ -389,13 +382,12 @@ class PatternCommandService:
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
             )
-        updated = await resolve_awaitable(
-            self.pattern_repository.set_pattern_disabled(
+        updated = await self.pattern_repository.set_pattern_disabled(
                 thread_id=pattern.thread_id,
                 pattern_id=pattern.pattern_id,
                 disabled=False,
             )
-        )
+        
         if updated is None:
             raise RuntimeError("Pattern repository returned no row for enable.")
         display_id = await self._display_index(thread.thread_id, updated.pattern_id) or updated.pattern_id
@@ -421,9 +413,8 @@ class PatternCommandService:
         if isinstance(thread, DiscordCommandResult):
             return thread
 
-        pattern = await resolve_awaitable(
-            self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id)
-        )
+        pattern = await self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id)
+        
         if pattern is None:
             return build_thread_result(
                 self.localizer,
@@ -467,8 +458,7 @@ class PatternCommandService:
             pattern=pattern,
         )
 
-        existing = await resolve_awaitable(
-            self.pattern_repository.find_exact_pattern(
+        existing = await self.pattern_repository.find_exact_pattern(
                 thread_id=thread.thread_id,
                 regex=new_text,
                 channel_scope_mode=new_channel_scope_mode,
@@ -480,7 +470,7 @@ class PatternCommandService:
                 is_regex=new_is_regex,
                 case_sensitive=new_case_sensitive,
             )
-        )
+        
         if existing is not None and existing.pattern_id != pattern.pattern_id:
             display_id = await self._display_index(thread.thread_id, existing.pattern_id) or existing.pattern_id
             return build_thread_result(
@@ -492,8 +482,7 @@ class PatternCommandService:
                 ephemeral=True,
             )
 
-        updated = await resolve_awaitable(
-            self.pattern_repository.update_pattern(
+        updated = await self.pattern_repository.update_pattern(
                 thread_id=thread.thread_id,
                 pattern_id=pattern.pattern_id,
                 regex=new_text,
@@ -508,7 +497,7 @@ class PatternCommandService:
                 color=new_color,
                 priority=new_priority,
             )
-        )
+        
         if updated is None:
             raise RuntimeError("Pattern repository returned no row for update.")
         display_id = await self._display_index(thread.thread_id, updated.pattern_id) or updated.pattern_id
@@ -577,7 +566,7 @@ class PatternCommandService:
         return {"DISPLAY_NAME": display_name, "LOGIN": login}
 
     async def _resolve_thread(self, command: PatternCommand) -> ThreadRecord | None:
-        return await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(command.discord_channel_id))
+        return await self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
 
     @staticmethod
     def _default_priority_for(

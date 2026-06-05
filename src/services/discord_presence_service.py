@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 from src.database.connection import MessageRepository
-from src.utils.async_utils import resolve_awaitable
 
 
 class DiscordPresenceStatusSender:
@@ -49,7 +48,7 @@ class DiscordPresenceService:
     async def poll_once(self) -> None:
         """Choose one recent message and publish it as Discord custom status."""
         since = datetime.now(UTC) - timedelta(minutes=self.lookback_minutes)
-        messages = await resolve_awaitable(self.message_repository.list_recent_messages(since=since, limit=self.message_limit))
+        messages = await self.message_repository.list_recent_messages(since=since, limit=self.message_limit)
         if not messages:
             return
         selected = random.choice(messages)

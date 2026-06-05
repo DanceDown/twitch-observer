@@ -11,7 +11,6 @@ from typing import Protocol
 
 from src.database.connection import MessageRepository, RecentMessageRecord
 from src.events.event_types import TwitchChatMessageEvent
-from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +75,7 @@ class BatchedMessageRepository(MessageRepository):
         limit: int,
     ) -> list[RecentMessageRecord]:
         await self.flush()
-        return await resolve_awaitable(self.repository.list_recent_messages(since=since, limit=limit))
+        return await self.repository.list_recent_messages(since=since, limit=limit)
 
     async def list_recent_messages_for_channel(
         self,
@@ -86,13 +85,12 @@ class BatchedMessageRepository(MessageRepository):
         limit: int,
     ) -> list[RecentMessageRecord]:
         await self.flush()
-        return await resolve_awaitable(
-            self.repository.list_recent_messages_for_channel(
+        return await self.repository.list_recent_messages_for_channel(
                 twitch_channel_id=twitch_channel_id,
                 since=since,
                 limit=limit,
             )
-        )
+        
 
     async def list_recent_messages_for_thread(
         self,
@@ -102,13 +100,12 @@ class BatchedMessageRepository(MessageRepository):
         limit: int,
     ) -> list[RecentMessageRecord]:
         await self.flush()
-        return await resolve_awaitable(
-            self.repository.list_recent_messages_for_thread(
+        return await self.repository.list_recent_messages_for_thread(
                 thread_id=thread_id,
                 since=since,
                 limit=limit,
             )
-        )
+        
 
     async def get_thread_message(
         self,
@@ -117,12 +114,11 @@ class BatchedMessageRepository(MessageRepository):
         message_id: str,
     ) -> RecentMessageRecord | None:
         await self.flush()
-        return await resolve_awaitable(
-            self.repository.get_thread_message(
+        return await self.repository.get_thread_message(
                 thread_id=thread_id,
                 message_id=message_id,
             )
-        )
+        
 
     async def flush(self) -> None:
         async with self._flush_lock:
@@ -188,22 +184,20 @@ class BatchedMessageRepository(MessageRepository):
     ) -> None:
         batch_repository = self.repository if hasattr(self.repository, "flush_write_batch") else None
         if batch_repository is not None:
-            await resolve_awaitable(
-                getattr(batch_repository, "flush_write_batch")(
+            await getattr(batch_repository, "flush_write_batch")(
                     message_events=message_events,
                     thread_matches=thread_matches,
                 )
-            )
+            
             return
         for event in message_events:
-            await resolve_awaitable(self.repository.save_twitch_message(event))
+            await self.repository.save_twitch_message(event)
         for thread_id, event in thread_matches:
-            await resolve_awaitable(
-                self.repository.mark_message_matched_in_thread(
+            await self.repository.mark_message_matched_in_thread(
                     thread_id=thread_id,
                     event=event,
                 )
-            )
+            
 
     async def _run_loop(self) -> None:
         while True:

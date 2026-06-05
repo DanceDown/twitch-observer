@@ -24,17 +24,13 @@ from src.gateways.twitch_api import TwitchUser
 from src.services.channel_event_display_index import ChannelEventDisplayIndexResolver
 from src.services.twitch_runtime import DISCORD_NOTIFY_ACTION
 from src.services.twitch_gateways import TwitchDirectoryGateway
-from src.utils.async_utils import resolve_awaitable
 
 
 async def _load_cached_user_by_id(twitch_api: TwitchDirectoryGateway, user_id: str) -> TwitchUser | None:
     normalized_user_id = user_id.strip()
     if not normalized_user_id:
         return None
-    cached_loader = getattr(twitch_api, "load_cached_user_by_id", None)
-    if callable(cached_loader):
-        return await resolve_awaitable(cached_loader(normalized_user_id))
-    return twitch_api.get_cached_user_by_id(normalized_user_id)
+    return await twitch_api.load_cached_user_by_id(normalized_user_id)
 
 
 async def _resolve_users_by_ids(
@@ -53,11 +49,8 @@ async def _resolve_users_by_ids(
         else:
             missing_ids.append(user_id)
     if missing_ids:
-        batch_loader = getattr(twitch_api, "get_users_by_ids", None)
-        if callable(batch_loader):
-            batch_users = await resolve_awaitable(batch_loader(tuple(missing_ids)))
-            for user in batch_users:
-                resolved[user.user_id.strip()] = user
+        for user in await twitch_api.get_users_by_ids(tuple(missing_ids)):
+            resolved[user.user_id.strip()] = user
         unresolved_ids = [user_id for user_id in missing_ids if user_id not in resolved]
         for user_id in unresolved_ids:
             resolved[user_id] = await twitch_api.get_channel_by_id(user_id) if channel_lookup else await twitch_api.get_user_by_id(user_id)
@@ -124,7 +117,7 @@ class TrackedChannelQueryService:
     twitch_api: TwitchDirectoryGateway
 
     async def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
-        return await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(discord_channel_id))
+        return await self.thread_repository.get_by_discord_channel_id(discord_channel_id)
 
     async def get_thread_language(self, discord_channel_id: int) -> str | None:
         thread = await self.get_thread(discord_channel_id)
@@ -143,7 +136,7 @@ class TrackedChannelQueryService:
         filter_set = None if filter_user_ids is None else {user_id.strip() for user_id in filter_user_ids if user_id.strip()}
         channels = [
             channel
-            for channel in await resolve_awaitable(self.channel_repository.list_channels_for_thread(thread.thread_id))
+            for channel in await self.channel_repository.list_channels_for_thread(thread.thread_id)
             if filter_set is None or channel.twitch_channel_id in filter_set
         ]
         resolved_users = await _resolve_users_by_ids(
@@ -173,14 +166,14 @@ class PatternQueryService:
     twitch_api: TwitchDirectoryGateway
 
     async def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
-        return await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(discord_channel_id))
+        return await self.thread_repository.get_by_discord_channel_id(discord_channel_id)
 
     async def list_patterns(self, discord_channel_id: int) -> list[PatternPresentation]:
         thread = await self.get_thread(discord_channel_id)
         if thread is None:
             return []
 
-        patterns = await resolve_awaitable(self.pattern_repository.list_patterns_for_thread(thread.thread_id))
+        patterns = await self.pattern_repository.list_patterns_for_thread(thread.thread_id)
         channel_users = await _resolve_users_by_ids(
             self.twitch_api,
             tuple(twitch_id for pattern in patterns for twitch_id in pattern.channel_scope_ids),
@@ -224,14 +217,14 @@ class TrackedUserQueryService:
     twitch_api: TwitchDirectoryGateway
 
     async def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
-        return await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(discord_channel_id))
+        return await self.thread_repository.get_by_discord_channel_id(discord_channel_id)
 
     async def list_tracked_users(self, discord_channel_id: int) -> list[TrackedUserPresentation]:
         thread = await self.get_thread(discord_channel_id)
         if thread is None:
             return []
 
-        tracked_users = await resolve_awaitable(self.tracked_user_repository.list_users_for_thread(thread.thread_id))
+        tracked_users = await self.tracked_user_repository.list_users_for_thread(thread.thread_id)
         resolved_users = await _resolve_users_by_ids(
             self.twitch_api,
             tuple(tracked_user.twitch_user_id for tracked_user in tracked_users),
@@ -258,7 +251,7 @@ class ReplyQueryService:
     pattern_queries: PatternQueryService
 
     async def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
-        return await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(discord_channel_id))
+        return await self.thread_repository.get_by_discord_channel_id(discord_channel_id)
 
     async def list_replies(self, discord_channel_id: int) -> list[ReplyPresentation]:
         thread = await self.get_thread(discord_channel_id)
@@ -267,7 +260,7 @@ class ReplyQueryService:
 
         pattern_map = {item.pattern.pattern_id: item for item in await self.pattern_queries.list_patterns(discord_channel_id)}
         presentations: list[ReplyPresentation] = []
-        for reply in await resolve_awaitable(self.reply_repository.list_replies_for_thread(thread.thread_id, include_disabled=True)):
+        for reply in await self.reply_repository.list_replies_for_thread(thread.thread_id, include_disabled=True):
             pattern = pattern_map.get(reply.pattern_id)
             if pattern is None:
                 continue
@@ -284,14 +277,14 @@ class AdapterEventQueryService:
     adapter_event_action_repository: AdapterEventActionRepository | None = None
 
     async def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
-        return await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(discord_channel_id))
+        return await self.thread_repository.get_by_discord_channel_id(discord_channel_id)
 
     async def list_adapter_events(self, discord_channel_id: int) -> list[AdapterEventPresentation]:
         thread = await self.get_thread(discord_channel_id)
         if thread is None or self.adapter_event_repository is None:
             return []
 
-        events = await resolve_awaitable(self.adapter_event_repository.list_events_for_thread(thread.thread_id, include_disabled=False))
+        events = await self.adapter_event_repository.list_events_for_thread(thread.thread_id, include_disabled=False)
         relevant_events = [event for event in events if event.adapter_key == "twitch" and event.subject_type == "channel"]
         channel_map = {
             item.user_id: item
@@ -316,11 +309,9 @@ class AdapterEventQueryService:
         event_map = {item.event.event_id: item for item in await self.list_adapter_events(discord_channel_id)}
         display_index_map = await ChannelEventDisplayIndexResolver(self.adapter_event_action_repository).build_index_map(thread.thread_id)
         presentations: list[AdapterEventActionPresentation] = []
-        for event_record, action_record in await resolve_awaitable(
-            self.adapter_event_action_repository.list_actions_for_thread(
-                thread.thread_id,
-                include_disabled=True,
-            )
+        for event_record, action_record in await self.adapter_event_action_repository.list_actions_for_thread(
+            thread.thread_id,
+            include_disabled=True,
         ):
             event = event_map.get(event_record.event_id)
             if event is None:
@@ -351,7 +342,7 @@ class WriteQueryService:
     message_repository: MessageRepository
 
     async def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
-        return await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(discord_channel_id))
+        return await self.thread_repository.get_by_discord_channel_id(discord_channel_id)
 
     async def list_recent_reply_candidates(
         self,
@@ -367,12 +358,10 @@ class WriteQueryService:
             return []
 
         since = datetime.now(UTC) - timedelta(minutes=max_age_minutes)
-        rows = await resolve_awaitable(
-            self.message_repository.list_recent_messages_for_thread(
-                thread_id=thread.thread_id,
-                since=since,
-                limit=limit,
-            )
+        rows = await self.message_repository.list_recent_messages_for_thread(
+            thread_id=thread.thread_id,
+            since=since,
+            limit=limit,
         )
         return [
             WriteReplyCandidatePresentation(
@@ -394,11 +383,9 @@ class WriteQueryService:
         thread = await self.get_thread(discord_channel_id)
         if thread is None:
             return None
-        row = await resolve_awaitable(
-            self.message_repository.get_thread_message(
-                thread_id=thread.thread_id,
-                message_id=message_id,
-            )
+        row = await self.message_repository.get_thread_message(
+            thread_id=thread.thread_id,
+            message_id=message_id,
         )
         if row is None:
             return None

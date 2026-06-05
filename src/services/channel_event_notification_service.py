@@ -17,7 +17,6 @@ from src.services.twitch_runtime import (
     STREAM_ONLINE_EVENT_KEY,
     TWITCH_ADAPTER_KEY,
 )
-from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -40,13 +39,12 @@ class ChannelLiveStatePersistenceService:
     channel_repository: ChannelRepository
 
     async def handle_change(self, event: TwitchChannelLiveStateChangedEvent) -> None:
-        updated_rows = await resolve_awaitable(
-            self.channel_repository.set_live_state_for_twitch_channel(
+        updated_rows = await self.channel_repository.set_live_state_for_twitch_channel(
                 twitch_channel_id=event.twitch_channel_id,
                 is_live=event.is_live,
                 changed_at=event.changed_at.isoformat(),
             )
-        )
+        
         logger.debug(
             "Persisted live-state change twitch_channel_id=%s is_live=%s rows=%s",
             event.twitch_channel_id,
@@ -74,15 +72,14 @@ class ChannelEventNotificationService:
         suppressed_events: set[tuple[int, int]] | None = None,
     ) -> None:
         event_key = STREAM_ONLINE_EVENT_KEY if event.is_live else STREAM_OFFLINE_EVENT_KEY
-        configured_events = await resolve_awaitable(
-            self.adapter_event_repository.list_matching_events(
+        configured_events = await self.adapter_event_repository.list_matching_events(
                 adapter_key=TWITCH_ADAPTER_KEY,
                 subject_type=CHANNEL_SUBJECT_TYPE,
                 subject_id=event.twitch_channel_id,
                 event_key=event_key,
                 include_disabled=False,
             )
-        )
+        
         if not configured_events:
             return
 
@@ -94,15 +91,14 @@ class ChannelEventNotificationService:
         for configured_event in configured_events:
             if suppressed_events and (configured_event.thread_id, configured_event.event_id) in suppressed_events:
                 continue
-            thread = await resolve_awaitable(self.thread_repository.get_by_thread_id(configured_event.thread_id))
+            thread = await self.thread_repository.get_by_thread_id(configured_event.thread_id)
             if thread is None or not thread.enabled:
                 continue
-            notify_action = await resolve_awaitable(
-                self.adapter_event_action_repository.get_action(
+            notify_action = await self.adapter_event_action_repository.get_action(
                     event_id=configured_event.event_id,
                     action_type=DISCORD_NOTIFY_ACTION,
                 )
-            )
+            
             if notify_action is None or notify_action.disabled:
                 continue
             await self.notifier.send_channel_result(

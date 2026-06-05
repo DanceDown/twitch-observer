@@ -34,7 +34,6 @@ from src.services.twitch_runtime import (
     TWITCH_ADAPTER_KEY,
 )
 from src.utils.permissions import ObserverPermission
-from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -91,9 +90,8 @@ class ChannelEventCommandService:
         if isinstance(thread, DiscordCommandResult):
             return thread
 
-        tracked_channel = await resolve_awaitable(
-            self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, command.twitch_channel_id)
-        )
+        tracked_channel = await self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, command.twitch_channel_id)
+        
         if tracked_channel is None:
             return build_thread_result(
                 self.localizer,
@@ -126,29 +124,26 @@ class ChannelEventCommandService:
         channel_display_name: str,
         channel_login: str,
     ) -> DiscordCommandResult:
-        adapter_event = await resolve_awaitable(
-            self.adapter_event_repository.upsert_event(
+        adapter_event = await self.adapter_event_repository.upsert_event(
                 thread_id=thread.thread_id,
                 adapter_key=TWITCH_ADAPTER_KEY,
                 subject_type=CHANNEL_SUBJECT_TYPE,
                 subject_id=command.twitch_channel_id,
                 event_key=command.event_kind.value,
             )
-        )
-        existing_action = await resolve_awaitable(
-            self.adapter_event_action_repository.get_action(
+        
+        existing_action = await self.adapter_event_action_repository.get_action(
                 event_id=adapter_event.event_id,
                 action_type=DISCORD_NOTIFY_ACTION,
             )
-        )
-        action = await resolve_awaitable(
-            self.adapter_event_action_repository.upsert_action(
+        
+        action = await self.adapter_event_action_repository.upsert_action(
                 event_id=adapter_event.event_id,
                 action_type=DISCORD_NOTIFY_ACTION,
                 message_template=None,
                 reply_as_reply=False,
             )
-        )
+        
         if existing_action is None:
             key = "results.channel_event.notification_added"
             style = DiscordResultStyle.SUCCESS
@@ -191,24 +186,22 @@ class ChannelEventCommandService:
         channel_display_name: str,
         channel_login: str,
     ) -> DiscordCommandResult:
-        adapter_event = await resolve_awaitable(
-            self.adapter_event_repository.get_event(
+        adapter_event = await self.adapter_event_repository.get_event(
                 thread_id=thread.thread_id,
                 adapter_key=TWITCH_ADAPTER_KEY,
                 subject_type=CHANNEL_SUBJECT_TYPE,
                 subject_id=command.twitch_channel_id,
                 event_key=command.event_kind.value,
             )
-        )
+        
         existing_action = (
             None
             if adapter_event is None
-            else await resolve_awaitable(
-                self.adapter_event_action_repository.get_action(
+            else await self.adapter_event_action_repository.get_action(
                     event_id=adapter_event.event_id,
                     action_type=DISCORD_NOTIFY_ACTION,
                 )
-            )
+            
         )
         if adapter_event is None or existing_action is None:
             return build_thread_result(
@@ -223,12 +216,11 @@ class ChannelEventCommandService:
             )
 
         display_id = await self._display_index(thread.thread_id, adapter_event.event_id) or adapter_event.event_id
-        await resolve_awaitable(
-            self.adapter_event_action_repository.remove_action(
+        await self.adapter_event_action_repository.remove_action(
                 event_id=adapter_event.event_id,
                 action_type=DISCORD_NOTIFY_ACTION,
             )
-        )
+        
         key = "results.channel_event.notification_removed"
 
         return build_thread_result(
@@ -258,9 +250,8 @@ class ChannelEventCommandService:
         if isinstance(thread, DiscordCommandResult):
             return thread
 
-        tracked_channel = await resolve_awaitable(
-            self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, command.twitch_channel_id)
-        )
+        tracked_channel = await self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, command.twitch_channel_id)
+        
         if tracked_channel is None:
             return build_thread_result(
                 self.localizer,
@@ -270,24 +261,22 @@ class ChannelEventCommandService:
                 ephemeral=True,
             )
 
-        adapter_event = await resolve_awaitable(
-            self.adapter_event_repository.get_event(
+        adapter_event = await self.adapter_event_repository.get_event(
                 thread_id=thread.thread_id,
                 adapter_key=TWITCH_ADAPTER_KEY,
                 subject_type=CHANNEL_SUBJECT_TYPE,
                 subject_id=command.twitch_channel_id,
                 event_key=command.event_kind.value,
             )
-        )
+        
         notify_action = (
             None
             if adapter_event is None
-            else await resolve_awaitable(
-                self.adapter_event_action_repository.get_action(
+            else await self.adapter_event_action_repository.get_action(
                     event_id=adapter_event.event_id,
                     action_type=DISCORD_NOTIFY_ACTION,
                 )
-            )
+            
         )
         channel_display_name, channel_login = await self._channel_identity(command.twitch_channel_id)
         if adapter_event is None or notify_action is None:
@@ -309,13 +298,12 @@ class ChannelEventCommandService:
             raise ValueError(self.localizer.text("results.channel_event.invalid_color", language=thread.language)) from error
 
         if normalized_color is None:
-            updated = await resolve_awaitable(
-                self.adapter_event_action_repository.set_action_color(
+            updated = await self.adapter_event_action_repository.set_action_color(
                     event_id=adapter_event.event_id,
                     action_type=DISCORD_NOTIFY_ACTION,
                     color=None,
                 )
-            )
+            
             if updated is None:
                 raise RuntimeError("Adapter event action repository returned no row for clear color.")
             return build_thread_result(
@@ -345,13 +333,12 @@ class ChannelEventCommandService:
                 ephemeral=True,
             )
 
-        updated = await resolve_awaitable(
-            self.adapter_event_action_repository.set_action_color(
+        updated = await self.adapter_event_action_repository.set_action_color(
                 event_id=adapter_event.event_id,
                 action_type=DISCORD_NOTIFY_ACTION,
                 color=normalized_color,
             )
-        )
+        
         if updated is None:
             raise RuntimeError("Adapter event action repository returned no row for set color.")
         return build_thread_result(
@@ -382,7 +369,7 @@ class ChannelEventCommandService:
         )
 
     async def _resolve_thread(self, command: ChannelEventCommand) -> ThreadRecord | None:
-        return await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(command.discord_channel_id))
+        return await self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
 
     async def _display_index(self, thread_id: int, event_id: int) -> int | None:
         return await ChannelEventDisplayIndexResolver(self.adapter_event_action_repository).resolve(

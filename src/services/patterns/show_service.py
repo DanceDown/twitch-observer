@@ -27,7 +27,6 @@ from src.services.patterns.show_renderer import ShowSectionRenderer
 from src.services.authz import thread_has_permission
 from src.services.twitch_gateways import TwitchDirectoryGateway
 from src.utils.permissions import ObserverPermission
-from src.utils.async_utils import resolve_awaitable
 
 
 @dataclass(slots=True)
@@ -65,7 +64,7 @@ class ShowCommandService:
 
     async def handle_command(self, command: ShowConfigurationCommand) -> DiscordCommandResult:
         """Create an overview embed body for the selected sections."""
-        thread = await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(command.discord_channel_id))
+        thread = await self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
         if thread is None:
             result = build_result(
                 self.localizer,

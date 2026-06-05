@@ -21,7 +21,6 @@ from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.services.authz import thread_has_permission
 from src.utils.permissions import ObserverPermission
-from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +45,7 @@ class ThreadCommandGuards:
     not_joined_key: str
 
     async def require_thread(self, command: ThreadScopedCommand) -> ThreadRecord | DiscordCommandResult:
-        thread = await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(command.discord_channel_id))
+        thread = await self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
         if thread is None:
             return build_result(
                 self.localizer,
@@ -114,7 +113,7 @@ class ThreadCommandGuards:
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
-        account = await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
+        account = await self.account_repository.get_by_account_id(thread.account_id)
         if account is None or not account.access_token:
             return build_thread_result(
                 self.localizer,
@@ -132,7 +131,7 @@ class ThreadCommandGuards:
         channel_count_lookup: Callable[[int], Awaitable[int]],
         denial_key: str,
     ) -> DiscordCommandResult | None:
-        if await resolve_awaitable(channel_count_lookup(thread.thread_id)) > 0:
+        if await channel_count_lookup(thread.thread_id) > 0:
             return None
         return build_thread_result(
             self.localizer,
@@ -164,7 +163,7 @@ class CommandExecutionRunner:
     async def run(
         self,
         command: CommandT,
-        operation: Callable[[], Awaitable[DiscordCommandResult] | DiscordCommandResult],
+        operation: Callable[[], Awaitable[DiscordCommandResult]],
         *,
         logger_: logging.Logger,
         validation_exceptions: tuple[type[Exception], ...] = (
@@ -176,9 +175,7 @@ class CommandExecutionRunner:
         ),
     ) -> DiscordCommandResult:
         try:
-            result = operation()
-            if hasattr(result, "__await__"):
-                result = await result
+            result = await operation()
         except validation_exceptions as error:
             result = await self._thread_result(
                 command,
@@ -224,7 +221,7 @@ class CommandExecutionRunner:
         ephemeral: bool,
         **placeholders: object,
     ) -> DiscordCommandResult:
-        thread = await resolve_awaitable(self._resolve_thread(command))
+        thread = await self._resolve_thread(command)
         return build_thread_result(
             self._localizer,
             key,

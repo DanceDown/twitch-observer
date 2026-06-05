@@ -5,14 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from src.database.connection import (
-    AdapterEventActionRecord,
     AdapterEventActionRepository,
-    AdapterEventRecord,
     AdapterEventRepository,
     ChannelRepository,
-    PatternRecord,
     PatternRepository,
-    ReplyRecord,
     ReplyRepository,
     ThreadRecord,
     TrackedUserRepository,
@@ -21,27 +17,26 @@ from src.database.connection import (
     UserPermissionRepository,
 )
 from src.localization import Localizer
-from src.services.channel_event_display_index import ChannelEventDisplayIndexResolver
-from src.services.twitch_gateways import TwitchDirectoryGateway
-from src.services.twitch_runtime import (
-    CHANNEL_SUBJECT_TYPE,
-    DISCORD_NOTIFY_ACTION,
-    STREAM_EVENT_KEY_TO_STATE,
-    TWITCH_ADAPTER_KEY,
-    TWITCH_SEND_MESSAGE_ACTION,
+from src.services.show import (
+    ShowAccountRenderer,
+    ShowChannelEventsRenderer,
+    ShowChannelsRenderer,
+    ShowFormattingService,
+    ShowPatternsRenderer,
+    ShowPermissionsRenderer,
+    ShowTwitchSubjectResolver,
+    ShowUsersRenderer,
 )
-from src.utils.permissions import explicit_permission_labels
-from src.gateways.twitch_api import TwitchUser
-from src.utils.async_utils import resolve_awaitable
+from src.services.twitch_gateways import TwitchDirectoryGateway
 
 
 @dataclass(slots=True)
 class ShowSectionRenderer:
-    """Render localized `/show` sections from persisted configuration."""
+    """Coordinate focused `/show` section renderers while keeping the public API stable."""
 
     channel_repository: ChannelRepository
     pattern_repository: PatternRepository
-    reply_repository: ReplyRepository
+    reply_repository: ReplyRepository | None
     twitch_api: TwitchDirectoryGateway
     tracked_user_repository: TrackedUserRepository | None = None
     adapter_event_repository: AdapterEventRepository | None = None
@@ -50,647 +45,79 @@ class ShowSectionRenderer:
     permission_repository: UserPermissionRepository | None = None
     account_repository: TwitchAccountRepository | None = None
     device_flow_repository: TwitchDeviceFlowRepository | None = None
-    _channel_resolution_cache: dict[str, TwitchUser] = field(default_factory=dict, init=False, repr=False)
-    _user_resolution_cache: dict[str, TwitchUser] = field(default_factory=dict, init=False, repr=False)
+    _formatter: ShowFormattingService = field(init=False, repr=False)
+    _resolver: ShowTwitchSubjectResolver = field(init=False, repr=False)
+    _channels: ShowChannelsRenderer = field(init=False, repr=False)
+    _channel_events: ShowChannelEventsRenderer = field(init=False, repr=False)
+    _patterns: ShowPatternsRenderer = field(init=False, repr=False)
+    _users: ShowUsersRenderer = field(init=False, repr=False)
+    _permissions: ShowPermissionsRenderer = field(init=False, repr=False)
+    _account: ShowAccountRenderer = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self._formatter = ShowFormattingService(self.localizer)
+        self._resolver = ShowTwitchSubjectResolver(self.twitch_api)
+        self._channels = ShowChannelsRenderer(
+            channel_repository=self.channel_repository,
+            resolver=self._resolver,
+            formatter=self._formatter,
+            localizer=self.localizer,
+        )
+        self._channel_events = ShowChannelEventsRenderer(
+            channel_repository=self.channel_repository,
+            adapter_event_action_repository=self.adapter_event_action_repository,
+            resolver=self._resolver,
+            formatter=self._formatter,
+            localizer=self.localizer,
+        )
+        self._patterns = ShowPatternsRenderer(
+            pattern_repository=self.pattern_repository,
+            reply_repository=self.reply_repository,
+            adapter_event_repository=self.adapter_event_repository,
+            adapter_event_action_repository=self.adapter_event_action_repository,
+            resolver=self._resolver,
+            formatter=self._formatter,
+            localizer=self.localizer,
+        )
+        self._users = ShowUsersRenderer(
+            tracked_user_repository=self.tracked_user_repository,
+            resolver=self._resolver,
+            formatter=self._formatter,
+            localizer=self.localizer,
+        )
+        self._permissions = ShowPermissionsRenderer(
+            permission_repository=self.permission_repository,
+            formatter=self._formatter,
+            localizer=self.localizer,
+        )
+        self._account = ShowAccountRenderer(
+            account_repository=self.account_repository,
+            device_flow_repository=self.device_flow_repository,
+            resolver=self._resolver,
+            formatter=self._formatter,
+            localizer=self.localizer,
+        )
 
     def reset_resolution_cache(self) -> None:
-        """Clear one render-pass memoization cache."""
-        self._channel_resolution_cache.clear()
-        self._user_resolution_cache.clear()
-
-    async def preload_channel_ids(self, twitch_ids: tuple[str, ...]) -> None:
-        """Warm the render-pass channel cache for a set of Twitch IDs."""
-        await self._resolve_ids_with_cache(
-            twitch_ids,
-            resolution_cache=self._channel_resolution_cache,
-            channel_lookup=True,
-        )
-
-    async def preload_user_ids(self, twitch_ids: tuple[str, ...]) -> None:
-        """Warm the render-pass user cache for a set of Twitch IDs."""
-        await self._resolve_ids_with_cache(
-            twitch_ids,
-            resolution_cache=self._user_resolution_cache,
-            channel_lookup=False,
-        )
+        self._resolver.reset()
 
     async def render_channels_section(self, thread: ThreadRecord) -> str:
-        """Render the tracked Twitch channels for one Discord configuration root."""
-        language = self.localizer.language_for_thread(thread)
-        channels = await resolve_awaitable(self.channel_repository.list_channels_for_thread(thread.thread_id))
-        if not channels:
-            return self.render_section(
-                "show.channel.section", self.localizer.text("show.channel.empty", language=language), language=language
-            )
-
-        await self.preload_channel_ids(tuple(channel.twitch_channel_id for channel in channels))
-        rows: list[str] = []
-        for channel in channels:
-            twitch_user = await self.resolve_channel_by_id(channel.twitch_channel_id)
-            details: list[str] = []
-            if channel.color:
-                details.append(
-                    self.localizer.text(
-                        "show.channel.custom_color",
-                        language=language,
-                        COLOR=channel.color,
-                    )
-                )
-            rows.append(
-                self.localizer.text(
-                    "show.channel.row",
-                    language=language,
-                    DISPLAY_NAME=twitch_user.display_name,
-                    LOGIN=twitch_user.login,
-                    DETAILS=("" if not details else self.localizer.text("show.channel.details", language=language, ITEMS=tuple(details))),
-                )
-            )
-        return self.render_section(
-            "show.channel.section", self.localizer.text("show.channel.rows", language=language, ITEMS=tuple(rows)), language=language
-        )
+        return await self._channels.render(thread)
 
     async def render_channel_events_section(self, thread: ThreadRecord) -> str:
-        """Render configured live/offline notification pings with compact display IDs."""
-        language = self.localizer.language_for_thread(thread)
-        if self.adapter_event_action_repository is None:
-            return self.render_section(
-                "show.channel_event.section", self.localizer.text("show.channel_event.empty", language=language), language=language
-            )
-
-        channel_by_id = {
-            channel.twitch_channel_id: channel
-            for channel in await resolve_awaitable(self.channel_repository.list_channels_for_thread(thread.thread_id))
-        }
-        rows: list[str] = []
-        display_index_map = await ChannelEventDisplayIndexResolver(self.adapter_event_action_repository).build_index_map(thread.thread_id)
-        actions = await self._channel_notification_actions(thread.thread_id)
-        await self.preload_channel_ids(tuple(event.subject_id for event, _action in actions))
-        for event, action in actions:
-            display_index = display_index_map.get(event.event_id)
-            if display_index is None:
-                continue
-            channel_user = await self.resolve_channel_by_id(event.subject_id)
-            details = [
-                self.localizer.text(
-                    "show.channel_event.channel",
-                    language=language,
-                    DISPLAY_NAME=channel_user.display_name,
-                    LOGIN=channel_user.login,
-                ),
-                self.localizer.text(
-                    "show.channel_event.trigger",
-                    language=language,
-                    STATE=self.stream_state_label(STREAM_EVENT_KEY_TO_STATE.get(event.event_key, event.event_key), language=language),
-                ),
-            ]
-            tracked_channel = channel_by_id.get(event.subject_id)
-            if tracked_channel is not None and tracked_channel.is_live is not None:
-                details.append(
-                    self.localizer.text(
-                        "show.channel_event.live_state",
-                        language=language,
-                        STATE=self.stream_state_label("online" if tracked_channel.is_live else "offline", language=language),
-                    )
-                )
-            if action.color:
-                details.append(
-                    self.localizer.text(
-                        "show.channel_event.custom_color",
-                        language=language,
-                        COLOR=action.color,
-                    )
-                )
-            if action.disabled:
-                details.append(self.localizer.text("show.channel_event.disabled", language=language))
-            rows.append(
-                self.render_row(
-                    row_key="show.channel_event.row",
-                    details_key="show.channel_event.details",
-                    head=self.localizer.text("show.channel_event.line", language=language, ID=display_index),
-                    details=details,
-                    language=language,
-                )
-            )
-        if not rows:
-            return self.render_section(
-                "show.channel_event.section", self.localizer.text("show.channel_event.empty", language=language), language=language
-            )
-        return self.render_section(
-            "show.channel_event.section",
-            self.localizer.text("show.channel_event.rows", language=language, ITEMS=tuple(rows)),
-            language=language,
-        )
+        return await self._channel_events.render(thread)
 
     async def render_patterns_section(self, thread: ThreadRecord) -> str:
-        """Render all stored pings with dense display IDs."""
-        language = self.localizer.language_for_thread(thread)
-        patterns = await resolve_awaitable(
-            self.pattern_repository.list_patterns_for_thread(
-                thread.thread_id,
-                is_regex=None,
-            )
-        )
-        if not patterns:
-            return self.render_section(
-                "show.pattern.section", self.localizer.text("show.pattern.empty", language=language), language=language
-            )
-        await self.preload_channel_ids(tuple(twitch_id for pattern in patterns for twitch_id in pattern.channel_scope_ids))
-        await self.preload_user_ids(tuple(twitch_id for pattern in patterns for twitch_id in pattern.user_scope_ids))
-        rows = [
-            await self.format_pattern_row(pattern, display_index=display_index, language=language)
-            for display_index, pattern in enumerate(patterns, start=1)
-        ]
-        return self.render_section(
-            "show.pattern.section", self.localizer.text("show.pattern.rows", language=language, ITEMS=tuple(rows)), language=language
-        )
+        return await self._patterns.render_patterns(thread)
 
     async def render_auto_replies_section(self, thread: ThreadRecord) -> str:
-        """Render all patterns and event-actions that currently send auto-replies."""
-        language = self.localizer.language_for_thread(thread)
-        replies = await resolve_awaitable(
-            self.reply_repository.list_replies_for_thread(
-                thread.thread_id,
-                include_disabled=True,
-            )
-        )
-        adapter_event_actions = (
-            []
-            if self.adapter_event_action_repository is None or self.adapter_event_repository is None
-            else [
-                (event_record, action_record)
-                for event_record, action_record in (
-                    await resolve_awaitable(
-                        self.adapter_event_action_repository.list_actions_for_thread(
-                            thread.thread_id,
-                            include_disabled=True,
-                        )
-                    )
-                )
-                if action_record.action_type == TWITCH_SEND_MESSAGE_ACTION
-            ]
-        )
-        empty_text = self.localizer.text("show.auto_replies.empty", language=language)
-        if not replies and not adapter_event_actions:
-            return self.render_section("show.auto_replies.section", empty_text, language=language)
-        rows: list[str] = []
-        patterns = await resolve_awaitable(self.pattern_repository.list_patterns_for_thread(thread.thread_id))
-        pattern_map = {pattern.pattern_id: pattern for pattern in patterns}
-        pattern_display_indices = {pattern.pattern_id: display_index for display_index, pattern in enumerate(patterns, start=1)}
-        await self.preload_channel_ids(
-            tuple(event.subject_id for event, _action in adapter_event_actions)
-            + tuple(twitch_id for pattern in patterns for twitch_id in pattern.channel_scope_ids)
-        )
-        await self.preload_user_ids(tuple(twitch_id for pattern in patterns for twitch_id in pattern.user_scope_ids))
-        for reply in replies:
-            pattern = pattern_map.get(reply.pattern_id)
-            if pattern is None:
-                continue
-            display_index = pattern_display_indices.get(pattern.pattern_id, pattern.pattern_id)
-            rows.append(
-                await self.format_auto_reply_row(
-                    pattern,
-                    reply,
-                    display_index=display_index,
-                    language=language,
-                )
-            )
-        for adapter_event, action in adapter_event_actions:
-            rows.append(await self.format_adapter_event_action_row(adapter_event, action, language=language))
-        if not rows:
-            return self.render_section("show.auto_replies.section", empty_text, language=language)
-        return self.render_section(
-            "show.auto_replies.section",
-            self.localizer.text("show.auto_replies.rows", language=language, ITEMS=tuple(rows)),
-            language=language,
-        )
+        return await self._patterns.render_auto_replies(thread)
 
     async def render_users_section(self, thread: ThreadRecord) -> str:
-        """Render the tracked Twitch users for one Discord configuration root."""
-        language = self.localizer.language_for_thread(thread)
-        empty_text = self.localizer.text("show.tracked_users.empty", language=language)
-        if self.tracked_user_repository is None:
-            return self.render_section("show.tracked_users.section", empty_text, language=language)
-        tracked_users = await resolve_awaitable(self.tracked_user_repository.list_users_for_thread(thread.thread_id))
-        if not tracked_users:
-            return self.render_section("show.tracked_users.section", empty_text, language=language)
-        await self.preload_user_ids(tuple(tracked_user.twitch_user_id for tracked_user in tracked_users))
-        rows: list[dict[str, str]] = []
-        for tracked_user in tracked_users:
-            twitch_user = await self.resolve_user_by_id(tracked_user.twitch_user_id)
-            rows.append({"DISPLAY_NAME": twitch_user.display_name, "LOGIN": twitch_user.login})
-        return self.render_section(
-            "show.tracked_users.section",
-            self.localizer.text("show.tracked_users.rows", language=language, ITEMS=tuple(rows)),
-            language=language,
-        )
+        return await self._users.render(thread)
 
     async def render_permissions_section(self, thread: ThreadRecord) -> str:
-        """Render the permission overview for one Discord context."""
-        language = self.localizer.language_for_thread(thread)
-        user_entries: list[str] = []
-        permission_msg = self.localizer.value("show.show_permissions", language=language)
-        if not isinstance(permission_msg, dict):
-            raise ValueError("show.show_permissions must be an object.")
-        body_template = permission_msg.get("body")
-        user_list_item = permission_msg.get("user_list_item")
-        if not isinstance(body_template, str) or not isinstance(user_list_item, str):
-            raise ValueError("show.show_permissions must define body and user_list_item.")
-
-        owner_permissions = self.localizer.text(
-            "show.show_permissions.permission_list",
-            language=language,
-            PERMISSIONS=(self.localizer.text("show.show_permissions.permission_label.owner", language=language),),
-        )
-        user_entries.append(
-            self.localizer.render(
-                user_list_item,
-                USERNAME=self.mention(thread.owner_id),
-                PERMISSION_LIST=owner_permissions,
-            )
-        )
-        rendered_user_list = self.render_permissions_user_list(user_entries, language=language)
-
-        if self.permission_repository is None:
-            return self.render_section(
-                "show.show_permissions.section",
-                self.localizer.render(
-                    body_template,
-                    USER_LIST=rendered_user_list,
-                ),
-                language=language,
-            )
-
-        grants = await resolve_awaitable(self.permission_repository.list_for_thread(thread_id=thread.thread_id))
-        for grant in grants:
-            labels = explicit_permission_labels(grant.permissions)
-            rendered = (
-                [self.permission_label(label, language=language) for label in labels]
-                if labels
-                else [self.localizer.text("show.show_permissions.permission_label.none", language=language)]
-            )
-            permission_lines = self.localizer.text(
-                "show.show_permissions.permission_list",
-                language=language,
-                PERMISSIONS=tuple(rendered),
-            )
-            user_entries.append(
-                self.localizer.render(
-                    user_list_item,
-                    USERNAME=self.mention(grant.discord_user_id),
-                    PERMISSION_LIST=permission_lines,
-                )
-            )
-        rendered_user_list = self.render_permissions_user_list(user_entries, language=language)
-        return self.render_section(
-            "show.show_permissions.section",
-            self.localizer.render(
-                body_template,
-                USER_LIST=rendered_user_list,
-            ),
-            language=language,
-        )
+        return await self._permissions.render(thread)
 
     async def render_account_section(self, thread: ThreadRecord) -> tuple[str, str | None]:
-        """Render linked account and pending device-flow details."""
-        language = self.localizer.language_for_thread(thread)
-        rows: list[str] = []
-        thumbnail_url = None
-        account = (
-            None
-            if self.account_repository is None or thread.account_id is None
-            else await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
-        )
-        if account is not None:
-            twitch_user = await self.resolve_user_by_id(account.twitch_user_id)
-            thumbnail_url = twitch_user.profile_image_url
-            rows.append(
-                self.localizer.text(
-                    "show.account.linked",
-                    language=language,
-                    USER=self.mention(account.discord_user_id),
-                    DISPLAY_NAME=twitch_user.display_name,
-                    LOGIN=twitch_user.login,
-                )
-            )
-            rows.append(
-                self.localizer.text(
-                    "show.account.token_status",
-                    language=language,
-                    STATUS=self.localizer.text(
-                        "show.account.token_available" if account.access_token else "show.account.token_missing",
-                        language=language,
-                    ),
-                )
-            )
-        pending = (
-            None
-            if self.device_flow_repository is None
-            else await resolve_awaitable(self.device_flow_repository.get_by_discord_channel_id(thread.discord_channel_id))
-        )
-        if pending is not None:
-            rows.append(
-                self.localizer.text(
-                    "show.account.pending",
-                    language=language,
-                    USER=self.mention(pending.discord_user_id),
-                    STATUS=pending.status,
-                    USER_CODE=pending.user_code,
-                )
-            )
-        if not rows:
-            rows.append(self.localizer.text("show.account.empty", language=language))
-        return (
-            self.render_section(
-                "show.account.section",
-                self.localizer.text("show.account.rows", language=language, ITEMS=tuple(rows)),
-                language=language,
-            ),
-            thumbnail_url,
-        )
-
-    async def format_pattern_row(self, pattern: PatternRecord, *, display_index: int, language: str) -> str:
-        """Render one compact row containing all identifying pattern fields."""
-        head = self.localizer.text(
-            "show.pattern.line",
-            language=language,
-            ID=display_index,
-        )
-        details = [
-            self.localizer.text(
-                "show.pattern.text",
-                language=language,
-                TEXT=pattern.regex,
-            ),
-            self.localizer.text(
-                "show.pattern.mode",
-                language=language,
-                PING_MODE=self.localizer.text(
-                    "show.pattern.mode_value.regex" if pattern.is_regex else "show.pattern.mode_value.word",
-                    language=language,
-                ),
-            ),
-        ]
-        details.extend(await self.describe_pattern_details(pattern, language=language))
-        return self.render_row(
-            row_key="show.pattern.row",
-            details_key="show.pattern.details",
-            head=head,
-            details=details,
-            language=language,
-        )
-
-    async def format_auto_reply_row(
-        self,
-        pattern: PatternRecord,
-        reply: ReplyRecord,
-        *,
-        display_index: int,
-        language: str,
-    ) -> str:
-        """Render one compact row for an attached auto-reply."""
-        details = [
-            self.localizer.text("show.reply.trigger", language=language, TEXT=pattern.regex),
-            self.localizer.text("show.reply.reply", language=language, TEXT=reply.reply_message),
-        ]
-        return self.render_row(
-            row_key="show.reply.row",
-            details_key="show.reply.details",
-            head=self.localizer.text("show.reply.line", language=language, ID=display_index),
-            details=details,
-            language=language,
-        )
-
-    async def format_adapter_event_action_row(
-        self,
-        event: AdapterEventRecord,
-        action: AdapterEventActionRecord,
-        *,
-        language: str,
-    ) -> str:
-        """Render one compact row for a source-driven auto-reply action."""
-        channel_user = await self.resolve_channel_by_id(event.subject_id)
-        state_label = self.stream_state_label(STREAM_EVENT_KEY_TO_STATE.get(event.event_key, event.event_key), language=language)
-        details = [
-            self.localizer.text(
-                "show.event_reply.channel",
-                language=language,
-                DISPLAY_NAME=channel_user.display_name,
-                LOGIN=channel_user.login,
-            ),
-            self.localizer.text("show.event_reply.reply", language=language, TEXT=action.message_template or ""),
-        ]
-        if action.disabled:
-            details.append(self.localizer.text("show.event_reply.disabled", language=language))
-        return self.render_row(
-            row_key="show.event_reply.row",
-            details_key="show.event_reply.details",
-            head=self.localizer.text("show.event_reply.line", language=language, STATE=state_label),
-            details=details,
-            language=language,
-        )
-
-    async def describe_pattern_details(self, pattern: PatternRecord, *, language: str) -> list[str]:
-        """Render the optional modifiers for a pattern."""
-        details: list[str] = []
-        if pattern.channel_scope_mode != "all_tracked":
-            channel_names = await self.resolve_twitch_links(pattern.channel_scope_ids)
-            if pattern.channel_scope_mode == "only_selected":
-                details.append(
-                    self.localizer.text(
-                        "show.pattern.where",
-                        language=language,
-                        VALUE=self.localizer.text("show.pattern.scope.channel_only", language=language, ITEMS=channel_names),
-                    )
-                )
-            elif pattern.channel_scope_mode == "all_except_selected":
-                details.append(
-                    self.localizer.text(
-                        "show.pattern.where",
-                        language=language,
-                        VALUE=self.localizer.text("show.pattern.scope.channel_except", language=language, ITEMS=channel_names),
-                    )
-                )
-        if pattern.user_scope_mode != "all_users":
-            user_names = await self.resolve_twitch_names(pattern.user_scope_ids)
-            if pattern.user_scope_mode == "only_selected":
-                details.append(
-                    self.localizer.text(
-                        "show.pattern.who",
-                        language=language,
-                        VALUE=self.localizer.text("show.pattern.scope.user_only", language=language, ITEMS=user_names),
-                    )
-                )
-            elif pattern.user_scope_mode == "all_except_selected":
-                details.append(
-                    self.localizer.text(
-                        "show.pattern.who",
-                        language=language,
-                        VALUE=self.localizer.text("show.pattern.scope.user_except", language=language, ITEMS=user_names),
-                    )
-                )
-            elif pattern.user_scope_mode == "all_tracked":
-                details.append(
-                    self.localizer.text(
-                        "show.pattern.who",
-                        language=language,
-                        VALUE=self.localizer.text("show.pattern.scope.user_all", language=language),
-                    )
-                )
-            elif pattern.user_scope_mode == "all_tracked_except_selected":
-                details.append(
-                    self.localizer.text(
-                        "show.pattern.who",
-                        language=language,
-                        VALUE=self.localizer.text("show.pattern.scope.user_tracked_except", language=language, ITEMS=user_names),
-                    )
-                )
-        if pattern.sub_state != "all":
-            details.append(
-                self.localizer.text(
-                    "show.pattern.subscribers_only" if pattern.sub_state == "subs" else "show.pattern.non_subscribers_only",
-                    language=language,
-                )
-            )
-        if pattern.offline_state != "both":
-            details.append(
-                self.localizer.text(
-                    "show.pattern.only_while_live" if pattern.offline_state == "online" else "show.pattern.only_while_offline",
-                    language=language,
-                )
-            )
-        if pattern.case_sensitive:
-            details.append(self.localizer.text("show.pattern.case_sensitive", language=language))
-        if pattern.color:
-            details.append(self.localizer.text("show.pattern.custom_color", language=language, COLOR=pattern.color))
-        details.append(self.localizer.text("show.pattern.priority", language=language, PRIORITY=pattern.priority))
-        if pattern.disabled:
-            details.append(self.localizer.text("show.pattern.disabled", language=language))
-        return details
-
-    async def _channel_notification_actions(self, thread_id: int) -> list[tuple[AdapterEventRecord, AdapterEventActionRecord]]:
-        if self.adapter_event_action_repository is None:
-            return []
-        rows = [
-            (event, action)
-            for event, action in await resolve_awaitable(
-                self.adapter_event_action_repository.list_actions_for_thread(
-                    thread_id,
-                    include_disabled=True,
-                )
-            )
-            if action.action_type == DISCORD_NOTIFY_ACTION
-            and event.adapter_key == TWITCH_ADAPTER_KEY
-            and event.subject_type == CHANNEL_SUBJECT_TYPE
-            and event.event_key in STREAM_EVENT_KEY_TO_STATE
-        ]
-        rows.sort(key=lambda item: item[0].event_id)
-        return rows
-
-    async def resolve_twitch_links(
-        self,
-        twitch_ids: tuple[str, ...],
-    ) -> tuple[dict[str, str], ...]:
-        """Resolve a list of Twitch user IDs to localized item placeholder values."""
-        resolved: list[dict[str, str]] = []
-        for twitch_id in twitch_ids:
-            user = await self.resolve_channel_by_id(twitch_id)
-            resolved.append({"DISPLAY_NAME": user.display_name, "LOGIN": user.login})
-        return tuple(resolved)
-
-    async def resolve_twitch_names(
-        self,
-        twitch_ids: tuple[str, ...],
-    ) -> tuple[dict[str, str], ...]:
-        """Resolve a list of Twitch user IDs to localized item placeholder values."""
-        resolved: list[dict[str, str]] = []
-        for twitch_id in twitch_ids:
-            user = await self.resolve_user_by_id(twitch_id)
-            resolved.append({"DISPLAY_NAME": user.display_name, "LOGIN": user.login})
-        return tuple(resolved)
-
-    def permission_label(self, label: str, *, language: str) -> str:
-        """Render one permission label using localization when available."""
-        return self.localizer.text(f"show.show_permissions.permission_label.{label}", language=language)
-
-    def render_permissions_user_list(self, user_entries: list[str], *, language: str) -> str:
-        """Render the caller-owned permission user list wrapper."""
-        return self.localizer.text("show.show_permissions.user_list", language=language, USER_LIST=tuple(user_entries))
-
-    def render_section(self, wrapper_key: str, body: str, *, language: str) -> str:
-        """Render one caller-owned localized section wrapper."""
-        return self.localizer.text(wrapper_key, language=language, SECTION_BODY=body)
-
-    def render_row(self, *, row_key: str, details_key: str, head: str, details: list[str], language: str) -> str:
-        """Render one caller-owned row template with an optional caller-owned detail block."""
-        return self.localizer.text(
-            row_key,
-            language=language,
-            HEAD=head,
-            DETAILS=("" if not details else self.localizer.text(details_key, language=language, ITEMS=tuple(details))),
-        )
-
-    @staticmethod
-    def mention(user_id: int) -> str:
-        """Render one Discord user mention."""
-        return f"<@{user_id}>"
-
-    def stream_state_label(self, value: str, *, language: str) -> str:
-        """Render a localized stream-state label."""
-        key = (
-            "discord.live_state_ui.states.stream.online"
-            if value in {"online", "live", "stream.online"}
-            else "discord.live_state_ui.states.stream.offline"
-        )
-        return self.localizer.text(key, language=language)
-
-    async def resolve_channel_by_id(self, user_id: str):
-        """Resolve one Twitch channel subject by Twitch ID."""
-        normalized_user_id = user_id.strip()
-        if normalized_user_id in self._channel_resolution_cache:
-            return self._channel_resolution_cache[normalized_user_id]
-        await self.preload_channel_ids((user_id,))
-        return self._channel_resolution_cache[normalized_user_id]
-
-    async def resolve_user_by_id(self, user_id: str):
-        """Resolve one Twitch user by Twitch ID, preferring cached metadata."""
-        normalized_user_id = user_id.strip()
-        if normalized_user_id in self._user_resolution_cache:
-            return self._user_resolution_cache[normalized_user_id]
-        await self.preload_user_ids((user_id,))
-        return self._user_resolution_cache[normalized_user_id]
-
-    async def _resolve_ids_with_cache(
-        self,
-        twitch_ids: tuple[str, ...],
-        *,
-        resolution_cache: dict[str, TwitchUser],
-        channel_lookup: bool,
-    ) -> None:
-        normalized_ids = tuple(dict.fromkeys(twitch_id.strip() for twitch_id in twitch_ids if twitch_id.strip()))
-        if not normalized_ids:
-            return
-        missing_ids: list[str] = []
-        cached_loader = getattr(self.twitch_api, "load_cached_user_by_id", None)
-        for twitch_id in normalized_ids:
-            if twitch_id in resolution_cache:
-                continue
-            if callable(cached_loader):
-                cached = await resolve_awaitable(cached_loader(twitch_id))
-            else:
-                cached = self.twitch_api.get_cached_user_by_id(twitch_id)
-            if cached is not None:
-                resolution_cache[twitch_id] = cached
-            else:
-                missing_ids.append(twitch_id)
-        if missing_ids:
-            batch_loader = getattr(self.twitch_api, "get_users_by_ids", None)
-            if callable(batch_loader):
-                for user in await resolve_awaitable(batch_loader(tuple(missing_ids))):
-                    resolution_cache[user.user_id.strip()] = user
-            unresolved_ids = [twitch_id for twitch_id in missing_ids if twitch_id not in resolution_cache]
-            for twitch_id in unresolved_ids:
-                resolution_cache[twitch_id] = (
-                    await self.twitch_api.get_channel_by_id(twitch_id)
-                    if channel_lookup
-                    else await self.twitch_api.get_user_by_id(twitch_id)
-                )
+        return await self._account.render(thread)

@@ -22,7 +22,6 @@ from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.services.account_support import AccountNotificationSender
 from src.services.twitch_gateways import TwitchAccountGateway
-from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -46,12 +45,11 @@ class DeviceFlowPollProcessor:
     ) -> None:
         """Process one pending flow if it is due and still valid."""
         if self._is_expired(pending, now):
-            await resolve_awaitable(
-                self.device_flow_repository.mark_failed(
+            await self.device_flow_repository.mark_failed(
                     discord_channel_id=pending.discord_channel_id or 0,
                     last_error="The Twitch login code expired before it was confirmed.",
                 )
-            )
+            
             await notify(
                 pending.discord_user_id,
                 await self._result_for_pending(
@@ -67,7 +65,7 @@ class DeviceFlowPollProcessor:
         if not self._is_due_for_poll(pending, now):
             return
 
-        await resolve_awaitable(self.device_flow_repository.touch_polled(discord_channel_id=pending.discord_channel_id or 0))
+        await self.device_flow_repository.touch_polled(discord_channel_id=pending.discord_channel_id or 0)
         result = await self.twitch_api.poll_device_code_flow(
             device_code=pending.device_code,
             scopes=pending.scope,
@@ -75,20 +73,18 @@ class DeviceFlowPollProcessor:
         if result.status == "pending":
             return
         if result.status == "slow_down":
-            await resolve_awaitable(
-                self.device_flow_repository.update_interval(
+            await self.device_flow_repository.update_interval(
                     discord_channel_id=pending.discord_channel_id or 0,
                     interval_seconds=pending.interval_seconds + int(result.interval or 0),
                 )
-            )
+            
             return
         if result.status == "failed":
-            await resolve_awaitable(
-                self.device_flow_repository.mark_failed(
+            await self.device_flow_repository.mark_failed(
                     discord_channel_id=pending.discord_channel_id or 0,
                     last_error=result.error_message or "The Twitch login was denied or expired.",
                 )
-            )
+            
             await notify(
                 pending.discord_user_id,
                 await self._result_for_pending(
@@ -105,12 +101,11 @@ class DeviceFlowPollProcessor:
 
         validated = await self.twitch_api.validate_user_access_token(result.token_bundle.access_token)
         if "user:write:chat" not in validated.scopes:
-            await resolve_awaitable(
-                self.device_flow_repository.mark_failed(
+            await self.device_flow_repository.mark_failed(
                     discord_channel_id=pending.discord_channel_id or 0,
                     last_error="The linked Twitch token is missing `user:write:chat`.",
                 )
-            )
+            
             await notify(
                 pending.discord_user_id,
                 await self._result_for_pending(
@@ -125,24 +120,22 @@ class DeviceFlowPollProcessor:
 
         expires_at = (now + timedelta(seconds=result.token_bundle.expires_in)).isoformat()
         thread = (
-            await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(pending.discord_channel_id))
+            await self.thread_repository.get_by_discord_channel_id(pending.discord_channel_id)
             if pending.discord_channel_id is not None
             else None
         )
         if thread is None:
-            await resolve_awaitable(
-                self.device_flow_repository.mark_failed(
+            await self.device_flow_repository.mark_failed(
                     discord_channel_id=pending.discord_channel_id or 0,
                     last_error="The Discord channel is no longer joined.",
                 )
-            )
+            
             return
 
         if thread.account_id is not None:
-            await resolve_awaitable(self.account_repository.remove_by_account_id(thread.account_id))
+            await self.account_repository.remove_by_account_id(thread.account_id)
 
-        stored = await resolve_awaitable(
-            self.account_repository.create_account(
+        stored = await self.account_repository.create_account(
                 discord_user_id=pending.discord_user_id,
                 twitch_user_id=validated.user_id,
                 twitch_login=validated.login,
@@ -153,14 +146,13 @@ class DeviceFlowPollProcessor:
                 scope=result.token_bundle.scope,
                 token_type=result.token_bundle.token_type,
             )
-        )
-        await resolve_awaitable(
-            self.thread_repository.set_account_id(
+        
+        await self.thread_repository.set_account_id(
                 discord_channel_id=thread.discord_channel_id,
                 account_id=stored.account_id,
             )
-        )
-        await resolve_awaitable(self.device_flow_repository.remove_by_discord_channel_id(thread.discord_channel_id))
+        
+        await self.device_flow_repository.remove_by_discord_channel_id(thread.discord_channel_id)
         await notify(
             pending.discord_user_id,
             self._result_for_thread(
@@ -194,7 +186,7 @@ class DeviceFlowPollProcessor:
         thread = (
             None
             if pending.discord_channel_id is None
-            else await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(pending.discord_channel_id))
+            else await self.thread_repository.get_by_discord_channel_id(pending.discord_channel_id)
         )
         return build_thread_result(self.localizer, key, thread=thread, style=style, ephemeral=ephemeral, **placeholders)
 
@@ -267,7 +259,7 @@ class DeviceFlowPollingService:
             localizer=self.localizer,
         )
         now = datetime.now(UTC)
-        for pending in await resolve_awaitable(self.device_flow_repository.list_pending_flows()):
+        for pending in await self.device_flow_repository.list_pending_flows():
             try:
                 await processor.process_pending(
                     pending,
@@ -279,9 +271,9 @@ class DeviceFlowPollingService:
 
     async def invalidate_account(self, discord_user_id: int) -> None:
         """Remove a broken linked account but keep configured auto-replies intact."""
-        account = await resolve_awaitable(self.account_repository.get_by_discord_user_id(discord_user_id))
+        account = await self.account_repository.get_by_discord_user_id(discord_user_id)
         if account is not None:
-            await resolve_awaitable(self.account_repository.remove_by_account_id(account.account_id))
+            await self.account_repository.remove_by_account_id(account.account_id)
 
     async def _notify(self, discord_user_id: int, result: DiscordCommandResult, discord_channel_id: int | None) -> None:
         await self.notifier.send_account_result(discord_user_id, discord_channel_id, result)

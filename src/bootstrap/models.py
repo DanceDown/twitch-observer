@@ -30,6 +30,7 @@ from src.services.channel_event_notification_service import (
     ChannelLiveStatePersistenceService,
 )
 from src.services.batched_message_repository import BatchedMessageRepository
+from src.services.chat import ChatMessageReactionService
 from src.services.chat_pipeline import ChatMessageProcessingService
 from src.services.discord_ui_query_service import DiscordUIQueryBundle
 from src.services.live_state_orchestrator import LiveStateChangeOrchestrator
@@ -79,6 +80,7 @@ class ApplicationServices:
     user_directory_ingest: TwitchUserDirectoryIngestService
     pattern_tracking: PatternTrackingService
     auto_reply: AutoReplyService
+    chat_reactions: ChatMessageReactionService
     live_state_persistence: ChannelLiveStatePersistenceService
     channel_event_notification: ChannelEventNotificationService
     channel_event_auto_reply: ChannelEventAutoReplyService

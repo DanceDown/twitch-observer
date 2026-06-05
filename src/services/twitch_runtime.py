@@ -15,7 +15,6 @@ from src.database.connection import (
     TwitchAccountRepository,
 )
 from src.services.twitch_gateways import TwitchAuthGateway, TwitchUserLookup
-from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -80,8 +79,7 @@ async def refresh_linked_account(
         return None
 
     expires_at = (datetime.now(UTC) + timedelta(seconds=refreshed.expires_in)).isoformat()
-    stored = await resolve_awaitable(
-        account_repository.update_account(
+    stored = await account_repository.update_account(
             account_id=account.account_id,
             twitch_user_id=validated.user_id,
             twitch_login=validated.login,
@@ -92,10 +90,10 @@ async def refresh_linked_account(
             scope=refreshed.scope,
             token_type=refreshed.token_type,
         )
-    )
+    
     if stored is None and thread is not None and thread_repository is not None and thread.account_id is not None:
-        await resolve_awaitable(account_repository.remove_by_account_id(thread.account_id))
-        await resolve_awaitable(thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None))
+        await account_repository.remove_by_account_id(thread.account_id)
+        await thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
     return stored
 
 
@@ -141,7 +139,7 @@ async def expand_pattern_for_tracked_users(
         tracked_user_ids: tuple[str, ...] = ()
     else:
         tracked_user_ids = tuple(
-            user.twitch_user_id for user in await resolve_awaitable(tracked_user_repository.list_users_for_thread(thread_id))
+            user.twitch_user_id for user in await tracked_user_repository.list_users_for_thread(thread_id)
         )
     if pattern.user_scope_mode == "all_tracked_except_selected":
         excluded_user_ids = set(pattern.user_scope_ids)

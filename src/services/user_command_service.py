@@ -12,7 +12,6 @@ from src.localization import Localizer
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
 from src.services.twitch_gateways import TwitchUserLookup
 from src.utils.permissions import ObserverPermission
-from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +60,8 @@ class UserCommandService:
             return thread
 
         twitch_user = await self.twitch_user_lookup.get_user_by_login(command.twitch_user_login)
-        existing = await resolve_awaitable(
-            self.tracked_user_repository.get_by_thread_and_twitch_user(thread.thread_id, twitch_user.user_id)
-        )
+        existing = await self.tracked_user_repository.get_by_thread_and_twitch_user(thread.thread_id, twitch_user.user_id)
+        
         if existing is not None:
             return build_thread_result(
                 self.localizer,
@@ -74,7 +72,7 @@ class UserCommandService:
                 DISPLAY_NAME=twitch_user.display_name,
                 LOGIN=twitch_user.login,
             )
-        await resolve_awaitable(self.tracked_user_repository.add_user(thread.thread_id, twitch_user.user_id))
+        await self.tracked_user_repository.add_user(thread.thread_id, twitch_user.user_id)
         return build_thread_result(
             self.localizer,
             "results.user.added",
@@ -96,9 +94,8 @@ class UserCommandService:
             return thread
 
         twitch_user = await self.twitch_user_lookup.get_user_by_login(command.twitch_user_login)
-        existing = await resolve_awaitable(
-            self.tracked_user_repository.get_by_thread_and_twitch_user(thread.thread_id, twitch_user.user_id)
-        )
+        existing = await self.tracked_user_repository.get_by_thread_and_twitch_user(thread.thread_id, twitch_user.user_id)
+        
         if existing is None:
             return build_thread_result(
                 self.localizer,
@@ -110,9 +107,8 @@ class UserCommandService:
                 LOGIN=twitch_user.login,
             )
         if (
-            await resolve_awaitable(
-                self.tracked_user_repository.count_pattern_scope_references(thread_id=thread.thread_id, twitch_user_id=twitch_user.user_id)
-            )
+            await self.tracked_user_repository.count_pattern_scope_references(thread_id=thread.thread_id, twitch_user_id=twitch_user.user_id)
+            
             > 0
         ):
             return build_thread_result(
@@ -124,7 +120,7 @@ class UserCommandService:
                 DISPLAY_NAME=twitch_user.display_name,
                 LOGIN=twitch_user.login,
             )
-        await resolve_awaitable(self.tracked_user_repository.remove_user(thread.thread_id, twitch_user.user_id))
+        await self.tracked_user_repository.remove_user(thread.thread_id, twitch_user.user_id)
         return build_thread_result(
             self.localizer,
             "results.user.removed",
@@ -137,4 +133,4 @@ class UserCommandService:
         )
 
     async def _resolve_thread(self, command: AddTrackedUserCommand | RemoveTrackedUserCommand):
-        return await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(command.discord_channel_id))
+        return await self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)

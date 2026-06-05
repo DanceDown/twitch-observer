@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from src.services.account_service import AccountCommandService
+from src.services.chat import ChatMessageReactionService, ChatPatternMatcher
 from src.services.channel_command_service import ChannelCommandService
 from src.services.channel_event_notification_service import (
     ChannelEventNotificationService,
@@ -204,6 +205,17 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         account_notifier=runtime_coordinator.accounts,
         token_refresh_skew_seconds=core.config.twitch_account_token_refresh_skew_seconds,
     )
+    chat_reactions = ChatMessageReactionService(
+        matcher=ChatPatternMatcher(
+            thread_repository=core.thread_repository,
+            channel_repository=core.channel_repository,
+            pattern_repository=core.pattern_repository,
+            reply_repository=core.reply_repository,
+            tracked_user_repository=core.tracked_user_repository,
+        ),
+        tracking=pattern_tracking,
+        replies=auto_reply,
+    )
     live_state_persistence = ChannelLiveStatePersistenceService(channel_repository=core.channel_repository)
     channel_event_notification = ChannelEventNotificationService(
         thread_repository=core.thread_repository,
@@ -228,8 +240,7 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
     chat_pipeline = ChatMessageProcessingService(
         message_ingest=message_ingest,
         user_observer=user_directory_ingest,
-        pattern_tracking=pattern_tracking,
-        auto_reply=auto_reply,
+        reactions=chat_reactions,
     )
     live_state_orchestrator = LiveStateChangeOrchestrator(
         persistence=live_state_persistence,
@@ -255,6 +266,7 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         user_directory_ingest=user_directory_ingest,
         pattern_tracking=pattern_tracking,
         auto_reply=auto_reply,
+        chat_reactions=chat_reactions,
         live_state_persistence=live_state_persistence,
         channel_event_notification=channel_event_notification,
         channel_event_auto_reply=channel_event_auto_reply,

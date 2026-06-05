@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from src.database.connection import PatternRepository
-from src.utils.async_utils import resolve_awaitable
 
 
 @dataclass(slots=True)
@@ -18,7 +17,7 @@ class PatternDisplayIndexResolver:
         return {
             pattern.pattern_id: display_index
             for display_index, pattern in enumerate(
-                await resolve_awaitable(self.pattern_repository.list_patterns_for_thread(thread_id)),
+                await self.pattern_repository.list_patterns_for_thread(thread_id),
                 start=1,
             )
         }

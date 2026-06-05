@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 
 from src.database.connection import MessageRepository
 from src.events.event_types import TwitchChatMessageEvent
-from src.utils.async_utils import resolve_awaitable
 
 
 @dataclass(slots=True)
@@ -22,5 +21,5 @@ class MessageIngestService:
 
     async def handle_chat_message(self, event: TwitchChatMessageEvent) -> None:
         """Store an incoming message and track processing metrics."""
-        await resolve_awaitable(self.message_repository.save_twitch_message(event))
+        await self.message_repository.save_twitch_message(event)
         self.handled_messages += 1

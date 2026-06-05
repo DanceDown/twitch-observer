@@ -24,7 +24,6 @@ from src.events.event_types import (
 )
 from src.localization import Localizer
 from src.services.authz import thread_has_permission
-from src.utils.async_utils import resolve_awaitable
 from src.utils.permissions import ObserverPermission
 
 
@@ -47,7 +46,7 @@ class DiscordUIFlowGuardService:
         thread = (
             None
             if event.discord_channel_id is None
-            else await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(event.discord_channel_id))
+            else await self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
         )
         if thread is None:
             return self._blocked(
@@ -71,8 +70,8 @@ class DiscordUIFlowGuardService:
                 ),
             )
 
-        if event.flow in {UIFlowKind.LIVE, UIFlowKind.WRITE} and not await resolve_awaitable(
-            self.channel_repository.list_channels_for_thread(thread.thread_id)
+        if event.flow in {UIFlowKind.LIVE, UIFlowKind.WRITE} and not await self.channel_repository.list_channels_for_thread(
+            thread.thread_id
         ):
             key = "discord.write_ui.errors.no_channels" if event.flow is UIFlowKind.WRITE else "discord.live_state_ui.errors.no_channels"
             return self._blocked(
@@ -82,7 +81,7 @@ class DiscordUIFlowGuardService:
 
         if event.flow is UIFlowKind.REPLY and event.step in {UIFlowStep.ADD_PATTERN, UIFlowStep.ADD_EVENT}:
             account = (
-                await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
+                await self.account_repository.get_by_account_id(thread.account_id)
                 if thread.account_id is not None
                 else None
             )
@@ -100,7 +99,7 @@ class DiscordUIFlowGuardService:
 
         if event.flow is UIFlowKind.WRITE:
             account = (
-                await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
+                await self.account_repository.get_by_account_id(thread.account_id)
                 if thread.account_id is not None
                 else None
             )

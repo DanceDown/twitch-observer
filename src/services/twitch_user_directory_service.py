@@ -10,7 +10,6 @@ import asyncio
 from src.database.connection import TwitchUserCacheRecord, TwitchUserCacheRepository
 from src.events.event_types import TwitchChatMessageEvent
 from src.gateways.twitch_api import TwitchAPIClient, TwitchUser
-from src.utils.async_utils import resolve_awaitable
 
 
 def _record_to_twitch_user(record: TwitchUserCacheRecord) -> TwitchUser:
@@ -120,43 +119,41 @@ class TwitchUserDirectoryService:
         return users
 
     async def list_cached_users(self) -> tuple[TwitchUserCacheRecord, ...]:
-        records = await resolve_awaitable(self.repository.list_all())
+        records = await self.repository.list_all()
         for record in records:
             self._remember_record(record)
         return tuple(records)
 
     async def upsert_users_from_api(self, users: tuple[TwitchUser, ...]) -> None:
         records = tuple((user.user_id, user.login, user.display_name, user.profile_image_url) for user in users)
-        await resolve_awaitable(self.repository.upsert_many_from_api(records))
+        await self.repository.upsert_many_from_api(records)
         self._remember_api_users(users)
 
     async def observe_chat_message(self, event: TwitchChatMessageEvent) -> None:
         """Warm the cache from IRC metadata without touching the Twitch API."""
         if event.author_id:
-            record = await resolve_awaitable(
-                self.repository.observe_from_chat(
+            record = await self.repository.observe_from_chat(
                     twitch_user_id=event.author_id,
                     twitch_login=event.author_login,
                     display_name=event.author_display_name or event.author_login,
                 )
-            )
+            
             self._remember_record(record)
         if event.broadcaster_id:
             existing_broadcaster = self.get_cached_user_by_id(event.broadcaster_id)
-            record = await resolve_awaitable(
-                self.repository.observe_from_chat(
+            record = await self.repository.observe_from_chat(
                     twitch_user_id=event.broadcaster_id,
                     twitch_login=event.channel_login,
                     display_name=None if existing_broadcaster is None else existing_broadcaster.display_name,
                 )
-            )
+            
             self._remember_record(record)
 
     async def _get_or_load_record_by_login(self, login: str) -> TwitchUserCacheRecord | None:
         cached = self._get_record_from_memory_by_login(login)
         if cached is not None:
             return cached
-        record = await resolve_awaitable(self.repository.get_by_login(login))
+        record = await self.repository.get_by_login(login)
         if record is None:
             return None
         self._remember_record(record)
@@ -166,7 +163,7 @@ class TwitchUserDirectoryService:
         cached = self._get_record_from_memory_by_id(user_id)
         if cached is not None:
             return cached
-        record = await resolve_awaitable(self.repository.get_by_user_id(user_id))
+        record = await self.repository.get_by_user_id(user_id)
         if record is None:
             return None
         self._remember_record(record)
@@ -216,27 +213,25 @@ class TwitchUserDirectoryService:
 
     async def _refresh_user_by_login_uncached(self, login: str) -> TwitchUser:
         user = await self.twitch_api.get_user_by_login(login)
-        record = await resolve_awaitable(
-            self.repository.upsert_from_api(
+        record = await self.repository.upsert_from_api(
                 twitch_user_id=user.user_id,
                 twitch_login=user.login,
                 display_name=user.display_name,
                 profile_image_url=user.profile_image_url,
             )
-        )
+        
         self._remember_record(record)
         return user
 
     async def _refresh_user_by_id_uncached(self, user_id: str) -> TwitchUser:
         user = await self.twitch_api.get_user_by_id(user_id)
-        record = await resolve_awaitable(
-            self.repository.upsert_from_api(
+        record = await self.repository.upsert_from_api(
                 twitch_user_id=user.user_id,
                 twitch_login=user.login,
                 display_name=user.display_name,
                 profile_image_url=user.profile_image_url,
             )
-        )
+        
         self._remember_record(record)
         return user
 

@@ -27,7 +27,6 @@ from src.services.account_support import AccountNotificationSender, format_accou
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
 from src.services.twitch_gateways import TwitchAccountGateway
 from src.utils.permissions import ObserverPermission
-from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 __all__ = ("AccountCommandService", "AccountNotificationSender")
@@ -75,11 +74,10 @@ class AccountCommandService:
         if isinstance(thread, DiscordCommandResult):
             return thread
         if thread.account_id is not None:
-            account = await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
+            account = await self.account_repository.get_by_account_id(thread.account_id)
             if account is None:
-                await resolve_awaitable(
-                    self.thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
-                )
+                await self.thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
+                
                 return build_thread_result(
                     self.localizer,
                     "results.account.already_linked_broken_state",
@@ -97,7 +95,7 @@ class AccountCommandService:
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
             )
-        existing_pending = await resolve_awaitable(self.device_flow_repository.get_by_discord_channel_id(thread.discord_channel_id))
+        existing_pending = await self.device_flow_repository.get_by_discord_channel_id(thread.discord_channel_id)
         if existing_pending is not None and existing_pending.status == "pending":
             return build_thread_result(
                 self.localizer,
@@ -111,8 +109,7 @@ class AccountCommandService:
             )
         start = await self.twitch_api.start_device_code_flow(scopes=("user:write:chat",))
         expires_at = (datetime.now().astimezone() + timedelta(seconds=start.expires_in)).isoformat()
-        pending = await resolve_awaitable(
-            self.device_flow_repository.upsert_pending_flow(
+        pending = await self.device_flow_repository.upsert_pending_flow(
                 discord_user_id=command.requester_id,
                 discord_channel_id=thread.discord_channel_id,
                 device_code=start.device_code,
@@ -122,7 +119,7 @@ class AccountCommandService:
                 expires_at=expires_at,
                 scope=("user:write:chat",),
             )
-        )
+        
         return build_thread_result(
             self.localizer,
             "results.account.finish_login",
@@ -143,11 +140,10 @@ class AccountCommandService:
         account_name = None
         account = None
         if thread.account_id is not None:
-            account = await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
+            account = await self.account_repository.get_by_account_id(thread.account_id)
             if account is None:
-                await resolve_awaitable(
-                    self.thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
-                )
+                await self.thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
+                
                 return build_thread_result(
                     self.localizer,
                     "results.account.unlinked_broken_state",
@@ -156,9 +152,9 @@ class AccountCommandService:
                     ephemeral=True,
                 )
             account_name = await self._display_name_for_account(account)
-            removed_account = await resolve_awaitable(self.account_repository.remove_by_account_id(thread.account_id))
-            await resolve_awaitable(self.thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None))
-        removed_pending = await resolve_awaitable(self.device_flow_repository.remove_by_discord_channel_id(thread.discord_channel_id))
+            removed_account = await self.account_repository.remove_by_account_id(thread.account_id)
+            await self.thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
+        removed_pending = await self.device_flow_repository.remove_by_discord_channel_id(thread.discord_channel_id)
         if not removed_account and not removed_pending:
             return build_thread_result(
                 self.localizer,
@@ -231,7 +227,7 @@ class AccountCommandService:
     async def _resolve_thread(self, command: AccountCommand) -> ThreadRecord | None:
         if command.discord_channel_id is None:
             return None
-        return await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(command.discord_channel_id))
+        return await self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
 
 
 @dataclass(slots=True, frozen=True)

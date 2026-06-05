@@ -37,7 +37,6 @@ from src.services.twitch_runtime import (
     TWITCH_SEND_MESSAGE_ACTION,
 )
 from src.utils.permissions import ObserverPermission
-from src.utils.async_utils import resolve_awaitable
 
 PatternReplyCommand = AddPatternReplyCommand | RemovePatternReplyCommand | SetPatternReplyEnabledCommand
 EventReplyCommand = AddChannelEventReplyCommand | RemoveChannelEventReplyCommand | SetChannelEventReplyEnabledCommand
@@ -154,9 +153,8 @@ class ReplyCommandService:
         if isinstance(thread, DiscordCommandResult):
             return thread
 
-        pattern = await resolve_awaitable(
-            self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id)
-        )
+        pattern = await self.pattern_repository.get_pattern_by_id(thread_id=thread.thread_id, pattern_id=command.pattern_id)
+        
         if pattern is None:
             return build_thread_result(
                 self.localizer,
@@ -169,7 +167,7 @@ class ReplyCommandService:
         display_id = await self._display_index(thread.thread_id, pattern.pattern_id) or pattern.pattern_id
         if action == "add":
             linked_account = (
-                await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
+                await self.account_repository.get_by_account_id(thread.account_id)
                 if thread.account_id is not None
                 else None
             )
@@ -187,9 +185,8 @@ class ReplyCommandService:
                 raise ValueError(self.localizer.text("results.reply.pattern_add_empty_message", language=thread.language))
             if len(message) > 500:
                 raise ValueError(self.localizer.text("results.reply.pattern_add_message_too_long", language=thread.language))
-            existing_reply = await resolve_awaitable(
-                self.reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=pattern.pattern_id)
-            )
+            existing_reply = await self.reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=pattern.pattern_id)
+            
             if existing_reply is not None:
                 return build_thread_result(
                     self.localizer,
@@ -198,14 +195,13 @@ class ReplyCommandService:
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 )
-            created = await resolve_awaitable(
-                self.reply_repository.add_reply(
+            created = await self.reply_repository.add_reply(
                     thread_id=thread.thread_id,
                     pattern_id=pattern.pattern_id,
                     reply_message=message,
                     reply_as_reply=command.reply_as_reply,
                 )
-            )
+            
             if created is None:
                 raise RuntimeError("Reply repository returned no row for add_reply.")
             return build_thread_result(
@@ -223,9 +219,8 @@ class ReplyCommandService:
                 USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
             )
 
-        existing_reply = await resolve_awaitable(
-            self.reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=pattern.pattern_id)
-        )
+        existing_reply = await self.reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=pattern.pattern_id)
+        
         if existing_reply is None:
             return build_thread_result(
                 self.localizer,
@@ -236,7 +231,7 @@ class ReplyCommandService:
             )
 
         if action == "remove":
-            cleared = await resolve_awaitable(self.reply_repository.remove_reply(thread_id=thread.thread_id, pattern_id=pattern.pattern_id))
+            cleared = await self.reply_repository.remove_reply(thread_id=thread.thread_id, pattern_id=pattern.pattern_id)
             if cleared is None:
                 raise RuntimeError("Reply repository returned no row for remove_reply.")
             return build_thread_result(
@@ -259,13 +254,12 @@ class ReplyCommandService:
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
-            disabled_reply = await resolve_awaitable(
-                self.reply_repository.set_reply_disabled(
+            disabled_reply = await self.reply_repository.set_reply_disabled(
                     thread_id=thread.thread_id,
                     pattern_id=pattern.pattern_id,
                     disabled=True,
                 )
-            )
+            
             if disabled_reply is None:
                 raise RuntimeError("Reply repository returned no row for disable pattern reply.")
             return build_thread_result(
@@ -288,13 +282,12 @@ class ReplyCommandService:
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
-            enabled_reply = await resolve_awaitable(
-                self.reply_repository.set_reply_disabled(
+            enabled_reply = await self.reply_repository.set_reply_disabled(
                     thread_id=thread.thread_id,
                     pattern_id=pattern.pattern_id,
                     disabled=False,
                 )
-            )
+            
             if enabled_reply is None:
                 raise RuntimeError("Reply repository returned no row for enable pattern reply.")
             return build_thread_result(
@@ -339,12 +332,11 @@ class ReplyCommandService:
         adapter_event = next(
             (
                 item
-                for item in await resolve_awaitable(
-                    event_configuration.adapter_event_repository.list_events_for_thread(
+                for item in await event_configuration.adapter_event_repository.list_events_for_thread(
                         thread.thread_id,
                         include_disabled=True,
                     )
-                )
+                
                 if item.event_id == command.adapter_event_id
             ),
             None,
@@ -367,16 +359,15 @@ class ReplyCommandService:
         channel_display_name = twitch_channel.display_name
         channel_login = twitch_channel.login
 
-        existing_reply = await resolve_awaitable(
-            event_configuration.adapter_event_action_repository.get_action(
+        existing_reply = await event_configuration.adapter_event_action_repository.get_action(
                 event_id=adapter_event.event_id,
                 action_type=TWITCH_SEND_MESSAGE_ACTION,
             )
-        )
+        
 
         if action == "add":
             linked_account = (
-                await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
+                await self.account_repository.get_by_account_id(thread.account_id)
                 if thread.account_id is not None
                 else None
             )
@@ -393,14 +384,13 @@ class ReplyCommandService:
                 raise ValueError(self.localizer.text("results.reply.event_add_empty_message", language=thread.language))
             if len(message) > 500:
                 raise ValueError(self.localizer.text("results.reply.event_add_message_too_long", language=thread.language))
-            created = await resolve_awaitable(
-                event_configuration.adapter_event_action_repository.upsert_action(
+            created = await event_configuration.adapter_event_action_repository.upsert_action(
                     event_id=adapter_event.event_id,
                     action_type=TWITCH_SEND_MESSAGE_ACTION,
                     message_template=message,
                     reply_as_reply=False,
                 )
-            )
+            
             return build_thread_result(
                 self.localizer,
                 "results.reply.added_event",
@@ -424,12 +414,11 @@ class ReplyCommandService:
             )
 
         if action == "remove":
-            removed = await resolve_awaitable(
-                event_configuration.adapter_event_action_repository.remove_action(
+            removed = await event_configuration.adapter_event_action_repository.remove_action(
                     event_id=adapter_event.event_id,
                     action_type=TWITCH_SEND_MESSAGE_ACTION,
                 )
-            )
+            
             if removed is None:
                 raise RuntimeError("Reply repository returned no row for remove adapter-event action.")
             return build_thread_result(
@@ -454,13 +443,12 @@ class ReplyCommandService:
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
-            disabled_reply = await resolve_awaitable(
-                event_configuration.adapter_event_action_repository.set_action_disabled(
+            disabled_reply = await event_configuration.adapter_event_action_repository.set_action_disabled(
                     event_id=adapter_event.event_id,
                     action_type=TWITCH_SEND_MESSAGE_ACTION,
                     disabled=True,
                 )
-            )
+            
             if disabled_reply is None:
                 raise RuntimeError("Reply repository returned no row for disable adapter-event action.")
             return build_thread_result(
@@ -485,13 +473,12 @@ class ReplyCommandService:
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
-            enabled_reply = await resolve_awaitable(
-                event_configuration.adapter_event_action_repository.set_action_disabled(
+            enabled_reply = await event_configuration.adapter_event_action_repository.set_action_disabled(
                     event_id=adapter_event.event_id,
                     action_type=TWITCH_SEND_MESSAGE_ACTION,
                     disabled=False,
                 )
-            )
+            
             if enabled_reply is None:
                 raise RuntimeError("Reply repository returned no row for enable adapter-event action.")
             return build_thread_result(
@@ -530,4 +517,4 @@ class ReplyCommandService:
         )
 
     async def _resolve_thread(self, command: ReplyCommand) -> ThreadRecord | None:
-        return await resolve_awaitable(self.thread_repository.get_by_discord_channel_id(command.discord_channel_id))
+        return await self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)

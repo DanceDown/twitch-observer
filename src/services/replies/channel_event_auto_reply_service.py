@@ -33,7 +33,6 @@ from src.services.twitch_runtime import (
     safe_get_twitch_user_by_id,
 )
 from src.utils.discord_embeds import build_channel_event_auto_reply_embed
-from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -57,15 +56,14 @@ class ChannelEventAutoReplyService:
         event: TwitchChannelLiveStateChangedEvent,
     ) -> set[tuple[int, int]]:
         event_key = STREAM_ONLINE_EVENT_KEY if event.is_live else STREAM_OFFLINE_EVENT_KEY
-        configured_events = await resolve_awaitable(
-            self.adapter_event_repository.list_matching_events(
+        configured_events = await self.adapter_event_repository.list_matching_events(
                 adapter_key=TWITCH_ADAPTER_KEY,
                 subject_type=CHANNEL_SUBJECT_TYPE,
                 subject_id=event.twitch_channel_id,
                 event_key=event_key,
                 include_disabled=False,
             )
-        )
+        
         if not configured_events:
             return set()
 
@@ -78,36 +76,33 @@ class ChannelEventAutoReplyService:
         event_state = STREAM_EVENT_KEY_TO_STATE[event_key]
         sent_event_keys: set[tuple[int, int]] = set()
         for configured_event in configured_events:
-            reply = await resolve_awaitable(
-                self.adapter_event_action_repository.get_action(
+            reply = await self.adapter_event_action_repository.get_action(
                     event_id=configured_event.event_id,
                     action_type=TWITCH_SEND_MESSAGE_ACTION,
                 )
-            )
+            
             if reply is None or reply.disabled or not reply.message_template:
                 continue
-            thread = await resolve_awaitable(self.thread_repository.get_by_thread_id(configured_event.thread_id))
+            thread = await self.thread_repository.get_by_thread_id(configured_event.thread_id)
             if thread is None or not thread.enabled:
                 continue
             account = (
-                await resolve_awaitable(self.account_repository.get_by_account_id(thread.account_id))
+                await self.account_repository.get_by_account_id(thread.account_id)
                 if thread.account_id is not None
                 else None
             )
             if account is None or not account.access_token:
                 continue
-            source_channel = await resolve_awaitable(
-                self.channel_repository.get_by_thread_and_twitch_channel(
+            source_channel = await self.channel_repository.get_by_thread_and_twitch_channel(
                     thread.thread_id,
                     event.twitch_channel_id,
                 )
-            )
-            notify_action = await resolve_awaitable(
-                self.adapter_event_action_repository.get_action(
+            
+            notify_action = await self.adapter_event_action_repository.get_action(
                     event_id=configured_event.event_id,
                     action_type=DISCORD_NOTIFY_ACTION,
                 )
-            )
+            
             account = (
                 await ensure_fresh_linked_account(
                     account=account,

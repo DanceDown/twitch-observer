@@ -6,11 +6,9 @@ import logging
 from dataclasses import dataclass
 
 from src.events.event_types import TwitchChatMessageEvent
+from src.services.chat import ChatMessageReactionService
 from src.services.message_ingest_service import MessageIngestService
-from src.services.patterns.tracking_service import PatternTrackingService
-from src.services.replies.pattern_auto_reply_service import AutoReplyService
 from src.services.twitch_user_directory_service import TwitchUserDirectoryIngestService
-from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +19,12 @@ class ChatMessageProcessingService:
 
     message_ingest: MessageIngestService
     user_observer: TwitchUserDirectoryIngestService
-    pattern_tracking: PatternTrackingService
-    auto_reply: AutoReplyService
+    reactions: ChatMessageReactionService
 
     async def process(self, message: TwitchChatMessageEvent) -> None:
-        await resolve_awaitable(self.message_ingest.handle_chat_message(message))
-        await resolve_awaitable(self.user_observer.handle_chat_message(message))
-        await resolve_awaitable(self.pattern_tracking.handle_chat_message(message))
-        await resolve_awaitable(self.auto_reply.handle_chat_message(message))
+        await self.message_ingest.handle_chat_message(message)
+        await self.user_observer.handle_chat_message(message)
+        await self.reactions.handle_chat_message(message)
         logger.debug(
             "Completed chat pipeline for channel=%s author=%s message_id=%s",
             message.channel_login,
