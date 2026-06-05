@@ -85,6 +85,10 @@ class AppConfig:
     discord_presence_lookback_minutes: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_LOOKBACK_MINUTES", "5"))
     discord_presence_message_limit: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_MESSAGE_LIMIT", "50"))
     discord_presence_max_status_length: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_MAX_STATUS_LENGTH", "120"))
+    twitch_message_write_batch_size: int = field(default_factory=lambda: _get_int("TWITCH_MESSAGE_WRITE_BATCH_SIZE", "50"))
+    twitch_message_write_flush_interval_seconds: float = field(
+        default_factory=lambda: _get_float("TWITCH_MESSAGE_WRITE_FLUSH_INTERVAL_SECONDS", "0.25")
+    )
     discord_write_reply_candidate_max_age_minutes: int = field(
         default_factory=lambda: _get_int("DISCORD_WRITE_REPLY_CANDIDATE_MAX_AGE_MINUTES", "1440")
     )

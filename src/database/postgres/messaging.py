@@ -20,7 +20,6 @@ class PostgresMessageRepository(MessageRepository):
 
     async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
         """Persist one incoming Twitch message if it has not been stored yet."""
-        message_id = self._resolve_message_id(event)
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -46,16 +45,58 @@ class PostgresMessageRepository(MessageRepository):
                 )
                 ON CONFLICT (message_id) DO NOTHING
                 """,
-                (
-                    message_id,
-                    event.broadcaster_id or event.channel_login,
-                    event.sent_at,
-                    event.author_id or event.author_login,
-                    event.author_display_name or event.author_login,
-                    event.content,
-                    event.reply_parent_message_id,
-                ),
+                self._build_message_params(event),
             )
+
+    async def flush_write_batch(
+        self,
+        *,
+        message_events: tuple[TwitchChatMessageEvent, ...],
+        thread_matches: tuple[tuple[int, TwitchChatMessageEvent], ...],
+    ) -> None:
+        """Persist one batched write snapshot for messages and thread matches."""
+        if not message_events and not thread_matches:
+            return
+        async with self.database.async_transaction() as connection:
+            async with connection.cursor() as cursor:
+                if message_events:
+                    await cursor.executemany(
+                        """
+                        INSERT INTO message (
+                            message_id,
+                            twitch_channel_id,
+                            timestamp,
+                            twitch_user_id,
+                            username,
+                            content,
+                            is_reply_to,
+                            is_bot
+                        )
+                        VALUES (
+                            %s,
+                            %s,
+                            %s,
+                            %s,
+                            %s,
+                            %s,
+                            (SELECT message_id FROM message WHERE message_id = %s),
+                            FALSE
+                        )
+                        ON CONFLICT (message_id) DO NOTHING
+                        """,
+                        tuple(self._build_message_params(event) for event in message_events),
+                    )
+                if thread_matches:
+                    await cursor.executemany(
+                        """
+                        INSERT INTO thread_message_match (thread_id, message_id)
+                        SELECT %s, message_id
+                        FROM message
+                        WHERE message_id = %s
+                        ON CONFLICT (thread_id, message_id) DO NOTHING
+                        """,
+                        tuple((thread_id, self._resolve_message_id(event)) for thread_id, event in thread_matches),
+                    )
 
     async def mark_message_matched_in_thread(
         self,
@@ -205,3 +246,15 @@ class PostgresMessageRepository(MessageRepository):
     @classmethod
     def _resolve_message_id(cls, event: TwitchChatMessageEvent) -> str:
         return event.message_id or cls._build_fallback_message_id(event)
+
+    @classmethod
+    def _build_message_params(cls, event: TwitchChatMessageEvent) -> tuple[object, ...]:
+        return (
+            cls._resolve_message_id(event),
+            event.broadcaster_id or event.channel_login,
+            event.sent_at,
+            event.author_id or event.author_login,
+            event.author_display_name or event.author_login,
+            event.content,
+            event.reply_parent_message_id,
+        )

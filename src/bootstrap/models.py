@@ -29,6 +29,7 @@ from src.services.channel_event_notification_service import (
     ChannelEventNotificationService,
     ChannelLiveStatePersistenceService,
 )
+from src.services.batched_message_repository import BatchedMessageRepository
 from src.services.chat_pipeline import ChatMessageProcessingService
 from src.services.discord_ui_query_service import DiscordUIQueryBundle
 from src.services.live_state_orchestrator import LiveStateChangeOrchestrator
@@ -105,5 +106,6 @@ class ApplicationRuntime:
     irc_bootstrap_service: IRCBootstrapService
     device_flow_poller: DeviceFlowPollingService
     presence_service: DiscordPresenceService
+    message_write_batcher: BatchedMessageRepository | None = None
     twitch_irc_task: asyncio.Task[None] | None = None
     discord_task: asyncio.Task[None] | None = None

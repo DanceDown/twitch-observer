@@ -22,6 +22,7 @@ from src.gateways.twitch_api import TwitchAPIClient
 from src.gateways.twitch_irc import AnonymousTwitchIRCGateway
 from src.localization import Localizer
 from src.services.twitch_auth_service import TwitchAuthService
+from src.services.batched_message_repository import BatchedMessageRepository
 from src.services.twitch_chat_write_service import TwitchChatWriteService
 from src.services.twitch_live_query_service import TwitchLiveQueryService
 from src.services.twitch_service_bundle import TwitchServiceBundle
@@ -33,7 +34,12 @@ from .models import ApplicationCore, ApplicationGateways
 def build_core(config: AppConfig) -> ApplicationCore:
     localizer = Localizer.from_directory()
     database = PostgresDatabase(config)
-    message_repository = PostgresMessageRepository(database)
+    raw_message_repository = PostgresMessageRepository(database)
+    message_repository = BatchedMessageRepository(
+        repository=raw_message_repository,
+        batch_size=max(1, config.twitch_message_write_batch_size),
+        flush_interval_seconds=max(0.0, config.twitch_message_write_flush_interval_seconds),
+    )
     thread_repository = PostgresThreadRepository(database)
     channel_repository = PostgresChannelRepository(database)
     tracked_user_repository = PostgresTrackedUserRepository(database)

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from src.entrypoints.discord import DiscordEntrypoint
 from src.entrypoints.discord.ui_data import DiscordUIDataProvider
 from src.entrypoints.twitch_irc import TwitchIRCEntrypoint
+from src.services.batched_message_repository import BatchedMessageRepository
 from src.services.account_polling_service import DeviceFlowPollingService
 from src.services.discord_presence_service import DiscordPresenceService
 from src.services.irc_bootstrap_service import IRCBootstrapService
@@ -40,6 +41,7 @@ def build_runtime(
     services: ApplicationServices,
     gateways: ApplicationGateways,
 ) -> ApplicationRuntime:
+    message_write_batcher = core.message_repository if isinstance(core.message_repository, BatchedMessageRepository) else None
     live_monitor_service = TwitchLiveMonitorService(
         channel_repository=core.channel_repository,
         twitch_api=core.twitch_bundle,
@@ -83,6 +85,7 @@ def build_runtime(
         max_status_length=core.config.discord_presence_max_status_length,
     )
     return ApplicationRuntime(
+        message_write_batcher=message_write_batcher,
         live_monitor_service=live_monitor_service,
         metadata_refresh_service=metadata_refresh_service,
         irc_bootstrap_service=irc_bootstrap_service,
@@ -105,6 +108,8 @@ async def start_runtime(
     *,
     task_failure_callback: Callable[[asyncio.Task[object]], None] | None = None,
 ) -> None:
+    if runtime.message_write_batcher is not None:
+        await runtime.message_write_batcher.start()
     runtime.twitch_irc_task = asyncio.create_task(entrypoints.twitch_irc.start(), name="twitch-irc-entrypoint")
     runtime.discord_task = asyncio.create_task(entrypoints.discord.start(), name="discord-entrypoint")
     if task_failure_callback is not None:
@@ -134,6 +139,8 @@ async def stop_runtime(core: ApplicationCore, entrypoints: ApplicationEntrypoint
     await runtime.irc_bootstrap_service.stop_periodic_sync()
     await runtime.device_flow_poller.stop()
     await runtime.presence_service.stop()
+    if runtime.message_write_batcher is not None:
+        await runtime.message_write_batcher.stop()
     await core.twitch_bundle.close()
     await entrypoints.discord.stop()
     await entrypoints.twitch_irc.stop()
