@@ -58,3 +58,14 @@ class DiscordUIDataProvider:
             max_age_minutes=max_age_minutes,
             limit=limit,
         )
+
+    async def get_write_reply_candidate(
+        self,
+        *,
+        discord_channel_id: int,
+        message_id: str,
+    ) -> WriteReplyCandidatePresentation | None:
+        return await self.queries.write.get_reply_candidate(
+            discord_channel_id=discord_channel_id,
+            message_id=message_id,
+        )

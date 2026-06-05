@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import discord
 
 from ...ui_data import TrackedChannelPresentation
+from ..selects import window_with_included_items
 
 if TYPE_CHECKING:
     from .home import PatternHomeView
@@ -19,6 +20,11 @@ class PatternChannelsModal(discord.ui.Modal):
         super().__init__(title=parent.text("discord.pattern_ui.channels.title"), timeout=300)
         self._parent_view = parent
         self._tracked_channels = tracked_channels
+        visible_channels = window_with_included_items(
+            tracked_channels,
+            key=lambda channel: channel.login,
+            included_keys=parent.state.selected_channels,
+        )
         self.scope = discord.ui.Label(
             text=parent.text("discord.pattern_ui.channels.scope_label"),
             component=discord.ui.RadioGroup(
@@ -52,10 +58,10 @@ class PatternChannelsModal(discord.ui.Modal):
                         description=channel.login[:100],
                         default=channel.login in parent.state.selected_channels,
                     )
-                    for channel in tracked_channels[:25]
+                    for channel in visible_channels
                 ],
                 min_values=1,
-                max_values=min(len(tracked_channels), 25),
+                max_values=min(len(visible_channels), 25),
                 required=False,
             ),
         )

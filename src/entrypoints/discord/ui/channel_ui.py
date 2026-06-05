@@ -10,6 +10,7 @@ from src.localization import Localizer
 from ..dispatch import dispatch_add_tracked_channel, dispatch_remove_tracked_channel, dispatch_set_tracked_channel_color
 from ..helpers import complete_bound_result, normalize_optional_text
 from ..ui_data import TrackedChannelPresentation
+from .selects import window_with_included_items
 
 
 class ChannelNameModal(discord.ui.Modal):
@@ -75,6 +76,11 @@ class ChannelSelectionModal(discord.ui.Modal):
         self._requester_id = requester_id
         self._action = action
         self._bound_message = bound_message
+        visible_channels = window_with_included_items(
+            tracked_channels,
+            key=lambda channel: channel.login,
+            included_keys=[default_login] if default_login else [],
+        )
         self.channel = discord.ui.Label(
             text=localizer.text("discord.channel_ui.modal.select.channel_label", language=language),
             description=localizer.text("discord.channel_ui.modal.select.channel_description", language=language),
@@ -86,7 +92,7 @@ class ChannelSelectionModal(discord.ui.Modal):
                         description=channel.login[:100],
                         default=channel.login == default_login,
                     )
-                    for channel in tracked_channels[:25]
+                    for channel in visible_channels
                 ],
                 min_values=1,
                 max_values=1,

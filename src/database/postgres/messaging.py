@@ -166,6 +166,36 @@ class PostgresMessageRepository(MessageRepository):
             for row in rows
         ]
 
+    async def get_thread_message(
+        self,
+        *,
+        thread_id: int,
+        message_id: str,
+    ) -> RecentMessageRecord | None:
+        """Load one stored Twitch message if it matched inside one Discord thread."""
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(
+                """
+                SELECT m.message_id, m.twitch_channel_id, m.username, m.content, m.timestamp
+                FROM thread_message_match AS tmm
+                JOIN message AS m ON m.message_id = tmm.message_id
+                WHERE tmm.thread_id = %s
+                  AND m.message_id = %s
+                LIMIT 1
+                """,
+                (thread_id, message_id),
+            )
+            row = await cursor.fetchone()
+        if row is None:
+            return None
+        return RecentMessageRecord(
+            message_id=str(row[0]),
+            twitch_channel_id=str(row[1]),
+            username=str(row[2]),
+            content=str(row[3]),
+            timestamp=row[4],
+        )
+
     @staticmethod
     def _build_fallback_message_id(event: TwitchChatMessageEvent) -> str:
         """Build a deterministic fallback ID when Twitch did not provide one."""

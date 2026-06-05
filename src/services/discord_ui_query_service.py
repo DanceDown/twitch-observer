@@ -339,6 +339,31 @@ class WriteQueryService:
             for row in rows
         ]
 
+    async def get_reply_candidate(
+        self,
+        *,
+        discord_channel_id: int,
+        message_id: str,
+    ) -> WriteReplyCandidatePresentation | None:
+        thread = await self.get_thread(discord_channel_id)
+        if thread is None:
+            return None
+        row = await resolve_awaitable(
+            self.message_repository.get_thread_message(
+                thread_id=thread.thread_id,
+                message_id=message_id,
+            )
+        )
+        if row is None:
+            return None
+        return WriteReplyCandidatePresentation(
+            message_id=row.message_id,
+            twitch_channel_id=row.twitch_channel_id,
+            username=row.username,
+            content=row.content,
+            timestamp=row.timestamp,
+        )
+
 
 @dataclass(slots=True)
 class DiscordUIQueryBundle:

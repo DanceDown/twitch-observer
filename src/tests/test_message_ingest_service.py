@@ -70,9 +70,7 @@ class InMemoryMessageRepository(MessageRepository):
     ) -> list[RecentMessageRecord]:
         matched_message_ids = set(self.matched_by_thread_id.get(thread_id, []))
         rows = [
-            row
-            for row in self.list_recent_messages(since=since, limit=max(limit * 10, limit))
-            if row.message_id in matched_message_ids
+            row for row in self.list_recent_messages(since=since, limit=max(limit * 10, limit)) if row.message_id in matched_message_ids
         ]
         return rows[:limit]
 

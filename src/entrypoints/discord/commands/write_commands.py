@@ -47,6 +47,7 @@ def register_write_commands(
 
         normalized_login = (twitch_channel_login or "").strip()
         normalized_message = (message or "").strip()
+        normalized_reply_parent_message_id = (reply_parent_message_id or "").strip() or None
         if normalized_login and normalized_message:
             result = await dispatch_send_twitch_message(
                 services,
@@ -54,7 +55,7 @@ def register_write_commands(
                 requester_id=interaction.user.id,
                 twitch_channel_login=normalized_login,
                 message=normalized_message,
-                reply_parent_message_id=(reply_parent_message_id or "").strip() or None,
+                reply_parent_message_id=normalized_reply_parent_message_id,
             )
             await send_initial_result(interaction, result)
             return
@@ -80,8 +81,17 @@ def register_write_commands(
         recent_replies = await ui_data_provider.list_recent_write_reply_candidates(
             discord_channel_id=interaction.channel_id,
             max_age_minutes=reply_candidate_max_age_minutes,
-            limit=min(max(reply_candidate_limit, 1), 25),
+            limit=max(reply_candidate_limit, 25),
         )
+        if normalized_reply_parent_message_id and all(
+            candidate.message_id != normalized_reply_parent_message_id for candidate in recent_replies
+        ):
+            selected_reply = await ui_data_provider.get_write_reply_candidate(
+                discord_channel_id=interaction.channel_id,
+                message_id=normalized_reply_parent_message_id,
+            )
+            if selected_reply is not None:
+                recent_replies.append(selected_reply)
         await interaction.response.send_modal(
             WriteModal(
                 services=services,
@@ -91,5 +101,8 @@ def register_write_commands(
                 reply_candidates=recent_replies,
                 localizer=localizer,
                 language=language,
+                default_channel_login=normalized_login or None,
+                default_message=normalized_message or None,
+                default_reply_parent_message_id=normalized_reply_parent_message_id,
             )
         )

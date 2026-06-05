@@ -63,9 +63,15 @@ def test_action_commands_remove_open_subcommands_and_make_ui_entry_fields_option
 
     liveping_group = _group_command(tree, "liveping")
     assert [command.name for command in liveping_group.commands] == ["add", "remove", "color"]
-    assert _subcommand(liveping_group, "add").parameters == []
-    assert _subcommand(liveping_group, "remove").parameters == []
-    assert _subcommand(liveping_group, "color").parameters == []
+    assert [parameter.name for parameter in _subcommand(liveping_group, "add").parameters] == [
+        "twitch_channel_login",
+        "state",
+    ]
+    assert [parameter.name for parameter in _subcommand(liveping_group, "remove").parameters] == ["ping_id"]
+    assert [parameter.name for parameter in _subcommand(liveping_group, "color").parameters] == ["ping_id", "color"]
+    assert all(not parameter.required for parameter in _subcommand(liveping_group, "add").parameters)
+    assert all(not parameter.required for parameter in _subcommand(liveping_group, "remove").parameters)
+    assert all(not parameter.required for parameter in _subcommand(liveping_group, "color").parameters)
 
     permission_group = _group_command(tree, "permission")
     assert "open" not in {command.name for command in permission_group.commands}

@@ -63,6 +63,14 @@ class MessageRepository:
     ) -> list[RecentMessageRecord]:  # pragma: no cover - interface
         raise NotImplementedError
 
+    async def get_thread_message(
+        self,
+        *,
+        thread_id: int,
+        message_id: str,
+    ) -> RecentMessageRecord | None:  # pragma: no cover - interface
+        raise NotImplementedError
+
 
 class ThreadRepository:
     """Persistence interface for Discord thread/channel configuration roots."""

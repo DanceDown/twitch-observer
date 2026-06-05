@@ -24,6 +24,7 @@ from ..ui_data import (
     PatternPresentation,
     ReplyPresentation,
 )
+from .selects import window_with_included_items
 
 
 def _pattern_label(pattern: PatternPresentation, *, localizer: Localizer, language: str, scope: str) -> str:
@@ -84,6 +85,11 @@ class PatternReplyAddModal(discord.ui.Modal):
         self._discord_channel_id = discord_channel_id
         self._requester_id = requester_id
         self._bound_message = bound_message
+        visible_patterns = window_with_included_items(
+            patterns,
+            key=lambda pattern: pattern.pattern.pattern_id,
+            included_keys=[default_pattern_id] if default_pattern_id is not None else [],
+        )
         self.message = discord.ui.TextInput(
             label=localizer.text("discord.reply_ui.pattern_add.message_label", language=language),
             style=discord.TextStyle.paragraph,
@@ -122,7 +128,7 @@ class PatternReplyAddModal(discord.ui.Modal):
                             ),
                         ),
                     )
-                    for pattern in patterns[:25]
+                    for pattern in visible_patterns
                 ],
                 min_values=1,
                 max_values=1,
@@ -183,6 +189,11 @@ class EventReplyAddModal(discord.ui.Modal):
         self._discord_channel_id = discord_channel_id
         self._requester_id = requester_id
         self._bound_message = bound_message
+        visible_events = window_with_included_items(
+            adapter_events,
+            key=lambda event: event.event.event_id,
+            included_keys=[default_event_id] if default_event_id is not None else [],
+        )
         self.message = discord.ui.TextInput(
             label=localizer.text("discord.reply_ui.event_add.message_label", language=language),
             style=discord.TextStyle.paragraph,
@@ -222,7 +233,7 @@ class EventReplyAddModal(discord.ui.Modal):
                             ).lower(),
                         ),
                     )
-                    for event in adapter_events[:25]
+                    for event in visible_events
                 ],
                 min_values=1,
                 max_values=1,

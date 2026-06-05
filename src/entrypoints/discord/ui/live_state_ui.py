@@ -15,6 +15,7 @@ from ..dispatch import (
 )
 from ..helpers import complete_bound_result
 from ..ui_data import AdapterEventActionPresentation, TrackedChannelPresentation
+from .selects import window_with_included_items
 
 
 class ChannelEventModal(discord.ui.Modal):
@@ -39,6 +40,14 @@ class ChannelEventModal(discord.ui.Modal):
         self._discord_channel_id = discord_channel_id
         self._requester_id = requester_id
         self._bound_message = bound_message
+        included_channel_logins = [
+            channel.login for channel in tracked_channels if channel.user_id == default_channel_id or channel.login == default_channel_id
+        ]
+        visible_channels = window_with_included_items(
+            tracked_channels,
+            key=lambda channel: channel.login,
+            included_keys=included_channel_logins,
+        )
         self.state = discord.ui.Label(
             text=localizer.text("discord.live_state_ui.modal.state_label", language=language),
             description=localizer.text("discord.live_state_ui.modal.state_description", language=language),
@@ -71,7 +80,7 @@ class ChannelEventModal(discord.ui.Modal):
                         description=channel.login[:100],
                         default=channel.user_id == default_channel_id or channel.login == default_channel_id,
                     )
-                    for channel in tracked_channels[:25]
+                    for channel in visible_channels
                 ],
                 min_values=1,
                 max_values=1,
@@ -104,6 +113,7 @@ class ChannelEventActionModal(discord.ui.Modal):
         actions: list[AdapterEventActionPresentation],
         localizer: Localizer,
         language: str,
+        default_notification_value: str | None = None,
         bound_message: discord.InteractionMessage | None = None,
     ) -> None:
         super().__init__(title=title, timeout=300)
@@ -112,6 +122,11 @@ class ChannelEventActionModal(discord.ui.Modal):
         self._requester_id = requester_id
         self._action = action
         self._bound_message = bound_message
+        visible_actions = window_with_included_items(
+            actions,
+            key=lambda item: f"{item.event.event.subject_id}:{item.event.event.event_key}",
+            included_keys=[default_notification_value] if default_notification_value else [],
+        )
         self.notification = discord.ui.Label(
             text=localizer.text("discord.live_state_ui.action.notification_label", language=language),
             description=localizer.text("discord.live_state_ui.action.notification_description", language=language),
@@ -121,8 +136,9 @@ class ChannelEventActionModal(discord.ui.Modal):
                         label=_notification_label(item, localizer=localizer, language=language),
                         value=f"{item.event.event.subject_id}:{item.event.event.event_key}",
                         description=item.event.channel.login[:100],
+                        default=f"{item.event.event.subject_id}:{item.event.event.event_key}" == default_notification_value,
                     )
-                    for item in actions[:25]
+                    for item in visible_actions
                 ],
                 min_values=1,
                 max_values=1,
@@ -157,6 +173,8 @@ class ChannelEventColorModal(discord.ui.Modal):
         actions: list[AdapterEventActionPresentation],
         localizer: Localizer,
         language: str,
+        default_notification_value: str | None = None,
+        default_color: str | None = None,
         bound_message: discord.InteractionMessage | None = None,
     ) -> None:
         super().__init__(title=title, timeout=300)
@@ -164,6 +182,11 @@ class ChannelEventColorModal(discord.ui.Modal):
         self._discord_channel_id = discord_channel_id
         self._requester_id = requester_id
         self._bound_message = bound_message
+        visible_actions = window_with_included_items(
+            actions,
+            key=lambda item: f"{item.event.event.subject_id}:{item.event.event.event_key}",
+            included_keys=[default_notification_value] if default_notification_value else [],
+        )
         self.notification = discord.ui.Label(
             text=localizer.text("discord.live_state_ui.action.notification_label", language=language),
             description=localizer.text("discord.live_state_ui.action.notification_description", language=language),
@@ -173,8 +196,9 @@ class ChannelEventColorModal(discord.ui.Modal):
                         label=_notification_label(item, localizer=localizer, language=language),
                         value=f"{item.event.event.subject_id}:{item.event.event.event_key}",
                         description=item.event.channel.login[:100],
+                        default=f"{item.event.event.subject_id}:{item.event.event.event_key}" == default_notification_value,
                     )
-                    for item in actions[:25]
+                    for item in visible_actions
                 ],
                 min_values=1,
                 max_values=1,
@@ -184,6 +208,7 @@ class ChannelEventColorModal(discord.ui.Modal):
         self.color = discord.ui.TextInput(
             label=localizer.text("discord.live_state_ui.action.color_label", language=language),
             placeholder=localizer.text("discord.live_state_ui.action.color_placeholder", language=language),
+            default=default_color,
             required=False,
             max_length=7,
         )

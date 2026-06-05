@@ -10,6 +10,7 @@ from src.localization import Localizer
 from ..dispatch import dispatch_add_tracked_user, dispatch_remove_tracked_user
 from ..helpers import complete_bound_result
 from ..ui_data import TrackedUserPresentation
+from .selects import window_with_included_items
 
 
 class UserNameModal(discord.ui.Modal):
@@ -68,6 +69,11 @@ class UserSelectionModal(discord.ui.Modal):
         self._discord_channel_id = discord_channel_id
         self._requester_id = requester_id
         self._bound_message = bound_message
+        visible_users = window_with_included_items(
+            tracked_users,
+            key=lambda user: user.login,
+            included_keys=[default_login] if default_login else [],
+        )
         self.user = discord.ui.Label(
             text=localizer.text("discord.user_ui.modal.remove.user_label", language=language),
             component=discord.ui.Select(
@@ -78,7 +84,7 @@ class UserSelectionModal(discord.ui.Modal):
                         description=user.login[:100],
                         default=user.login == default_login,
                     )
-                    for user in tracked_users[:25]
+                    for user in visible_users
                 ],
                 min_values=1,
                 max_values=1,

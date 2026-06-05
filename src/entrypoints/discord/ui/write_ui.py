@@ -13,6 +13,7 @@ from src.services.discord_ui_query_service import TrackedChannelPresentation, Wr
 
 from ..dispatch import dispatch_send_twitch_message
 from ..helpers import send_initial_result
+from .selects import window_with_included_items
 
 _NO_REPLY_VALUE = "__none__"
 
@@ -38,6 +39,9 @@ class WriteModal(discord.ui.Modal):
         reply_candidates: list[WriteReplyCandidatePresentation],
         localizer: Localizer,
         language: str,
+        default_channel_login: str | None = None,
+        default_message: str | None = None,
+        default_reply_parent_message_id: str | None = None,
     ) -> None:
         super().__init__(title=localizer.text("discord.write_ui.modal.title", language=language), timeout=300)
         self._services = services
@@ -48,9 +52,15 @@ class WriteModal(discord.ui.Modal):
         self.message = discord.ui.TextInput(
             label=localizer.text("discord.write_ui.modal.message_label", language=language),
             style=discord.TextStyle.paragraph,
+            default=default_message,
             placeholder=localizer.text("discord.write_ui.modal.message_placeholder", language=language),
             required=True,
             max_length=500,
+        )
+        visible_channels = window_with_included_items(
+            tracked_channels,
+            key=lambda channel: channel.login,
+            included_keys=[default_channel_login] if default_channel_login else [],
         )
         self.channel = discord.ui.Label(
             text=localizer.text("discord.write_ui.modal.channel_label", language=language),
@@ -61,8 +71,9 @@ class WriteModal(discord.ui.Modal):
                         label=channel.display_name[:100],
                         value=channel.login,
                         description=channel.login[:100],
+                        default=channel.login == default_channel_login,
                     )
-                    for channel in tracked_channels[:25]
+                    for channel in visible_channels
                 ],
                 min_values=1,
                 max_values=1,
@@ -72,7 +83,12 @@ class WriteModal(discord.ui.Modal):
             text=localizer.text("discord.write_ui.modal.reply_to_label", language=language),
             description=localizer.text("discord.write_ui.modal.reply_to_description", language=language),
             component=discord.ui.Select(
-                options=self._build_reply_options(reply_candidates, localizer=localizer, language=language),
+                options=self._build_reply_options(
+                    reply_candidates,
+                    localizer=localizer,
+                    language=language,
+                    default_reply_parent_message_id=default_reply_parent_message_id,
+                ),
                 min_values=1,
                 max_values=1,
             ),
@@ -87,15 +103,23 @@ class WriteModal(discord.ui.Modal):
         *,
         localizer: Localizer,
         language: str,
+        default_reply_parent_message_id: str | None,
     ) -> list[discord.SelectOption]:
         options: list[discord.SelectOption] = [
             discord.SelectOption(
                 label=localizer.text("discord.write_ui.modal.reply_to_none_label", language=language)[:100],
                 value=_NO_REPLY_VALUE,
                 description=localizer.text("discord.write_ui.modal.reply_to_none_description", language=language)[:100],
+                default=default_reply_parent_message_id is None,
             )
         ]
-        for candidate in candidates:
+        visible_candidates = window_with_included_items(
+            candidates,
+            key=lambda candidate: candidate.message_id,
+            included_keys=[default_reply_parent_message_id] if default_reply_parent_message_id else [],
+            limit=24,
+        )
+        for candidate in visible_candidates:
             key = candidate.message_id
             if key in self._reply_map:
                 continue
@@ -116,6 +140,7 @@ class WriteModal(discord.ui.Modal):
                     label=label[:100],
                     value=key,
                     description=description[:100],
+                    default=key == default_reply_parent_message_id,
                 )
             )
             if len(options) >= 25:

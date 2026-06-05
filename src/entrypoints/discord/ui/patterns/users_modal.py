@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import discord
 
 from ...ui_data import TrackedUserPresentation
+from ..selects import window_with_included_items
 
 if TYPE_CHECKING:
     from .home import PatternHomeView
@@ -19,6 +20,11 @@ class PatternUsersModal(discord.ui.Modal):
         super().__init__(title=parent.text("discord.pattern_ui.users.title"), timeout=300)
         self._parent_view = parent
         self._tracked_users = tracked_users
+        visible_users = window_with_included_items(
+            tracked_users,
+            key=lambda user: user.login,
+            included_keys=parent.state.selected_users,
+        )
         self.scope = discord.ui.Label(
             text=parent.text("discord.pattern_ui.users.scope_label"),
             component=discord.ui.RadioGroup(
@@ -62,10 +68,10 @@ class PatternUsersModal(discord.ui.Modal):
                         description=user.login[:100],
                         default=user.login in parent.state.selected_users,
                     )
-                    for user in tracked_users[:25]
+                    for user in visible_users
                 ],
                 min_values=1,
-                max_values=min(len(tracked_users), 25),
+                max_values=min(len(visible_users), 25),
                 required=False,
             ),
         )
