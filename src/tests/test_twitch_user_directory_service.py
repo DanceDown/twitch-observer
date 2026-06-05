@@ -175,7 +175,7 @@ async def test_directory_ingests_chat_metadata_without_any_helix_lookup() -> Non
     )
     ingest = TwitchUserDirectoryIngestService(directory=directory)
 
-    ingest.handle_chat_message(
+    await ingest.handle_chat_message(
         TwitchChatMessageEvent(
             channel_login="broadcaster",
             author_login="alice",

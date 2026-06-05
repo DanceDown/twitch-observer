@@ -136,7 +136,7 @@ class AutoReplyService:
                 )
                 continue
             matching_pattern, matching_reply = match
-            self.message_repository.mark_message_matched_in_thread(thread_id=thread.thread_id, event=event)
+            await resolve_awaitable(self.message_repository.mark_message_matched_in_thread(thread_id=thread.thread_id, event=event))
             channel_user = await safe_get_twitch_user_by_id(
                 self.twitch_api,
                 event.broadcaster_id,
@@ -256,10 +256,12 @@ class AutoReplyService:
                             retry_error,
                         )
                 if thread.account_id is not None:
-                    self.account_repository.remove_by_account_id(thread.account_id)
-                    self.thread_repository.set_account_id(
-                        discord_channel_id=thread.discord_channel_id,
-                        account_id=None,
+                    await resolve_awaitable(self.account_repository.remove_by_account_id(thread.account_id))
+                    await resolve_awaitable(
+                        self.thread_repository.set_account_id(
+                            discord_channel_id=thread.discord_channel_id,
+                            account_id=None,
+                        )
                     )
                 logger.warning(
                     "Removed invalid linked Twitch account for thread_id=%s after auth failure. Error: %s",

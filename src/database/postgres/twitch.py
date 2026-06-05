@@ -34,7 +34,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
             return None
         return self._build_account_record(row)
 
-    def create_account(
+    async def create_account(
         self,
         *,
         discord_user_id: int,
@@ -47,8 +47,8 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
         scope: tuple[str, ...],
         token_type: str | None,
     ) -> TwitchAccountRecord:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 INSERT INTO twitch_account (
                     discord_user_id, twitch_user_id, twitch_login, client_id,
@@ -70,11 +70,11 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
                     token_type,
                 ),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         row = require_row(row, operation="twitch_account.create_account")
         return self._build_account_record(row)
 
-    def update_account(
+    async def update_account(
         self,
         *,
         account_id: int,
@@ -87,8 +87,8 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
         scope: tuple[str, ...],
         token_type: str | None,
     ) -> TwitchAccountRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE twitch_account
                 SET twitch_user_id = %s,
@@ -116,14 +116,14 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
                     account_id,
                 ),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return self._build_account_record(row)
 
-    def remove_by_account_id(self, account_id: int) -> bool:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def remove_by_account_id(self, account_id: int) -> bool:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 DELETE FROM twitch_account
                 WHERE account_id = %s
@@ -131,7 +131,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
                 """,
                 (account_id,),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         return row is not None
 
     async def get_by_discord_user_id(self, discord_user_id: int) -> TwitchAccountRecord | None:
@@ -152,7 +152,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
             return None
         return self._build_account_record(row)
 
-    def upsert_account(
+    async def upsert_account(
         self,
         *,
         discord_user_id: int,
@@ -165,9 +165,9 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
         scope: tuple[str, ...],
         token_type: str | None,
     ) -> TwitchAccountRecord:
-        existing = self._get_by_discord_user_id_sync(discord_user_id)
+        existing = await self.get_by_discord_user_id(discord_user_id)
         if existing is None:
-            return self.create_account(
+            return await self.create_account(
                 discord_user_id=discord_user_id,
                 twitch_user_id=twitch_user_id,
                 twitch_login=twitch_login,
@@ -178,7 +178,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
                 scope=scope,
                 token_type=token_type,
             )
-        updated = self.update_account(
+        updated = await self.update_account(
             account_id=existing.account_id,
             twitch_user_id=twitch_user_id,
             twitch_login=twitch_login,
@@ -191,11 +191,11 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
         )
         return require_value(updated, operation="twitch_account.upsert_account")
 
-    def remove_by_discord_user_id(self, discord_user_id: int) -> bool:
-        existing = self._get_by_discord_user_id_sync(discord_user_id)
+    async def remove_by_discord_user_id(self, discord_user_id: int) -> bool:
+        existing = await self.get_by_discord_user_id(discord_user_id)
         if existing is None:
             return False
-        return self.remove_by_account_id(existing.account_id)
+        return await self.remove_by_account_id(existing.account_id)
 
     async def list_accounts(self) -> list[TwitchAccountRecord]:
         async with self.database.read_cursor() as cursor:
@@ -209,24 +209,6 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
             )
             rows = await cursor.fetchall()
         return [self._build_account_record(row) for row in rows]
-
-    def _get_by_discord_user_id_sync(self, discord_user_id: int) -> TwitchAccountRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT account_id, discord_user_id, twitch_user_id, twitch_login, client_id,
-                       access_token, refresh_token, expires_at, scope, token_type
-                FROM twitch_account
-                WHERE discord_user_id = %s
-                ORDER BY updated_at DESC NULLS LAST, account_id DESC
-                LIMIT 1
-                """,
-                (discord_user_id,),
-            )
-            row = cursor.fetchone()
-        if row is None:
-            return None
-        return self._build_account_record(row)
 
     @staticmethod
     def _build_account_record(row: tuple) -> TwitchAccountRecord:
@@ -267,7 +249,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
             return None
         return self._build_record(row)
 
-    def upsert_pending_flow(
+    async def upsert_pending_flow(
         self,
         *,
         discord_user_id: int,
@@ -279,8 +261,8 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
         expires_at: str,
         scope: tuple[str, ...],
     ) -> TwitchDeviceFlowRecord:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 INSERT INTO twitch_device_flow (
                     discord_channel_id, discord_user_id, device_code, user_code, verification_uri,
@@ -314,7 +296,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
                     Jsonb(list(scope)),
                 ),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         row = require_row(row, operation="twitch_device_flow.upsert_pending_flow")
         return self._build_record(row)
 
@@ -332,9 +314,9 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
             rows = await cursor.fetchall()
         return [self._build_record(row) for row in rows]
 
-    def mark_failed(self, *, discord_channel_id: int, last_error: str) -> TwitchDeviceFlowRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def mark_failed(self, *, discord_channel_id: int, last_error: str) -> TwitchDeviceFlowRecord | None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE twitch_device_flow
                 SET status = 'failed',
@@ -346,14 +328,14 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
                 """,
                 (last_error, discord_channel_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return self._build_record(row)
 
-    def touch_polled(self, *, discord_channel_id: int) -> None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def touch_polled(self, *, discord_channel_id: int) -> None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE twitch_device_flow
                 SET last_polled_at = NOW(),
@@ -363,9 +345,9 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
                 (discord_channel_id,),
             )
 
-    def update_interval(self, *, discord_channel_id: int, interval_seconds: int) -> None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def update_interval(self, *, discord_channel_id: int, interval_seconds: int) -> None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE twitch_device_flow
                 SET interval_seconds = %s,
@@ -375,9 +357,9 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
                 (interval_seconds, discord_channel_id),
             )
 
-    def remove_by_discord_channel_id(self, discord_channel_id: int) -> bool:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def remove_by_discord_channel_id(self, discord_channel_id: int) -> bool:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 DELETE FROM twitch_device_flow
                 WHERE discord_channel_id = %s
@@ -385,7 +367,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
                 """,
                 (discord_channel_id,),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         return row is not None
 
     async def get_by_discord_user_id(self, discord_user_id: int) -> TwitchDeviceFlowRecord | None:
@@ -406,29 +388,11 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
             return None
         return self._build_record(row)
 
-    def remove_by_discord_user_id(self, discord_user_id: int) -> bool:
-        existing = self._get_by_discord_user_id_sync(discord_user_id)
+    async def remove_by_discord_user_id(self, discord_user_id: int) -> bool:
+        existing = await self.get_by_discord_user_id(discord_user_id)
         if existing is None:
             return False
-        return self.remove_by_discord_channel_id(existing.discord_channel_id or 0)
-
-    def _get_by_discord_user_id_sync(self, discord_user_id: int) -> TwitchDeviceFlowRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT discord_channel_id, discord_user_id, device_code, user_code, verification_uri, interval_seconds,
-                       expires_at, scope, status, last_error, last_polled_at
-                FROM twitch_device_flow
-                WHERE discord_user_id = %s
-                ORDER BY updated_at DESC, discord_channel_id DESC
-                LIMIT 1
-                """,
-                (discord_user_id,),
-            )
-            row = cursor.fetchone()
-        if row is None:
-            return None
-        return self._build_record(row)
+        return await self.remove_by_discord_channel_id(existing.discord_channel_id or 0)
 
     @staticmethod
     def _build_record(row: tuple) -> TwitchDeviceFlowRecord:
@@ -486,7 +450,7 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
             return None
         return self._build_record(row)
 
-    def upsert_from_api(
+    async def upsert_from_api(
         self,
         *,
         twitch_user_id: str,
@@ -495,15 +459,15 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
         profile_image_url: str | None,
     ) -> TwitchUserCacheRecord:
         normalized_login = twitch_login.strip().lower()
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 DELETE FROM twitch_user_cache
                 WHERE twitch_login = %s AND twitch_user_id <> %s
                 """,
                 (normalized_login, twitch_user_id),
             )
-            cursor.execute(
+            await cursor.execute(
                 """
                 INSERT INTO twitch_user_cache (
                     twitch_user_id,
@@ -536,11 +500,11 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
                     profile_image_url,
                 ),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         row = require_row(row, operation="twitch_user_cache.upsert_from_api")
         return self._build_record(row)
 
-    def observe_from_chat(
+    async def observe_from_chat(
         self,
         *,
         twitch_user_id: str,
@@ -549,15 +513,15 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
     ) -> TwitchUserCacheRecord:
         normalized_login = twitch_login.strip().lower()
         normalized_display_name = (display_name or "").strip() or None
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 DELETE FROM twitch_user_cache
                 WHERE twitch_login = %s AND twitch_user_id <> %s
                 """,
                 (normalized_login, twitch_user_id),
             )
-            cursor.execute(
+            await cursor.execute(
                 """
                 INSERT INTO twitch_user_cache (
                     twitch_user_id,
@@ -589,7 +553,7 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
                     normalized_display_name,
                 ),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         row = require_row(row, operation="twitch_user_cache.observe_from_chat")
         return self._build_record(row)
 
@@ -605,11 +569,11 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
             rows = await cursor.fetchall()
         return [self._build_record(row) for row in rows]
 
-    def upsert_many_from_api(self, records: tuple[tuple[str, str, str, str | None], ...]) -> None:
+    async def upsert_many_from_api(self, records: tuple[tuple[str, str, str, str | None], ...]) -> None:
         if not records:
             return
-        with self.database.transaction() as connection:
-            with connection.cursor() as cursor:
+        async with self.database.async_transaction() as connection:
+            async with connection.cursor() as cursor:
                 deduplicated = {}
                 for twitch_user_id, twitch_login, display_name, profile_image_url in records:
                     deduplicated[twitch_user_id] = (
@@ -619,14 +583,14 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
                         profile_image_url,
                     )
                 normalized_records = tuple(deduplicated.values())
-                cursor.executemany(
+                await cursor.executemany(
                     """
                     DELETE FROM twitch_user_cache
                     WHERE twitch_login = %s AND twitch_user_id <> %s
                     """,
                     [(twitch_login, twitch_user_id) for twitch_user_id, twitch_login, _, _ in normalized_records],
                 )
-                cursor.executemany(
+                await cursor.executemany(
                     """
                     INSERT INTO twitch_user_cache (
                         twitch_user_id,

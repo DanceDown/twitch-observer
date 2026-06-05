@@ -26,7 +26,7 @@ from .records import (
 class MessageRepository:
     """Persistence interface for normalized Twitch chat messages."""
 
-    def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:  # pragma: no cover - interface
+    async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:  # pragma: no cover - interface
         raise NotImplementedError
 
     async def list_recent_messages(
@@ -46,7 +46,7 @@ class MessageRepository:
     ) -> list[RecentMessageRecord]:  # pragma: no cover - interface
         raise NotImplementedError
 
-    def mark_message_matched_in_thread(
+    async def mark_message_matched_in_thread(
         self,
         *,
         thread_id: int,
@@ -81,16 +81,16 @@ class ThreadRepository:
     async def get_by_thread_id(self, thread_id: int) -> ThreadRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def create(self, owner_id: int, discord_channel_id: int) -> ThreadRecord:  # pragma: no cover
+    async def create(self, owner_id: int, discord_channel_id: int) -> ThreadRecord:  # pragma: no cover
         raise NotImplementedError
 
-    def delete_by_discord_channel_id(
+    async def delete_by_discord_channel_id(
         self,
         discord_channel_id: int,
     ) -> ThreadRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def set_enabled(
+    async def set_enabled(
         self,
         *,
         discord_channel_id: int,
@@ -98,7 +98,7 @@ class ThreadRepository:
     ) -> ThreadRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def set_color(
+    async def set_color(
         self,
         *,
         discord_channel_id: int,
@@ -106,7 +106,7 @@ class ThreadRepository:
     ) -> ThreadRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def set_account_id(
+    async def set_account_id(
         self,
         *,
         discord_channel_id: int,
@@ -114,7 +114,7 @@ class ThreadRepository:
     ) -> ThreadRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def set_language(
+    async def set_language(
         self,
         *,
         discord_channel_id: int,
@@ -132,7 +132,7 @@ class TwitchAccountRepository:
     async def get_by_account_id(self, account_id: int) -> TwitchAccountRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def create_account(
+    async def create_account(
         self,
         *,
         discord_user_id: int,
@@ -147,7 +147,7 @@ class TwitchAccountRepository:
     ) -> TwitchAccountRecord:  # pragma: no cover
         raise NotImplementedError
 
-    def update_account(
+    async def update_account(
         self,
         *,
         account_id: int,
@@ -162,7 +162,7 @@ class TwitchAccountRepository:
     ) -> TwitchAccountRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def remove_by_account_id(self, account_id: int) -> bool:  # pragma: no cover
+    async def remove_by_account_id(self, account_id: int) -> bool:  # pragma: no cover
         raise NotImplementedError
 
     async def get_by_discord_user_id(
@@ -171,7 +171,7 @@ class TwitchAccountRepository:
     ) -> TwitchAccountRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def upsert_account(
+    async def upsert_account(
         self,
         *,
         discord_user_id: int,
@@ -186,7 +186,7 @@ class TwitchAccountRepository:
     ) -> TwitchAccountRecord:  # pragma: no cover
         raise NotImplementedError
 
-    def remove_by_discord_user_id(self, discord_user_id: int) -> bool:  # pragma: no cover
+    async def remove_by_discord_user_id(self, discord_user_id: int) -> bool:  # pragma: no cover
         raise NotImplementedError
 
     async def list_accounts(self) -> list[TwitchAccountRecord]:  # pragma: no cover
@@ -202,7 +202,7 @@ class TwitchDeviceFlowRepository:
     ) -> TwitchDeviceFlowRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def upsert_pending_flow(
+    async def upsert_pending_flow(
         self,
         *,
         discord_user_id: int,
@@ -219,7 +219,7 @@ class TwitchDeviceFlowRepository:
     async def list_pending_flows(self) -> list[TwitchDeviceFlowRecord]:  # pragma: no cover
         raise NotImplementedError
 
-    def mark_failed(
+    async def mark_failed(
         self,
         *,
         discord_channel_id: int,
@@ -227,10 +227,10 @@ class TwitchDeviceFlowRepository:
     ) -> TwitchDeviceFlowRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def touch_polled(self, *, discord_channel_id: int) -> None:  # pragma: no cover
+    async def touch_polled(self, *, discord_channel_id: int) -> None:  # pragma: no cover
         raise NotImplementedError
 
-    def update_interval(
+    async def update_interval(
         self,
         *,
         discord_channel_id: int,
@@ -238,7 +238,7 @@ class TwitchDeviceFlowRepository:
     ) -> None:  # pragma: no cover
         raise NotImplementedError
 
-    def remove_by_discord_channel_id(self, discord_channel_id: int) -> bool:  # pragma: no cover
+    async def remove_by_discord_channel_id(self, discord_channel_id: int) -> bool:  # pragma: no cover
         raise NotImplementedError
 
     async def get_by_discord_user_id(
@@ -247,7 +247,7 @@ class TwitchDeviceFlowRepository:
     ) -> TwitchDeviceFlowRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def remove_by_discord_user_id(self, discord_user_id: int) -> bool:  # pragma: no cover
+    async def remove_by_discord_user_id(self, discord_user_id: int) -> bool:  # pragma: no cover
         raise NotImplementedError
 
 
@@ -260,7 +260,7 @@ class TwitchUserCacheRepository:
     async def get_by_login(self, twitch_login: str) -> TwitchUserCacheRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def upsert_from_api(
+    async def upsert_from_api(
         self,
         *,
         twitch_user_id: str,
@@ -270,7 +270,7 @@ class TwitchUserCacheRepository:
     ) -> TwitchUserCacheRecord:  # pragma: no cover
         raise NotImplementedError
 
-    def observe_from_chat(
+    async def observe_from_chat(
         self,
         *,
         twitch_user_id: str,
@@ -282,7 +282,7 @@ class TwitchUserCacheRepository:
     async def list_all(self) -> list[TwitchUserCacheRecord]:  # pragma: no cover
         raise NotImplementedError
 
-    def upsert_many_from_api(self, records: tuple[tuple[str, str, str, str | None], ...]) -> None:  # pragma: no cover
+    async def upsert_many_from_api(self, records: tuple[tuple[str, str, str, str | None], ...]) -> None:  # pragma: no cover
         raise NotImplementedError
 
 
@@ -296,13 +296,13 @@ class ChannelRepository:
     ) -> ChannelRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:  # pragma: no cover
+    async def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:  # pragma: no cover
         raise NotImplementedError
 
-    def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:  # pragma: no cover
+    async def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:  # pragma: no cover
         raise NotImplementedError
 
-    def set_color(
+    async def set_color(
         self,
         *,
         thread_id: int,
@@ -311,7 +311,7 @@ class ChannelRepository:
     ) -> ChannelRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def set_live_state_for_twitch_channel(
+    async def set_live_state_for_twitch_channel(
         self,
         *,
         twitch_channel_id: str,
@@ -346,10 +346,10 @@ class TrackedUserRepository:
     ) -> TrackedUserRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def add_user(self, thread_id: int, twitch_user_id: str) -> None:  # pragma: no cover
+    async def add_user(self, thread_id: int, twitch_user_id: str) -> None:  # pragma: no cover
         raise NotImplementedError
 
-    def remove_user(self, thread_id: int, twitch_user_id: str) -> None:  # pragma: no cover
+    async def remove_user(self, thread_id: int, twitch_user_id: str) -> None:  # pragma: no cover
         raise NotImplementedError
 
     async def list_users_for_thread(self, thread_id: int) -> list[TrackedUserRecord]:  # pragma: no cover
@@ -383,7 +383,7 @@ class PatternRepository:
     ) -> PatternRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def add_pattern(
+    async def add_pattern(
         self,
         *,
         thread_id: int,
@@ -402,10 +402,10 @@ class PatternRepository:
     ) -> PatternRecord:  # pragma: no cover
         raise NotImplementedError
 
-    def remove_pattern(self, *, thread_id: int, pattern_id: int) -> None:  # pragma: no cover
+    async def remove_pattern(self, *, thread_id: int, pattern_id: int) -> None:  # pragma: no cover
         raise NotImplementedError
 
-    def set_pattern_disabled(
+    async def set_pattern_disabled(
         self,
         *,
         thread_id: int,
@@ -414,7 +414,7 @@ class PatternRepository:
     ) -> PatternRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def set_pattern_priority(
+    async def set_pattern_priority(
         self,
         *,
         thread_id: int,
@@ -423,7 +423,7 @@ class PatternRepository:
     ) -> PatternRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def update_pattern(
+    async def update_pattern(
         self,
         *,
         thread_id: int,
@@ -476,7 +476,7 @@ class ReplyRepository:
     async def get_by_pattern(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def add_reply(
+    async def add_reply(
         self,
         *,
         thread_id: int,
@@ -486,10 +486,10 @@ class ReplyRepository:
     ) -> ReplyRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def remove_reply(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:  # pragma: no cover
+    async def remove_reply(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def set_reply_disabled(
+    async def set_reply_disabled(
         self,
         *,
         thread_id: int,
@@ -506,17 +506,17 @@ class ReplyRepository:
     ) -> list[ReplyRecord]:  # pragma: no cover
         raise NotImplementedError
 
-    def disable_replies_for_thread(self, thread_id: int) -> int:  # pragma: no cover
+    async def disable_replies_for_thread(self, thread_id: int) -> int:  # pragma: no cover
         raise NotImplementedError
 
-    def enable_replies_for_thread(self, thread_id: int) -> int:  # pragma: no cover
+    async def enable_replies_for_thread(self, thread_id: int) -> int:  # pragma: no cover
         raise NotImplementedError
 
 
 class AdapterEventRepository:
     """Persistence interface for external adapter event triggers."""
 
-    def upsert_event(
+    async def upsert_event(
         self,
         *,
         thread_id: int,
@@ -561,7 +561,7 @@ class AdapterEventRepository:
 class AdapterEventActionRepository:
     """Persistence interface for follow-up actions on external adapter events."""
 
-    def upsert_action(
+    async def upsert_action(
         self,
         *,
         event_id: int,
@@ -579,7 +579,7 @@ class AdapterEventActionRepository:
     ) -> AdapterEventActionRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def remove_action(
+    async def remove_action(
         self,
         *,
         event_id: int,
@@ -587,7 +587,7 @@ class AdapterEventActionRepository:
     ) -> AdapterEventActionRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def set_action_disabled(
+    async def set_action_disabled(
         self,
         *,
         event_id: int,
@@ -596,7 +596,7 @@ class AdapterEventActionRepository:
     ) -> AdapterEventActionRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def set_action_color(
+    async def set_action_color(
         self,
         *,
         event_id: int,
@@ -633,7 +633,7 @@ class UserPermissionRepository:
     ) -> UserPermissionRecord | None:  # pragma: no cover
         raise NotImplementedError
 
-    def upsert_permissions(
+    async def upsert_permissions(
         self,
         *,
         discord_user_id: int,
@@ -642,7 +642,7 @@ class UserPermissionRepository:
     ) -> UserPermissionRecord:  # pragma: no cover
         raise NotImplementedError
 
-    def remove_by_user_and_thread(
+    async def remove_by_user_and_thread(
         self,
         *,
         discord_user_id: int,

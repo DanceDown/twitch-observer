@@ -71,7 +71,7 @@ class PostgresPatternRepository(PatternRepository):
                 return pattern
         return None
 
-    def add_pattern(
+    async def add_pattern(
         self,
         *,
         thread_id: int,
@@ -88,9 +88,9 @@ class PostgresPatternRepository(PatternRepository):
         disabled: bool,
         priority: int,
     ) -> PatternRecord:
-        with self.database.transaction() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
+        async with self.database.async_transaction() as connection:
+            async with connection.cursor() as cursor:
+                await cursor.execute(
                     """
                     INSERT INTO pattern (
                         thread_id, regex, channel_scope_mode, user_scope_mode,
@@ -116,10 +116,10 @@ class PostgresPatternRepository(PatternRepository):
                         priority,
                     ),
                 )
-                row = require_row(cursor.fetchone(), operation="pattern.add_pattern")
+                row = require_row(await cursor.fetchone(), operation="pattern.add_pattern")
                 persisted_pattern_id = int(row[1])
                 if channel_scope_ids:
-                    cursor.executemany(
+                    await cursor.executemany(
                         """
                         INSERT INTO pattern_channel_scope (thread_id, pattern_id, twitch_channel_id)
                         VALUES (%s, %s, %s)
@@ -127,7 +127,7 @@ class PostgresPatternRepository(PatternRepository):
                         [(thread_id, persisted_pattern_id, twitch_channel_id) for twitch_channel_id in channel_scope_ids],
                     )
                 if user_scope_ids:
-                    cursor.executemany(
+                    await cursor.executemany(
                         """
                         INSERT INTO pattern_user_scope (thread_id, pattern_id, twitch_user_id)
                         VALUES (%s, %s, %s)
@@ -140,9 +140,9 @@ class PostgresPatternRepository(PatternRepository):
             user_scope_ids=tuple(sorted(user_scope_ids)),
         )
 
-    def remove_pattern(self, *, thread_id: int, pattern_id: int) -> None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def remove_pattern(self, *, thread_id: int, pattern_id: int) -> None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 DELETE FROM pattern
                 WHERE thread_id = %s AND pattern_id = %s
@@ -150,9 +150,9 @@ class PostgresPatternRepository(PatternRepository):
                 (thread_id, pattern_id),
             )
 
-    def set_pattern_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool) -> PatternRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def set_pattern_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool) -> PatternRecord | None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE pattern
                 SET disabled = %s
@@ -163,18 +163,19 @@ class PostgresPatternRepository(PatternRepository):
                 """,
                 (disabled, thread_id, pattern_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
+        channel_scope_map, user_scope_map = await self._load_scope_maps(thread_id=thread_id, pattern_ids=(pattern_id,))
         return self._build_pattern_record(
             row,
-            channel_scope_ids=self._load_channel_scope_ids(thread_id=thread_id, pattern_id=pattern_id),
-            user_scope_ids=self._load_user_scope_ids(thread_id=thread_id, pattern_id=pattern_id),
+            channel_scope_ids=channel_scope_map.get(pattern_id, ()),
+            user_scope_ids=user_scope_map.get(pattern_id, ()),
         )
 
-    def set_pattern_priority(self, *, thread_id: int, pattern_id: int, priority: int) -> PatternRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def set_pattern_priority(self, *, thread_id: int, pattern_id: int, priority: int) -> PatternRecord | None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE pattern
                 SET priority = %s
@@ -185,16 +186,17 @@ class PostgresPatternRepository(PatternRepository):
                 """,
                 (priority, thread_id, pattern_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
+        channel_scope_map, user_scope_map = await self._load_scope_maps(thread_id=thread_id, pattern_ids=(pattern_id,))
         return self._build_pattern_record(
             row,
-            channel_scope_ids=self._load_channel_scope_ids(thread_id=thread_id, pattern_id=pattern_id),
-            user_scope_ids=self._load_user_scope_ids(thread_id=thread_id, pattern_id=pattern_id),
+            channel_scope_ids=channel_scope_map.get(pattern_id, ()),
+            user_scope_ids=user_scope_map.get(pattern_id, ()),
         )
 
-    def update_pattern(
+    async def update_pattern(
         self,
         *,
         thread_id: int,
@@ -211,8 +213,8 @@ class PostgresPatternRepository(PatternRepository):
         color: str | None,
         priority: int,
     ) -> PatternRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE pattern
                 SET regex = %s,
@@ -243,10 +245,10 @@ class PostgresPatternRepository(PatternRepository):
                     pattern_id,
                 ),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
             if row is None:
                 return None
-            cursor.execute(
+            await cursor.execute(
                 """
                 DELETE FROM pattern_channel_scope
                 WHERE thread_id = %s AND pattern_id = %s
@@ -254,14 +256,14 @@ class PostgresPatternRepository(PatternRepository):
                 (thread_id, pattern_id),
             )
             if channel_scope_ids:
-                cursor.executemany(
+                await cursor.executemany(
                     """
                     INSERT INTO pattern_channel_scope (thread_id, pattern_id, twitch_channel_id)
                     VALUES (%s, %s, %s)
                     """,
                     [(thread_id, pattern_id, twitch_channel_id) for twitch_channel_id in channel_scope_ids],
                 )
-            cursor.execute(
+            await cursor.execute(
                 """
                 DELETE FROM pattern_user_scope
                 WHERE thread_id = %s AND pattern_id = %s
@@ -269,7 +271,7 @@ class PostgresPatternRepository(PatternRepository):
                 (thread_id, pattern_id),
             )
             if user_scope_ids:
-                cursor.executemany(
+                await cursor.executemany(
                     """
                     INSERT INTO pattern_user_scope (thread_id, pattern_id, twitch_user_id)
                     VALUES (%s, %s, %s)
@@ -423,34 +425,6 @@ class PostgresPatternRepository(PatternRepository):
         for row in rows:
             scope_map[int(row[0])].append(str(row[1]))
         return {pattern_id: tuple(values) for pattern_id, values in scope_map.items()}
-
-    def _load_channel_scope_ids(self, *, thread_id: int, pattern_id: int) -> tuple[str, ...]:
-        with self.database.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT twitch_channel_id
-                FROM pattern_channel_scope
-                WHERE thread_id = %s AND pattern_id = %s
-                ORDER BY twitch_channel_id
-                """,
-                (thread_id, pattern_id),
-            )
-            rows = cursor.fetchall()
-        return tuple(str(row[0]) for row in rows)
-
-    def _load_user_scope_ids(self, *, thread_id: int, pattern_id: int) -> tuple[str, ...]:
-        with self.database.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT twitch_user_id
-                FROM pattern_user_scope
-                WHERE thread_id = %s AND pattern_id = %s
-                ORDER BY twitch_user_id
-                """,
-                (thread_id, pattern_id),
-            )
-            rows = cursor.fetchall()
-        return tuple(str(row[0]) for row in rows)
 
     @staticmethod
     def _build_pattern_record(

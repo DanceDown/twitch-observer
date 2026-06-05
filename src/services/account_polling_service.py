@@ -46,9 +46,11 @@ class DeviceFlowPollProcessor:
     ) -> None:
         """Process one pending flow if it is due and still valid."""
         if self._is_expired(pending, now):
-            self.device_flow_repository.mark_failed(
-                discord_channel_id=pending.discord_channel_id or 0,
-                last_error="The Twitch login code expired before it was confirmed.",
+            await resolve_awaitable(
+                self.device_flow_repository.mark_failed(
+                    discord_channel_id=pending.discord_channel_id or 0,
+                    last_error="The Twitch login code expired before it was confirmed.",
+                )
             )
             await notify(
                 pending.discord_user_id,
@@ -65,7 +67,7 @@ class DeviceFlowPollProcessor:
         if not self._is_due_for_poll(pending, now):
             return
 
-        self.device_flow_repository.touch_polled(discord_channel_id=pending.discord_channel_id or 0)
+        await resolve_awaitable(self.device_flow_repository.touch_polled(discord_channel_id=pending.discord_channel_id or 0))
         result = await self.twitch_api.poll_device_code_flow(
             device_code=pending.device_code,
             scopes=pending.scope,
@@ -73,15 +75,19 @@ class DeviceFlowPollProcessor:
         if result.status == "pending":
             return
         if result.status == "slow_down":
-            self.device_flow_repository.update_interval(
-                discord_channel_id=pending.discord_channel_id or 0,
-                interval_seconds=pending.interval_seconds + int(result.interval or 0),
+            await resolve_awaitable(
+                self.device_flow_repository.update_interval(
+                    discord_channel_id=pending.discord_channel_id or 0,
+                    interval_seconds=pending.interval_seconds + int(result.interval or 0),
+                )
             )
             return
         if result.status == "failed":
-            self.device_flow_repository.mark_failed(
-                discord_channel_id=pending.discord_channel_id or 0,
-                last_error=result.error_message or "The Twitch login was denied or expired.",
+            await resolve_awaitable(
+                self.device_flow_repository.mark_failed(
+                    discord_channel_id=pending.discord_channel_id or 0,
+                    last_error=result.error_message or "The Twitch login was denied or expired.",
+                )
             )
             await notify(
                 pending.discord_user_id,
@@ -99,9 +105,11 @@ class DeviceFlowPollProcessor:
 
         validated = await self.twitch_api.validate_user_access_token(result.token_bundle.access_token)
         if "user:write:chat" not in validated.scopes:
-            self.device_flow_repository.mark_failed(
-                discord_channel_id=pending.discord_channel_id or 0,
-                last_error="The linked Twitch token is missing `user:write:chat`.",
+            await resolve_awaitable(
+                self.device_flow_repository.mark_failed(
+                    discord_channel_id=pending.discord_channel_id or 0,
+                    last_error="The linked Twitch token is missing `user:write:chat`.",
+                )
             )
             await notify(
                 pending.discord_user_id,
@@ -122,31 +130,37 @@ class DeviceFlowPollProcessor:
             else None
         )
         if thread is None:
-            self.device_flow_repository.mark_failed(
-                discord_channel_id=pending.discord_channel_id or 0,
-                last_error="The Discord channel is no longer joined.",
+            await resolve_awaitable(
+                self.device_flow_repository.mark_failed(
+                    discord_channel_id=pending.discord_channel_id or 0,
+                    last_error="The Discord channel is no longer joined.",
+                )
             )
             return
 
         if thread.account_id is not None:
-            self.account_repository.remove_by_account_id(thread.account_id)
+            await resolve_awaitable(self.account_repository.remove_by_account_id(thread.account_id))
 
-        stored = self.account_repository.create_account(
-            discord_user_id=pending.discord_user_id,
-            twitch_user_id=validated.user_id,
-            twitch_login=validated.login,
-            client_id=validated.client_id,
-            access_token=result.token_bundle.access_token,
-            refresh_token=result.token_bundle.refresh_token,
-            expires_at=expires_at,
-            scope=result.token_bundle.scope,
-            token_type=result.token_bundle.token_type,
+        stored = await resolve_awaitable(
+            self.account_repository.create_account(
+                discord_user_id=pending.discord_user_id,
+                twitch_user_id=validated.user_id,
+                twitch_login=validated.login,
+                client_id=validated.client_id,
+                access_token=result.token_bundle.access_token,
+                refresh_token=result.token_bundle.refresh_token,
+                expires_at=expires_at,
+                scope=result.token_bundle.scope,
+                token_type=result.token_bundle.token_type,
+            )
         )
-        self.thread_repository.set_account_id(
-            discord_channel_id=thread.discord_channel_id,
-            account_id=stored.account_id,
+        await resolve_awaitable(
+            self.thread_repository.set_account_id(
+                discord_channel_id=thread.discord_channel_id,
+                account_id=stored.account_id,
+            )
         )
-        self.device_flow_repository.remove_by_discord_channel_id(thread.discord_channel_id)
+        await resolve_awaitable(self.device_flow_repository.remove_by_discord_channel_id(thread.discord_channel_id))
         await notify(
             pending.discord_user_id,
             self._result_for_thread(
@@ -267,7 +281,7 @@ class DeviceFlowPollingService:
         """Remove a broken linked account but keep configured auto-replies intact."""
         account = await resolve_awaitable(self.account_repository.get_by_discord_user_id(discord_user_id))
         if account is not None:
-            self.account_repository.remove_by_account_id(account.account_id)
+            await resolve_awaitable(self.account_repository.remove_by_account_id(account.account_id))
 
     async def _notify(self, discord_user_id: int, result: DiscordCommandResult, discord_channel_id: int | None) -> None:
         await self.notifier.send_account_result(discord_user_id, discord_channel_id, result)

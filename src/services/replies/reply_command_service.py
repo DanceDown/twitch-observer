@@ -198,11 +198,13 @@ class ReplyCommandService:
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 )
-            created = self.reply_repository.add_reply(
-                thread_id=thread.thread_id,
-                pattern_id=pattern.pattern_id,
-                reply_message=message,
-                reply_as_reply=command.reply_as_reply,
+            created = await resolve_awaitable(
+                self.reply_repository.add_reply(
+                    thread_id=thread.thread_id,
+                    pattern_id=pattern.pattern_id,
+                    reply_message=message,
+                    reply_as_reply=command.reply_as_reply,
+                )
             )
             if created is None:
                 raise RuntimeError("Reply repository returned no row for add_reply.")
@@ -234,7 +236,7 @@ class ReplyCommandService:
             )
 
         if action == "remove":
-            cleared = self.reply_repository.remove_reply(thread_id=thread.thread_id, pattern_id=pattern.pattern_id)
+            cleared = await resolve_awaitable(self.reply_repository.remove_reply(thread_id=thread.thread_id, pattern_id=pattern.pattern_id))
             if cleared is None:
                 raise RuntimeError("Reply repository returned no row for remove_reply.")
             return build_thread_result(
@@ -257,10 +259,12 @@ class ReplyCommandService:
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
-            disabled_reply = self.reply_repository.set_reply_disabled(
-                thread_id=thread.thread_id,
-                pattern_id=pattern.pattern_id,
-                disabled=True,
+            disabled_reply = await resolve_awaitable(
+                self.reply_repository.set_reply_disabled(
+                    thread_id=thread.thread_id,
+                    pattern_id=pattern.pattern_id,
+                    disabled=True,
+                )
             )
             if disabled_reply is None:
                 raise RuntimeError("Reply repository returned no row for disable pattern reply.")
@@ -284,10 +288,12 @@ class ReplyCommandService:
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
-            enabled_reply = self.reply_repository.set_reply_disabled(
-                thread_id=thread.thread_id,
-                pattern_id=pattern.pattern_id,
-                disabled=False,
+            enabled_reply = await resolve_awaitable(
+                self.reply_repository.set_reply_disabled(
+                    thread_id=thread.thread_id,
+                    pattern_id=pattern.pattern_id,
+                    disabled=False,
+                )
             )
             if enabled_reply is None:
                 raise RuntimeError("Reply repository returned no row for enable pattern reply.")
@@ -387,11 +393,13 @@ class ReplyCommandService:
                 raise ValueError(self.localizer.text("results.reply.event_add_empty_message", language=thread.language))
             if len(message) > 500:
                 raise ValueError(self.localizer.text("results.reply.event_add_message_too_long", language=thread.language))
-            created = event_configuration.adapter_event_action_repository.upsert_action(
-                event_id=adapter_event.event_id,
-                action_type=TWITCH_SEND_MESSAGE_ACTION,
-                message_template=message,
-                reply_as_reply=False,
+            created = await resolve_awaitable(
+                event_configuration.adapter_event_action_repository.upsert_action(
+                    event_id=adapter_event.event_id,
+                    action_type=TWITCH_SEND_MESSAGE_ACTION,
+                    message_template=message,
+                    reply_as_reply=False,
+                )
             )
             return build_thread_result(
                 self.localizer,
@@ -416,9 +424,11 @@ class ReplyCommandService:
             )
 
         if action == "remove":
-            removed = event_configuration.adapter_event_action_repository.remove_action(
-                event_id=adapter_event.event_id,
-                action_type=TWITCH_SEND_MESSAGE_ACTION,
+            removed = await resolve_awaitable(
+                event_configuration.adapter_event_action_repository.remove_action(
+                    event_id=adapter_event.event_id,
+                    action_type=TWITCH_SEND_MESSAGE_ACTION,
+                )
             )
             if removed is None:
                 raise RuntimeError("Reply repository returned no row for remove adapter-event action.")
@@ -444,10 +454,12 @@ class ReplyCommandService:
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
-            disabled_reply = event_configuration.adapter_event_action_repository.set_action_disabled(
-                event_id=adapter_event.event_id,
-                action_type=TWITCH_SEND_MESSAGE_ACTION,
-                disabled=True,
+            disabled_reply = await resolve_awaitable(
+                event_configuration.adapter_event_action_repository.set_action_disabled(
+                    event_id=adapter_event.event_id,
+                    action_type=TWITCH_SEND_MESSAGE_ACTION,
+                    disabled=True,
+                )
             )
             if disabled_reply is None:
                 raise RuntimeError("Reply repository returned no row for disable adapter-event action.")
@@ -473,10 +485,12 @@ class ReplyCommandService:
                     style=DiscordResultStyle.INFO,
                     ephemeral=True,
                 )
-            enabled_reply = event_configuration.adapter_event_action_repository.set_action_disabled(
-                event_id=adapter_event.event_id,
-                action_type=TWITCH_SEND_MESSAGE_ACTION,
-                disabled=False,
+            enabled_reply = await resolve_awaitable(
+                event_configuration.adapter_event_action_repository.set_action_disabled(
+                    event_id=adapter_event.event_id,
+                    action_type=TWITCH_SEND_MESSAGE_ACTION,
+                    disabled=False,
+                )
             )
             if enabled_reply is None:
                 raise RuntimeError("Reply repository returned no row for enable adapter-event action.")

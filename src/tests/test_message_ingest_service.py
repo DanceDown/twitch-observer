@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from random import seed
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 
 import pytest
 
@@ -95,7 +95,7 @@ class FakePresenceNotifier(DiscordPresenceStatusSender):
 class RecordingCursor:
     statements: list[tuple[str, tuple[object, ...]]] = field(default_factory=list)
 
-    def execute(self, query: str, params: tuple[object, ...]) -> None:
+    async def execute(self, query: str, params: tuple[object, ...]) -> None:
         self.statements.append((query, params))
 
 
@@ -103,8 +103,8 @@ class RecordingCursor:
 class RecordingDatabase:
     cursor_instance: RecordingCursor = field(default_factory=RecordingCursor)
 
-    @contextmanager
-    def cursor(self) -> RecordingCursor:
+    @asynccontextmanager
+    async def async_cursor(self) -> RecordingCursor:
         yield self.cursor_instance
 
 
@@ -114,7 +114,7 @@ async def test_message_ingest_service_registers_and_persists_messages() -> None:
     service = MessageIngestService(message_repository=repository)
 
     event = TwitchChatMessageEvent(channel_login="channel", author_login="bob", content="hey")
-    service.handle_chat_message(event)
+    await service.handle_chat_message(event)
 
     assert repository.messages == [event]
     assert service.handled_messages == 1
@@ -136,7 +136,7 @@ async def test_presence_service_uses_recent_message_as_status() -> None:
 
     event = TwitchChatMessageEvent(channel_login="channel", author_login="bob", author_display_name="Bob", content="A tracked message")
 
-    ingest_service.handle_chat_message(event)
+    await ingest_service.handle_chat_message(event)
     seed(1)
     await service.poll_once()
 
@@ -162,7 +162,8 @@ async def test_presence_service_keeps_current_status_when_no_recent_message_exis
     assert notifier.statuses == ["old status"]
 
 
-def test_postgres_message_repository_uses_null_reply_reference_when_parent_is_missing() -> None:
+@pytest.mark.asyncio
+async def test_postgres_message_repository_uses_null_reply_reference_when_parent_is_missing() -> None:
     database = RecordingDatabase()
     repository = PostgresMessageRepository(database=database)  # type: ignore[arg-type]
     event = TwitchChatMessageEvent(
@@ -176,7 +177,7 @@ def test_postgres_message_repository_uses_null_reply_reference_when_parent_is_mi
         content="reply body",
     )
 
-    repository.save_twitch_message(event)
+    await repository.save_twitch_message(event)
 
     assert len(database.cursor_instance.statements) == 1
     query, params = database.cursor_instance.statements[0]
@@ -229,8 +230,8 @@ async def test_write_query_service_only_returns_messages_matched_in_thread() -> 
         content="unrelated text",
     )
 
-    ingest_service.handle_chat_message(matched_event)
-    ingest_service.handle_chat_message(unrelated_event)
+    await ingest_service.handle_chat_message(matched_event)
+    await ingest_service.handle_chat_message(unrelated_event)
     repository.mark_message_matched_in_thread(thread_id=7, event=matched_event)
 
     candidates = await query_service.list_recent_reply_candidates(

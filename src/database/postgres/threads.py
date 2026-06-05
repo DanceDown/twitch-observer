@@ -88,9 +88,9 @@ class PostgresThreadRepository(ThreadRepository):
             account_id=row[6],
         )
 
-    def create(self, owner_id: int, discord_channel_id: int) -> ThreadRecord:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def create(self, owner_id: int, discord_channel_id: int) -> ThreadRecord:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 INSERT INTO thread (owner_id, discord_channel_id)
                 VALUES (%s, %s)
@@ -98,7 +98,7 @@ class PostgresThreadRepository(ThreadRepository):
                 """,
                 (owner_id, discord_channel_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         row = require_row(row, operation="thread.create")
         return ThreadRecord(
             thread_id=row[0],
@@ -110,9 +110,9 @@ class PostgresThreadRepository(ThreadRepository):
             account_id=row[6],
         )
 
-    def delete_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def delete_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 DELETE FROM thread
                 WHERE discord_channel_id = %s
@@ -120,7 +120,7 @@ class PostgresThreadRepository(ThreadRepository):
                 """,
                 (discord_channel_id,),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return ThreadRecord(
@@ -133,9 +133,9 @@ class PostgresThreadRepository(ThreadRepository):
             account_id=row[6],
         )
 
-    def set_enabled(self, *, discord_channel_id: int, enabled: bool) -> ThreadRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def set_enabled(self, *, discord_channel_id: int, enabled: bool) -> ThreadRecord | None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE thread
                 SET enabled = %s
@@ -144,7 +144,7 @@ class PostgresThreadRepository(ThreadRepository):
                 """,
                 (enabled, discord_channel_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return ThreadRecord(
@@ -157,9 +157,9 @@ class PostgresThreadRepository(ThreadRepository):
             account_id=row[6],
         )
 
-    def set_color(self, *, discord_channel_id: int, color: str | None) -> ThreadRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def set_color(self, *, discord_channel_id: int, color: str | None) -> ThreadRecord | None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE thread
                 SET color = %s
@@ -168,7 +168,7 @@ class PostgresThreadRepository(ThreadRepository):
                 """,
                 (color, discord_channel_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return ThreadRecord(
@@ -181,9 +181,9 @@ class PostgresThreadRepository(ThreadRepository):
             account_id=row[6],
         )
 
-    def set_account_id(self, *, discord_channel_id: int, account_id: int | None) -> ThreadRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def set_account_id(self, *, discord_channel_id: int, account_id: int | None) -> ThreadRecord | None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE thread
                 SET account_id = %s
@@ -192,7 +192,7 @@ class PostgresThreadRepository(ThreadRepository):
                 """,
                 (account_id, discord_channel_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return ThreadRecord(
@@ -205,9 +205,9 @@ class PostgresThreadRepository(ThreadRepository):
             account_id=row[6],
         )
 
-    def set_language(self, *, discord_channel_id: int, language: str) -> ThreadRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def set_language(self, *, discord_channel_id: int, language: str) -> ThreadRecord | None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE thread
                 SET language = %s
@@ -216,7 +216,7 @@ class PostgresThreadRepository(ThreadRepository):
                 """,
                 (language, discord_channel_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return ThreadRecord(
@@ -257,9 +257,9 @@ class PostgresChannelRepository(ChannelRepository):
             last_live_status_at=row[4].isoformat() if row[4] is not None else None,
         )
 
-    def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 INSERT INTO channel (thread_id, twitch_channel_id)
                 VALUES (%s, %s)
@@ -268,9 +268,9 @@ class PostgresChannelRepository(ChannelRepository):
                 (thread_id, twitch_channel_id),
             )
 
-    def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 DELETE FROM channel
                 WHERE thread_id = %s AND twitch_channel_id = %s
@@ -278,9 +278,9 @@ class PostgresChannelRepository(ChannelRepository):
                 (thread_id, twitch_channel_id),
             )
 
-    def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE channel
                 SET color = %s
@@ -289,7 +289,7 @@ class PostgresChannelRepository(ChannelRepository):
                 """,
                 (color, thread_id, twitch_channel_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return ChannelRecord(
@@ -300,7 +300,7 @@ class PostgresChannelRepository(ChannelRepository):
             last_live_status_at=row[4].isoformat() if row[4] is not None else None,
         )
 
-    def set_live_state_for_twitch_channel(
+    async def set_live_state_for_twitch_channel(
         self,
         *,
         twitch_channel_id: str,
@@ -308,8 +308,8 @@ class PostgresChannelRepository(ChannelRepository):
         changed_at: str | None,
     ) -> int:
         effective_changed_at = datetime.fromisoformat(changed_at) if changed_at is not None else datetime.now(UTC)
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE channel
                 SET is_live = %s,
@@ -426,9 +426,9 @@ class PostgresTrackedUserRepository(TrackedUserRepository):
             return None
         return TrackedUserRecord(thread_id=row[0], twitch_user_id=row[1])
 
-    def add_user(self, thread_id: int, twitch_user_id: str) -> None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def add_user(self, thread_id: int, twitch_user_id: str) -> None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 INSERT INTO tracked_user (thread_id, twitch_user_id)
                 VALUES (%s, %s)
@@ -437,9 +437,9 @@ class PostgresTrackedUserRepository(TrackedUserRepository):
                 (thread_id, twitch_user_id),
             )
 
-    def remove_user(self, thread_id: int, twitch_user_id: str) -> None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def remove_user(self, thread_id: int, twitch_user_id: str) -> None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 DELETE FROM tracked_user
                 WHERE thread_id = %s AND twitch_user_id = %s

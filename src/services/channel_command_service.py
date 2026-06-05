@@ -102,7 +102,7 @@ class ChannelCommandService:
         if is_first_subscription:
             await self.irc_gateway.ensure_connected()
             await self.irc_gateway.join_channel(twitch_user.login)
-        self.channel_repository.add_channel(thread.thread_id, twitch_user.user_id)
+        await resolve_awaitable(self.channel_repository.add_channel(thread.thread_id, twitch_user.user_id))
         logger.debug(
             "Added tracked channel thread_id=%s twitch_channel_id=%s twitch_login=%s",
             thread.thread_id,
@@ -141,10 +141,12 @@ class ChannelCommandService:
 
         normalized_color = normalize_optional_color(command.color)
         if normalized_color is None:
-            updated = self.channel_repository.set_color(
-                thread_id=thread.thread_id,
-                twitch_channel_id=twitch_user.user_id,
-                color=None,
+            updated = await resolve_awaitable(
+                self.channel_repository.set_color(
+                    thread_id=thread.thread_id,
+                    twitch_channel_id=twitch_user.user_id,
+                    color=None,
+                )
             )
             if updated is None:
                 raise ApplicationInvariantError("Tracked channel color clear returned no row.")
@@ -158,10 +160,12 @@ class ChannelCommandService:
                 LOGIN=twitch_user.login,
                 USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
             )
-        updated = self.channel_repository.set_color(
-            thread_id=thread.thread_id,
-            twitch_channel_id=twitch_user.user_id,
-            color=normalized_color,
+        updated = await resolve_awaitable(
+            self.channel_repository.set_color(
+                thread_id=thread.thread_id,
+                twitch_channel_id=twitch_user.user_id,
+                color=normalized_color,
+            )
         )
         if updated is None:
             raise ApplicationInvariantError("Tracked channel color update returned no row.")
@@ -218,7 +222,7 @@ class ChannelCommandService:
         if is_last_subscription:
             await self.irc_gateway.ensure_connected()
             await self.irc_gateway.leave_channel(twitch_user.login)
-        self.channel_repository.remove_channel(thread.thread_id, twitch_user.user_id)
+        await resolve_awaitable(self.channel_repository.remove_channel(thread.thread_id, twitch_user.user_id))
         logger.debug(
             "Removed tracked channel thread_id=%s twitch_channel_id=%s twitch_login=%s",
             thread.thread_id,

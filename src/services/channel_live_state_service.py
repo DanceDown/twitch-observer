@@ -126,12 +126,14 @@ class ChannelEventCommandService:
         channel_display_name: str,
         channel_login: str,
     ) -> DiscordCommandResult:
-        adapter_event = self.adapter_event_repository.upsert_event(
-            thread_id=thread.thread_id,
-            adapter_key=TWITCH_ADAPTER_KEY,
-            subject_type=CHANNEL_SUBJECT_TYPE,
-            subject_id=command.twitch_channel_id,
-            event_key=command.event_kind.value,
+        adapter_event = await resolve_awaitable(
+            self.adapter_event_repository.upsert_event(
+                thread_id=thread.thread_id,
+                adapter_key=TWITCH_ADAPTER_KEY,
+                subject_type=CHANNEL_SUBJECT_TYPE,
+                subject_id=command.twitch_channel_id,
+                event_key=command.event_kind.value,
+            )
         )
         existing_action = await resolve_awaitable(
             self.adapter_event_action_repository.get_action(
@@ -139,11 +141,13 @@ class ChannelEventCommandService:
                 action_type=DISCORD_NOTIFY_ACTION,
             )
         )
-        action = self.adapter_event_action_repository.upsert_action(
-            event_id=adapter_event.event_id,
-            action_type=DISCORD_NOTIFY_ACTION,
-            message_template=None,
-            reply_as_reply=False,
+        action = await resolve_awaitable(
+            self.adapter_event_action_repository.upsert_action(
+                event_id=adapter_event.event_id,
+                action_type=DISCORD_NOTIFY_ACTION,
+                message_template=None,
+                reply_as_reply=False,
+            )
         )
         if existing_action is None:
             key = "results.channel_event.notification_added"
@@ -219,9 +223,11 @@ class ChannelEventCommandService:
             )
 
         display_id = await self._display_index(thread.thread_id, adapter_event.event_id) or adapter_event.event_id
-        self.adapter_event_action_repository.remove_action(
-            event_id=adapter_event.event_id,
-            action_type=DISCORD_NOTIFY_ACTION,
+        await resolve_awaitable(
+            self.adapter_event_action_repository.remove_action(
+                event_id=adapter_event.event_id,
+                action_type=DISCORD_NOTIFY_ACTION,
+            )
         )
         key = "results.channel_event.notification_removed"
 
@@ -303,10 +309,12 @@ class ChannelEventCommandService:
             raise ValueError(self.localizer.text("results.channel_event.invalid_color", language=thread.language)) from error
 
         if normalized_color is None:
-            updated = self.adapter_event_action_repository.set_action_color(
-                event_id=adapter_event.event_id,
-                action_type=DISCORD_NOTIFY_ACTION,
-                color=None,
+            updated = await resolve_awaitable(
+                self.adapter_event_action_repository.set_action_color(
+                    event_id=adapter_event.event_id,
+                    action_type=DISCORD_NOTIFY_ACTION,
+                    color=None,
+                )
             )
             if updated is None:
                 raise RuntimeError("Adapter event action repository returned no row for clear color.")
@@ -337,10 +345,12 @@ class ChannelEventCommandService:
                 ephemeral=True,
             )
 
-        updated = self.adapter_event_action_repository.set_action_color(
-            event_id=adapter_event.event_id,
-            action_type=DISCORD_NOTIFY_ACTION,
-            color=normalized_color,
+        updated = await resolve_awaitable(
+            self.adapter_event_action_repository.set_action_color(
+                event_id=adapter_event.event_id,
+                action_type=DISCORD_NOTIFY_ACTION,
+                color=normalized_color,
+            )
         )
         if updated is None:
             raise RuntimeError("Adapter event action repository returned no row for set color.")

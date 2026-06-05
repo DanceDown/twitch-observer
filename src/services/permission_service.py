@@ -79,9 +79,11 @@ class PermissionCommandService:
         thread, denied = await self._require_manage_permissions(command)
         if denied is not None:
             return denied
-        removed = self.permission_repository.remove_by_user_and_thread(
-            discord_user_id=command.target_user_id,
-            thread_id=thread.thread_id,
+        removed = await resolve_awaitable(
+            self.permission_repository.remove_by_user_and_thread(
+                discord_user_id=command.target_user_id,
+                thread_id=thread.thread_id,
+            )
         )
         return build_thread_result(
             self.localizer,
@@ -108,10 +110,12 @@ class PermissionCommandService:
             )
         )
         current_mask = 0 if current is None else current.permissions
-        updated = self.permission_repository.upsert_permissions(
-            discord_user_id=command.target_user_id,
-            thread_id=thread.thread_id,
-            permissions=current_mask | permission_mask,
+        updated = await resolve_awaitable(
+            self.permission_repository.upsert_permissions(
+                discord_user_id=command.target_user_id,
+                thread_id=thread.thread_id,
+                permissions=current_mask | permission_mask,
+            )
         )
         return build_thread_result(
             self.localizer,
@@ -157,15 +161,19 @@ class PermissionCommandService:
             )
         new_mask = current_mask & ~permission_mask
         if new_mask == 0:
-            self.permission_repository.remove_by_user_and_thread(
-                discord_user_id=command.target_user_id,
-                thread_id=thread.thread_id,
+            await resolve_awaitable(
+                self.permission_repository.remove_by_user_and_thread(
+                    discord_user_id=command.target_user_id,
+                    thread_id=thread.thread_id,
+                )
             )
         else:
-            self.permission_repository.upsert_permissions(
-                discord_user_id=command.target_user_id,
-                thread_id=thread.thread_id,
-                permissions=new_mask,
+            await resolve_awaitable(
+                self.permission_repository.upsert_permissions(
+                    discord_user_id=command.target_user_id,
+                    thread_id=thread.thread_id,
+                    permissions=new_mask,
+                )
             )
         return build_thread_result(
             self.localizer,

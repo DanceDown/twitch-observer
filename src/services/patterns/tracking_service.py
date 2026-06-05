@@ -171,7 +171,7 @@ class PatternTrackingService:
                     effective_pattern.pattern_id,
                     thread.discord_channel_id,
                 )
-                self.message_repository.mark_message_matched_in_thread(thread_id=thread.thread_id, event=event)
+                await resolve_awaitable(self.message_repository.mark_message_matched_in_thread(thread_id=thread.thread_id, event=event))
                 await self.notifier.send_tracking_embed(
                     thread.discord_channel_id,
                     build_tracking_embed(

@@ -111,10 +111,12 @@ class TwitchLiveMonitorService:
                 continue
 
             if not notify_transitions or previous.is_live is None:
-                self.channel_repository.set_live_state_for_twitch_channel(
-                    twitch_channel_id=twitch_channel_id,
-                    is_live=current_is_live,
-                    changed_at=changed_at.isoformat(),
+                await resolve_awaitable(
+                    self.channel_repository.set_live_state_for_twitch_channel(
+                        twitch_channel_id=twitch_channel_id,
+                        is_live=current_is_live,
+                        changed_at=changed_at.isoformat(),
+                    )
                 )
                 continue
 

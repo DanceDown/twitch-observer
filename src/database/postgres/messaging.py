@@ -18,11 +18,11 @@ class PostgresMessageRepository(MessageRepository):
 
     database: PostgresDatabase
 
-    def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
+    async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
         """Persist one incoming Twitch message if it has not been stored yet."""
         message_id = self._resolve_message_id(event)
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 INSERT INTO message (
                     message_id,
@@ -57,15 +57,15 @@ class PostgresMessageRepository(MessageRepository):
                 ),
             )
 
-    def mark_message_matched_in_thread(
+    async def mark_message_matched_in_thread(
         self,
         *,
         thread_id: int,
         event: TwitchChatMessageEvent,
     ) -> None:
         """Persist that one stored Twitch message matched inside one Discord thread."""
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 INSERT INTO thread_message_match (thread_id, message_id)
                 SELECT %s, message_id

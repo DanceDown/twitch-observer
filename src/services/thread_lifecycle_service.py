@@ -93,9 +93,11 @@ class ThreadLifecycleService:
                 ephemeral=True,
             )
 
-        created = self.thread_repository.create(
-            owner_id=command.requester_id,
-            discord_channel_id=command.discord_channel_id,
+        created = await resolve_awaitable(
+            self.thread_repository.create(
+                owner_id=command.requester_id,
+                discord_channel_id=command.discord_channel_id,
+            )
         )
         logger.debug(
             "Joined Discord context discord_channel_id=%s owner_id=%s",
@@ -135,7 +137,7 @@ class ThreadLifecycleService:
             if not remaining_thread_ids:
                 part_candidate_channel_ids.append(twitch_channel_id)
 
-        deleted = self.thread_repository.delete_by_discord_channel_id(command.discord_channel_id)
+        deleted = await resolve_awaitable(self.thread_repository.delete_by_discord_channel_id(command.discord_channel_id))
         if deleted is None:
             return build_result(
                 self.localizer,
@@ -194,9 +196,11 @@ class ThreadLifecycleService:
                 ephemeral=True,
             )
 
-        updated = self.thread_repository.set_enabled(
-            discord_channel_id=command.discord_channel_id,
-            enabled=command.enabled,
+        updated = await resolve_awaitable(
+            self.thread_repository.set_enabled(
+                discord_channel_id=command.discord_channel_id,
+                enabled=command.enabled,
+            )
         )
         if updated is None:
             raise ApplicationInvariantError("Thread enable state update returned no row.")
@@ -220,7 +224,7 @@ class ThreadLifecycleService:
 
         normalized_color = normalize_optional_color(command.color)
         if normalized_color is None:
-            updated = self.thread_repository.set_color(discord_channel_id=command.discord_channel_id, color=None)
+            updated = await resolve_awaitable(self.thread_repository.set_color(discord_channel_id=command.discord_channel_id, color=None))
             if updated is None:
                 raise ApplicationInvariantError("Thread color clear returned no row.")
             return build_thread_result(
@@ -240,9 +244,11 @@ class ThreadLifecycleService:
                 ephemeral=True,
                 COLOR=normalized_color,
             )
-        updated = self.thread_repository.set_color(
-            discord_channel_id=command.discord_channel_id,
-            color=normalized_color,
+        updated = await resolve_awaitable(
+            self.thread_repository.set_color(
+                discord_channel_id=command.discord_channel_id,
+                color=normalized_color,
+            )
         )
         if updated is None:
             raise ApplicationInvariantError("Thread color update returned no row.")
@@ -290,9 +296,11 @@ class ThreadLifecycleService:
                 LANGUAGE_NAME=language_name,
                 LANGUAGE_CODE=requested_language,
             )
-        updated = self.thread_repository.set_language(
-            discord_channel_id=command.discord_channel_id,
-            language=requested_language,
+        updated = await resolve_awaitable(
+            self.thread_repository.set_language(
+                discord_channel_id=command.discord_channel_id,
+                language=requested_language,
+            )
         )
         if updated is None:
             raise ApplicationInvariantError("Thread language update returned no row.")

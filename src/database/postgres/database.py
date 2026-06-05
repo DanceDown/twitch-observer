@@ -86,6 +86,34 @@ class PostgresDatabase:
             async with connection.cursor() as cursor:
                 yield cursor
 
+    @asynccontextmanager
+    async def async_connection(self) -> AsyncIterator[psycopg.AsyncConnection]:
+        """Lease one async connection for one repository operation with commit/rollback handling."""
+        connection = await self._acquire_async()
+        try:
+            yield connection
+            if not connection.closed:
+                await connection.commit()
+        except Exception:
+            if not connection.closed:
+                await connection.rollback()
+            raise
+        finally:
+            await self._release_async(connection)
+
+    @asynccontextmanager
+    async def async_transaction(self) -> AsyncIterator[psycopg.AsyncConnection]:
+        """Lease one async connection for one explicit transactional operation."""
+        async with self.async_connection() as connection:
+            yield connection
+
+    @asynccontextmanager
+    async def async_cursor(self) -> AsyncIterator[psycopg.AsyncCursor]:
+        """Lease one async cursor for one repository operation."""
+        async with self.async_connection() as connection:
+            async with connection.cursor() as cursor:
+                yield cursor
+
     def close(self) -> None:
         """Close all idle connections in the local pool."""
         with self._condition:
@@ -196,7 +224,7 @@ class PostgresDatabase:
                     ) from error
 
         try:
-            connection = await psycopg.AsyncConnection.connect(self.config.postgres_dsn, autocommit=True)
+            connection = await psycopg.AsyncConnection.connect(self.config.postgres_dsn)
             return connection
         except Exception:
             async with self._async_condition:

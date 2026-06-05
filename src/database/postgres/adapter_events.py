@@ -16,7 +16,7 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
 
     database: PostgresDatabase
 
-    def upsert_event(
+    async def upsert_event(
         self,
         *,
         thread_id: int,
@@ -25,8 +25,8 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
         subject_id: str,
         event_key: str,
     ) -> AdapterEventRecord:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 INSERT INTO adapter_event (thread_id, adapter_key, subject_type, subject_id, event_key, disabled)
                 VALUES (%s, %s, %s, %s, %s, FALSE)
@@ -36,7 +36,7 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
                 """,
                 (thread_id, adapter_key, subject_type, subject_id, event_key),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         row = require_row(row, operation="adapter_event.upsert_event")
         return self._build_record(row)
 

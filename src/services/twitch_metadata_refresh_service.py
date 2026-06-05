@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 
 from src.gateways.twitch_api import TwitchAPIError
 from src.services.twitch_user_directory_service import TwitchUserDirectoryService
+from src.utils.async_utils import resolve_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ class TwitchMetadataRefreshService:
             except TwitchAPIError as error:
                 logger.warning("Failed to refresh Twitch metadata batch (%s ids): %s", len(batch), error)
                 continue
-            await asyncio.to_thread(self.directory.upsert_users_from_api, users)
+            await resolve_awaitable(self.directory.upsert_users_from_api(users))
             if index < len(batches) - 1:
                 await self._wait_or_stop(spacing_seconds)
 

@@ -39,11 +39,13 @@ class ChannelLiveStatePersistenceService:
 
     channel_repository: ChannelRepository
 
-    def handle_change(self, event: TwitchChannelLiveStateChangedEvent) -> None:
-        updated_rows = self.channel_repository.set_live_state_for_twitch_channel(
-            twitch_channel_id=event.twitch_channel_id,
-            is_live=event.is_live,
-            changed_at=event.changed_at.isoformat(),
+    async def handle_change(self, event: TwitchChannelLiveStateChangedEvent) -> None:
+        updated_rows = await resolve_awaitable(
+            self.channel_repository.set_live_state_for_twitch_channel(
+                twitch_channel_id=event.twitch_channel_id,
+                is_live=event.is_live,
+                changed_at=event.changed_at.isoformat(),
+            )
         )
         logger.debug(
             "Persisted live-state change twitch_channel_id=%s is_live=%s rows=%s",

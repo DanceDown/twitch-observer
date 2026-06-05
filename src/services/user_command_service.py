@@ -74,7 +74,7 @@ class UserCommandService:
                 DISPLAY_NAME=twitch_user.display_name,
                 LOGIN=twitch_user.login,
             )
-        self.tracked_user_repository.add_user(thread.thread_id, twitch_user.user_id)
+        await resolve_awaitable(self.tracked_user_repository.add_user(thread.thread_id, twitch_user.user_id))
         return build_thread_result(
             self.localizer,
             "results.user.added",
@@ -124,7 +124,7 @@ class UserCommandService:
                 DISPLAY_NAME=twitch_user.display_name,
                 LOGIN=twitch_user.login,
             )
-        self.tracked_user_repository.remove_user(thread.thread_id, twitch_user.user_id)
+        await resolve_awaitable(self.tracked_user_repository.remove_user(thread.thread_id, twitch_user.user_id))
         return build_thread_result(
             self.localizer,
             "results.user.removed",

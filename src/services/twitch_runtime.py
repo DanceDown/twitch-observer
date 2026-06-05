@@ -80,20 +80,22 @@ async def refresh_linked_account(
         return None
 
     expires_at = (datetime.now(UTC) + timedelta(seconds=refreshed.expires_in)).isoformat()
-    stored = account_repository.update_account(
-        account_id=account.account_id,
-        twitch_user_id=validated.user_id,
-        twitch_login=validated.login,
-        client_id=validated.client_id,
-        access_token=refreshed.access_token,
-        refresh_token=refreshed.refresh_token,
-        expires_at=expires_at,
-        scope=refreshed.scope,
-        token_type=refreshed.token_type,
+    stored = await resolve_awaitable(
+        account_repository.update_account(
+            account_id=account.account_id,
+            twitch_user_id=validated.user_id,
+            twitch_login=validated.login,
+            client_id=validated.client_id,
+            access_token=refreshed.access_token,
+            refresh_token=refreshed.refresh_token,
+            expires_at=expires_at,
+            scope=refreshed.scope,
+            token_type=refreshed.token_type,
+        )
     )
     if stored is None and thread is not None and thread_repository is not None and thread.account_id is not None:
-        account_repository.remove_by_account_id(thread.account_id)
-        thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
+        await resolve_awaitable(account_repository.remove_by_account_id(thread.account_id))
+        await resolve_awaitable(thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None))
     return stored
 
 

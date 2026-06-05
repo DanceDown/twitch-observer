@@ -217,29 +217,31 @@ class PatternCommandService:
                 ephemeral=True,
             )
 
-        created = self.pattern_repository.add_pattern(
-            thread_id=thread.thread_id,
-            regex=text,
-            channel_scope_mode=command.channel_scope_mode.value,
-            channel_scope_ids=tuple(channel.user_id for channel in scoped_channels),
-            user_scope_mode=command.user_scope_mode.value,
-            user_scope_ids=tuple(user.user_id for user in scoped_users),
-            sub_state=command.sub_state.value,
-            offline_state=command.offline_state.value,
-            is_regex=command.is_regex,
-            case_sensitive=command.case_sensitive,
-            color=command.color.strip() if command.color else None,
-            disabled=command.disabled,
-            priority=(
-                command.priority
-                if command.priority is not None
-                else self._default_priority_for(
-                    channel_scope_mode=command.channel_scope_mode,
-                    user_scope_mode=command.user_scope_mode,
-                    sub_state=command.sub_state,
-                    offline_state=command.offline_state,
-                )
-            ),
+        created = await resolve_awaitable(
+            self.pattern_repository.add_pattern(
+                thread_id=thread.thread_id,
+                regex=text,
+                channel_scope_mode=command.channel_scope_mode.value,
+                channel_scope_ids=tuple(channel.user_id for channel in scoped_channels),
+                user_scope_mode=command.user_scope_mode.value,
+                user_scope_ids=tuple(user.user_id for user in scoped_users),
+                sub_state=command.sub_state.value,
+                offline_state=command.offline_state.value,
+                is_regex=command.is_regex,
+                case_sensitive=command.case_sensitive,
+                color=command.color.strip() if command.color else None,
+                disabled=command.disabled,
+                priority=(
+                    command.priority
+                    if command.priority is not None
+                    else self._default_priority_for(
+                        channel_scope_mode=command.channel_scope_mode,
+                        user_scope_mode=command.user_scope_mode,
+                        sub_state=command.sub_state,
+                        offline_state=command.offline_state,
+                    )
+                ),
+            )
         )
         display_id = await self._display_index(thread.thread_id, created.pattern_id) or created.pattern_id
         logger.debug(
@@ -287,7 +289,7 @@ class PatternCommandService:
             )
 
         display_id = await self._display_index(thread.thread_id, pattern.pattern_id) or pattern.pattern_id
-        self.pattern_repository.remove_pattern(thread_id=pattern.thread_id, pattern_id=pattern.pattern_id)
+        await resolve_awaitable(self.pattern_repository.remove_pattern(thread_id=pattern.thread_id, pattern_id=pattern.pattern_id))
         logger.debug("Removed pattern thread_id=%s pattern_id=%s regex=%r", pattern.thread_id, pattern.pattern_id, pattern.regex)
         return build_thread_result(
             self.localizer,
@@ -333,10 +335,12 @@ class PatternCommandService:
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
             )
-        updated = self.pattern_repository.set_pattern_disabled(
-            thread_id=pattern.thread_id,
-            pattern_id=pattern.pattern_id,
-            disabled=True,
+        updated = await resolve_awaitable(
+            self.pattern_repository.set_pattern_disabled(
+                thread_id=pattern.thread_id,
+                pattern_id=pattern.pattern_id,
+                disabled=True,
+            )
         )
         if updated is None:
             raise RuntimeError("Pattern repository returned no row for disable.")
@@ -385,10 +389,12 @@ class PatternCommandService:
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
             )
-        updated = self.pattern_repository.set_pattern_disabled(
-            thread_id=pattern.thread_id,
-            pattern_id=pattern.pattern_id,
-            disabled=False,
+        updated = await resolve_awaitable(
+            self.pattern_repository.set_pattern_disabled(
+                thread_id=pattern.thread_id,
+                pattern_id=pattern.pattern_id,
+                disabled=False,
+            )
         )
         if updated is None:
             raise RuntimeError("Pattern repository returned no row for enable.")
@@ -486,20 +492,22 @@ class PatternCommandService:
                 ephemeral=True,
             )
 
-        updated = self.pattern_repository.update_pattern(
-            thread_id=thread.thread_id,
-            pattern_id=pattern.pattern_id,
-            regex=new_text,
-            channel_scope_mode=new_channel_scope_mode,
-            channel_scope_ids=tuple(channel.user_id for channel in scoped_channels),
-            user_scope_mode=new_user_scope_mode,
-            user_scope_ids=tuple(user.user_id for user in scoped_users),
-            sub_state=new_sub_state,
-            offline_state=new_offline_state,
-            is_regex=new_is_regex,
-            case_sensitive=new_case_sensitive,
-            color=new_color,
-            priority=new_priority,
+        updated = await resolve_awaitable(
+            self.pattern_repository.update_pattern(
+                thread_id=thread.thread_id,
+                pattern_id=pattern.pattern_id,
+                regex=new_text,
+                channel_scope_mode=new_channel_scope_mode,
+                channel_scope_ids=tuple(channel.user_id for channel in scoped_channels),
+                user_scope_mode=new_user_scope_mode,
+                user_scope_ids=tuple(user.user_id for user in scoped_users),
+                sub_state=new_sub_state,
+                offline_state=new_offline_state,
+                is_regex=new_is_regex,
+                case_sensitive=new_case_sensitive,
+                color=new_color,
+                priority=new_priority,
+            )
         )
         if updated is None:
             raise RuntimeError("Pattern repository returned no row for update.")

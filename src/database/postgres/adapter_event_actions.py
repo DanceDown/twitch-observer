@@ -17,7 +17,7 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
 
     database: PostgresDatabase
 
-    def upsert_action(
+    async def upsert_action(
         self,
         *,
         event_id: int,
@@ -25,8 +25,8 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
         message_template: str | None,
         reply_as_reply: bool,
     ) -> AdapterEventActionRecord:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 INSERT INTO adapter_event_action (event_id, action_type, message_template, reply_as_reply, color, disabled)
                 VALUES (%s, %s, %s, %s, NULL, FALSE)
@@ -39,7 +39,7 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
                 """,
                 (event_id, action_type, message_template, reply_as_reply),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         row = require_row(row, operation="adapter_event_action.upsert_action")
         return self._build_record(row)
 
@@ -58,9 +58,9 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
             return None
         return self._build_record(row)
 
-    def remove_action(self, *, event_id: int, action_type: str) -> AdapterEventActionRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def remove_action(self, *, event_id: int, action_type: str) -> AdapterEventActionRecord | None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 DELETE FROM adapter_event_action
                 WHERE event_id = %s AND action_type = %s
@@ -68,20 +68,20 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
                 """,
                 (event_id, action_type),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return self._build_record(row)
 
-    def set_action_disabled(
+    async def set_action_disabled(
         self,
         *,
         event_id: int,
         action_type: str,
         disabled: bool,
     ) -> AdapterEventActionRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE adapter_event_action
                 SET disabled = %s
@@ -90,20 +90,20 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
                 """,
                 (disabled, event_id, action_type),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return self._build_record(row)
 
-    def set_action_color(
+    async def set_action_color(
         self,
         *,
         event_id: int,
         action_type: str,
         color: str | None,
     ) -> AdapterEventActionRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE adapter_event_action
                 SET color = %s
@@ -112,7 +112,7 @@ class PostgresAdapterEventActionRepository(AdapterEventActionRepository):
                 """,
                 (color, event_id, action_type),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return self._build_record(row)

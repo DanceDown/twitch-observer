@@ -31,15 +31,15 @@ class PostgresUserPermissionRepository(UserPermissionRepository):
             return None
         return UserPermissionRecord(discord_user_id=int(row[0]), thread_id=int(row[1]), permissions=int(row[2]))
 
-    def upsert_permissions(
+    async def upsert_permissions(
         self,
         *,
         discord_user_id: int,
         thread_id: int,
         permissions: int,
     ) -> UserPermissionRecord:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 INSERT INTO user_permissions (discord_user_id, thread_id, permissions)
                 VALUES (%s, %s, %s)
@@ -49,13 +49,13 @@ class PostgresUserPermissionRepository(UserPermissionRepository):
                 """,
                 (discord_user_id, thread_id, permissions),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         row = require_row(row, operation="user_permissions.upsert_permissions")
         return UserPermissionRecord(discord_user_id=int(row[0]), thread_id=int(row[1]), permissions=int(row[2]))
 
-    def remove_by_user_and_thread(self, *, discord_user_id: int, thread_id: int) -> bool:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def remove_by_user_and_thread(self, *, discord_user_id: int, thread_id: int) -> bool:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 DELETE FROM user_permissions
                 WHERE discord_user_id = %s AND thread_id = %s
@@ -63,7 +63,7 @@ class PostgresUserPermissionRepository(UserPermissionRepository):
                 """,
                 (discord_user_id, thread_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         return row is not None
 
     async def list_for_thread(self, *, thread_id: int) -> list[UserPermissionRecord]:

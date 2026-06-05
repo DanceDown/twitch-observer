@@ -125,26 +125,30 @@ class TwitchUserDirectoryService:
             self._remember_record(record)
         return tuple(records)
 
-    def upsert_users_from_api(self, users: tuple[TwitchUser, ...]) -> None:
+    async def upsert_users_from_api(self, users: tuple[TwitchUser, ...]) -> None:
         records = tuple((user.user_id, user.login, user.display_name, user.profile_image_url) for user in users)
-        self.repository.upsert_many_from_api(records)
+        await resolve_awaitable(self.repository.upsert_many_from_api(records))
         self._remember_api_users(users)
 
-    def observe_chat_message(self, event: TwitchChatMessageEvent) -> None:
+    async def observe_chat_message(self, event: TwitchChatMessageEvent) -> None:
         """Warm the cache from IRC metadata without touching the Twitch API."""
         if event.author_id:
-            record = self.repository.observe_from_chat(
-                twitch_user_id=event.author_id,
-                twitch_login=event.author_login,
-                display_name=event.author_display_name or event.author_login,
+            record = await resolve_awaitable(
+                self.repository.observe_from_chat(
+                    twitch_user_id=event.author_id,
+                    twitch_login=event.author_login,
+                    display_name=event.author_display_name or event.author_login,
+                )
             )
             self._remember_record(record)
         if event.broadcaster_id:
             existing_broadcaster = self.get_cached_user_by_id(event.broadcaster_id)
-            record = self.repository.observe_from_chat(
-                twitch_user_id=event.broadcaster_id,
-                twitch_login=event.channel_login,
-                display_name=None if existing_broadcaster is None else existing_broadcaster.display_name,
+            record = await resolve_awaitable(
+                self.repository.observe_from_chat(
+                    twitch_user_id=event.broadcaster_id,
+                    twitch_login=event.channel_login,
+                    display_name=None if existing_broadcaster is None else existing_broadcaster.display_name,
+                )
             )
             self._remember_record(record)
 
@@ -212,22 +216,26 @@ class TwitchUserDirectoryService:
 
     async def _refresh_user_by_login_uncached(self, login: str) -> TwitchUser:
         user = await self.twitch_api.get_user_by_login(login)
-        record = self.repository.upsert_from_api(
-            twitch_user_id=user.user_id,
-            twitch_login=user.login,
-            display_name=user.display_name,
-            profile_image_url=user.profile_image_url,
+        record = await resolve_awaitable(
+            self.repository.upsert_from_api(
+                twitch_user_id=user.user_id,
+                twitch_login=user.login,
+                display_name=user.display_name,
+                profile_image_url=user.profile_image_url,
+            )
         )
         self._remember_record(record)
         return user
 
     async def _refresh_user_by_id_uncached(self, user_id: str) -> TwitchUser:
         user = await self.twitch_api.get_user_by_id(user_id)
-        record = self.repository.upsert_from_api(
-            twitch_user_id=user.user_id,
-            twitch_login=user.login,
-            display_name=user.display_name,
-            profile_image_url=user.profile_image_url,
+        record = await resolve_awaitable(
+            self.repository.upsert_from_api(
+                twitch_user_id=user.user_id,
+                twitch_login=user.login,
+                display_name=user.display_name,
+                profile_image_url=user.profile_image_url,
+            )
         )
         self._remember_record(record)
         return user
@@ -271,5 +279,5 @@ class TwitchUserDirectoryIngestService:
 
     directory: TwitchUserDirectoryService
 
-    def handle_chat_message(self, event: TwitchChatMessageEvent) -> None:
-        self.directory.observe_chat_message(event)
+    async def handle_chat_message(self, event: TwitchChatMessageEvent) -> None:
+        await self.directory.observe_chat_message(event)

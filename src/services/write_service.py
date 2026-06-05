@@ -122,8 +122,10 @@ class TwitchWriteCommandService:
             )
             if refreshed is None:
                 if thread.account_id is not None:
-                    self.account_repository.remove_by_account_id(thread.account_id)
-                    self.thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
+                    await resolve_awaitable(self.account_repository.remove_by_account_id(thread.account_id))
+                    await resolve_awaitable(
+                        self.thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
+                    )
                 return build_thread_result(
                     self.localizer,
                     "results.write.account_expired",

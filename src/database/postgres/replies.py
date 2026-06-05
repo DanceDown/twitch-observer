@@ -30,7 +30,7 @@ class PostgresReplyRepository(ReplyRepository):
             return None
         return self._build_reply_record(row)
 
-    def add_reply(
+    async def add_reply(
         self,
         *,
         thread_id: int,
@@ -38,8 +38,8 @@ class PostgresReplyRepository(ReplyRepository):
         reply_message: str,
         reply_as_reply: bool,
     ) -> ReplyRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 INSERT INTO reply (thread_id, pattern_id, reply_message, reply_as_reply, disabled)
                 VALUES (%s, %s, %s, %s, FALSE)
@@ -48,14 +48,14 @@ class PostgresReplyRepository(ReplyRepository):
                 """,
                 (thread_id, pattern_id, reply_message, reply_as_reply),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return self._build_reply_record(row)
 
-    def remove_reply(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def remove_reply(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 DELETE FROM reply
                 WHERE thread_id = %s AND pattern_id = %s
@@ -63,14 +63,14 @@ class PostgresReplyRepository(ReplyRepository):
                 """,
                 (thread_id, pattern_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return self._build_reply_record(row)
 
-    def set_reply_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool) -> ReplyRecord | None:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def set_reply_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool) -> ReplyRecord | None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE reply
                 SET disabled = %s
@@ -79,7 +79,7 @@ class PostgresReplyRepository(ReplyRepository):
                 """,
                 (disabled, thread_id, pattern_id),
             )
-            row = cursor.fetchone()
+            row = await cursor.fetchone()
         if row is None:
             return None
         return self._build_reply_record(row)
@@ -109,9 +109,9 @@ class PostgresReplyRepository(ReplyRepository):
             rows = await cursor.fetchall()
         return [self._build_reply_record(row) for row in rows]
 
-    def disable_replies_for_thread(self, thread_id: int) -> int:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def disable_replies_for_thread(self, thread_id: int) -> int:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE reply
                 SET disabled = TRUE
@@ -123,9 +123,9 @@ class PostgresReplyRepository(ReplyRepository):
             rows = cursor.fetchall()
         return len(rows)
 
-    def enable_replies_for_thread(self, thread_id: int) -> int:
-        with self.database.cursor() as cursor:
-            cursor.execute(
+    async def enable_replies_for_thread(self, thread_id: int) -> int:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
                 """
                 UPDATE reply
                 SET disabled = FALSE
