@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.discord_results import build_thread_result, discord_user_mention
+from src.discord_results import build_thread_result
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 from src.services.twitch_runtime import (
     CHANNEL_SUBJECT_TYPE,
@@ -77,15 +77,21 @@ async def handle_pattern_action(
             localizer,
             "results.reply.added_pattern",
             thread=thread,
-            ID=display_id,
-            MODE=support.text(
-                "results.reply.added_pattern.mode.reply" if created.reply_as_reply else "results.reply.added_pattern.mode.message",
-                language=thread.language,
-            ),
-            MESSAGE=created.reply_message,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    "user_id": command.requester_id,
+                    "id": display_id,
+                    "mode": support.text(
+                        "results.reply.added_pattern.mode.reply"
+                        if created.reply_as_reply
+                        else "results.reply.added_pattern.mode.message",
+                        language=thread.language,
+                    ),
+                    "message": created.reply_message,
+                }
+            },
         )
 
     existing_reply = await reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=pattern.pattern_id)
@@ -106,11 +112,15 @@ async def handle_pattern_action(
             localizer,
             "results.reply.removed_pattern",
             thread=thread,
-            ID=display_id,
-            MESSAGE=existing_reply.reply_message,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    "user_id": command.requester_id,
+                    "id": display_id,
+                    "message": existing_reply.reply_message,
+                }
+            },
         )
 
     if action == "disable":
@@ -133,11 +143,15 @@ async def handle_pattern_action(
             localizer,
             "results.reply.disabled_pattern",
             thread=thread,
-            ID=display_id,
-            MESSAGE=disabled_reply.reply_message,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    "user_id": command.requester_id,
+                    "id": display_id,
+                    "message": disabled_reply.reply_message,
+                }
+            },
         )
 
     if action == "enable":
@@ -160,11 +174,15 @@ async def handle_pattern_action(
             localizer,
             "results.reply.enabled_pattern",
             thread=thread,
-            ID=display_id,
-            MESSAGE=enabled_reply.reply_message,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    "user_id": command.requester_id,
+                    "id": display_id,
+                    "message": enabled_reply.reply_message,
+                }
+            },
         )
 
     raise ValueError(support.text("results.reply.pattern_action_unsupported", language=thread.language))
@@ -246,13 +264,17 @@ async def handle_event_action(
             localizer,
             "results.reply.added_event",
             thread=thread,
-            DISPLAY_NAME=channel_display_name,
-            LOGIN=channel_login,
-            STATE=state_label,
-            MESSAGE=created.message_template or "",
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    "user_id": command.requester_id,
+                    "display_name": channel_display_name,
+                    "login": channel_login,
+                    "state": state_label,
+                    "message": created.message_template or "",
+                }
+            },
         )
 
     if existing_reply is None:
@@ -275,13 +297,17 @@ async def handle_event_action(
             localizer,
             "results.reply.removed_event",
             thread=thread,
-            DISPLAY_NAME=channel_display_name,
-            LOGIN=channel_login,
-            STATE=state_label,
-            MESSAGE=existing_reply.message_template or "",
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    "user_id": command.requester_id,
+                    "display_name": channel_display_name,
+                    "login": channel_login,
+                    "state": state_label,
+                    "message": existing_reply.message_template or "",
+                }
+            },
         )
 
     if action == "disable":
@@ -304,13 +330,17 @@ async def handle_event_action(
             localizer,
             "results.reply.disabled_event",
             thread=thread,
-            DISPLAY_NAME=channel_display_name,
-            LOGIN=channel_login,
-            STATE=state_label,
-            MESSAGE=disabled_reply.message_template or "",
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    "user_id": command.requester_id,
+                    "display_name": channel_display_name,
+                    "login": channel_login,
+                    "state": state_label,
+                    "message": disabled_reply.message_template or "",
+                }
+            },
         )
 
     if action == "enable":
@@ -333,13 +363,17 @@ async def handle_event_action(
             localizer,
             "results.reply.enabled_event",
             thread=thread,
-            DISPLAY_NAME=channel_display_name,
-            LOGIN=channel_login,
-            STATE=state_label,
-            MESSAGE=enabled_reply.message_template or "",
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    "user_id": command.requester_id,
+                    "display_name": channel_display_name,
+                    "login": channel_login,
+                    "state": state_label,
+                    "message": enabled_reply.message_template or "",
+                }
+            },
         )
 
     raise ValueError(support.text("results.reply.event_action_unsupported", language=thread.language))

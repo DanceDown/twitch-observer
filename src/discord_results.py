@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Mapping
+
 from src.database.records import ThreadRecord
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 from src.localization import LocalizationError, Localizer
@@ -16,7 +18,8 @@ def build_result(
     ephemeral: bool = False,
     thumbnail_url: str | None = None,
     color: str | None = None,
-    **placeholders: object,
+    sources: Mapping[str, object] | None = None,
+    **legacy_placeholders: object,
 ) -> DiscordCommandResult:
     """Build one Discord command result from a localized `title`/`body`/`footer` object."""
     value = localizer.value(key, language=language)
@@ -30,23 +33,26 @@ def build_result(
         raise LocalizationError(f"Translation result {key!r} must contain string title/body/footer.")
     if placeholder_specs is not None and not isinstance(placeholder_specs, dict):
         raise LocalizationError(f"Translation result {key!r} must contain object placeholders when provided.")
+    resolved_sources = dict(sources or {})
+    if legacy_placeholders:
+        resolved_sources.update(legacy_placeholders)
     return DiscordCommandResult(
         title=localizer.render_with_placeholders(
             title,
             language=language,
-            placeholders=placeholders,
+            sources=resolved_sources,
             placeholder_specs=placeholder_specs,
         ),
         message=localizer.render_with_placeholders(
             body,
             language=language,
-            placeholders=placeholders,
+            sources=resolved_sources,
             placeholder_specs=placeholder_specs,
         ),
         footer=localizer.render_with_placeholders(
             footer,
             language=language,
-            placeholders=placeholders,
+            sources=resolved_sources,
             placeholder_specs=placeholder_specs,
         ),
         style=style,
@@ -66,9 +72,15 @@ def build_thread_result(
     ephemeral: bool = False,
     thumbnail_url: str | None = None,
     color: str | None = None,
-    **placeholders: object,
+    sources: Mapping[str, object] | None = None,
+    **legacy_placeholders: object,
 ) -> DiscordCommandResult:
     """Build one Discord command result using the language configured on a thread."""
+    resolved_sources = dict(sources or {})
+    if thread is not None:
+        resolved_sources.setdefault("thread", thread)
+    if legacy_placeholders:
+        resolved_sources.update(legacy_placeholders)
     return build_result(
         localizer,
         key,
@@ -77,10 +89,5 @@ def build_thread_result(
         ephemeral=ephemeral,
         thumbnail_url=thumbnail_url,
         color=color,
-        **placeholders,
+        sources=resolved_sources,
     )
-
-
-def discord_user_mention(localizer: Localizer, user_id: int, *, language: str | None = None) -> str:
-    """Build one localized Discord mention string for later placeholder insertion."""
-    return f"<@{user_id}>"

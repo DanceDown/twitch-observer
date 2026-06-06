@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass, field
 
 from src.database.connection import ThreadRepository, UserPermissionRepository
-from src.discord_results import build_thread_result, discord_user_mention
+from src.discord_results import build_thread_result
 from src.events.event_types import (
     ClearPermissionsCommand,
     DiscordCommandResult,
@@ -87,10 +87,14 @@ class PermissionCommandService:
             self.localizer,
             "results.permission.cleared" if removed else "results.permission.none_found",
             thread=thread,
-            TARGET=f"<@{command.target_user_id}>",
             style=DiscordResultStyle.SUCCESS if removed else DiscordResultStyle.INFO,
             ephemeral=not removed,
-            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    "requester_id": command.requester_id,
+                    "target_user_id": command.target_user_id,
+                }
+            },
         )
 
     async def _grant(self, command: GrantPermissionsCommand) -> DiscordCommandResult:
@@ -117,13 +121,18 @@ class PermissionCommandService:
             self.localizer,
             "results.permission.granted",
             thread=thread,
-            TARGET=f"<@{updated.discord_user_id}>",
-            PERMISSIONS=[
-                self._permission_label("results.permission.granted", value, language=thread.language) for value in requested_permissions
-            ],
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    "requester_id": command.requester_id,
+                    "target_user_id": updated.discord_user_id,
+                    "permissions": [
+                        self._permission_label("results.permission.granted", value, language=thread.language)
+                        for value in requested_permissions
+                    ],
+                }
+            },
         )
 
     async def _revoke(self, command: RevokePermissionsCommand) -> DiscordCommandResult:
@@ -146,13 +155,17 @@ class PermissionCommandService:
                 self.localizer,
                 "results.permission.not_granted",
                 thread=thread,
-                TARGET=f"<@{command.target_user_id}>",
-                PERMISSIONS=[
-                    self._permission_label("results.permission.not_granted", value, language=thread.language)
-                    for value in requested_permissions
-                ],
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
+                sources={
+                    "view": {
+                        "target_user_id": command.target_user_id,
+                        "permissions": [
+                            self._permission_label("results.permission.not_granted", value, language=thread.language)
+                            for value in requested_permissions
+                        ],
+                    }
+                },
             )
         new_mask = current_mask & ~permission_mask
         if new_mask == 0:
@@ -172,13 +185,18 @@ class PermissionCommandService:
             self.localizer,
             "results.permission.revoked",
             thread=thread,
-            TARGET=f"<@{command.target_user_id}>",
-            PERMISSIONS=[
-                self._permission_label("results.permission.revoked", value, language=thread.language) for value in requested_permissions
-            ],
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    "requester_id": command.requester_id,
+                    "target_user_id": command.target_user_id,
+                    "permissions": [
+                        self._permission_label("results.permission.revoked", value, language=thread.language)
+                        for value in requested_permissions
+                    ],
+                }
+            },
         )
 
     def _permission_label(self, scope: str, value: str, *, language: str) -> str:

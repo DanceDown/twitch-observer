@@ -60,8 +60,7 @@ class PatternFilterResolver:
                     self._text(
                         thread,
                         "results.pattern.channel_not_tracked",
-                        DISPLAY_NAME=channel_user.display_name,
-                        LOGIN=channel_user.login,
+                        sources={"view": {"channel": {"display_name": channel_user.display_name, "login": channel_user.login}}},
                     )
                 )
             scoped_channels.append(channel_user)
@@ -108,8 +107,7 @@ class PatternFilterResolver:
                     self._text(
                         thread,
                         "results.pattern.user_not_tracked",
-                        DISPLAY_NAME=resolved_user.display_name,
-                        LOGIN=resolved_user.login,
+                        sources={"view": {"user": {"display_name": resolved_user.display_name, "login": resolved_user.login}}},
                     )
                 )
             scoped_users.append(resolved_user)
@@ -189,7 +187,7 @@ class PatternFilterResolver:
         links: list[dict[str, str]] = []
         for twitch_user_id in twitch_user_ids:
             user = await self._resolve_user_by_id(twitch_user_id)
-            links.append({"DISPLAY_NAME": user.display_name, "LOGIN": user.login})
+            links.append({"display_name": user.display_name, "login": user.login})
         return tuple(links)
 
     async def _resolve_user_by_login(self, login: str):
@@ -215,10 +213,11 @@ class PatternFilterResolver:
         self,
         thread: ThreadRecord,
         key: str,
-        **placeholders: object,
+        *,
+        sources: dict[str, object] | None = None,
     ) -> str:
         return self.localizer.text(
             key,
             language=self.localizer.language_for_thread(thread),
-            **placeholders,
+            sources=sources,
         )

@@ -107,10 +107,16 @@ class ChannelEventNotificationService:
                     self.localizer,
                     "results.channel_event.went_live" if event.is_live else "results.channel_event.went_offline",
                     thread=thread,
-                    DISPLAY_NAME=channel_display_name,
-                    LOGIN=channel_login,
                     color=notify_action.color,
                     style=DiscordResultStyle.INFO,
                     ephemeral=False,
+                    sources={
+                        "view": {
+                            "channel": {
+                                "display_name": channel_display_name,
+                                "login": channel_login,
+                            }
+                        }
+                    },
                 ),
             )

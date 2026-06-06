@@ -15,7 +15,7 @@ from src.database.connection import (
     TwitchDeviceFlowRepository,
     UserPermissionRepository,
 )
-from src.discord_results import build_result, build_thread_result, discord_user_mention
+from src.discord_results import build_result, build_thread_result
 from src.events.event_types import (
     DiscordCommandResult,
     DiscordResultStyle,
@@ -23,7 +23,7 @@ from src.events.event_types import (
     UnlinkAccountCommand,
 )
 from src.localization import Localizer
-from src.services.account_support import AccountNotificationSender, format_account_timestamp
+from src.services.account_support import AccountNotificationSender
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
 from src.services.twitch_gateways import TwitchAccountGateway
 from src.utils.permissions import ObserverPermission
@@ -90,10 +90,16 @@ class AccountCommandService:
                 self.localizer,
                 "results.account.already_linked",
                 thread=thread,
-                DISPLAY_NAME=account_name or account.twitch_login,
-                LOGIN=account.twitch_login,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                sources={
+                    "view": {
+                        "account": {
+                            "display_name": account_name or account.twitch_login,
+                            "login": account.twitch_login,
+                        }
+                    }
+                },
             )
         existing_pending = await self.device_flow_repository.get_by_discord_channel_id(thread.discord_channel_id)
         if existing_pending is not None and existing_pending.status == "pending":
@@ -101,11 +107,15 @@ class AccountCommandService:
                 self.localizer,
                 "results.account.login_pending",
                 thread=thread,
-                VERIFICATION_URI=existing_pending.verification_uri,
-                USER_CODE=existing_pending.user_code,
-                EXPIRES_AT=format_account_timestamp(existing_pending.expires_at),
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
+                sources={
+                    "view": {
+                        "verification_uri": existing_pending.verification_uri,
+                        "user_code": existing_pending.user_code,
+                        "expires_at": existing_pending.expires_at,
+                    }
+                },
             )
         start = await self.twitch_api.start_device_code_flow(scopes=("user:write:chat",))
         expires_at = (datetime.now().astimezone() + timedelta(seconds=start.expires_in)).isoformat()
@@ -124,11 +134,15 @@ class AccountCommandService:
             self.localizer,
             "results.account.finish_login",
             thread=thread,
-            VERIFICATION_URI=pending.verification_uri,
-            USER_CODE=pending.user_code,
-            EXPIRES_AT=format_account_timestamp(pending.expires_at),
             style=DiscordResultStyle.INFO,
             ephemeral=True,
+            sources={
+                "view": {
+                    "verification_uri": pending.verification_uri,
+                    "user_code": pending.user_code,
+                    "expires_at": pending.expires_at,
+                }
+            },
         )
 
     async def _unlink_account(self, command: UnlinkAccountCommand) -> DiscordCommandResult:
@@ -167,11 +181,17 @@ class AccountCommandService:
             self.localizer,
             "results.account.unlinked",
             thread=thread,
-            DISPLAY_NAME=account_name or account.twitch_login,
-            LOGIN=account.twitch_login,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    "requester_id": command.requester_id,
+                    "account": {
+                        "display_name": account_name or account.twitch_login,
+                        "login": account.twitch_login,
+                    },
+                }
+            },
         )
 
     async def _require_thread_with_permission(

@@ -6,7 +6,7 @@ import logging
 import re
 
 from src.database.connection import PatternRecord, ThreadRecord
-from src.discord_results import build_thread_result, discord_user_mention
+from src.discord_results import build_thread_result
 from src.events.event_types import AddPatternCommand, DiscordCommandResult, DiscordResultStyle, EditPatternCommand, SetPatternEnabledCommand
 
 from .command_support import PatternCommandSupport
@@ -61,9 +61,9 @@ async def add_pattern(
             localizer,
             "results.pattern.already_exists",
             thread=thread,
-            ID=display_id,
             style=DiscordResultStyle.INFO,
             ephemeral=True,
+            sources={"view": {"id": display_id}},
         )
 
     created = await pattern_repository.add_pattern(
@@ -104,17 +104,21 @@ async def add_pattern(
         localizer,
         "results.pattern.added_result",
         thread=thread,
-        USER=discord_user_mention(localizer, command.requester_id, language=thread.language),
-        ID=display_id,
-        SUMMARY=support.format_pattern_summary(
-            pattern=created,
-            channel_logins=tuple(support.profile_item(channel.display_name, channel.login) for channel in scoped_channels),
-            user_logins=tuple(support.profile_item(user.display_name, user.login) for user in scoped_users),
-            language=thread.language,
-            key_prefix="results.pattern.added_result.summary",
-        ),
         style=DiscordResultStyle.SUCCESS,
         ephemeral=False,
+        sources={
+            "view": {
+                "user_id": command.requester_id,
+                "id": display_id,
+                "summary": support.format_pattern_summary(
+                    pattern=created,
+                    channel_logins=tuple(support.profile_item(channel.display_name, channel.login) for channel in scoped_channels),
+                    user_logins=tuple(support.profile_item(user.display_name, user.login) for user in scoped_users),
+                    language=thread.language,
+                    key_prefix="results.pattern.added_result.summary",
+                ),
+            }
+        },
     )
 
 
@@ -144,12 +148,16 @@ async def remove_pattern(
         localizer,
         "results.pattern.removed_result",
         thread=thread,
-        USER=discord_user_mention(localizer, command.requester_id, language=thread.language),
-        ID=display_id,
-        TEXT=pattern.regex,
-        PING_MODE=support.pattern_mode(pattern.is_regex, language=thread.language, scope="results.pattern.removed_result"),
         style=DiscordResultStyle.SUCCESS,
         ephemeral=False,
+        sources={
+            "view": {
+                "user_id": command.requester_id,
+                "id": display_id,
+                "text": pattern.regex,
+                "ping_mode": support.pattern_mode(pattern.is_regex, language=thread.language, scope="results.pattern.removed_result"),
+            }
+        },
     )
 
 
@@ -179,9 +187,9 @@ async def set_pattern_enabled(
             localizer,
             f"results.pattern.already_{'enabled' if command.enabled else 'disabled'}",
             thread=thread,
-            ID=display_id,
             style=DiscordResultStyle.INFO,
             ephemeral=True,
+            sources={"view": {"id": display_id}},
         )
 
     updated = await pattern_repository.set_pattern_disabled(
@@ -198,12 +206,16 @@ async def set_pattern_enabled(
         localizer,
         f"results.pattern.{result_scope}",
         thread=thread,
-        USER=discord_user_mention(localizer, command.requester_id, language=thread.language),
-        ID=display_id,
-        TEXT=updated.regex,
-        PING_MODE=support.pattern_mode(updated.is_regex, language=thread.language, scope=f"results.pattern.{result_scope}"),
         style=DiscordResultStyle.SUCCESS,
         ephemeral=False,
+        sources={
+            "view": {
+                "user_id": command.requester_id,
+                "id": display_id,
+                "text": updated.regex,
+                "ping_mode": support.pattern_mode(updated.is_regex, language=thread.language, scope=f"results.pattern.{result_scope}"),
+            }
+        },
     )
 
 
@@ -279,9 +291,9 @@ async def edit_pattern(
             localizer,
             "results.pattern.already_exists_other",
             thread=thread,
-            ID=display_id,
             style=DiscordResultStyle.INFO,
             ephemeral=True,
+            sources={"view": {"id": display_id}},
         )
 
     updated = await pattern_repository.update_pattern(
@@ -309,18 +321,22 @@ async def edit_pattern(
         localizer,
         "results.pattern.updated_result",
         thread=thread,
-        USER=discord_user_mention(localizer, command.requester_id, language=thread.language),
-        ID=display_id,
-        SUMMARY=support.format_pattern_changes(
-            before=pattern,
-            after=updated,
-            old_channel_logins=old_channel_logins,
-            new_channel_logins=tuple(support.profile_item(channel.display_name, channel.login) for channel in scoped_channels),
-            old_user_logins=old_user_logins,
-            new_user_logins=tuple(support.profile_item(user.display_name, user.login) for user in scoped_users),
-            language=thread.language,
-            key_prefix="results.pattern.updated_result.summary",
-        ),
         style=DiscordResultStyle.SUCCESS,
         ephemeral=False,
+        sources={
+            "view": {
+                "user_id": command.requester_id,
+                "id": display_id,
+                "summary": support.format_pattern_changes(
+                    before=pattern,
+                    after=updated,
+                    old_channel_logins=old_channel_logins,
+                    new_channel_logins=tuple(support.profile_item(channel.display_name, channel.login) for channel in scoped_channels),
+                    old_user_logins=old_user_logins,
+                    new_user_logins=tuple(support.profile_item(user.display_name, user.login) for user in scoped_users),
+                    language=thread.language,
+                    key_prefix="results.pattern.updated_result.summary",
+                ),
+            }
+        },
     )

@@ -20,7 +20,7 @@ from src.database.connection import (
     TwitchDeviceFlowRecord,
     TwitchDeviceFlowRepository,
 )
-from src.discord_results import build_thread_result, discord_user_mention
+from src.discord_results import build_thread_result
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.services.account_support import AccountNotificationSender
@@ -161,11 +161,17 @@ class DeviceFlowPollProcessor:
             self._result_for_thread(
                 thread,
                 "results.account.linked",
-                DISPLAY_NAME=await self._display_name_for_user_id(stored.twitch_user_id, stored.twitch_login),
-                LOGIN=stored.twitch_login,
-                USER=discord_user_mention(self.localizer, pending.discord_user_id, language=thread.language),
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=True,
+                sources={
+                    "view": {
+                        "account": {
+                            "display_name": await self._display_name_for_user_id(stored.twitch_user_id, stored.twitch_login),
+                            "login": stored.twitch_login,
+                        },
+                        "requester_id": pending.discord_user_id,
+                    }
+                },
             ),
             pending.discord_channel_id,
         )
@@ -184,14 +190,21 @@ class DeviceFlowPollProcessor:
         *,
         style: DiscordResultStyle,
         ephemeral: bool,
-        **placeholders: object,
+        sources: dict[str, object] | None = None,
     ) -> DiscordCommandResult:
         thread = (
             None
             if pending.discord_channel_id is None
             else await self.thread_repository.get_by_discord_channel_id(pending.discord_channel_id)
         )
-        return build_thread_result(self.localizer, key, thread=thread, style=style, ephemeral=ephemeral, **placeholders)
+        return build_thread_result(
+            self.localizer,
+            key,
+            thread=thread,
+            style=style,
+            ephemeral=ephemeral,
+            sources=sources,
+        )
 
     def _result_for_thread(
         self,
@@ -200,9 +213,16 @@ class DeviceFlowPollProcessor:
         *,
         style: DiscordResultStyle,
         ephemeral: bool,
-        **placeholders: object,
+        sources: dict[str, object] | None = None,
     ) -> DiscordCommandResult:
-        return build_thread_result(self.localizer, key, thread=thread, style=style, ephemeral=ephemeral, **placeholders)
+        return build_thread_result(
+            self.localizer,
+            key,
+            thread=thread,
+            style=style,
+            ephemeral=ephemeral,
+            sources=sources,
+        )
 
     @staticmethod
     def _is_expired(pending: TwitchDeviceFlowRecord, now: datetime) -> bool:

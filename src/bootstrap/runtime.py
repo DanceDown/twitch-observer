@@ -144,5 +144,4 @@ async def stop_runtime(core: ApplicationCore, entrypoints: ApplicationEntrypoint
     await core.twitch_bundle.close()
     await entrypoints.discord.stop()
     await entrypoints.twitch_irc.stop()
-    await core.database.close_async()
-    core.database.close()
+    await core.database.close()

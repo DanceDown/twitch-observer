@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from src.database.connection import ThreadRecord, TwitchAccountRepository, TwitchDeviceFlowRepository
 from src.localization import Localizer
 
-from .support import ShowFormattingService, ShowTwitchSubjectResolver
+from .support import ShowTwitchSubjectResolver
 
 
 @dataclass(slots=True)
@@ -15,7 +15,6 @@ class ShowAccountRenderer:
     account_repository: TwitchAccountRepository | None
     device_flow_repository: TwitchDeviceFlowRepository | None
     resolver: ShowTwitchSubjectResolver
-    formatter: ShowFormattingService
     localizer: Localizer
 
     async def render(self, thread: ThreadRecord) -> tuple[str, str | None]:
@@ -34,19 +33,28 @@ class ShowAccountRenderer:
                 self.localizer.text(
                     "show.account.linked",
                     language=language,
-                    USER=self.formatter.mention(account.discord_user_id),
-                    DISPLAY_NAME=twitch_user.display_name,
-                    LOGIN=twitch_user.login,
+                    sources={
+                        "view": {
+                            "user_id": account.discord_user_id,
+                            "display_name": twitch_user.display_name,
+                            "login": twitch_user.login,
+                        }
+                    },
                 )
             )
             rows.append(
                 self.localizer.text(
                     "show.account.token_status",
                     language=language,
-                    STATUS=self.localizer.text(
-                        "show.account.token_available" if account.access_token else "show.account.token_missing",
-                        language=language,
-                    ),
+                    sources={
+                        "view": {
+                            "status": self.localizer.lookup(
+                                "show.account.token_state",
+                                bool(account.access_token),
+                                language=language,
+                            )
+                        }
+                    },
                 )
             )
         pending = (
@@ -59,18 +67,30 @@ class ShowAccountRenderer:
                 self.localizer.text(
                     "show.account.pending",
                     language=language,
-                    USER=self.formatter.mention(pending.discord_user_id),
-                    STATUS=pending.status,
-                    USER_CODE=pending.user_code,
+                    sources={
+                        "view": {
+                            "user_id": pending.discord_user_id,
+                            "status": pending.status,
+                            "user_code": pending.user_code,
+                        }
+                    },
                 )
             )
         if not rows:
             rows.append(self.localizer.text("show.account.empty", language=language))
         return (
-            self.formatter.render_section(
+            self.localizer.text(
                 "show.account.section",
-                self.localizer.text("show.account.rows", language=language, ITEMS=tuple(rows)),
                 language=language,
+                sources={
+                    "view": {
+                        "section_body": self.localizer.text(
+                            "show.account.rows",
+                            language=language,
+                            sources={"view": {"items": tuple(rows)}},
+                        )
+                    }
+                },
             ),
             thumbnail_url,
         )

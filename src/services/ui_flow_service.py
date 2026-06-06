@@ -186,9 +186,16 @@ class DiscordUIFlowGuardService:
                 self.localizer,
                 "results.ui_flow.permission_denied",
                 thread=thread,
-                DETAIL=self.localizer.text("results.ui_flow.permission_detail.generic", language=thread.language),
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                sources={
+                    "view": {
+                        "detail": self.localizer.text(
+                            "results.ui_flow.permission_detail.generic",
+                            language=thread.language,
+                        )
+                    }
+                },
             )
         return build_thread_result(self.localizer, key, thread=thread, style=DiscordResultStyle.ERROR, ephemeral=True)
 

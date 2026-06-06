@@ -8,7 +8,7 @@ from typing import Protocol
 
 from src.gateways.twitch_api import TwitchAuthenticationError
 from src.database.connection import ChannelRepository, ThreadRepository, TwitchAccountRepository, UserPermissionRepository
-from src.discord_results import build_thread_result, discord_user_mention
+from src.discord_results import build_thread_result
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle, SendTwitchMessageCommand
 from src.localization import Localizer
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
@@ -80,10 +80,9 @@ class TwitchWriteCommandService:
                 self.localizer,
                 "results.write.channel_not_tracked",
                 thread=thread,
-                DISPLAY_NAME=twitch_channel.display_name,
-                LOGIN=twitch_channel.login,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                sources={"view": self._channel_view(twitch_channel.display_name, twitch_channel.login)},
             )
 
         account = await self._guards.require_linked_account(thread, denial_key="results.write.no_linked_account")
@@ -144,22 +143,32 @@ class TwitchWriteCommandService:
                 self.localizer,
                 "results.write.reply_sent",
                 thread=thread,
-                DISPLAY_NAME=twitch_channel.display_name,
-                LOGIN=twitch_channel.login,
-                REPLY_TARGET=command.reply_parent_message_id,
-                MESSAGE=message,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
-                USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+                sources={
+                    "view": {
+                        **self._channel_view(twitch_channel.display_name, twitch_channel.login),
+                        "reply_target": command.reply_parent_message_id,
+                        "message": message,
+                        "requester_id": command.requester_id,
+                    }
+                },
             )
         return build_thread_result(
             self.localizer,
             "results.write.message_sent",
             thread=thread,
-            DISPLAY_NAME=twitch_channel.display_name,
-            LOGIN=twitch_channel.login,
-            MESSAGE=message,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    **self._channel_view(twitch_channel.display_name, twitch_channel.login),
+                    "message": message,
+                    "requester_id": command.requester_id,
+                }
+            },
         )
+
+    @staticmethod
+    def _channel_view(display_name: str, login: str) -> dict[str, object]:
+        return {"channel": {"display_name": display_name, "login": login}}

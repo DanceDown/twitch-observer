@@ -9,7 +9,6 @@ from src.events.event_types import ChannelScopeMode, OfflineScope, SubscriptionS
 from src.localization import Localizer
 from src.services.patterns.display_index import PatternDisplayIndexResolver
 from src.services.patterns.filters import PatternFilterResolver
-from src.services.patterns.presentation import PatternCommandPresenter
 from src.services.twitch_gateways import TwitchDirectoryGateway
 
 
@@ -24,7 +23,6 @@ class PatternCommandSupport:
     tracked_user_repository: TrackedUserRepository | None = None
     _display_index: PatternDisplayIndexResolver = field(init=False, repr=False)
     _filters: PatternFilterResolver = field(init=False, repr=False)
-    _presenter: PatternCommandPresenter = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         self._display_index = PatternDisplayIndexResolver(self.pattern_repository)
@@ -34,23 +32,25 @@ class PatternCommandSupport:
             tracked_user_repository=self.tracked_user_repository,
             localizer=self.localizer,
         )
-        self._presenter = PatternCommandPresenter(self.localizer)
 
     def text(
         self,
         thread: ThreadRecord | None,
         key: str,
-        **placeholders: object,
+        *,
+        sources: dict[str, object] | None = None,
+        **legacy_placeholders: object,
     ) -> str:
         return self.localizer.text(
             key,
             language=self.localizer.language_for_thread(thread),
-            **placeholders,
+            sources=sources,
+            **legacy_placeholders,
         )
 
     def pattern_mode(self, is_regex: bool, *, language: str, scope: str) -> str:
         suffix = "regex" if is_regex else "word"
-        return self.localizer.text(f"{scope}.mode_value.{suffix}", language=language)
+        return self.localizer.lookup(f"{scope}.mode_value", suffix, language=language)
 
     async def display_index(self, thread_id: int, pattern_id: int) -> int | None:
         return await self._display_index.resolve(thread_id=thread_id, pattern_id=pattern_id)
@@ -103,12 +103,75 @@ class PatternCommandSupport:
         language: str,
         key_prefix: str,
     ) -> str:
-        return self._presenter.format_pattern_summary(
-            pattern=pattern,
-            channel_logins=channel_logins,
-            user_logins=user_logins,
+        parts = [
+            self.localizer.text(
+                f"{key_prefix}.text",
+                language=language,
+                sources={"view": {"text": pattern.regex}},
+            ),
+            self.localizer.text(
+                f"{key_prefix}.mode",
+                language=language,
+                sources={"view": {"ping_mode": self.pattern_mode(pattern.is_regex, language=language, scope=key_prefix)}},
+            ),
+        ]
+        channel_scope = self._scope_text(
+            mode=pattern.channel_scope_mode,
+            selected=channel_logins,
             language=language,
-            key_prefix=key_prefix,
+            key_prefix=f"{key_prefix}.scope",
+            subject="channel",
+        )
+        user_scope = self._scope_text(
+            mode=pattern.user_scope_mode,
+            selected=user_logins,
+            language=language,
+            key_prefix=f"{key_prefix}.scope",
+            subject="user",
+        )
+        if channel_scope:
+            parts.append(channel_scope)
+        if user_scope:
+            parts.append(user_scope)
+        if pattern.sub_state != "all":
+            parts.append(
+                self.localizer.text(
+                    f"{key_prefix}.subscribers_only" if pattern.sub_state == "subs" else f"{key_prefix}.non_subscribers_only",
+                    language=language,
+                )
+            )
+        if pattern.offline_state != "both":
+            parts.append(
+                self.localizer.text(
+                    f"{key_prefix}.only_while_live" if pattern.offline_state == "online" else f"{key_prefix}.only_while_offline",
+                    language=language,
+                )
+            )
+        parts.append(
+            self.localizer.text(
+                f"{key_prefix}.case_sensitive_yes" if pattern.case_sensitive else f"{key_prefix}.case_sensitive_no",
+                language=language,
+            )
+        )
+        if pattern.color:
+            parts.append(
+                self.localizer.text(
+                    f"{key_prefix}.custom_color",
+                    language=language,
+                    sources={"view": {"color": pattern.color}},
+                )
+            )
+        parts.append(
+            self.localizer.text(
+                f"{key_prefix}.priority",
+                language=language,
+                sources={"view": {"priority": pattern.priority}},
+            )
+        )
+        return self.localizer.text(
+            f"{key_prefix}.list",
+            language=language,
+            sources={"view": {"items": tuple(parts)}},
         )
 
     def format_pattern_changes(
@@ -123,20 +186,180 @@ class PatternCommandSupport:
         language: str,
         key_prefix: str,
     ) -> str:
-        return self._presenter.format_pattern_changes(
-            before=before,
-            after=after,
-            old_channel_logins=old_channel_logins,
-            new_channel_logins=new_channel_logins,
-            old_user_logins=old_user_logins,
-            new_user_logins=new_user_logins,
+        changes: list[str] = []
+        if before.regex != after.regex:
+            changes.append(
+                self.localizer.text(
+                    f"{key_prefix}.text",
+                    language=language,
+                    sources={"view": {"before": before.regex, "after": after.regex}},
+                )
+            )
+        if before.is_regex != after.is_regex:
+            changes.append(
+                self.localizer.text(
+                    f"{key_prefix}.mode",
+                    language=language,
+                    sources={
+                        "view": {
+                            "before": self.pattern_mode(before.is_regex, language=language, scope=key_prefix),
+                            "after": self.pattern_mode(after.is_regex, language=language, scope=key_prefix),
+                        }
+                    },
+                )
+            )
+
+        old_channel_scope = self._scope_text(
+            mode=before.channel_scope_mode,
+            selected=old_channel_logins,
             language=language,
-            key_prefix=key_prefix,
+            key_prefix=f"{key_prefix}.scope",
+            subject="channel",
+        )
+        new_channel_scope = self._scope_text(
+            mode=after.channel_scope_mode,
+            selected=new_channel_logins,
+            language=language,
+            key_prefix=f"{key_prefix}.scope",
+            subject="channel",
+        )
+        if old_channel_scope != new_channel_scope:
+            all_channels_scope = self.localizer.text(f"{key_prefix}.scope.channel_all", language=language)
+            changes.append(
+                self.localizer.text(
+                    f"{key_prefix}.where",
+                    language=language,
+                    sources={"view": {"before": old_channel_scope or all_channels_scope, "after": new_channel_scope or all_channels_scope}},
+                )
+            )
+
+        old_user_scope = self._scope_text(
+            mode=before.user_scope_mode,
+            selected=old_user_logins,
+            language=language,
+            key_prefix=f"{key_prefix}.scope",
+            subject="user",
+        )
+        new_user_scope = self._scope_text(
+            mode=after.user_scope_mode,
+            selected=new_user_logins,
+            language=language,
+            key_prefix=f"{key_prefix}.scope",
+            subject="user",
+        )
+        if old_user_scope != new_user_scope:
+            everyone_scope = self.localizer.text(f"{key_prefix}.scope.user_everyone", language=language)
+            changes.append(
+                self.localizer.text(
+                    f"{key_prefix}.who",
+                    language=language,
+                    sources={"view": {"before": old_user_scope or everyone_scope, "after": new_user_scope or everyone_scope}},
+                )
+            )
+        if before.sub_state != after.sub_state:
+            changes.append(
+                self.localizer.text(
+                    f"{key_prefix}.subscribers",
+                    language=language,
+                    sources={
+                        "view": {
+                            "before": self.localizer.text(f"{key_prefix}.sub_state.{before.sub_state}", language=language),
+                            "after": self.localizer.text(f"{key_prefix}.sub_state.{after.sub_state}", language=language),
+                        }
+                    },
+                )
+            )
+        if before.offline_state != after.offline_state:
+            changes.append(
+                self.localizer.text(
+                    f"{key_prefix}.stream_state",
+                    language=language,
+                    sources={
+                        "view": {
+                            "before": self.localizer.text(f"{key_prefix}.stream_state_value.{before.offline_state}", language=language),
+                            "after": self.localizer.text(f"{key_prefix}.stream_state_value.{after.offline_state}", language=language),
+                        }
+                    },
+                )
+            )
+        if before.case_sensitive != after.case_sensitive:
+            changes.append(
+                self.localizer.text(
+                    f"{key_prefix}.case_sensitive",
+                    language=language,
+                    sources={
+                        "view": {
+                            "before": self.localizer.text(
+                                f"{key_prefix}.case_sensitive_yes" if before.case_sensitive else f"{key_prefix}.case_sensitive_no",
+                                language=language,
+                            ),
+                            "after": self.localizer.text(
+                                f"{key_prefix}.case_sensitive_yes" if after.case_sensitive else f"{key_prefix}.case_sensitive_no",
+                                language=language,
+                            ),
+                        }
+                    },
+                )
+            )
+        if before.color != after.color:
+            inherited_color = self.localizer.text(f"{key_prefix}.color_inherited", language=language)
+            changes.append(
+                self.localizer.text(
+                    f"{key_prefix}.color",
+                    language=language,
+                    sources={"view": {"before": before.color or inherited_color, "after": after.color or inherited_color}},
+                )
+            )
+        if before.priority != after.priority:
+            changes.append(
+                self.localizer.text(
+                    f"{key_prefix}.priority",
+                    language=language,
+                    sources={"view": {"before": before.priority, "after": after.priority}},
+                )
+            )
+        return self.localizer.text(
+            f"{key_prefix}.list",
+            language=language,
+            sources={"view": {"items": tuple(changes)}},
         )
 
     @staticmethod
     def profile_item(display_name: str, login: str) -> dict[str, str]:
-        return {"DISPLAY_NAME": display_name, "LOGIN": login}
+        return {"display_name": display_name, "login": login}
+
+    def _scope_text(
+        self,
+        *,
+        mode: str,
+        selected: tuple[dict[str, str], ...],
+        language: str,
+        key_prefix: str,
+        subject: str,
+    ) -> str | None:
+        if mode == "all_users":
+            return None
+        if mode == "all_tracked":
+            return self.localizer.text(f"{key_prefix}.{subject}_all", language=language)
+        if mode == "only_selected":
+            return self.localizer.text(
+                f"{key_prefix}.{subject}_only",
+                language=language,
+                sources={"view": {"items": selected}},
+            )
+        if mode == "all_except_selected":
+            return self.localizer.text(
+                f"{key_prefix}.{subject}_except",
+                language=language,
+                sources={"view": {"items": selected}},
+            )
+        if mode == "all_tracked_except_selected":
+            return self.localizer.text(
+                f"{key_prefix}.{subject}_tracked_except",
+                language=language,
+                sources={"view": {"items": selected}},
+            )
+        return None
 
     @staticmethod
     def default_priority_for(

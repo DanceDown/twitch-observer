@@ -21,7 +21,6 @@ from src.services.show import (
     ShowAccountRenderer,
     ShowChannelEventsRenderer,
     ShowChannelsRenderer,
-    ShowFormattingService,
     ShowPatternsRenderer,
     ShowPermissionsRenderer,
     ShowTwitchSubjectResolver,
@@ -45,7 +44,6 @@ class ShowSectionRenderer:
     permission_repository: UserPermissionRepository | None = None
     account_repository: TwitchAccountRepository | None = None
     device_flow_repository: TwitchDeviceFlowRepository | None = None
-    _formatter: ShowFormattingService = field(init=False, repr=False)
     _resolver: ShowTwitchSubjectResolver = field(init=False, repr=False)
     _channels: ShowChannelsRenderer = field(init=False, repr=False)
     _channel_events: ShowChannelEventsRenderer = field(init=False, repr=False)
@@ -55,19 +53,16 @@ class ShowSectionRenderer:
     _account: ShowAccountRenderer = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._formatter = ShowFormattingService(self.localizer)
         self._resolver = ShowTwitchSubjectResolver(self.twitch_api)
         self._channels = ShowChannelsRenderer(
             channel_repository=self.channel_repository,
             resolver=self._resolver,
-            formatter=self._formatter,
             localizer=self.localizer,
         )
         self._channel_events = ShowChannelEventsRenderer(
             channel_repository=self.channel_repository,
             adapter_event_action_repository=self.adapter_event_action_repository,
             resolver=self._resolver,
-            formatter=self._formatter,
             localizer=self.localizer,
         )
         self._patterns = ShowPatternsRenderer(
@@ -76,25 +71,21 @@ class ShowSectionRenderer:
             adapter_event_repository=self.adapter_event_repository,
             adapter_event_action_repository=self.adapter_event_action_repository,
             resolver=self._resolver,
-            formatter=self._formatter,
             localizer=self.localizer,
         )
         self._users = ShowUsersRenderer(
             tracked_user_repository=self.tracked_user_repository,
             resolver=self._resolver,
-            formatter=self._formatter,
             localizer=self.localizer,
         )
         self._permissions = ShowPermissionsRenderer(
             permission_repository=self.permission_repository,
-            formatter=self._formatter,
             localizer=self.localizer,
         )
         self._account = ShowAccountRenderer(
             account_repository=self.account_repository,
             device_flow_repository=self.device_flow_repository,
             resolver=self._resolver,
-            formatter=self._formatter,
             localizer=self.localizer,
         )
 

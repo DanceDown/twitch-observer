@@ -8,84 +8,58 @@ from src.discord_results import build_result
 from src.localization import LocalizationError, Localizer
 
 
-def test_localizer_interpolates_placeholders_and_supports_backslash_escaping() -> None:
+def test_localizer_resolves_sources_with_dot_paths_and_backslash_escaping() -> None:
     localizer = Localizer(
         catalogs={
             "english": {
                 "example": {
-                    "body": "Language now {LANGUAGE_NAME}",
+                    "body": "Language now {view.language_name}",
                 }
             }
         }
     )
 
-    rendered = localizer.text(
-        "example.body",
-        language="english",
-        USER="<@123456789012345678>",
-        LANGUAGE_NAME="German",
+    rendered = localizer.text("example.body", language="english", sources={"view": {"language_name": "German"}})
+    escaped = localizer._interpolate(  # type: ignore[attr-defined]
+        r"Literal \{name\} and \\ and {view.value}",
+        {"view": {"value": "ok"}},
+        language=None,
+        placeholder_specs=None,
     )
-    escaped = localizer._interpolate(r"Literal \{NAME\} and \\ and {VALUE}", {"VALUE": "ok"})  # type: ignore[attr-defined]
 
     assert "German" in rendered
-    assert "{LANGUAGE_NAME}" not in rendered
-    assert "{NAME}" in escaped
+    assert "{view.language_name}" not in rendered
+    assert "{name}" in escaped
     assert escaped.endswith("ok")
 
 
-def test_localizer_replaces_user_placeholder_directly() -> None:
+def test_localizer_supports_explicit_placeholder_modes_with_dot_paths() -> None:
     localizer = Localizer.from_directory()
 
     rendered = localizer._interpolate(  # type: ignore[attr-defined]
-        r"\{USER\} then {RAW:USER} then {VALUE}",
-        {"USER": "<@123456789012345678>", "VALUE": "ok"},
+        "Escaped={view.value} Raw={RAW:view.value} Code=`{CODE:view.value}` Mention=<@{RAW:view.user_id}>",
+        {"view": {"value": "Hello` @everyone [x]", "user_id": 123}},
+        language=None,
+        placeholder_specs=None,
     )
 
-    assert rendered.startswith("{USER} then <@123456789012345678>")
-    assert rendered.endswith("then ok")
+    assert r"Escaped=Hello\` @" in rendered
+    assert "Raw=Hello` @everyone [x]" in rendered
+    assert "Code=`Hello" in rendered
+    assert "Mention=<@123>" in rendered
 
 
-def test_localizer_supports_explicit_placeholder_modes() -> None:
-    localizer = Localizer.from_directory()
-
-    rendered = localizer._interpolate(  # type: ignore[attr-defined]
-        "Escaped={VALUE} Raw={RAW:VALUE} Code=`{CODE:VALUE}`",
-        {"VALUE": "Hello` @everyone [x]"},
-    )
-
-    assert rendered == r"Escaped=Hello\` @​everyone \[x\] Raw=Hello` @everyone [x] Code=`Hello´ @everyone [x]`"
-
-
-def test_localizer_formats_localized_lists() -> None:
+def test_localizer_formats_localized_lists_with_item_sources() -> None:
     localizer = Localizer(
         catalogs={
             "english": {
                 "example": {
                     "items": {
-                        "item_format": "<{RAW:LIST_ITEM}>",
-                        "separator": ", ",
-                    }
-                }
-            }
-        }
-    )
-
-    rendered = localizer.format_list("<{RAW:LIST_ITEM}>", ", ", ["one", "two"])
-
-    assert rendered == "<one>, <two>"
-
-
-def test_localizer_uses_list_metadata_from_template_entries() -> None:
-    localizer = Localizer(
-        catalogs={
-            "english": {
-                "example": {
-                    "supported": {
-                        "template": "Supported: {RAW:LANGUAGES}",
+                        "template": "{RAW:view.items}",
                         "placeholders": {
-                            "LANGUAGES": {
+                            "view.items": {
                                 "list": {
-                                    "item_format": "`{CODE:LIST_ITEM}`",
+                                    "item_format": "<{RAW:item}>",
                                     "separator": ", ",
                                 }
                             }
@@ -96,16 +70,49 @@ def test_localizer_uses_list_metadata_from_template_entries() -> None:
         }
     )
 
-    rendered = localizer.text(
-        "example.supported",
-        language="english",
-        LANGUAGES=["english", "german"],
+    rendered = localizer.text("example.items", language="english", sources={"view": {"items": ["one", "two"]}})
+
+    assert rendered == "<one>, <two>"
+
+
+def test_localizer_supports_lookup_and_timestamp_specs() -> None:
+    localizer = Localizer(
+        catalogs={
+            "english": {
+                "common": {
+                    "formats": {
+                        "timestamp": "%d-%m-%Y %H:%M:%S",
+                        "unknown_timestamp": "unknown",
+                    }
+                },
+                "labels": {
+                    "mode": {
+                        "regex": "Regex",
+                    }
+                },
+                "example": {
+                    "body": {
+                        "template": "{value} <@{RAW:view.user_id}> {expires_at}",
+                        "placeholders": {
+                            "value": {"path": "view.mode", "lookup": {"regex": "labels.mode.regex"}},
+                            "expires_at": {"path": "view.expires_at", "timestamp": True},
+                        },
+                    }
+                },
+            }
+        }
     )
 
-    assert rendered == "Supported: `english`, `german`"
+    rendered = localizer.text(
+        "example.body",
+        language="english",
+        sources={"view": {"mode": "regex", "user_id": 123, "expires_at": "2026-06-06T12:34:56+00:00"}},
+    )
+
+    assert rendered == "Regex <@123> 06-06-2026 12:34:56"
 
 
-def test_build_result_uses_list_metadata_from_result_entries() -> None:
+def test_build_result_uses_sources_with_list_metadata() -> None:
     localizer = Localizer(
         catalogs={
             "english": {
@@ -113,12 +120,12 @@ def test_build_result_uses_list_metadata_from_result_entries() -> None:
                     "example": {
                         "granted": {
                             "title": "Done",
-                            "body": "{RAW:USER} -> {RAW:TARGET}\n{RAW:PERMISSIONS}",
+                            "body": "<@{RAW:view.user_id}> -> <@{RAW:view.target_id}>\n{RAW:view.permissions}",
                             "footer": "",
                             "placeholders": {
-                                "PERMISSIONS": {
+                                "view.permissions": {
                                     "list": {
-                                        "item_format": "- {RAW:LIST_ITEM}",
+                                        "item_format": "- {RAW:item}",
                                         "separator": "\n",
                                     }
                                 }
@@ -134,9 +141,7 @@ def test_build_result_uses_list_metadata_from_result_entries() -> None:
         localizer,
         "results.example.granted",
         language="english",
-        USER="<@1>",
-        TARGET="<@2>",
-        PERMISSIONS=["View", "Edit"],
+        sources={"view": {"user_id": 1, "target_id": 2, "permissions": ["View", "Edit"]}},
     )
 
     assert result.message.endswith("- View\n- Edit")
@@ -155,8 +160,8 @@ def test_localizer_loads_utf8_german_text_from_files(tmp_path) -> None:
     assert rendered == "verfügbar außer äöüß"
 
 
-def test_localizer_raises_for_missing_placeholder_values() -> None:
-    localizer = Localizer(catalogs={"english": {"example": {"body": "Hello {DISPLAY_NAME}"}}})
+def test_localizer_raises_for_missing_source_values() -> None:
+    localizer = Localizer(catalogs={"english": {"example": {"body": "Hello {view.display_name}"}}})
 
     with pytest.raises(LocalizationError):
-        localizer.text("example.body", language="english")
+        localizer.text("example.body", language="english", sources={"view": {}})

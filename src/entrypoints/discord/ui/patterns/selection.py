@@ -140,15 +140,19 @@ class PatternEditSelectionModal(discord.ui.Modal):
                         description=localizer.text(
                             "discord.pattern_ui.selection.option_description",
                             language=language,
-                            ID=item.display_index,
-                            PING_MODE=localizer.text(
-                                (
-                                    "discord.pattern_ui.summary.mode_regex"
-                                    if item.pattern.is_regex
-                                    else "discord.pattern_ui.summary.mode_word"
-                                ),
-                                language=language,
-                            ),
+                            sources={
+                                "view": {
+                                    "display_id": item.display_index,
+                                    "ping_mode": localizer.text(
+                                        (
+                                            "discord.pattern_ui.summary.mode_regex"
+                                            if item.pattern.is_regex
+                                            else "discord.pattern_ui.summary.mode_word"
+                                        ),
+                                        language=language,
+                                    ),
+                                }
+                            },
                         ),
                     )
                     for item in patterns[:25]

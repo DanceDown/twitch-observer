@@ -172,8 +172,7 @@ class ShowPaginationView(discord.ui.View):
             text=self._localizer.text(
                 "discord.show_ui.pagination.footer",
                 language=self._language,
-                CURRENT=self._page_index + 1,
-                TOTAL=len(self._pages),
+                sources={"view": {"current": self._page_index + 1, "total": len(self._pages)}},
             )
         )
         return embed

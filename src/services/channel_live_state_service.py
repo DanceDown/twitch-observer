@@ -13,7 +13,7 @@ from src.database.connection import (
     ThreadRepository,
     UserPermissionRepository,
 )
-from src.discord_results import build_thread_result, discord_user_mention
+from src.discord_results import build_thread_result
 from src.events.event_types import (
     AddChannelEventCommand,
     DiscordCommandResult,
@@ -168,13 +168,17 @@ class ChannelEventCommandService:
             self.localizer,
             key,
             thread=thread,
-            ID=display_id,
-            STATE=self._state_label(command.event_kind.value, thread),
-            DISPLAY_NAME=channel_display_name,
-            LOGIN=channel_login,
             style=style,
             ephemeral=ephemeral,
-            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": self._event_view(
+                    requester_id=command.requester_id,
+                    display_id=display_id,
+                    state=self._state_label(command.event_kind.value, thread),
+                    channel_display_name=channel_display_name,
+                    channel_login=channel_login,
+                )
+            },
         )
 
     async def _update_notification(
@@ -208,11 +212,15 @@ class ChannelEventCommandService:
                 self.localizer,
                 "results.channel_event.none_configured",
                 thread=thread,
-                STATE=self._state_label(command.event_kind.value, thread),
-                DISPLAY_NAME=channel_display_name,
-                LOGIN=channel_login,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                sources={
+                    "view": self._event_view(
+                        state=self._state_label(command.event_kind.value, thread),
+                        channel_display_name=channel_display_name,
+                        channel_login=channel_login,
+                    )
+                },
             )
 
         display_id = await self._display_index(thread.thread_id, adapter_event.event_id) or adapter_event.event_id
@@ -227,13 +235,17 @@ class ChannelEventCommandService:
             self.localizer,
             key,
             thread=thread,
-            ID=display_id,
-            STATE=self._state_label(command.event_kind.value, thread),
-            DISPLAY_NAME=channel_display_name,
-            LOGIN=channel_login,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": self._event_view(
+                    requester_id=command.requester_id,
+                    display_id=display_id,
+                    state=self._state_label(command.event_kind.value, thread),
+                    channel_display_name=channel_display_name,
+                    channel_login=channel_login,
+                )
+            },
         )
 
     async def _channel_identity(self, twitch_channel_id: str) -> tuple[str, str]:
@@ -284,11 +296,15 @@ class ChannelEventCommandService:
                 self.localizer,
                 "results.channel_event.none_configured",
                 thread=thread,
-                STATE=self._state_label(command.event_kind.value, thread),
-                DISPLAY_NAME=channel_display_name,
-                LOGIN=channel_login,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
+                sources={
+                    "view": self._event_view(
+                        state=self._state_label(command.event_kind.value, thread),
+                        channel_display_name=channel_display_name,
+                        channel_login=channel_login,
+                    )
+                },
             )
 
         display_id = await self._display_index(thread.thread_id, adapter_event.event_id) or adapter_event.event_id
@@ -310,13 +326,17 @@ class ChannelEventCommandService:
                 self.localizer,
                 "results.channel_event.color_cleared",
                 thread=thread,
-                ID=display_id,
-                STATE=self._state_label(command.event_kind.value, thread),
-                DISPLAY_NAME=channel_display_name,
-                LOGIN=channel_login,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
-                USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+                sources={
+                    "view": self._event_view(
+                        requester_id=command.requester_id,
+                        display_id=display_id,
+                        state=self._state_label(command.event_kind.value, thread),
+                        channel_display_name=channel_display_name,
+                        channel_login=channel_login,
+                    )
+                },
             )
 
         if notify_action.color == normalized_color:
@@ -324,13 +344,17 @@ class ChannelEventCommandService:
                 self.localizer,
                 "results.channel_event.already_color",
                 thread=thread,
-                ID=display_id,
-                STATE=self._state_label(command.event_kind.value, thread),
-                DISPLAY_NAME=channel_display_name,
-                LOGIN=channel_login,
-                COLOR=normalized_color,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
+                sources={
+                    "view": self._event_view(
+                        display_id=display_id,
+                        state=self._state_label(command.event_kind.value, thread),
+                        channel_display_name=channel_display_name,
+                        channel_login=channel_login,
+                        color=normalized_color,
+                    )
+                },
             )
 
         updated = await self.adapter_event_action_repository.set_action_color(
@@ -345,14 +369,18 @@ class ChannelEventCommandService:
             self.localizer,
             "results.channel_event.color_updated",
             thread=thread,
-            ID=display_id,
-            STATE=self._state_label(command.event_kind.value, thread),
-            DISPLAY_NAME=channel_display_name,
-            LOGIN=channel_login,
-            COLOR=updated.color or "",
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": self._event_view(
+                    requester_id=command.requester_id,
+                    display_id=display_id,
+                    state=self._state_label(command.event_kind.value, thread),
+                    channel_display_name=channel_display_name,
+                    channel_login=channel_login,
+                    color=updated.color or "",
+                )
+            },
         )
 
     async def _ensure_permission(
@@ -376,3 +404,28 @@ class ChannelEventCommandService:
             thread_id=thread_id,
             event_id=event_id,
         )
+
+    @staticmethod
+    def _event_view(
+        *,
+        state: str,
+        channel_display_name: str,
+        channel_login: str,
+        requester_id: int | None = None,
+        display_id: int | None = None,
+        color: str | None = None,
+    ) -> dict[str, object]:
+        view: dict[str, object] = {
+            "state": state,
+            "channel": {
+                "display_name": channel_display_name,
+                "login": channel_login,
+            },
+        }
+        if requester_id is not None:
+            view["requester_id"] = requester_id
+        if display_id is not None:
+            view["display_id"] = display_id
+        if color is not None:
+            view["color"] = color
+        return view

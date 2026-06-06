@@ -12,8 +12,10 @@ from src.utils.discord_embeds import build_channel_event_auto_reply_embed, build
 def test_public_actor_embed_keeps_direct_user_placeholder_without_duplicate_prefix() -> None:
     localizer = Localizer.from_directory()
     message = localizer._interpolate(  # type: ignore[attr-defined]
-        "{RAW:USER} added a ping: `{PING}`",
-        {"USER": "@Tester", "PING": "alpha"},
+        "<@{RAW:view.requester_id}> added a ping: `{CODE:view.ping}`",
+        {"view": {"requester_id": "123", "ping": "alpha"}},
+        language=None,
+        placeholder_specs=None,
     )
     result = DiscordCommandResult(
         title="Ping Added",
@@ -25,7 +27,7 @@ def test_public_actor_embed_keeps_direct_user_placeholder_without_duplicate_pref
     embed = build_public_result_embed(result)
 
     assert embed.description is not None
-    assert embed.description.count("@Tester") == 1
+    assert embed.description.count("<@123>") == 1
     assert "`alpha`" in embed.description
 
 

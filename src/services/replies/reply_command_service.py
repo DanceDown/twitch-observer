@@ -15,7 +15,6 @@ from src.database.connection import (
     TwitchAccountRepository,
     UserPermissionRepository,
 )
-from src.discord_results import build_thread_result, discord_user_mention
 from src.events.event_types import (
     AddChannelEventReplyCommand,
     AddPatternReplyCommand,

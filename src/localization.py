@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Mapping, Protocol
 
 from src.utils.discord_text import escape_discord_text, normalize_discord_code_value
 
 DEFAULT_LANGUAGE = "english"
 _LANG_DIRECTORY = Path(__file__).resolve().parent.parent / "lang"
-DEFAULT_LIST_ITEM_PLACEHOLDER = "LIST_ITEM"
+_DEFAULT_TIMESTAMP_FORMAT = "%d-%m-%Y %H:%M:%S %Z"
+_DEFAULT_UNKNOWN_TIMESTAMP = "unknown"
 
 
 class LocalizationError(ValueError):
@@ -71,14 +73,27 @@ class Localizer:
             return self.default_language
         return self.resolve_language(thread.language)
 
-    def text(self, key: str, *, language: str | None = None, **placeholders: object) -> str:
+    def text(
+        self,
+        key: str,
+        *,
+        language: str | None = None,
+        sources: Mapping[str, object] | None = None,
+        **legacy_placeholders: object,
+    ) -> str:
         """Resolve one localized string and interpolate its placeholders."""
         value = self.value(key, language=language)
+        resolved_sources = self._merge_sources(sources, legacy_placeholders)
         if isinstance(value, str):
-            return self.render(value, **placeholders)
+            return self.render(value, sources=resolved_sources)
         if self._is_template_entry(value):
-            return self._render_template_entry(value, language=language, placeholders=placeholders)
+            return self._render_template_entry(value, language=language, sources=resolved_sources)
         raise LocalizationError(f"Translation key {key!r} is not a string.")
+
+    def lookup(self, key_prefix: str, value: object, *, language: str | None = None) -> str:
+        """Resolve one language key from a base path plus one runtime value."""
+        normalized_value = self._normalize_lookup_value(value)
+        return self.text(f"{key_prefix}.{normalized_value}", language=language)
 
     def value(self, key: str, *, language: str | None = None) -> Any:
         """Resolve one raw localized entry from the active catalog."""
@@ -88,37 +103,58 @@ class Localizer:
             raise LocalizationError(f"Unsupported language: {catalog_language}")
         return self._lookup(catalog, key)
 
-    def render(self, template: str, **placeholders: object) -> str:
+    def render(
+        self,
+        template: str,
+        *,
+        sources: Mapping[str, object] | None = None,
+        **legacy_placeholders: object,
+    ) -> str:
         """Render one already-resolved template string with placeholders."""
-        return self._interpolate(template, placeholders)
+        return self._interpolate(template, self._merge_sources(sources, legacy_placeholders), language=None, placeholder_specs=None)
 
     def render_with_placeholders(
         self,
         template: str,
         *,
         language: str | None = None,
-        placeholders: dict[str, object],
+        sources: Mapping[str, object] | None = None,
+        placeholders: dict[str, object] | None = None,
         placeholder_specs: dict[str, Any] | None = None,
+        **legacy_placeholders: object,
     ) -> str:
         """Render one template with optional placeholder-format metadata from the catalog."""
-        return self.render(template, **self._prepare_placeholders(placeholders, language=language, placeholder_specs=placeholder_specs))
+        merged_sources = self._merge_sources(sources, placeholders, legacy_placeholders)
+        return self._interpolate(
+            template,
+            merged_sources,
+            language=language,
+            placeholder_specs=placeholder_specs,
+        )
 
     def format_list(
         self,
         item_format: str,
         separator: str,
         items: list[dict[str, object] | object] | tuple[dict[str, object] | object, ...],
-        **shared_placeholders: object,
+        *,
+        language: str | None = None,
+        sources: Mapping[str, object] | None = None,
     ) -> str:
         """Render one localized list by formatting each item and joining them."""
         rendered_items: list[str] = []
+        shared_sources = dict(sources or {})
         for item in items:
-            placeholders = dict(shared_placeholders)
-            if isinstance(item, dict):
-                placeholders.update(item)
-            else:
-                placeholders[DEFAULT_LIST_ITEM_PLACEHOLDER] = item
-            rendered_items.append(self._interpolate(item_format, placeholders))
+            item_sources = dict(shared_sources)
+            item_sources["item"] = item
+            rendered_items.append(
+                self._interpolate(
+                    item_format,
+                    item_sources,
+                    language=language,
+                    placeholder_specs=None,
+                )
+            )
         return separator.join(rendered_items)
 
     def _render_template_entry(
@@ -126,7 +162,7 @@ class Localizer:
         entry: dict[str, Any],
         *,
         language: str | None,
-        placeholders: dict[str, object],
+        sources: Mapping[str, object],
     ) -> str:
         template = entry.get("template")
         placeholder_specs = entry.get("placeholders")
@@ -137,39 +173,20 @@ class Localizer:
         return self.render_with_placeholders(
             template,
             language=language,
-            placeholders=placeholders,
+            sources=sources,
             placeholder_specs=placeholder_specs,
         )
 
-    def _prepare_placeholders(
-        self,
-        placeholders: dict[str, object],
-        *,
-        language: str | None,
-        placeholder_specs: dict[str, Any] | None,
+    @staticmethod
+    def _merge_sources(
+        *sources: Mapping[str, object] | dict[str, object] | None,
     ) -> dict[str, object]:
-        prepared = dict(placeholders)
-        if placeholder_specs is None:
-            return prepared
-        for name, spec in placeholder_specs.items():
-            if name not in prepared:
+        merged: dict[str, object] = {}
+        for source in sources:
+            if source is None:
                 continue
-            if not isinstance(spec, dict):
-                raise LocalizationError(f"Placeholder spec for {name!r} must be an object.")
-            list_spec = spec.get("list")
-            if list_spec is None:
-                continue
-            if not isinstance(list_spec, dict):
-                raise LocalizationError(f"Placeholder list spec for {name!r} must be an object.")
-            item_format = list_spec.get("item_format")
-            separator = list_spec.get("separator")
-            if not isinstance(item_format, str) or not isinstance(separator, str):
-                raise LocalizationError(f"Placeholder list spec for {name!r} must define string item_format/separator.")
-            value = prepared[name]
-            if not isinstance(value, list | tuple):
-                raise LocalizationError(f"Placeholder {name!r} must be a list or tuple for list formatting.")
-            prepared[name] = self.format_list(item_format, separator, value)
-        return prepared
+            merged.update(source)
+        return merged
 
     @staticmethod
     def _is_template_entry(value: object) -> bool:
@@ -184,8 +201,14 @@ class Localizer:
             current = current[part]
         return current
 
-    @staticmethod
-    def _interpolate(template: str, placeholders: dict[str, object]) -> str:
+    def _interpolate(
+        self,
+        template: str,
+        sources: Mapping[str, object],
+        *,
+        language: str | None,
+        placeholder_specs: dict[str, Any] | None,
+    ) -> str:
         parts: list[str] = []
         index = 0
         length = len(template)
@@ -213,29 +236,177 @@ class Localizer:
             raw_name = template[index + 1 : end_index]
             if not raw_name:
                 raise LocalizationError("Empty placeholder names are not allowed.")
-            mode, name = Localizer._parse_placeholder(raw_name)
-            if name not in placeholders:
-                raise LocalizationError(f"Missing placeholder value for {name!r}.")
-            value = placeholders[name]
-            parts.append(Localizer._render_placeholder_value(mode, value))
+            mode, name = self._parse_placeholder(raw_name)
+            spec = self._placeholder_spec(name, placeholder_specs)
+            value = self._resolve_placeholder_value(name, sources, spec)
+            value = self._transform_placeholder_value(name, value, spec, language=language, sources=sources)
+            parts.append(self._render_placeholder_value(mode, value, language=language))
             index = end_index + 1
         return "".join(parts)
 
     @staticmethod
     def _parse_placeholder(raw_name: str) -> tuple[str, str]:
         if ":" not in raw_name:
-            return "escaped", raw_name
+            return "escaped", raw_name.strip()
         mode, name = raw_name.split(":", 1)
         normalized_mode = mode.strip().lower()
         normalized_name = name.strip()
-        if normalized_mode not in {"escaped", "raw", "code"}:
+        if normalized_mode not in {"escaped", "raw", "code", "timestamp"}:
             raise LocalizationError(f"Unsupported placeholder mode {mode!r}.")
         if not normalized_name:
             raise LocalizationError("Empty placeholder names are not allowed.")
         return normalized_mode, normalized_name
 
     @staticmethod
-    def _render_placeholder_value(mode: str, value: object) -> str:
+    def _placeholder_spec(name: str, placeholder_specs: dict[str, Any] | None) -> dict[str, Any] | None:
+        if placeholder_specs is None:
+            return None
+        spec = placeholder_specs.get(name)
+        if spec is None:
+            return None
+        if not isinstance(spec, dict):
+            raise LocalizationError(f"Placeholder spec for {name!r} must be an object.")
+        return spec
+
+    def _resolve_placeholder_value(
+        self,
+        name: str,
+        sources: Mapping[str, object],
+        spec: dict[str, Any] | None,
+    ) -> object:
+        path = name
+        if spec is not None:
+            spec_path = spec.get("path")
+            if spec_path is not None:
+                if not isinstance(spec_path, str) or not spec_path.strip():
+                    raise LocalizationError(f"Placeholder path for {name!r} must be a non-empty string.")
+                path = spec_path.strip()
+        return self._resolve_source_path(path, sources)
+
+    def _transform_placeholder_value(
+        self,
+        name: str,
+        value: object,
+        spec: dict[str, Any] | None,
+        *,
+        language: str | None,
+        sources: Mapping[str, object],
+    ) -> object:
+        if spec is None:
+            return value
+        list_spec = spec.get("list")
+        if list_spec is not None:
+            if not isinstance(list_spec, dict):
+                raise LocalizationError(f"Placeholder list spec for {name!r} must be an object.")
+            item_format = list_spec.get("item_format")
+            separator = list_spec.get("separator")
+            if not isinstance(item_format, str) or not isinstance(separator, str):
+                raise LocalizationError(f"Placeholder list spec for {name!r} must define string item_format/separator.")
+            if not isinstance(value, list | tuple):
+                raise LocalizationError(f"Placeholder {name!r} must be a list or tuple for list formatting.")
+            value = self.format_list(
+                item_format,
+                separator,
+                value,
+                language=language,
+                sources=sources,
+            )
+
+        lookup_spec = spec.get("lookup")
+        if lookup_spec is not None:
+            value = self._lookup_placeholder_value(name, value, lookup_spec, language=language)
+
+        timestamp_spec = spec.get("timestamp")
+        if timestamp_spec is not None:
+            value = self._format_timestamp_value(value, language=language, spec=timestamp_spec)
+        return value
+
+    def _lookup_placeholder_value(
+        self,
+        name: str,
+        value: object,
+        lookup_spec: object,
+        *,
+        language: str | None,
+    ) -> str:
+        if isinstance(lookup_spec, str):
+            return self.lookup(lookup_spec, value, language=language)
+        if isinstance(lookup_spec, dict):
+            normalized_value = self._normalize_lookup_value(value)
+            target_key = lookup_spec.get(normalized_value)
+            if not isinstance(target_key, str):
+                raise LocalizationError(f"Lookup spec for {name!r} is missing a translation key for {normalized_value!r}.")
+            return self.text(target_key, language=language)
+        raise LocalizationError(f"Placeholder lookup spec for {name!r} must be a string or object.")
+
+    @staticmethod
+    def _resolve_source_path(path: str, sources: Mapping[str, object]) -> object:
+        if path in sources:
+            return sources[path]
+        current: object = sources
+        for part in path.split("."):
+            if isinstance(current, Mapping):
+                if part not in current:
+                    raise LocalizationError(f"Missing source value for {path!r}.")
+                current = current[part]
+                continue
+            if hasattr(current, part):
+                current = getattr(current, part)
+                continue
+            raise LocalizationError(f"Missing source value for {path!r}.")
+        return current
+
+    def _format_timestamp_value(
+        self,
+        value: object,
+        *,
+        language: str | None,
+        spec: object,
+    ) -> str:
+        if value is None:
+            return self._unknown_timestamp(language)
+        if isinstance(value, datetime):
+            parsed = value
+        else:
+            rendered_value = str(value).strip()
+            if not rendered_value:
+                return self._unknown_timestamp(language)
+            try:
+                parsed = datetime.fromisoformat(rendered_value)
+            except ValueError:
+                if spec is True:
+                    return rendered_value
+                raise LocalizationError(f"Timestamp placeholder value {value!r} is not valid ISO-8601 data.")
+        return parsed.strftime(self._timestamp_format(language)).strip() or parsed.isoformat(sep=" ", timespec="seconds")
+
+    def _timestamp_format(self, language: str | None) -> str:
+        try:
+            value = self.value("common.formats.timestamp", language=language)
+        except LocalizationError:
+            return _DEFAULT_TIMESTAMP_FORMAT
+        if not isinstance(value, str):
+            raise LocalizationError("common.formats.timestamp must be a string.")
+        return value
+
+    def _unknown_timestamp(self, language: str | None) -> str:
+        try:
+            value = self.value("common.formats.unknown_timestamp", language=language)
+        except LocalizationError:
+            return _DEFAULT_UNKNOWN_TIMESTAMP
+        if not isinstance(value, str):
+            raise LocalizationError("common.formats.unknown_timestamp must be a string.")
+        return value
+
+    @staticmethod
+    def _normalize_lookup_value(value: object) -> str:
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        return str(value).strip().lower()
+
+    def _render_placeholder_value(self, mode: str, value: object, *, language: str | None) -> str:
+        if mode == "timestamp":
+            return self._format_timestamp_value(value, language=language, spec=True)
+
         rendered = str(value)
         if mode == "raw":
             return rendered

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import ChannelRepository, ThreadRepository, UserPermissionRepository
-from src.discord_results import build_result, build_thread_result, discord_user_mention
+from src.discord_results import build_result, build_thread_result
 from src.errors import ApplicationInvariantError
 from src.events.event_types import (
     DiscordCommandResult,
@@ -108,7 +108,7 @@ class ThreadLifecycleService:
             thread=created,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(self.localizer, command.requester_id, language=created.language),
+            sources={"view": {"requester_id": command.requester_id}},
         )
 
     async def _leave_context(self, command: LeaveThreadCommand) -> DiscordCommandResult:
@@ -174,7 +174,7 @@ class ThreadLifecycleService:
             thread=thread,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            sources={"view": {"requester_id": command.requester_id}},
         )
 
     async def _set_context_enabled(self, command: SetThreadEnabledCommand) -> DiscordCommandResult:
@@ -207,7 +207,7 @@ class ThreadLifecycleService:
             thread=updated,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            USER=discord_user_mention(self.localizer, command.requester_id, language=updated.language),
+            sources={"view": {"requester_id": command.requester_id}},
         )
 
     async def _set_context_color(self, command: SetThreadColorCommand) -> DiscordCommandResult:
@@ -230,7 +230,7 @@ class ThreadLifecycleService:
                 thread=updated,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
-                USER=discord_user_mention(self.localizer, command.requester_id, language=updated.language),
+                sources={"view": {"requester_id": command.requester_id}},
             )
         if thread.color == normalized_color:
             return build_thread_result(
@@ -239,7 +239,7 @@ class ThreadLifecycleService:
                 thread=thread,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
-                COLOR=normalized_color,
+                sources={"view": {"color": normalized_color}},
             )
         updated = await self.thread_repository.set_color(
                 discord_channel_id=command.discord_channel_id,
@@ -254,8 +254,12 @@ class ThreadLifecycleService:
             thread=updated,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            COLOR=updated.color or "",
-            USER=discord_user_mention(self.localizer, command.requester_id, language=updated.language),
+            sources={
+                "view": {
+                    "color": updated.color or "",
+                    "requester_id": command.requester_id,
+                }
+            },
         )
 
     async def _set_context_language(self, command: SetThreadLanguageCommand) -> DiscordCommandResult:
@@ -275,11 +279,15 @@ class ThreadLifecycleService:
                 thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
-                DETAIL=self.localizer.text(
-                    "results.validation_detail.unsupported_language",
-                    language=thread.language,
-                    LANGUAGES=self.localizer.available_languages(),
-                ),
+                sources={
+                    "view": {
+                        "detail": self.localizer.text(
+                            "results.validation_detail.unsupported_language",
+                            language=thread.language,
+                            sources={"view": {"languages": self.localizer.available_languages()}},
+                        )
+                    }
+                },
             )
         if thread.language == requested_language:
             language_name = self._thread_language_name("results.thread.already_language", requested_language)
@@ -289,8 +297,7 @@ class ThreadLifecycleService:
                 thread=thread,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
-                LANGUAGE_NAME=language_name,
-                LANGUAGE_CODE=requested_language,
+                sources={"view": {"language": {"name": language_name, "code": requested_language}}},
             )
         updated = await self.thread_repository.set_language(
                 discord_channel_id=command.discord_channel_id,
@@ -306,9 +313,12 @@ class ThreadLifecycleService:
             thread=updated,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            LANGUAGE_NAME=language_name,
-            LANGUAGE_CODE=requested_language,
-            USER=discord_user_mention(self.localizer, command.requester_id, language=updated.language),
+            sources={
+                "view": {
+                    "language": {"name": language_name, "code": requested_language},
+                    "requester_id": command.requester_id,
+                }
+            },
         )
 
     def _thread_language_name(self, result_key: str, requested_language: str) -> str:

@@ -31,9 +31,10 @@ from src.services.twitch_user_directory_service import TwitchUserDirectoryServic
 from .models import ApplicationCore, ApplicationGateways
 
 
-def build_core(config: AppConfig) -> ApplicationCore:
+async def build_core(config: AppConfig) -> ApplicationCore:
     localizer = Localizer.from_directory()
     database = PostgresDatabase(config)
+    await database.open()
     raw_message_repository = PostgresMessageRepository(database)
     message_repository = BatchedMessageRepository(
         repository=raw_message_repository,
@@ -85,7 +86,7 @@ def build_core(config: AppConfig) -> ApplicationCore:
         twitch_directory=twitch_directory,
         twitch_bundle=twitch_bundle,
     )
-    database.healthcheck()
+    await database.healthcheck()
     return core
 
 

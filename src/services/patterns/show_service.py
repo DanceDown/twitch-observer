@@ -113,7 +113,7 @@ class ShowCommandService:
                 thread=thread,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
-                SECTION_LIST=[section for section in lines if section],
+                sources={"view": {"sections": [section for section in lines if section]}},
                 thumbnail_url=thumbnail_url,
             )
         return result

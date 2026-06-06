@@ -70,9 +70,9 @@ class BaseFormView(discord.ui.View):
         """Return the resolved UI language for this form."""
         return self._language
 
-    def text(self, key: str, **placeholders: object) -> str:
+    def text(self, key: str, *, sources: dict[str, object] | None = None, **placeholders: object) -> str:
         """Resolve one localized UI string for this view."""
-        return self._localizer.text(key, language=self._language, **placeholders)
+        return self._localizer.text(key, language=self._language, sources=sources, **placeholders)
 
     def result(
         self,
@@ -80,6 +80,7 @@ class BaseFormView(discord.ui.View):
         *,
         style: DiscordResultStyle = DiscordResultStyle.INFO,
         ephemeral: bool = True,
+        sources: dict[str, object] | None = None,
         **placeholders: object,
     ) -> DiscordCommandResult:
         """Resolve one localized command result for this form."""
@@ -89,16 +90,24 @@ class BaseFormView(discord.ui.View):
             language=self._language,
             style=style,
             ephemeral=ephemeral,
+            sources=sources,
             **placeholders,
         )
 
-    def form_embed(self, result_key: str, **placeholders: object) -> discord.Embed:
+    def form_embed(
+        self,
+        result_key: str,
+        *,
+        sources: dict[str, object] | None = None,
+        **placeholders: object,
+    ) -> discord.Embed:
         """Build one localized configuration embed for the current form state."""
         return build_form_embed(
             self.result(
                 result_key,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
+                sources=sources,
                 **placeholders,
             )
         )

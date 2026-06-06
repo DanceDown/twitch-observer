@@ -20,24 +20,23 @@ from src.services.twitch_runtime import (
     TWITCH_ADAPTER_KEY,
 )
 
-from .support import ShowFormattingService, ShowTwitchSubjectResolver
+from .support import ShowTwitchSubjectResolver, stream_state_key
 
 
 @dataclass(slots=True)
 class ShowChannelsRenderer:
     channel_repository: ChannelRepository
     resolver: ShowTwitchSubjectResolver
-    formatter: ShowFormattingService
     localizer: Localizer
 
     async def render(self, thread: ThreadRecord) -> str:
         language = self.localizer.language_for_thread(thread)
         channels = await self.channel_repository.list_channels_for_thread(thread.thread_id)
         if not channels:
-            return self.formatter.render_section(
+            return self.localizer.text(
                 "show.channel.section",
-                self.localizer.text("show.channel.empty", language=language),
                 language=language,
+                sources={"view": {"section_body": self.localizer.text("show.channel.empty", language=language)}},
             )
 
         await self.resolver.preload_channel_ids(tuple(channel.twitch_channel_id for channel in channels))
@@ -50,26 +49,42 @@ class ShowChannelsRenderer:
                     self.localizer.text(
                         "show.channel.custom_color",
                         language=language,
-                        COLOR=channel.color,
+                        sources={"view": {"color": channel.color}},
                     )
                 )
             rows.append(
                 self.localizer.text(
                     "show.channel.row",
                     language=language,
-                    DISPLAY_NAME=twitch_user.display_name,
-                    LOGIN=twitch_user.login,
-                    DETAILS=(
-                        ""
-                        if not details
-                        else self.localizer.text("show.channel.details", language=language, ITEMS=tuple(details))
-                    ),
+                    sources={
+                        "view": {
+                            "display_name": twitch_user.display_name,
+                            "login": twitch_user.login,
+                            "details": (
+                                ""
+                                if not details
+                                else self.localizer.text(
+                                    "show.channel.details",
+                                    language=language,
+                                    sources={"view": {"items": tuple(details)}},
+                                )
+                            ),
+                        }
+                    },
                 )
             )
-        return self.formatter.render_section(
+        return self.localizer.text(
             "show.channel.section",
-            self.localizer.text("show.channel.rows", language=language, ITEMS=tuple(rows)),
             language=language,
+            sources={
+                "view": {
+                    "section_body": self.localizer.text(
+                        "show.channel.rows",
+                        language=language,
+                        sources={"view": {"items": tuple(rows)}},
+                    )
+                }
+            },
         )
 
 
@@ -78,16 +93,15 @@ class ShowChannelEventsRenderer:
     channel_repository: ChannelRepository
     adapter_event_action_repository: AdapterEventActionRepository | None
     resolver: ShowTwitchSubjectResolver
-    formatter: ShowFormattingService
     localizer: Localizer
 
     async def render(self, thread: ThreadRecord) -> str:
         language = self.localizer.language_for_thread(thread)
         if self.adapter_event_action_repository is None:
-            return self.formatter.render_section(
+            return self.localizer.text(
                 "show.channel_event.section",
-                self.localizer.text("show.channel_event.empty", language=language),
                 language=language,
+                sources={"view": {"section_body": self.localizer.text("show.channel_event.empty", language=language)}},
             )
 
         channel_by_id = {
@@ -109,16 +123,20 @@ class ShowChannelEventsRenderer:
                 self.localizer.text(
                     "show.channel_event.channel",
                     language=language,
-                    DISPLAY_NAME=channel_user.display_name,
-                    LOGIN=channel_user.login,
+                    sources={"view": {"display_name": channel_user.display_name, "login": channel_user.login}},
                 ),
                 self.localizer.text(
                     "show.channel_event.trigger",
                     language=language,
-                    STATE=self.formatter.stream_state_label(
-                        STREAM_EVENT_KEY_TO_STATE.get(event.event_key, event.event_key),
-                        language=language,
-                    ),
+                    sources={
+                        "view": {
+                            "state": self.localizer.lookup(
+                                "discord.live_state_ui.states.stream",
+                                stream_state_key(STREAM_EVENT_KEY_TO_STATE.get(event.event_key, event.event_key)),
+                                language=language,
+                            )
+                        }
+                    },
                 ),
             ]
             tracked_channel = channel_by_id.get(event.subject_id)
@@ -127,10 +145,15 @@ class ShowChannelEventsRenderer:
                     self.localizer.text(
                         "show.channel_event.live_state",
                         language=language,
-                        STATE=self.formatter.stream_state_label(
-                            "online" if tracked_channel.is_live else "offline",
-                            language=language,
-                        ),
+                        sources={
+                            "view": {
+                                "state": self.localizer.lookup(
+                                    "discord.live_state_ui.states.stream",
+                                    stream_state_key("online" if tracked_channel.is_live else "offline"),
+                                    language=language,
+                                )
+                            }
+                        },
                     )
                 )
             if action.color:
@@ -138,30 +161,53 @@ class ShowChannelEventsRenderer:
                     self.localizer.text(
                         "show.channel_event.custom_color",
                         language=language,
-                        COLOR=action.color,
+                        sources={"view": {"color": action.color}},
                     )
                 )
             if action.disabled:
                 details.append(self.localizer.text("show.channel_event.disabled", language=language))
             rows.append(
-                self.formatter.render_row(
-                    row_key="show.channel_event.row",
-                    details_key="show.channel_event.details",
-                    head=self.localizer.text("show.channel_event.line", language=language, ID=display_index),
-                    details=details,
+                self.localizer.text(
+                    "show.channel_event.row",
                     language=language,
+                    sources={
+                        "view": {
+                            "head": self.localizer.text(
+                                "show.channel_event.line",
+                                language=language,
+                                sources={"view": {"id": display_index}},
+                            ),
+                            "details": (
+                                ""
+                                if not details
+                                else self.localizer.text(
+                                    "show.channel_event.details",
+                                    language=language,
+                                    sources={"view": {"items": tuple(details)}},
+                                )
+                            ),
+                        }
+                    },
                 )
             )
         if not rows:
-            return self.formatter.render_section(
+            return self.localizer.text(
                 "show.channel_event.section",
-                self.localizer.text("show.channel_event.empty", language=language),
                 language=language,
+                sources={"view": {"section_body": self.localizer.text("show.channel_event.empty", language=language)}},
             )
-        return self.formatter.render_section(
+        return self.localizer.text(
             "show.channel_event.section",
-            self.localizer.text("show.channel_event.rows", language=language, ITEMS=tuple(rows)),
             language=language,
+            sources={
+                "view": {
+                    "section_body": self.localizer.text(
+                        "show.channel_event.rows",
+                        language=language,
+                        sources={"view": {"items": tuple(rows)}},
+                    )
+                }
+            },
         )
 
     async def _channel_notification_actions(self, thread_id: int) -> list[tuple[AdapterEventRecord, AdapterEventActionRecord]]:

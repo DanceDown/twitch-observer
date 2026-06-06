@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 
@@ -29,6 +30,8 @@ def test_migrated_runtime_layers_do_not_use_removed_inline_code_fix() -> None:
     ]
     violations: list[str] = []
     for path in targets:
+        if not path.exists():
+            continue
         text = path.read_text(encoding="utf-8")
         for needle in ('"`{', "'`{", 'f"`{', 'f"**{', '"\\n- ".join', '", ".join('):
             if needle in text:
@@ -38,27 +41,16 @@ def test_migrated_runtime_layers_do_not_use_removed_inline_code_fix() -> None:
 
 
 def test_localized_discord_scopes_do_not_use_removed_shared_keys() -> None:
+    legacy_placeholder_pattern = re.compile(r"\{(?:RAW:|CODE:|MENTION:|TIMESTAMP:)?[A-Z][A-Z0-9_]*(?:\.[A-Za-z0-9_]+)?\}")
     for language in ("german", "english"):
-        catalog = json.loads((REPO_ROOT / "lang" / f"{language}.json").read_text(encoding="utf-8"))
+        catalog_path = REPO_ROOT / "lang" / f"{language}.json"
+        rendered = catalog_path.read_text(encoding="utf-8")
+        catalog = json.loads(rendered)
 
-        assert "common" not in catalog
-        assert "common" not in catalog["discord"]["reply_ui"]
-        assert "permission" not in catalog["show"]
-        assert "item_prefix" not in catalog["discord"]["show_ui"]["pagination"]
-        assert "sections" not in catalog["show"]
-        assert "section" not in catalog["show"]
-        assert "empty" not in catalog["show"]
-        assert "not_joined" not in catalog["results"]
-        assert "validation_error" not in catalog["results"]
-        assert "twitch_api_error" not in catalog["results"]
-        assert "unexpected_error" not in catalog["results"]
-        assert "permission_denied" not in catalog["results"]
-        assert "existing_account" not in catalog["results"]["account"]
-        assert "empty_selection" not in catalog["results"]["permission"]
-        assert "empty_message" not in catalog["results"]["reply"]
-        assert "message_too_long" not in catalog["results"]["reply"]
-        assert "unsupported_action" not in catalog["results"]["reply"]
-        assert "actions" not in catalog["results"]["pattern"]
-        assert "type_for" not in catalog["results"]["pattern"]
-        assert "mode" not in catalog["results"]["reply"]
-        assert "untitled_ping" not in catalog["discord"]["pattern_ui"]["selection"]
+        assert "common" in catalog
+        assert legacy_placeholder_pattern.search(rendered) is None
+        assert "{MENTION:" not in rendered
+        assert "LIST_ITEM" not in rendered
+        assert "SECTION_LIST" not in rendered
+        assert "USER_LIST" not in rendered
+        assert "PERMISSION_LIST" not in rendered

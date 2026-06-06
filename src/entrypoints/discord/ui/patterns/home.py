@@ -60,58 +60,96 @@ class PatternHomeView(BaseFormView):
 
     def render_embed(self) -> discord.Embed:
         lines = [
-            self.text("discord.pattern_ui.summary.text", TEXT=self.state.pattern_text or self.text("discord.pattern_ui.summary.not_set")),
+            self.text(
+                "discord.pattern_ui.summary.text",
+                sources={"view": {"text": self.state.pattern_text or self.text("discord.pattern_ui.summary.not_set")}},
+            ),
             self.text(
                 "discord.pattern_ui.summary.mode",
-                PING_MODE=self.text(
-                    "discord.pattern_ui.summary.mode_regex" if self.state.is_regex else "discord.pattern_ui.summary.mode_word"
-                ),
+                sources={
+                    "view": {
+                        "mode": self.text(
+                            "discord.pattern_ui.summary.mode_regex"
+                            if self.state.is_regex
+                            else "discord.pattern_ui.summary.mode_word"
+                        )
+                    }
+                },
             ),
             self.text(
                 "discord.pattern_ui.summary.where",
-                VALUE=channel_scope_text(
-                    self._localizer,
-                    self.language,
-                    self.state.channel_scope_mode,
-                    self.state.selected_channel_names,
-                ),
+                sources={
+                    "view": {
+                        "value": channel_scope_text(
+                            self._localizer,
+                            self.language,
+                            self.state.channel_scope_mode,
+                            self.state.selected_channel_names,
+                        )
+                    }
+                },
             ),
             self.text(
                 "discord.pattern_ui.summary.who",
-                VALUE=user_scope_text(
-                    self._localizer,
-                    self.language,
-                    self.state.user_scope_mode,
-                    self.state.selected_user_names,
-                ),
+                sources={
+                    "view": {
+                        "value": user_scope_text(
+                            self._localizer,
+                            self.language,
+                            self.state.user_scope_mode,
+                            self.state.selected_user_names,
+                        )
+                    }
+                },
             ),
             self.text(
                 "discord.pattern_ui.summary.subscribers",
-                VALUE=sub_state_text(self._localizer, self.language, self.state.sub_state),
+                sources={"view": {"value": sub_state_text(self._localizer, self.language, self.state.sub_state)}},
             ),
             self.text(
                 "discord.pattern_ui.summary.stream_state",
-                VALUE=offline_state_text(self._localizer, self.language, self.state.offline_state),
+                sources={
+                    "view": {
+                        "value": offline_state_text(self._localizer, self.language, self.state.offline_state)
+                    }
+                },
             ),
             self.text(
                 "discord.pattern_ui.summary.case_sensitive",
-                VALUE=self.text(
-                    "discord.pattern_ui.summary.case_sensitive_yes"
-                    if self.state.case_sensitive
-                    else "discord.pattern_ui.summary.case_sensitive_no"
-                ),
+                sources={
+                    "view": {
+                        "value": self.text(
+                            "discord.pattern_ui.summary.case_sensitive_yes"
+                            if self.state.case_sensitive
+                            else "discord.pattern_ui.summary.case_sensitive_no"
+                        )
+                    }
+                },
             ),
             self.text(
                 "discord.pattern_ui.summary.color",
-                VALUE=self.state.color or self.text("discord.pattern_ui.summary.color_inherited"),
+                sources={
+                    "view": {
+                        "value": self.state.color or self.text("discord.pattern_ui.summary.color_inherited")
+                    }
+                },
             ),
             self.text(
                 "discord.pattern_ui.summary.priority",
-                VALUE=self.state.priority if self.state.priority is not None else self.text("discord.pattern_ui.summary.priority_auto"),
+                sources={
+                    "view": {
+                        "value": self.state.priority
+                        if self.state.priority is not None
+                        else self.text("discord.pattern_ui.summary.priority_auto")
+                    }
+                },
             ),
         ]
         result_key = "discord.pattern_ui.create_embed" if self.mode is PatternEditorMode.ADD else "discord.pattern_ui.edit_embed"
-        return self.form_embed(result_key, SUMMARY_LINES=lines, COLOR_PICKER_URL=COLOR_PICKER_URL)
+        return self.form_embed(
+            result_key,
+            sources={"view": {"summary_lines": lines, "color_picker_url": COLOR_PICKER_URL}},
+        )
 
     @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def basics(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:

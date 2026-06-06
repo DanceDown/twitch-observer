@@ -60,7 +60,7 @@ class PatternIdActionView(BaseFormView):
             PatternActionKind.DISABLE: self.text("discord.pattern_ui.action.disable_title"),
             PatternActionKind.ENABLE: self.text("discord.pattern_ui.action.enable_title"),
         }.get(self._action, self.text("discord.pattern_ui.action.manage_title"))
-        return self.form_embed("discord.pattern_ui.action.embed", ACTION=action_label)
+        return self.form_embed("discord.pattern_ui.action.embed", sources={"view": {"action": action_label}})
 
     async def run_action(self, interaction: discord.Interaction, pattern_id: int) -> None:
         if self._action is PatternActionKind.REMOVE:
@@ -113,15 +113,19 @@ class PatternActionSelectionModal(discord.ui.Modal):
                         description=localizer.text(
                             "discord.pattern_ui.selection.option_description",
                             language=language,
-                            ID=item.display_index,
-                            PING_MODE=localizer.text(
-                                (
-                                    "discord.pattern_ui.summary.mode_regex"
-                                    if item.pattern.is_regex
-                                    else "discord.pattern_ui.summary.mode_word"
-                                ),
-                                language=language,
-                            ),
+                            sources={
+                                "view": {
+                                    "display_id": item.display_index,
+                                    "ping_mode": localizer.text(
+                                        (
+                                            "discord.pattern_ui.summary.mode_regex"
+                                            if item.pattern.is_regex
+                                            else "discord.pattern_ui.summary.mode_word"
+                                        ),
+                                        language=language,
+                                    ),
+                                }
+                            },
                         ),
                     )
                     for item in patterns[:25]

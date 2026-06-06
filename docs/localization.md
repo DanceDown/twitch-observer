@@ -9,7 +9,7 @@ This includes:
 - command result titles and messages
 - modal titles, labels, placeholders, and descriptions
 - section wrappers, bullet prefixes, separators, and inline-code fragments
-- reusable link and mention fragments
+- mentions, timestamps, and Twitch profile links
 
 This does not include:
 
@@ -17,42 +17,79 @@ This does not include:
 - logs
 - internal keys, enum values, or action tokens
 
+## Sources
+
+The runtime now sends structured source objects to the localizer instead of flat placeholder maps.
+
+Typical namespaces are:
+
+- `thread`
+- `view`
+- `event`
+- `requester`
+- `account`
+
+Use dot-path placeholders in the language files:
+
+- `{view.display_name}`
+- `{CODE:view.id}`
+- `{RAW:view.section_body}`
+- `{MENTION:view.user_id}`
+- `{TIMESTAMP:view.expires_at}`
+
+For list rendering, use `item.*` inside `item_format`:
+
+- `[`{CODE:item.display_name}`](https://www.twitch.tv/{RAW:item.login})`
+
 ## Placeholder Modes
 
-The `Localizer` supports three explicit placeholder modes:
+The `Localizer` supports these placeholder modes:
 
-- `{NAME}`: escaped Discord text
-- `{RAW:NAME}`: inserted as-is
-- `{CODE:NAME}`: inserted for inline-code contexts; runtime backticks are normalized before rendering
+- `{name}`: escaped Discord text
+- `{RAW:name}`: inserted as-is
+- `{CODE:name}`: normalized for inline-code output
+- `{MENTION:name}`: rendered as a Discord user mention
+- `{TIMESTAMP:name}`: rendered from ISO timestamps with the per-language timestamp format
 
 Use `{RAW:...}` only for fragments that are already safe and intentionally formatted, such as:
 
 - rendered bullet lists
 - rendered Twitch profile links
-- Discord mentions
 - full section bodies
 
-## Reusable Lists
+## Placeholder Specs
 
-Reusable list and wrapper formats live in the language files under `common.lists` and `common.fragments`.
+Template entries may define `placeholders` metadata for one dot-path placeholder.
 
-Current shared building blocks include:
+Supported formatter specs:
 
-- `common.fragments.twitch_code_link`
-- `common.fragments.twitch_link`
-- `common.fragments.section`
-- `common.fragments.inline_code`
-- `common.fragments.discord_user_mention`
-- `common.lists.raw_lines`
-- `common.lists.bullets`
-- `common.lists.indented_bullets`
-- `common.lists.comma_raw`
-- `common.lists.section_breaks`
+- `list`
+- `lookup`
+- `mention`
+- `timestamp`
+- `path`
 
-Use `Localizer.format_list(...)` instead of building runtime-visible lists with Python string concatenation.
+Example:
+
+```json
+{
+  "template": "{RAW:view.items}",
+  "placeholders": {
+    "view.items": {
+      "list": {
+        "item_format": "- {RAW:item}",
+        "separator": "\n"
+      }
+    }
+  }
+}
+```
+
+`lookup` resolves one runtime value against localized labels. `path` lets one placeholder name read from another source path when needed.
 
 ## Guardrails
 
 - Do not add new runtime copy directly in entrypoints or services when it can live in a language file.
-- Prefer composing localized fragments over hand-built Markdown.
-- When a runtime value is intended to stay clickable, pass it through a `{RAW:...}` placeholder into a language-file template that owns the surrounding formatting.
+- Prefer sending structured source objects over hand-built placeholder maps.
+- Keep visible formatting decisions in the localizer and language catalogs.
+- When a runtime value is intended to stay clickable, pass the raw data and let the language file own the Markdown wrapper.

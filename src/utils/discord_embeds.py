@@ -57,7 +57,7 @@ def build_tracking_embed(
         text=localizer.text(
             "discord.tracking_embed.footer_channel",
             language=language,
-            CHANNEL=(channel_display_name or event.channel_login),
+            sources={"view": {"channel_name": channel_display_name or event.channel_login}},
         ),
     )
     if reply is not None:
@@ -120,8 +120,14 @@ def build_channel_event_auto_reply_embed(
         description=localizer.text(
             description_key,
             language=language,
-            DISPLAY_NAME=channel_display_name,
-            LOGIN=channel_login,
+            sources={
+                "view": {
+                    "channel": {
+                        "display_name": channel_display_name,
+                        "login": channel_login,
+                    }
+                }
+            },
         ),
         color=resolve_channel_event_color(
             event_color=event_color,
@@ -133,7 +139,7 @@ def build_channel_event_auto_reply_embed(
         name=localizer.text(
             "discord.channel_event_reply_embed.author_name",
             language=language,
-            DISPLAY_NAME=channel_display_name,
+            sources={"view": {"channel": {"display_name": channel_display_name}}},
         ),
         url=None if not channel_login else f"https://www.twitch.tv/{channel_login}",
         icon_url=channel_icon_url,

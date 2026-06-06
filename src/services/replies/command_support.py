@@ -23,5 +23,12 @@ class ReplyCommandSupport:
     async def display_index(self, thread_id: int, pattern_id: int) -> int | None:
         return await self._display_index.resolve(thread_id=thread_id, pattern_id=pattern_id)
 
-    def text(self, key: str, *, language: str, **placeholders: object) -> str:
-        return self.localizer.text(key, language=language, **placeholders)
+    def text(
+        self,
+        key: str,
+        *,
+        language: str,
+        sources: dict[str, object] | None = None,
+        **legacy_placeholders: object,
+    ) -> str:
+        return self.localizer.text(key, language=language, sources=sources, **legacy_placeholders)

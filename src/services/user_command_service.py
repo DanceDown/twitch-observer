@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass, field
 
 from src.database.connection import ThreadRepository, TrackedUserRepository, UserPermissionRepository
-from src.discord_results import build_thread_result, discord_user_mention
+from src.discord_results import build_thread_result
 from src.events.event_types import AddTrackedUserCommand, DiscordCommandResult, DiscordResultStyle, RemoveTrackedUserCommand
 from src.localization import Localizer
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
@@ -69,8 +69,7 @@ class UserCommandService:
                 thread=thread,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
-                DISPLAY_NAME=twitch_user.display_name,
-                LOGIN=twitch_user.login,
+                sources={"view": self._user_view(twitch_user.display_name, twitch_user.login)},
             )
         await self.tracked_user_repository.add_user(thread.thread_id, twitch_user.user_id)
         return build_thread_result(
@@ -79,9 +78,12 @@ class UserCommandService:
             thread=thread,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            DISPLAY_NAME=twitch_user.display_name,
-            LOGIN=twitch_user.login,
-            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    **self._user_view(twitch_user.display_name, twitch_user.login),
+                    "requester_id": command.requester_id,
+                }
+            },
         )
 
     async def _remove_user(self, command: RemoveTrackedUserCommand) -> DiscordCommandResult:
@@ -103,8 +105,7 @@ class UserCommandService:
                 thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
-                DISPLAY_NAME=twitch_user.display_name,
-                LOGIN=twitch_user.login,
+                sources={"view": self._user_view(twitch_user.display_name, twitch_user.login)},
             )
         if (
             await self.tracked_user_repository.count_pattern_scope_references(thread_id=thread.thread_id, twitch_user_id=twitch_user.user_id)
@@ -117,8 +118,7 @@ class UserCommandService:
                 thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
-                DISPLAY_NAME=twitch_user.display_name,
-                LOGIN=twitch_user.login,
+                sources={"view": self._user_view(twitch_user.display_name, twitch_user.login)},
             )
         await self.tracked_user_repository.remove_user(thread.thread_id, twitch_user.user_id)
         return build_thread_result(
@@ -127,10 +127,17 @@ class UserCommandService:
             thread=thread,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            DISPLAY_NAME=twitch_user.display_name,
-            LOGIN=twitch_user.login,
-            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    **self._user_view(twitch_user.display_name, twitch_user.login),
+                    "requester_id": command.requester_id,
+                }
+            },
         )
 
     async def _resolve_thread(self, command: AddTrackedUserCommand | RemoveTrackedUserCommand):
         return await self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
+
+    @staticmethod
+    def _user_view(display_name: str, login: str) -> dict[str, object]:
+        return {"user": {"display_name": display_name, "login": login}}

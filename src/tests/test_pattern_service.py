@@ -33,7 +33,7 @@ from src.services.patterns import (
     TrackingNotificationSender,
 )
 from src.services.patterns.display_index import PatternDisplayIndexResolver
-from src.services.patterns.presentation import PatternCommandPresenter
+from src.services.patterns.command_support import PatternCommandSupport
 
 
 @dataclass
@@ -539,37 +539,37 @@ def _scope_summary_localizer() -> Localizer:
                         "added_result": {
                             "summary": {
                                 "list": {
-                                    "template": "{RAW:ITEMS}",
+                                    "template": "{RAW:view.items}",
                                     "placeholders": {
-                                        "ITEMS": {
+                                        "view.items": {
                                             "list": {
-                                                "item_format": "- {RAW:LIST_ITEM}",
+                                                "item_format": "- {RAW:item}",
                                                 "separator": "\n",
                                             }
                                         }
                                     },
                                 },
-                                "text": "Text: `{CODE:TEXT}`",
-                                "mode": "Mode: `{CODE:PING_MODE}`",
+                                "text": "Text: `{CODE:view.text}`",
+                                "mode": "Mode: `{CODE:view.ping_mode}`",
                                 "mode_value": {"word": "Word", "regex": "Regex"},
                                 "scope": {
                                     "channel_only": {
-                                        "template": "Only in {RAW:ITEMS}",
+                                        "template": "Only in {RAW:view.items}",
                                         "placeholders": {
-                                            "ITEMS": {
+                                            "view.items": {
                                                 "list": {
-                                                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
+                                                    "item_format": "[`{CODE:item.display_name}`](https://www.twitch.tv/{RAW:item.login})",
                                                     "separator": ", ",
                                                 }
                                             }
                                         },
                                     },
                                     "user_only": {
-                                        "template": "Only from {RAW:ITEMS}",
+                                        "template": "Only from {RAW:view.items}",
                                         "placeholders": {
-                                            "ITEMS": {
+                                            "view.items": {
                                                 "list": {
-                                                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
+                                                    "item_format": "[`{CODE:item.display_name}`](https://www.twitch.tv/{RAW:item.login})",
                                                     "separator": ", ",
                                                 }
                                             }
@@ -578,17 +578,17 @@ def _scope_summary_localizer() -> Localizer:
                                 },
                                 "case_sensitive_yes": "Case-Sensitive: `Yes`",
                                 "case_sensitive_no": "Case-Sensitive: `No`",
-                                "priority": "Priority: `{CODE:PRIORITY}`",
+                                "priority": "Priority: `{CODE:view.priority}`",
                             }
                         },
                         "updated_result": {
                             "summary": {
                                 "list": {
-                                    "template": "{RAW:ITEMS}",
+                                    "template": "{RAW:view.items}",
                                     "placeholders": {
-                                        "ITEMS": {
+                                        "view.items": {
                                             "list": {
-                                                "item_format": "- {RAW:LIST_ITEM}",
+                                                "item_format": "- {RAW:item}",
                                                 "separator": "\n",
                                             }
                                         }
@@ -599,30 +599,30 @@ def _scope_summary_localizer() -> Localizer:
                                     "channel_all": "Every watched channel",
                                     "user_everyone": "Everyone",
                                     "channel_only": {
-                                        "template": "Only in {RAW:ITEMS}",
+                                        "template": "Only in {RAW:view.items}",
                                         "placeholders": {
-                                            "ITEMS": {
+                                            "view.items": {
                                                 "list": {
-                                                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
+                                                    "item_format": "[`{CODE:item.display_name}`](https://www.twitch.tv/{RAW:item.login})",
                                                     "separator": ", ",
                                                 }
                                             }
                                         },
                                     },
                                     "user_only": {
-                                        "template": "Only from {RAW:ITEMS}",
+                                        "template": "Only from {RAW:view.items}",
                                         "placeholders": {
-                                            "ITEMS": {
+                                            "view.items": {
                                                 "list": {
-                                                    "item_format": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN})",
+                                                    "item_format": "[`{CODE:item.display_name}`](https://www.twitch.tv/{RAW:item.login})",
                                                     "separator": ", ",
                                                 }
                                             }
                                         },
                                     },
                                 },
-                                "where": "Where: From {RAW:BEFORE} to {RAW:AFTER}",
-                                "who": "Who: From {RAW:BEFORE} to {RAW:AFTER}",
+                                "where": "Where: From {RAW:view.before} to {RAW:view.after}",
+                                "who": "Who: From {RAW:view.before} to {RAW:view.after}",
                             }
                         },
                     }
@@ -633,7 +633,12 @@ def _scope_summary_localizer() -> Localizer:
 
 
 def test_pattern_presenter_keeps_scope_links_clickable_in_added_summary() -> None:
-    presenter = PatternCommandPresenter(localizer=_scope_summary_localizer())
+    support = PatternCommandSupport(
+        channel_repository=InMemoryChannelRepository(),
+        pattern_repository=InMemoryPatternRepository(),
+        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        localizer=_scope_summary_localizer(),
+    )
     pattern = PatternRecord(
         thread_id=1,
         pattern_id=7,
@@ -651,10 +656,10 @@ def test_pattern_presenter_keeps_scope_links_clickable_in_added_summary() -> Non
         priority=0,
     )
 
-    rendered = presenter.format_pattern_summary(
+    rendered = support.format_pattern_summary(
         pattern=pattern,
-        channel_logins=({"DISPLAY_NAME": "DanceDown", "LOGIN": "dancedown"},),
-        user_logins=({"DISPLAY_NAME": "Alice", "LOGIN": "alice"},),
+        channel_logins=({"display_name": "DanceDown", "login": "dancedown"},),
+        user_logins=({"display_name": "Alice", "login": "alice"},),
         language="english",
         key_prefix="results.pattern.added_result.summary",
     )
@@ -664,7 +669,12 @@ def test_pattern_presenter_keeps_scope_links_clickable_in_added_summary() -> Non
 
 
 def test_pattern_presenter_formats_updated_scope_change_without_wrapping_links_in_code() -> None:
-    presenter = PatternCommandPresenter(localizer=_scope_summary_localizer())
+    support = PatternCommandSupport(
+        channel_repository=InMemoryChannelRepository(),
+        pattern_repository=InMemoryPatternRepository(),
+        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        localizer=_scope_summary_localizer(),
+    )
     before = PatternRecord(
         thread_id=1,
         pattern_id=7,
@@ -698,13 +708,13 @@ def test_pattern_presenter_formats_updated_scope_change_without_wrapping_links_i
         priority=0,
     )
 
-    rendered = presenter.format_pattern_changes(
+    rendered = support.format_pattern_changes(
         before=before,
         after=after,
         old_channel_logins=(),
-        new_channel_logins=({"DISPLAY_NAME": "DanceDown", "LOGIN": "dancedown"},),
+        new_channel_logins=({"display_name": "DanceDown", "login": "dancedown"},),
         old_user_logins=(),
-        new_user_logins=({"DISPLAY_NAME": "Alice", "LOGIN": "alice"},),
+        new_user_logins=({"display_name": "Alice", "login": "alice"},),
         language="english",
         key_prefix="results.pattern.updated_result.summary",
     )

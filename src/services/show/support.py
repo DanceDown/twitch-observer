@@ -5,44 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from src.gateways.twitch_api import TwitchUser
-from src.localization import Localizer
 from src.services.twitch_gateways import TwitchDirectoryGateway
 
 
-@dataclass(slots=True)
-class ShowFormattingService:
-    """Shared localized formatting helpers for `/show` sections and rows."""
-
-    localizer: Localizer
-
-    def permission_label(self, label: str, *, language: str) -> str:
-        return self.localizer.text(f"show.show_permissions.permission_label.{label}", language=language)
-
-    def render_permissions_user_list(self, user_entries: list[str], *, language: str) -> str:
-        return self.localizer.text("show.show_permissions.user_list", language=language, USER_LIST=tuple(user_entries))
-
-    def render_section(self, wrapper_key: str, body: str, *, language: str) -> str:
-        return self.localizer.text(wrapper_key, language=language, SECTION_BODY=body)
-
-    def render_row(self, *, row_key: str, details_key: str, head: str, details: list[str], language: str) -> str:
-        return self.localizer.text(
-            row_key,
-            language=language,
-            HEAD=head,
-            DETAILS=("" if not details else self.localizer.text(details_key, language=language, ITEMS=tuple(details))),
-        )
-
-    @staticmethod
-    def mention(user_id: int) -> str:
-        return f"<@{user_id}>"
-
-    def stream_state_label(self, value: str, *, language: str) -> str:
-        key = (
-            "discord.live_state_ui.states.stream.online"
-            if value in {"online", "live", "stream.online"}
-            else "discord.live_state_ui.states.stream.offline"
-        )
-        return self.localizer.text(key, language=language)
+def stream_state_key(value: str) -> str:
+    """Normalize runtime stream state values to the localized key suffix."""
+    return "online" if value in {"online", "live", "stream.online"} else "offline"
 
 
 @dataclass(slots=True)
@@ -87,14 +55,14 @@ class ShowTwitchSubjectResolver:
         resolved: list[dict[str, str]] = []
         for twitch_id in twitch_ids:
             user = await self.resolve_channel_by_id(twitch_id)
-            resolved.append({"DISPLAY_NAME": user.display_name, "LOGIN": user.login})
+            resolved.append({"display_name": user.display_name, "login": user.login})
         return tuple(resolved)
 
     async def resolve_twitch_names(self, twitch_ids: tuple[str, ...]) -> tuple[dict[str, str], ...]:
         resolved: list[dict[str, str]] = []
         for twitch_id in twitch_ids:
             user = await self.resolve_user_by_id(twitch_id)
-            resolved.append({"DISPLAY_NAME": user.display_name, "LOGIN": user.login})
+            resolved.append({"display_name": user.display_name, "login": user.login})
         return tuple(resolved)
 
     async def _resolve_ids_with_cache(

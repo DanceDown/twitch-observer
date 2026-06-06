@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass, field
 
 from src.database.connection import ChannelRepository, PatternRepository, ThreadRepository, UserPermissionRepository
-from src.discord_results import build_thread_result, discord_user_mention
+from src.discord_results import build_thread_result
 from src.errors import ApplicationInvariantError
 from src.events.event_types import (
     AddTrackedChannelCommand,
@@ -92,8 +92,7 @@ class ChannelCommandService:
                 thread=thread,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
-                DISPLAY_NAME=twitch_user.display_name,
-                LOGIN=twitch_user.login,
+                sources={"view": self._channel_view(twitch_user.display_name, twitch_user.login)},
             )
         is_first_subscription = (
             await self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id) == 0
@@ -115,9 +114,12 @@ class ChannelCommandService:
             thread=thread,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            DISPLAY_NAME=twitch_user.display_name,
-            LOGIN=twitch_user.login,
-            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    **self._channel_view(twitch_user.display_name, twitch_user.login),
+                    "requester_id": command.requester_id,
+                }
+            },
         )
 
     async def _set_color(self, command: SetTrackedChannelColorCommand) -> DiscordCommandResult:
@@ -134,8 +136,7 @@ class ChannelCommandService:
                 thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
-                DISPLAY_NAME=twitch_user.display_name,
-                LOGIN=twitch_user.login,
+                sources={"view": self._channel_view(twitch_user.display_name, twitch_user.login)},
             )
 
         normalized_color = normalize_optional_color(command.color)
@@ -154,9 +155,12 @@ class ChannelCommandService:
                 thread=thread,
                 style=DiscordResultStyle.SUCCESS,
                 ephemeral=False,
-                DISPLAY_NAME=twitch_user.display_name,
-                LOGIN=twitch_user.login,
-                USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+                sources={
+                    "view": {
+                        **self._channel_view(twitch_user.display_name, twitch_user.login),
+                        "requester_id": command.requester_id,
+                    }
+                },
             )
         updated = await self.channel_repository.set_color(
                 thread_id=thread.thread_id,
@@ -172,10 +176,13 @@ class ChannelCommandService:
             thread=thread,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            DISPLAY_NAME=twitch_user.display_name,
-            LOGIN=twitch_user.login,
-            COLOR=updated.color or "",
-            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    **self._channel_view(twitch_user.display_name, twitch_user.login),
+                    "color": updated.color or "",
+                    "requester_id": command.requester_id,
+                }
+            },
         )
 
     async def _remove_channel(self, command: RemoveTrackedChannelCommand) -> DiscordCommandResult:
@@ -192,8 +199,7 @@ class ChannelCommandService:
                 thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
-                DISPLAY_NAME=twitch_user.display_name,
-                LOGIN=twitch_user.login,
+                sources={"view": self._channel_view(twitch_user.display_name, twitch_user.login)},
             )
 
         if (
@@ -210,8 +216,7 @@ class ChannelCommandService:
                 thread=thread,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
-                DISPLAY_NAME=twitch_user.display_name,
-                LOGIN=twitch_user.login,
+                sources={"view": self._channel_view(twitch_user.display_name, twitch_user.login)},
             )
 
         is_last_subscription = await self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id) == 1
@@ -232,10 +237,17 @@ class ChannelCommandService:
             thread=thread,
             style=DiscordResultStyle.SUCCESS,
             ephemeral=False,
-            DISPLAY_NAME=twitch_user.display_name,
-            LOGIN=twitch_user.login,
-            USER=discord_user_mention(self.localizer, command.requester_id, language=thread.language),
+            sources={
+                "view": {
+                    **self._channel_view(twitch_user.display_name, twitch_user.login),
+                    "requester_id": command.requester_id,
+                }
+            },
         )
 
     async def _notify_tracked_channels_changed(self) -> None:
         await self.tracked_channels_notifier.notify_tracked_channels_changed()
+
+    @staticmethod
+    def _channel_view(display_name: str, login: str) -> dict[str, object]:
+        return {"channel": {"display_name": display_name, "login": login}}

@@ -182,7 +182,7 @@ class CommandExecutionRunner:
                 self._validation_error_key,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
-                DETAIL=str(error),
+                sources={"view": {"detail": str(error)}},
             )
         except TwitchAPIError as error:
             result = await self._thread_result(
@@ -190,7 +190,7 @@ class CommandExecutionRunner:
                 self._twitch_api_error_key,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
-                DETAIL=str(error),
+                sources={"view": {"detail": str(error)}},
             )
         except DatabasePoolExhaustedError as error:
             logger_.error("Database pool exhausted while handling %s.", command.__class__.__name__)
@@ -199,7 +199,7 @@ class CommandExecutionRunner:
                 self._unexpected_error_key,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
-                DETAIL=str(error),
+                sources={"view": {"detail": str(error)}},
             )
         except Exception as error:
             logger_.exception("Unexpected error while handling %s.", command.__class__.__name__)
@@ -208,7 +208,7 @@ class CommandExecutionRunner:
                 self._unexpected_error_key,
                 style=DiscordResultStyle.ERROR,
                 ephemeral=True,
-                DETAIL=str(error),
+                sources={"view": {"detail": str(error)}},
             )
         return result
 
@@ -219,7 +219,7 @@ class CommandExecutionRunner:
         *,
         style: DiscordResultStyle,
         ephemeral: bool,
-        **placeholders: object,
+        sources: dict[str, object] | None = None,
     ) -> DiscordCommandResult:
         thread = await self._resolve_thread(command)
         return build_thread_result(
@@ -228,5 +228,5 @@ class CommandExecutionRunner:
             thread=thread,
             style=style,
             ephemeral=ephemeral,
-            **placeholders,
+            sources=sources,
         )
