@@ -39,13 +39,11 @@ class PatternCommandSupport:
         key: str,
         *,
         sources: dict[str, object] | None = None,
-        **legacy_placeholders: object,
     ) -> str:
         return self.localizer.text(
             key,
             language=self.localizer.language_for_thread(thread),
             sources=sources,
-            **legacy_placeholders,
         )
 
     def pattern_mode(self, is_regex: bool, *, language: str, scope: str) -> str:

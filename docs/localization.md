@@ -34,8 +34,8 @@ Use dot-path placeholders in the language files:
 - `{view.display_name}`
 - `{CODE:view.id}`
 - `{RAW:view.section_body}`
-- `{MENTION:view.user_id}`
 - `{TIMESTAMP:view.expires_at}`
+- `<@{RAW:view.user_id}>`
 
 For list rendering, use `item.*` inside `item_format`:
 
@@ -48,7 +48,6 @@ The `Localizer` supports these placeholder modes:
 - `{name}`: escaped Discord text
 - `{RAW:name}`: inserted as-is
 - `{CODE:name}`: normalized for inline-code output
-- `{MENTION:name}`: rendered as a Discord user mention
 - `{TIMESTAMP:name}`: rendered from ISO timestamps with the per-language timestamp format
 
 Use `{RAW:...}` only for fragments that are already safe and intentionally formatted, such as:
@@ -65,7 +64,6 @@ Supported formatter specs:
 
 - `list`
 - `lookup`
-- `mention`
 - `timestamp`
 - `path`
 
@@ -86,6 +84,15 @@ Example:
 ```
 
 `lookup` resolves one runtime value against localized labels. `path` lets one placeholder name read from another source path when needed.
+
+## Timestamp Format
+
+Timestamp rendering is configured per language in the language files:
+
+- `lang/english.json` -> `common.formats.timestamp`
+- `lang/german.json` -> `common.formats.timestamp`
+
+Fallback text for missing timestamps lives next to it under `common.formats.unknown_timestamp`.
 
 ## Guardrails
 

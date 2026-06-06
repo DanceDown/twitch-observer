@@ -29,6 +29,5 @@ class ReplyCommandSupport:
         *,
         language: str,
         sources: dict[str, object] | None = None,
-        **legacy_placeholders: object,
     ) -> str:
-        return self.localizer.text(key, language=language, sources=sources, **legacy_placeholders)
+        return self.localizer.text(key, language=language, sources=sources)

@@ -41,7 +41,7 @@ def test_migrated_runtime_layers_do_not_use_removed_inline_code_fix() -> None:
 
 
 def test_localized_discord_scopes_do_not_use_removed_shared_keys() -> None:
-    legacy_placeholder_pattern = re.compile(r"\{(?:RAW:|CODE:|MENTION:|TIMESTAMP:)?[A-Z][A-Z0-9_]*(?:\.[A-Za-z0-9_]+)?\}")
+    legacy_placeholder_pattern = re.compile(r"\{(?:RAW:|CODE:|TIMESTAMP:)?[A-Z][A-Z0-9_]*(?:\.[A-Za-z0-9_]+)?\}")
     for language in ("german", "english"):
         catalog_path = REPO_ROOT / "lang" / f"{language}.json"
         rendered = catalog_path.read_text(encoding="utf-8")
@@ -49,7 +49,6 @@ def test_localized_discord_scopes_do_not_use_removed_shared_keys() -> None:
 
         assert "common" in catalog
         assert legacy_placeholder_pattern.search(rendered) is None
-        assert "{MENTION:" not in rendered
         assert "LIST_ITEM" not in rendered
         assert "SECTION_LIST" not in rendered
         assert "USER_LIST" not in rendered

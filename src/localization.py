@@ -79,15 +79,13 @@ class Localizer:
         *,
         language: str | None = None,
         sources: Mapping[str, object] | None = None,
-        **legacy_placeholders: object,
     ) -> str:
         """Resolve one localized string and interpolate its placeholders."""
         value = self.value(key, language=language)
-        resolved_sources = self._merge_sources(sources, legacy_placeholders)
         if isinstance(value, str):
-            return self.render(value, sources=resolved_sources)
+            return self.render(value, sources=sources)
         if self._is_template_entry(value):
-            return self._render_template_entry(value, language=language, sources=resolved_sources)
+            return self._render_template_entry(value, language=language, sources=dict(sources or {}))
         raise LocalizationError(f"Translation key {key!r} is not a string.")
 
     def lookup(self, key_prefix: str, value: object, *, language: str | None = None) -> str:
@@ -108,10 +106,9 @@ class Localizer:
         template: str,
         *,
         sources: Mapping[str, object] | None = None,
-        **legacy_placeholders: object,
     ) -> str:
         """Render one already-resolved template string with placeholders."""
-        return self._interpolate(template, self._merge_sources(sources, legacy_placeholders), language=None, placeholder_specs=None)
+        return self._interpolate(template, dict(sources or {}), language=None, placeholder_specs=None)
 
     def render_with_placeholders(
         self,
@@ -121,10 +118,9 @@ class Localizer:
         sources: Mapping[str, object] | None = None,
         placeholders: dict[str, object] | None = None,
         placeholder_specs: dict[str, Any] | None = None,
-        **legacy_placeholders: object,
     ) -> str:
         """Render one template with optional placeholder-format metadata from the catalog."""
-        merged_sources = self._merge_sources(sources, placeholders, legacy_placeholders)
+        merged_sources = self._merge_sources(sources, placeholders)
         return self._interpolate(
             template,
             merged_sources,

@@ -19,7 +19,6 @@ def build_result(
     thumbnail_url: str | None = None,
     color: str | None = None,
     sources: Mapping[str, object] | None = None,
-    **legacy_placeholders: object,
 ) -> DiscordCommandResult:
     """Build one Discord command result from a localized `title`/`body`/`footer` object."""
     value = localizer.value(key, language=language)
@@ -33,26 +32,23 @@ def build_result(
         raise LocalizationError(f"Translation result {key!r} must contain string title/body/footer.")
     if placeholder_specs is not None and not isinstance(placeholder_specs, dict):
         raise LocalizationError(f"Translation result {key!r} must contain object placeholders when provided.")
-    resolved_sources = dict(sources or {})
-    if legacy_placeholders:
-        resolved_sources.update(legacy_placeholders)
     return DiscordCommandResult(
         title=localizer.render_with_placeholders(
             title,
             language=language,
-            sources=resolved_sources,
+            sources=sources,
             placeholder_specs=placeholder_specs,
         ),
         message=localizer.render_with_placeholders(
             body,
             language=language,
-            sources=resolved_sources,
+            sources=sources,
             placeholder_specs=placeholder_specs,
         ),
         footer=localizer.render_with_placeholders(
             footer,
             language=language,
-            sources=resolved_sources,
+            sources=sources,
             placeholder_specs=placeholder_specs,
         ),
         style=style,
@@ -73,14 +69,11 @@ def build_thread_result(
     thumbnail_url: str | None = None,
     color: str | None = None,
     sources: Mapping[str, object] | None = None,
-    **legacy_placeholders: object,
 ) -> DiscordCommandResult:
     """Build one Discord command result using the language configured on a thread."""
     resolved_sources = dict(sources or {})
     if thread is not None:
         resolved_sources.setdefault("thread", thread)
-    if legacy_placeholders:
-        resolved_sources.update(legacy_placeholders)
     return build_result(
         localizer,
         key,
