@@ -7,7 +7,7 @@ import discord
 from src.database.connection import ChannelRecord, PatternRecord, ReplyRecord, ThreadRecord
 from src.events.event_types import DiscordCommandResult, DiscordResultStyle, TwitchChatMessageEvent
 from src.localization import Localizer
-from src.utils.discord_text import escape_discord_preserving_links, escape_discord_text
+from src.utils.discord_text import escape_discord_preserving_links
 
 EMBED_COLORS: dict[DiscordResultStyle, int] = {
     DiscordResultStyle.SUCCESS: 0x2ECC71,
@@ -49,7 +49,7 @@ def build_tracking_embed(
         color=resolve_tracking_color(event=event, pattern=pattern, channel=channel, thread=thread),
     )
     embed.set_author(
-        name=escape_discord_text(event.author_display_name or event.author_login),
+        name=event.author_display_name or event.author_login,
         url=f"https://www.twitch.tv/{event.author_login}",
         icon_url=author_icon_url,
     )

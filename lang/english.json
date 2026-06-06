@@ -1425,7 +1425,7 @@
     },
     "channel_event_reply_embed": {
       "title": "",
-      "author_name": "{DISPLAY_NAME}",
+      "author_name": "{RAW:DISPLAY_NAME}",
       "description_online": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is now live <:Binoculars:1497727665283662077>",
       "description_offline": "[`{CODE:DISPLAY_NAME}`](https://www.twitch.tv/{RAW:LOGIN}) is now offline <a:Lurk:1497684902135463986>",
       "reply_field": "Reply"
