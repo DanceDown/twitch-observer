@@ -20,10 +20,10 @@ class InMemoryMessageRepository(MessageRepository):
     messages: list[TwitchChatMessageEvent] = field(default_factory=list)
     matched_by_thread_id: dict[int, list[str]] = field(default_factory=dict)
 
-    def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
+    async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
         self.messages.append(event)
 
-    def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
+    async def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
         rows = [
             RecentMessageRecord(
                 message_id=message.message_id or f"{message.channel_login}:{message.author_login}:{message.sent_at.isoformat()}",
@@ -38,7 +38,7 @@ class InMemoryMessageRepository(MessageRepository):
         rows.sort(key=lambda row: row.timestamp, reverse=True)
         return rows[:limit]
 
-    def list_recent_messages_for_channel(
+    async def list_recent_messages_for_channel(
         self,
         *,
         twitch_channel_id: str,
@@ -46,11 +46,13 @@ class InMemoryMessageRepository(MessageRepository):
         limit: int,
     ) -> list[RecentMessageRecord]:
         rows = [
-            row for row in self.list_recent_messages(since=since, limit=max(limit * 5, limit)) if row.twitch_channel_id == twitch_channel_id
+            row
+            for row in await self.list_recent_messages(since=since, limit=max(limit * 5, limit))
+            if row.twitch_channel_id == twitch_channel_id
         ]
         return rows[:limit]
 
-    def mark_message_matched_in_thread(
+    async def mark_message_matched_in_thread(
         self,
         *,
         thread_id: int,
@@ -61,7 +63,7 @@ class InMemoryMessageRepository(MessageRepository):
         if message_id not in thread_matches:
             thread_matches.append(message_id)
 
-    def list_recent_messages_for_thread(
+    async def list_recent_messages_for_thread(
         self,
         *,
         thread_id: int,
@@ -70,7 +72,9 @@ class InMemoryMessageRepository(MessageRepository):
     ) -> list[RecentMessageRecord]:
         matched_message_ids = set(self.matched_by_thread_id.get(thread_id, []))
         rows = [
-            row for row in self.list_recent_messages(since=since, limit=max(limit * 10, limit)) if row.message_id in matched_message_ids
+            row
+            for row in await self.list_recent_messages(since=since, limit=max(limit * 10, limit))
+            if row.message_id in matched_message_ids
         ]
         return rows[:limit]
 
@@ -79,7 +83,7 @@ class InMemoryMessageRepository(MessageRepository):
 class StaticThreadRepository:
     thread: ThreadRecord | None
 
-    def get_by_discord_channel_id(self, _discord_channel_id: int) -> ThreadRecord | None:
+    async def get_by_discord_channel_id(self, _discord_channel_id: int) -> ThreadRecord | None:
         return self.thread
 
 
@@ -232,7 +236,7 @@ async def test_write_query_service_only_returns_messages_matched_in_thread() -> 
 
     await ingest_service.handle_chat_message(matched_event)
     await ingest_service.handle_chat_message(unrelated_event)
-    repository.mark_message_matched_in_thread(thread_id=7, event=matched_event)
+    await repository.mark_message_matched_in_thread(thread_id=7, event=matched_event)
 
     candidates = await query_service.list_recent_reply_candidates(
         discord_channel_id=42,

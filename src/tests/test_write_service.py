@@ -26,16 +26,16 @@ class InMemoryThreadRepository(ThreadRepository):
     threads_by_channel_id: dict[int, ThreadRecord] = field(default_factory=dict)
     next_thread_id: int = 1
 
-    def get_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
+    async def get_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
         return self.threads_by_channel_id.get(discord_channel_id)
 
-    def get_by_thread_id(self, thread_id: int) -> ThreadRecord | None:
+    async def get_by_thread_id(self, thread_id: int) -> ThreadRecord | None:
         for thread in self.threads_by_channel_id.values():
             if thread.thread_id == thread_id:
                 return thread
         return None
 
-    def create(self, owner_id: int, discord_channel_id: int) -> ThreadRecord:
+    async def create(self, owner_id: int, discord_channel_id: int) -> ThreadRecord:
         thread = ThreadRecord(
             thread_id=self.next_thread_id,
             owner_id=owner_id,
@@ -48,10 +48,10 @@ class InMemoryThreadRepository(ThreadRepository):
         self.threads_by_channel_id[discord_channel_id] = thread
         return thread
 
-    def delete_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
+    async def delete_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
         return self.threads_by_channel_id.pop(discord_channel_id, None)
 
-    def set_enabled(self, *, discord_channel_id: int, enabled: bool) -> ThreadRecord | None:
+    async def set_enabled(self, *, discord_channel_id: int, enabled: bool) -> ThreadRecord | None:
         thread = self.threads_by_channel_id.get(discord_channel_id)
         if thread is None:
             return None
@@ -66,7 +66,7 @@ class InMemoryThreadRepository(ThreadRepository):
         self.threads_by_channel_id[discord_channel_id] = updated
         return updated
 
-    def set_color(self, *, discord_channel_id: int, color: str | None) -> ThreadRecord | None:
+    async def set_color(self, *, discord_channel_id: int, color: str | None) -> ThreadRecord | None:
         thread = self.threads_by_channel_id.get(discord_channel_id)
         if thread is None:
             return None
@@ -81,7 +81,7 @@ class InMemoryThreadRepository(ThreadRepository):
         self.threads_by_channel_id[discord_channel_id] = updated
         return updated
 
-    def set_account_id(self, *, discord_channel_id: int, account_id: int | None) -> ThreadRecord | None:
+    async def set_account_id(self, *, discord_channel_id: int, account_id: int | None) -> ThreadRecord | None:
         thread = self.threads_by_channel_id.get(discord_channel_id)
         if thread is None:
             return None
@@ -96,7 +96,7 @@ class InMemoryThreadRepository(ThreadRepository):
         self.threads_by_channel_id[discord_channel_id] = updated
         return updated
 
-    def list_by_owner_id(self, owner_id: int) -> list[ThreadRecord]:
+    async def list_by_owner_id(self, owner_id: int) -> list[ThreadRecord]:
         return [thread for thread in self.threads_by_channel_id.values() if thread.owner_id == owner_id]
 
 
@@ -104,20 +104,20 @@ class InMemoryThreadRepository(ThreadRepository):
 class InMemoryChannelRepository(ChannelRepository):
     channels_by_thread: dict[tuple[int, str], ChannelRecord] = field(default_factory=dict)
 
-    def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:
+    async def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:
         return self.channels_by_thread.get((thread_id, twitch_channel_id))
 
-    def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
+    async def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
         self.channels_by_thread[(thread_id, twitch_channel_id)] = ChannelRecord(
             thread_id=thread_id,
             twitch_channel_id=twitch_channel_id,
             color=None,
         )
 
-    def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:
+    async def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:
         self.channels_by_thread.pop((thread_id, twitch_channel_id), None)
 
-    def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:
+    async def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:
         key = (thread_id, twitch_channel_id)
         existing = self.channels_by_thread.get(key)
         if existing is None:
@@ -126,13 +126,13 @@ class InMemoryChannelRepository(ChannelRepository):
         self.channels_by_thread[key] = updated
         return updated
 
-    def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
+    async def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
         return sum(1 for record in self.channels_by_thread.values() if record.twitch_channel_id == twitch_channel_id)
 
-    def list_thread_ids_by_twitch_channel_id(self, twitch_channel_id: str) -> list[int]:
+    async def list_thread_ids_by_twitch_channel_id(self, twitch_channel_id: str) -> list[int]:
         return [record.thread_id for record in self.channels_by_thread.values() if record.twitch_channel_id == twitch_channel_id]
 
-    def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
+    async def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
         return [record for record in self.channels_by_thread.values() if record.thread_id == thread_id]
 
 
@@ -141,10 +141,10 @@ class InMemoryAccountRepository(TwitchAccountRepository):
     accounts_by_account_id: dict[int, TwitchAccountRecord] = field(default_factory=dict)
     next_account_id: int = 1
 
-    def get_by_account_id(self, account_id: int) -> TwitchAccountRecord | None:
+    async def get_by_account_id(self, account_id: int) -> TwitchAccountRecord | None:
         return self.accounts_by_account_id.get(account_id)
 
-    def create_account(
+    async def create_account(
         self,
         *,
         discord_user_id: int,
@@ -174,7 +174,7 @@ class InMemoryAccountRepository(TwitchAccountRepository):
         self.accounts_by_account_id[account_id] = record
         return record
 
-    def update_account(
+    async def update_account(
         self,
         *,
         account_id: int,
@@ -205,16 +205,16 @@ class InMemoryAccountRepository(TwitchAccountRepository):
         self.accounts_by_account_id[account_id] = updated
         return updated
 
-    def remove_by_account_id(self, account_id: int) -> bool:
+    async def remove_by_account_id(self, account_id: int) -> bool:
         return self.accounts_by_account_id.pop(account_id, None) is not None
 
-    def get_by_discord_user_id(self, discord_user_id: int) -> TwitchAccountRecord | None:
+    async def get_by_discord_user_id(self, discord_user_id: int) -> TwitchAccountRecord | None:
         matches = [account for account in self.accounts_by_account_id.values() if account.discord_user_id == discord_user_id]
         if not matches:
             return None
         return sorted(matches, key=lambda account: account.account_id)[-1]
 
-    def upsert_account(
+    async def upsert_account(
         self,
         *,
         discord_user_id: int,
@@ -227,9 +227,9 @@ class InMemoryAccountRepository(TwitchAccountRepository):
         scope: tuple[str, ...],
         token_type: str | None,
     ) -> TwitchAccountRecord:
-        existing = self.get_by_discord_user_id(discord_user_id)
+        existing = await self.get_by_discord_user_id(discord_user_id)
         if existing is None:
-            return self.create_account(
+            return await self.create_account(
                 discord_user_id=discord_user_id,
                 twitch_user_id=twitch_user_id,
                 twitch_login=twitch_login,
@@ -240,7 +240,7 @@ class InMemoryAccountRepository(TwitchAccountRepository):
                 scope=scope,
                 token_type=token_type,
             )
-        updated = self.update_account(
+        updated = await self.update_account(
             account_id=existing.account_id,
             twitch_user_id=twitch_user_id,
             twitch_login=twitch_login,
@@ -254,29 +254,29 @@ class InMemoryAccountRepository(TwitchAccountRepository):
         assert updated is not None
         return updated
 
-    def remove_by_discord_user_id(self, discord_user_id: int) -> bool:
-        existing = self.get_by_discord_user_id(discord_user_id)
+    async def remove_by_discord_user_id(self, discord_user_id: int) -> bool:
+        existing = await self.get_by_discord_user_id(discord_user_id)
         if existing is None:
             return False
-        return self.remove_by_account_id(existing.account_id)
+        return await self.remove_by_account_id(existing.account_id)
 
 
 @dataclass
 class InMemoryPermissionRepository(UserPermissionRepository):
     rows: dict[tuple[int, int], UserPermissionRecord] = field(default_factory=dict)
 
-    def get_by_user_and_thread(self, *, discord_user_id: int, thread_id: int) -> UserPermissionRecord | None:
+    async def get_by_user_and_thread(self, *, discord_user_id: int, thread_id: int) -> UserPermissionRecord | None:
         return self.rows.get((discord_user_id, thread_id))
 
-    def upsert_permissions(self, *, discord_user_id: int, thread_id: int, permissions: int) -> UserPermissionRecord:
+    async def upsert_permissions(self, *, discord_user_id: int, thread_id: int, permissions: int) -> UserPermissionRecord:
         record = UserPermissionRecord(discord_user_id=discord_user_id, thread_id=thread_id, permissions=permissions)
         self.rows[(discord_user_id, thread_id)] = record
         return record
 
-    def remove_by_user_and_thread(self, *, discord_user_id: int, thread_id: int) -> bool:
+    async def remove_by_user_and_thread(self, *, discord_user_id: int, thread_id: int) -> bool:
         return self.rows.pop((discord_user_id, thread_id), None) is not None
 
-    def list_for_thread(self, *, thread_id: int) -> list[UserPermissionRecord]:
+    async def list_for_thread(self, *, thread_id: int) -> list[UserPermissionRecord]:
         return [record for record in self.rows.values() if record.thread_id == thread_id]
 
 
@@ -337,11 +337,11 @@ class FakeTwitchAPI:
 async def test_write_send_posts_plain_twitch_message() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="77",
         twitch_login="dancedown",
@@ -352,7 +352,7 @@ async def test_write_send_posts_plain_twitch_message() -> None:
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     bus.write = TwitchWriteCommandService(
         thread_repository=thread_repository,
@@ -381,11 +381,11 @@ async def test_write_send_posts_plain_twitch_message() -> None:
 async def test_write_send_can_reply_to_specific_twitch_message() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="77",
         twitch_login="dancedown",
@@ -396,7 +396,7 @@ async def test_write_send_can_reply_to_specific_twitch_message() -> None:
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     bus.write = TwitchWriteCommandService(
         thread_repository=thread_repository,
@@ -424,12 +424,12 @@ async def test_write_send_can_reply_to_specific_twitch_message() -> None:
 async def test_write_send_respects_granted_permission_for_non_owner() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     permission_repository = InMemoryPermissionRepository()
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="77",
         twitch_login="dancedown",
@@ -440,7 +440,7 @@ async def test_write_send_respects_granted_permission_for_non_owner() -> None:
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     bus.permission = PermissionCommandService(
         thread_repository=thread_repository,
@@ -480,9 +480,9 @@ async def test_write_send_respects_granted_permission_for_non_owner() -> None:
 async def test_write_send_reports_missing_owner_account_even_for_permitted_helper() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(1, "42")
+    await channel_repository.add_channel(1, "42")
     permission_repository = InMemoryPermissionRepository()
     account_repository = InMemoryAccountRepository()
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})

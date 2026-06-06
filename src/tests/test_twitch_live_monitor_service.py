@@ -22,20 +22,20 @@ class CollectingLiveStateHandler:
 class InMemoryChannelRepository(ChannelRepository):
     channels_by_thread: dict[tuple[int, str], ChannelRecord] = field(default_factory=dict)
 
-    def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:
+    async def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:
         return self.channels_by_thread.get((thread_id, twitch_channel_id))
 
-    def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
+    async def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
         self.channels_by_thread[(thread_id, twitch_channel_id)] = ChannelRecord(
             thread_id=thread_id,
             twitch_channel_id=twitch_channel_id,
             color=None,
         )
 
-    def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:
+    async def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:
         self.channels_by_thread.pop((thread_id, twitch_channel_id), None)
 
-    def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:
+    async def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:
         existing = self.channels_by_thread.get((thread_id, twitch_channel_id))
         if existing is None:
             return None
@@ -49,7 +49,7 @@ class InMemoryChannelRepository(ChannelRepository):
         self.channels_by_thread[(thread_id, twitch_channel_id)] = updated
         return updated
 
-    def set_live_state_for_twitch_channel(self, *, twitch_channel_id: str, is_live: bool, changed_at: str | None) -> int:
+    async def set_live_state_for_twitch_channel(self, *, twitch_channel_id: str, is_live: bool, changed_at: str | None) -> int:
         updated_rows = 0
         for key, existing in list(self.channels_by_thread.items()):
             if existing.twitch_channel_id != twitch_channel_id:
@@ -64,19 +64,19 @@ class InMemoryChannelRepository(ChannelRepository):
             updated_rows += 1
         return updated_rows
 
-    def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
+    async def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
         return sum(1 for record in self.channels_by_thread.values() if record.twitch_channel_id == twitch_channel_id)
 
-    def list_thread_ids_by_twitch_channel_id(self, twitch_channel_id: str) -> list[int]:
+    async def list_thread_ids_by_twitch_channel_id(self, twitch_channel_id: str) -> list[int]:
         return [record.thread_id for record in self.channels_by_thread.values() if record.twitch_channel_id == twitch_channel_id]
 
-    def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
+    async def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
         return [record for record in self.channels_by_thread.values() if record.thread_id == thread_id]
 
-    def list_all_twitch_channel_ids(self) -> list[str]:
+    async def list_all_twitch_channel_ids(self) -> list[str]:
         return sorted({record.twitch_channel_id for record in self.channels_by_thread.values()})
 
-    def list_distinct_channel_states(self) -> list[TrackedChannelStateRecord]:
+    async def list_distinct_channel_states(self) -> list[TrackedChannelStateRecord]:
         rows: dict[str, TrackedChannelStateRecord] = {}
         for record in self.channels_by_thread.values():
             rows[record.twitch_channel_id] = TrackedChannelStateRecord(
@@ -107,7 +107,7 @@ class FakeTwitchAPI:
 @pytest.mark.asyncio
 async def test_live_monitor_initial_sync_persists_state_without_emitting_transition() -> None:
     repository = InMemoryChannelRepository()
-    repository.add_channel(1, "42")
+    await repository.add_channel(1, "42")
     handler = CollectingLiveStateHandler()
     monitor = TwitchLiveMonitorService(
         channel_repository=repository,
@@ -120,7 +120,7 @@ async def test_live_monitor_initial_sync_persists_state_without_emitting_transit
 
     await monitor.sync_once(notify_transitions=False)
 
-    stored = repository.get_by_thread_and_twitch_channel(1, "42")
+    stored = await repository.get_by_thread_and_twitch_channel(1, "42")
     assert stored is not None
     assert stored.is_live is True
     assert handler.events == []
@@ -129,8 +129,8 @@ async def test_live_monitor_initial_sync_persists_state_without_emitting_transit
 @pytest.mark.asyncio
 async def test_live_monitor_emits_transition_event_after_known_state_changes() -> None:
     repository = InMemoryChannelRepository()
-    repository.add_channel(1, "42")
-    repository.set_live_state_for_twitch_channel(twitch_channel_id="42", is_live=False, changed_at="before")
+    await repository.add_channel(1, "42")
+    await repository.set_live_state_for_twitch_channel(twitch_channel_id="42", is_live=False, changed_at="before")
     handler = CollectingLiveStateHandler()
     monitor = TwitchLiveMonitorService(
         channel_repository=repository,

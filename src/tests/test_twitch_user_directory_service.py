@@ -16,17 +16,17 @@ from src.services.twitch_user_directory_service import TwitchUserDirectoryIngest
 class InMemoryTwitchUserCacheRepository(TwitchUserCacheRepository):
     by_id: dict[str, TwitchUserCacheRecord] = field(default_factory=dict)
 
-    def get_by_user_id(self, twitch_user_id: str) -> TwitchUserCacheRecord | None:
+    async def get_by_user_id(self, twitch_user_id: str) -> TwitchUserCacheRecord | None:
         return self.by_id.get(twitch_user_id)
 
-    def get_by_login(self, twitch_login: str) -> TwitchUserCacheRecord | None:
+    async def get_by_login(self, twitch_login: str) -> TwitchUserCacheRecord | None:
         normalized = twitch_login.strip().lower()
         for record in self.by_id.values():
             if record.twitch_login == normalized:
                 return record
         return None
 
-    def upsert_from_api(
+    async def upsert_from_api(
         self,
         *,
         twitch_user_id: str,
@@ -46,7 +46,7 @@ class InMemoryTwitchUserCacheRepository(TwitchUserCacheRepository):
         self.by_id[twitch_user_id] = record
         return record
 
-    def observe_from_chat(
+    async def observe_from_chat(
         self,
         *,
         twitch_user_id: str,
@@ -64,6 +64,18 @@ class InMemoryTwitchUserCacheRepository(TwitchUserCacheRepository):
         )
         self.by_id[twitch_user_id] = record
         return record
+
+    async def list_all(self) -> list[TwitchUserCacheRecord]:
+        return list(self.by_id.values())
+
+    async def upsert_many_from_api(self, records: tuple[tuple[str, str, str, str | None], ...]) -> None:
+        for twitch_user_id, twitch_login, display_name, profile_image_url in records:
+            await self.upsert_from_api(
+                twitch_user_id=twitch_user_id,
+                twitch_login=twitch_login,
+                display_name=display_name,
+                profile_image_url=profile_image_url,
+            )
 
 
 @dataclass
@@ -315,7 +327,9 @@ async def test_directory_returns_missing_profile_image_from_cached_record_until_
 
     assert user.profile_image_url is None
     assert twitch_api.id_requests == []
-    assert repository.get_by_user_id("42").profile_image_url is None
+    cached_record = await repository.get_by_user_id("42")
+    assert cached_record is not None
+    assert cached_record.profile_image_url is None
 
 
 @pytest.mark.asyncio

@@ -14,20 +14,20 @@ from src.services.twitch_gateways import TwitchIRCConnectionGateway
 class InMemoryChannelRepository(ChannelRepository):
     channels_by_thread: dict[tuple[int, str], ChannelRecord] = field(default_factory=dict)
 
-    def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:
+    async def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:
         return self.channels_by_thread.get((thread_id, twitch_channel_id))
 
-    def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
+    async def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
         self.channels_by_thread[(thread_id, twitch_channel_id)] = ChannelRecord(
             thread_id=thread_id,
             twitch_channel_id=twitch_channel_id,
             color=None,
         )
 
-    def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:
+    async def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:
         self.channels_by_thread.pop((thread_id, twitch_channel_id), None)
 
-    def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:
+    async def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:
         existing = self.channels_by_thread.get((thread_id, twitch_channel_id))
         if existing is None:
             return None
@@ -35,16 +35,16 @@ class InMemoryChannelRepository(ChannelRepository):
         self.channels_by_thread[(thread_id, twitch_channel_id)] = updated
         return updated
 
-    def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
+    async def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
         return sum(1 for record in self.channels_by_thread.values() if record.twitch_channel_id == twitch_channel_id)
 
-    def list_thread_ids_by_twitch_channel_id(self, twitch_channel_id: str) -> list[int]:
+    async def list_thread_ids_by_twitch_channel_id(self, twitch_channel_id: str) -> list[int]:
         return [record.thread_id for record in self.channels_by_thread.values() if record.twitch_channel_id == twitch_channel_id]
 
-    def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
+    async def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
         return [record for record in self.channels_by_thread.values() if record.thread_id == thread_id]
 
-    def list_all_twitch_channel_ids(self) -> list[str]:
+    async def list_all_twitch_channel_ids(self) -> list[str]:
         return sorted({record.twitch_channel_id for record in self.channels_by_thread.values()})
 
 
@@ -85,9 +85,9 @@ class FakeIRCGateway(TwitchIRCConnectionGateway):
 @pytest.mark.asyncio
 async def test_bootstrap_service_joins_all_distinct_persisted_channels() -> None:
     repository = InMemoryChannelRepository()
-    repository.add_channel(1, "42")
-    repository.add_channel(2, "42")
-    repository.add_channel(1, "84")
+    await repository.add_channel(1, "42")
+    await repository.add_channel(2, "42")
+    await repository.add_channel(1, "84")
     twitch_api = FakeTwitchAPI(
         users_by_id={
             "42": TwitchUser(user_id="42", login="example", display_name="Example"),
@@ -111,8 +111,8 @@ async def test_bootstrap_service_joins_all_distinct_persisted_channels() -> None
 @pytest.mark.asyncio
 async def test_bootstrap_service_skips_channels_that_cannot_be_resolved() -> None:
     repository = InMemoryChannelRepository()
-    repository.add_channel(1, "42")
-    repository.add_channel(1, "404")
+    await repository.add_channel(1, "42")
+    await repository.add_channel(1, "404")
     twitch_api = FakeTwitchAPI(users_by_id={"42": TwitchUser(user_id="42", login="example", display_name="Example")})
     irc_gateway = FakeIRCGateway()
     service = IRCBootstrapService(
@@ -130,7 +130,7 @@ async def test_bootstrap_service_skips_channels_that_cannot_be_resolved() -> Non
 @pytest.mark.asyncio
 async def test_bootstrap_service_prefers_cached_channel_metadata() -> None:
     repository = InMemoryChannelRepository()
-    repository.add_channel(1, "42")
+    await repository.add_channel(1, "42")
     twitch_api = FakeTwitchAPI(
         users_by_id={},
         cached_users_by_id={"42": TwitchUser(user_id="42", login="example", display_name="Example")},

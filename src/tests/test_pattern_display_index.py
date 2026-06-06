@@ -24,7 +24,7 @@ def _pattern(*, pattern_id: int) -> PatternRecord:
         color=None,
         disabled=False,
         notify=True,
-        priority=None,
+        priority=0,
         reply_message=None,
         reply_as_reply=False,
     )
@@ -34,7 +34,7 @@ def _pattern(*, pattern_id: int) -> PatternRecord:
 class InMemoryPatternRepository(PatternRepository):
     patterns_by_thread: dict[int, list[PatternRecord]] = field(default_factory=dict)
 
-    def list_patterns_for_thread(self, thread_id: int) -> list[PatternRecord]:
+    async def list_patterns_for_thread(self, thread_id: int) -> list[PatternRecord]:
         return list(self.patterns_by_thread.get(thread_id, ()))
 
 

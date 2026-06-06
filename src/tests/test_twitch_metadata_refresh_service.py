@@ -27,7 +27,7 @@ class FakeDirectory:
             raise TwitchAPIError("batch failed")
         return tuple(self.users_by_id[user_id] for user_id in normalized if user_id in self.users_by_id)
 
-    def upsert_users_from_api(self, users: tuple[TwitchUser, ...]) -> None:
+    async def upsert_users_from_api(self, users: tuple[TwitchUser, ...]) -> None:
         self.upserted_batches.append(users)
 
 

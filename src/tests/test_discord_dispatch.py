@@ -22,7 +22,7 @@ class FakeThreadService:
 class FakeUIFlowGuard:
     seen: list[RequestUIFlowCommand]
 
-    def decide(self, command: RequestUIFlowCommand) -> DiscordUIFlowDecision:
+    async def decide(self, command: RequestUIFlowCommand) -> DiscordUIFlowDecision:
         self.seen.append(command)
         return DiscordUIFlowDecision(flow=command.flow, step=command.step, open_ui=True)
 

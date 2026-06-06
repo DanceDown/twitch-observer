@@ -39,16 +39,16 @@ class InMemoryThreadRepository(ThreadRepository):
     threads_by_channel_id: dict[int, ThreadRecord] = field(default_factory=dict)
     next_thread_id: int = 1
 
-    def get_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
+    async def get_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
         return self.threads_by_channel_id.get(discord_channel_id)
 
-    def get_by_thread_id(self, thread_id: int) -> ThreadRecord | None:
+    async def get_by_thread_id(self, thread_id: int) -> ThreadRecord | None:
         for thread in self.threads_by_channel_id.values():
             if thread.thread_id == thread_id:
                 return thread
         return None
 
-    def create(self, owner_id: int, discord_channel_id: int) -> ThreadRecord:
+    async def create(self, owner_id: int, discord_channel_id: int) -> ThreadRecord:
         thread = ThreadRecord(
             thread_id=self.next_thread_id,
             owner_id=owner_id,
@@ -60,10 +60,10 @@ class InMemoryThreadRepository(ThreadRepository):
         self.threads_by_channel_id[discord_channel_id] = thread
         return thread
 
-    def delete_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
+    async def delete_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
         return self.threads_by_channel_id.pop(discord_channel_id, None)
 
-    def set_enabled(self, *, discord_channel_id: int, enabled: bool) -> ThreadRecord | None:
+    async def set_enabled(self, *, discord_channel_id: int, enabled: bool) -> ThreadRecord | None:
         thread = self.threads_by_channel_id.get(discord_channel_id)
         if thread is None:
             return None
@@ -77,7 +77,7 @@ class InMemoryThreadRepository(ThreadRepository):
         self.threads_by_channel_id[discord_channel_id] = updated
         return updated
 
-    def set_color(self, *, discord_channel_id: int, color: str | None) -> ThreadRecord | None:
+    async def set_color(self, *, discord_channel_id: int, color: str | None) -> ThreadRecord | None:
         thread = self.threads_by_channel_id.get(discord_channel_id)
         if thread is None:
             return None
@@ -96,20 +96,20 @@ class InMemoryThreadRepository(ThreadRepository):
 class InMemoryChannelRepository(ChannelRepository):
     channels_by_thread: dict[tuple[int, str], ChannelRecord] = field(default_factory=dict)
 
-    def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:
+    async def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:
         return self.channels_by_thread.get((thread_id, twitch_channel_id))
 
-    def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
+    async def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
         self.channels_by_thread[(thread_id, twitch_channel_id)] = ChannelRecord(
             thread_id=thread_id,
             twitch_channel_id=twitch_channel_id,
             color=None,
         )
 
-    def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:
+    async def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:
         self.channels_by_thread.pop((thread_id, twitch_channel_id), None)
 
-    def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:
+    async def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:
         key = (thread_id, twitch_channel_id)
         existing = self.channels_by_thread.get(key)
         if existing is None:
@@ -124,7 +124,7 @@ class InMemoryChannelRepository(ChannelRepository):
         self.channels_by_thread[key] = updated
         return updated
 
-    def set_live_state_for_twitch_channel(self, *, twitch_channel_id: str, is_live: bool, changed_at: str | None) -> int:
+    async def set_live_state_for_twitch_channel(self, *, twitch_channel_id: str, is_live: bool, changed_at: str | None) -> int:
         updated_rows = 0
         for key, existing in list(self.channels_by_thread.items()):
             if existing.twitch_channel_id != twitch_channel_id:
@@ -139,13 +139,13 @@ class InMemoryChannelRepository(ChannelRepository):
             updated_rows += 1
         return updated_rows
 
-    def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
+    async def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
         return sum(1 for record in self.channels_by_thread.values() if record.twitch_channel_id == twitch_channel_id)
 
-    def list_thread_ids_by_twitch_channel_id(self, twitch_channel_id: str) -> list[int]:
+    async def list_thread_ids_by_twitch_channel_id(self, twitch_channel_id: str) -> list[int]:
         return [record.thread_id for record in self.channels_by_thread.values() if record.twitch_channel_id == twitch_channel_id]
 
-    def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
+    async def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
         return sorted(
             [record for record in self.channels_by_thread.values() if record.thread_id == thread_id],
             key=lambda record: record.twitch_channel_id,
@@ -157,7 +157,7 @@ class InMemoryPatternRepository(PatternRepository):
     patterns: list[PatternRecord] = field(default_factory=list)
     next_pattern_id: int = 1
 
-    def find_exact_pattern(
+    async def find_exact_pattern(
         self,
         *,
         thread_id: int,
@@ -187,7 +187,7 @@ class InMemoryPatternRepository(PatternRepository):
                 return pattern
         return None
 
-    def add_pattern(
+    async def add_pattern(
         self,
         *,
         thread_id: int,
@@ -227,10 +227,10 @@ class InMemoryPatternRepository(PatternRepository):
         self.next_pattern_id += 1
         return record
 
-    def remove_pattern(self, *, thread_id: int, pattern_id: int) -> None:
+    async def remove_pattern(self, *, thread_id: int, pattern_id: int) -> None:
         self.patterns = [pattern for pattern in self.patterns if not (pattern.thread_id == thread_id and pattern.pattern_id == pattern_id)]
 
-    def set_pattern_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool) -> PatternRecord | None:
+    async def set_pattern_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool) -> PatternRecord | None:
         for index, pattern in enumerate(self.patterns):
             if pattern.thread_id == thread_id and pattern.pattern_id == pattern_id:
                 updated = PatternRecord(
@@ -254,7 +254,7 @@ class InMemoryPatternRepository(PatternRepository):
                 return updated
         return None
 
-    def set_pattern_priority(self, *, thread_id: int, pattern_id: int, priority: int) -> PatternRecord | None:
+    async def set_pattern_priority(self, *, thread_id: int, pattern_id: int, priority: int) -> PatternRecord | None:
         for index, pattern in enumerate(self.patterns):
             if pattern.thread_id == thread_id and pattern.pattern_id == pattern_id:
                 updated = PatternRecord(
@@ -278,7 +278,7 @@ class InMemoryPatternRepository(PatternRepository):
                 return updated
         return None
 
-    def update_pattern(
+    async def update_pattern(
         self,
         *,
         thread_id: int,
@@ -318,23 +318,23 @@ class InMemoryPatternRepository(PatternRepository):
                 return updated
         return None
 
-    def list_active_patterns_for_thread(self, thread_id: int) -> list[PatternRecord]:
+    async def list_active_patterns_for_thread(self, thread_id: int) -> list[PatternRecord]:
         rows = [pattern for pattern in self.patterns if pattern.thread_id == thread_id and not pattern.disabled and pattern.notify]
         return sorted(rows, key=lambda pattern: (-pattern.priority, pattern.pattern_id))
 
-    def get_pattern_by_id(self, *, thread_id: int, pattern_id: int) -> PatternRecord | None:
+    async def get_pattern_by_id(self, *, thread_id: int, pattern_id: int) -> PatternRecord | None:
         for pattern in self.patterns:
             if pattern.thread_id == thread_id and pattern.pattern_id == pattern_id:
                 return pattern
         return None
 
-    def list_patterns_for_thread(self, thread_id: int, *, is_regex: bool | None = None) -> list[PatternRecord]:
+    async def list_patterns_for_thread(self, thread_id: int, *, is_regex: bool | None = None) -> list[PatternRecord]:
         rows = [pattern for pattern in self.patterns if pattern.thread_id == thread_id]
         if is_regex is not None:
             rows = [pattern for pattern in rows if pattern.is_regex == is_regex]
         return sorted(rows, key=lambda pattern: pattern.pattern_id)
 
-    def count_channel_scope_references(self, *, thread_id: int, twitch_channel_id: str) -> int:
+    async def count_channel_scope_references(self, *, thread_id: int, twitch_channel_id: str) -> int:
         return sum(1 for pattern in self.patterns if pattern.thread_id == thread_id and twitch_channel_id in pattern.channel_scope_ids)
 
 
@@ -342,10 +342,10 @@ class InMemoryPatternRepository(PatternRepository):
 class InMemoryReplyRepository(ReplyRepository):
     replies_by_pattern: dict[tuple[int, int], ReplyRecord] = field(default_factory=dict)
 
-    def get_by_pattern(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:
+    async def get_by_pattern(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:
         return self.replies_by_pattern.get((thread_id, pattern_id))
 
-    def add_reply(self, *, thread_id: int, pattern_id: int, reply_message: str, reply_as_reply: bool) -> ReplyRecord | None:
+    async def add_reply(self, *, thread_id: int, pattern_id: int, reply_message: str, reply_as_reply: bool) -> ReplyRecord | None:
         reply = ReplyRecord(
             thread_id=thread_id,
             pattern_id=pattern_id,
@@ -356,19 +356,19 @@ class InMemoryReplyRepository(ReplyRepository):
         self.replies_by_pattern[(thread_id, pattern_id)] = reply
         return reply
 
-    def remove_reply(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:
+    async def remove_reply(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:
         return self.replies_by_pattern.pop((thread_id, pattern_id), None)
 
-    def list_replies_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[ReplyRecord]:
+    async def list_replies_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[ReplyRecord]:
         rows = [reply for reply in self.replies_by_pattern.values() if reply.thread_id == thread_id]
         if not include_disabled:
             rows = [reply for reply in rows if not reply.disabled]
         return sorted(rows, key=lambda reply: reply.pattern_id)
 
-    def disable_replies_for_thread(self, thread_id: int) -> int:
+    async def disable_replies_for_thread(self, thread_id: int) -> int:
         return 0
 
-    def enable_replies_for_thread(self, thread_id: int) -> int:
+    async def enable_replies_for_thread(self, thread_id: int) -> int:
         return 0
 
 
@@ -376,24 +376,24 @@ class InMemoryReplyRepository(ReplyRepository):
 class InMemoryTrackedUserRepository(TrackedUserRepository):
     tracked_users: dict[tuple[int, str], TrackedUserRecord] = field(default_factory=dict)
 
-    def get_by_thread_and_twitch_user(self, thread_id: int, twitch_user_id: str) -> TrackedUserRecord | None:
+    async def get_by_thread_and_twitch_user(self, thread_id: int, twitch_user_id: str) -> TrackedUserRecord | None:
         return self.tracked_users.get((thread_id, twitch_user_id))
 
-    def add_user(self, *, thread_id: int, twitch_user_id: str) -> TrackedUserRecord:
+    async def add_user(self, *, thread_id: int, twitch_user_id: str) -> TrackedUserRecord:
         record = TrackedUserRecord(thread_id=thread_id, twitch_user_id=twitch_user_id)
         self.tracked_users[(thread_id, twitch_user_id)] = record
         return record
 
-    def remove_user(self, *, thread_id: int, twitch_user_id: str) -> None:
+    async def remove_user(self, *, thread_id: int, twitch_user_id: str) -> None:
         self.tracked_users.pop((thread_id, twitch_user_id), None)
 
-    def list_users_for_thread(self, thread_id: int) -> list[TrackedUserRecord]:
+    async def list_users_for_thread(self, thread_id: int) -> list[TrackedUserRecord]:
         return sorted(
             [record for record in self.tracked_users.values() if record.thread_id == thread_id],
             key=lambda record: record.twitch_user_id,
         )
 
-    def count_pattern_scope_references(self, *, thread_id: int, twitch_user_id: str) -> int:
+    async def count_pattern_scope_references(self, *, thread_id: int, twitch_user_id: str) -> int:
         return 0
 
 
@@ -401,13 +401,13 @@ class InMemoryTrackedUserRepository(TrackedUserRepository):
 class InMemoryMessageRepository(MessageRepository):
     matched_thread_ids: list[tuple[int, str | None]] = field(default_factory=list)
 
-    def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
+    async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
         return None
 
-    def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
+    async def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
         return []
 
-    def list_recent_messages_for_channel(
+    async def list_recent_messages_for_channel(
         self,
         *,
         twitch_channel_id: str,
@@ -416,10 +416,10 @@ class InMemoryMessageRepository(MessageRepository):
     ) -> list[RecentMessageRecord]:
         return []
 
-    def mark_message_matched_in_thread(self, *, thread_id: int, event: TwitchChatMessageEvent) -> None:
+    async def mark_message_matched_in_thread(self, *, thread_id: int, event: TwitchChatMessageEvent) -> None:
         self.matched_thread_ids.append((thread_id, event.message_id))
 
-    def list_recent_messages_for_thread(
+    async def list_recent_messages_for_thread(
         self,
         *,
         thread_id: int,
@@ -470,6 +470,18 @@ class FakeTwitchAPI:
             if user.user_id == user_id:
                 return user
         return None
+
+    async def load_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
+        return self.get_cached_user_by_id(user_id)
+
+    async def get_users_by_ids(self, user_ids: tuple[str, ...]) -> tuple[TwitchUser, ...]:
+        rows: list[TwitchUser] = []
+        for user_id in user_ids:
+            try:
+                rows.append(await self.get_user_by_id(user_id))
+            except TwitchChannelNotFoundError:
+                continue
+        return tuple(rows)
 
     async def is_user_live(self, user_id: str) -> bool:
         self.live_requests.append(user_id)
@@ -674,9 +686,9 @@ def test_pattern_presenter_formats_updated_scope_change_without_wrapping_links_i
 async def test_ping_command_adds_pattern_with_selected_channel_scope() -> None:
     event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(1, "42")
+    await channel_repository.add_channel(1, "42")
     pattern_repository = InMemoryPatternRepository()
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     event_bus.pattern = PatternCommandService(
@@ -715,7 +727,7 @@ async def test_ping_command_adds_pattern_with_selected_channel_scope() -> None:
 async def test_ping_command_add_saves_explicit_priority() -> None:
     event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository()
     event_bus.pattern = PatternCommandService(
         thread_repository=thread_repository,
@@ -752,7 +764,7 @@ async def test_ping_command_add_saves_explicit_priority() -> None:
 async def test_pattern_command_removes_existing_regex_by_id() -> None:
     event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository()
     channel_repository = InMemoryChannelRepository()
     twitch_api = FakeTwitchAPI()
@@ -808,7 +820,7 @@ async def test_pattern_command_removes_existing_regex_by_id() -> None:
 async def test_ping_command_disables_existing_pattern_by_id() -> None:
     event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository()
     channel_repository = InMemoryChannelRepository()
     twitch_api = FakeTwitchAPI()
@@ -864,7 +876,7 @@ async def test_ping_command_disables_existing_pattern_by_id() -> None:
 async def test_ping_command_enables_disabled_pattern_by_id() -> None:
     event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository()
     channel_repository = InMemoryChannelRepository()
     twitch_api = FakeTwitchAPI()
@@ -958,7 +970,7 @@ async def test_ping_command_requires_join_before_adding_patterns() -> None:
 async def test_pattern_priority_command_updates_existing_pattern_priority() -> None:
     event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository()
     channel_repository = InMemoryChannelRepository()
     twitch_api = FakeTwitchAPI()
@@ -1015,10 +1027,10 @@ async def test_pattern_priority_command_updates_existing_pattern_priority() -> N
 async def test_pattern_edit_updates_existing_pattern_fields() -> None:
     event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(1, "42")
-    channel_repository.add_channel(1, "43")
+    await channel_repository.add_channel(1, "42")
+    await channel_repository.add_channel(1, "43")
     pattern_repository = InMemoryPatternRepository()
     twitch_api = FakeTwitchAPI(
         users_by_login={
@@ -1091,7 +1103,7 @@ async def test_pattern_edit_updates_existing_pattern_fields() -> None:
 async def test_ping_command_rejects_selected_scope_channels_that_are_not_tracked() -> None:
     event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository()
     channel_repository = InMemoryChannelRepository()
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
@@ -1130,11 +1142,11 @@ async def test_ping_command_rejects_selected_scope_channels_that_are_not_tracked
 async def test_ping_command_supports_all_except_selected_scope() -> None:
     event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository()
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(1, "42")
-    channel_repository.add_channel(1, "43")
+    await channel_repository.add_channel(1, "42")
+    await channel_repository.add_channel(1, "43")
     twitch_api = FakeTwitchAPI(
         users_by_login={
             "example": TwitchUser(user_id="42", login="example", display_name="Example"),
@@ -1176,7 +1188,7 @@ async def test_ping_command_supports_all_except_selected_scope() -> None:
 async def test_ping_command_supports_selected_user_scope() -> None:
     event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository()
     channel_repository = InMemoryChannelRepository()
     twitch_api = FakeTwitchAPI(
@@ -1219,7 +1231,7 @@ async def test_ping_command_supports_selected_user_scope() -> None:
 async def test_ping_command_supports_all_except_selected_users() -> None:
     event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository()
     channel_repository = InMemoryChannelRepository()
     twitch_api = FakeTwitchAPI(
@@ -1262,11 +1274,11 @@ async def test_ping_command_supports_all_except_selected_users() -> None:
 async def test_show_command_lists_channels_and_all_pattern_types_together() -> None:
     event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    pattern_repository.add_pattern(
+    await pattern_repository.add_pattern(
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="only_selected",
@@ -1281,7 +1293,7 @@ async def test_show_command_lists_channels_and_all_pattern_types_together() -> N
         disabled=False,
         priority=2,
     )
-    pattern_repository.add_pattern(
+    await pattern_repository.add_pattern(
         thread_id=thread.thread_id,
         regex="^hello$",
         channel_scope_mode="all_tracked",
@@ -1325,9 +1337,9 @@ async def test_show_command_lists_channels_and_all_pattern_types_together() -> N
 async def test_show_command_lists_tracked_users_with_links() -> None:
     event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     tracked_user_repository = InMemoryTrackedUserRepository()
-    tracked_user_repository.add_user(thread_id=thread.thread_id, twitch_user_id="7")
+    await tracked_user_repository.add_user(thread_id=thread.thread_id, twitch_user_id="7")
     event_bus.show = ShowCommandService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
@@ -1357,11 +1369,11 @@ async def test_show_command_lists_tracked_users_with_links() -> None:
 async def test_show_command_renders_where_and_who_as_bullets() -> None:
     event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     tracked_user_repository = InMemoryTrackedUserRepository()
-    tracked_user_repository.add_user(thread_id=thread.thread_id, twitch_user_id="7")
+    await tracked_user_repository.add_user(thread_id=thread.thread_id, twitch_user_id="7")
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
@@ -1411,11 +1423,11 @@ async def test_show_command_renders_where_and_who_as_bullets() -> None:
 @pytest.mark.asyncio
 async def test_tracking_service_sends_embed_for_matching_ping_with_pattern_color() -> None:
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=1000)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=1000)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    pattern_repository.add_pattern(
+    await pattern_repository.add_pattern(
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="all_tracked",
@@ -1462,11 +1474,11 @@ async def test_tracking_service_sends_embed_for_matching_ping_with_pattern_color
 @pytest.mark.asyncio
 async def test_tracking_service_refreshes_missing_author_profile_image_once() -> None:
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=1000)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=1000)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    pattern_repository.add_pattern(
+    await pattern_repository.add_pattern(
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="all_tracked",
@@ -1523,11 +1535,11 @@ async def test_tracking_service_refreshes_missing_author_profile_image_once() ->
 @pytest.mark.asyncio
 async def test_tracking_service_sends_embed_for_case_sensitive_ping_match() -> None:
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=1000)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=1000)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    pattern_repository.add_pattern(
+    await pattern_repository.add_pattern(
         thread_id=thread.thread_id,
         regex="test",
         channel_scope_mode="all_tracked",
@@ -1571,11 +1583,11 @@ async def test_tracking_service_sends_embed_for_case_sensitive_ping_match() -> N
 @pytest.mark.asyncio
 async def test_tracking_service_uses_highest_priority_match_and_stops_after_first_match() -> None:
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=1000)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=1000)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    pattern_repository.add_pattern(
+    await pattern_repository.add_pattern(
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="all_tracked",
@@ -1590,7 +1602,7 @@ async def test_tracking_service_uses_highest_priority_match_and_stops_after_firs
         disabled=False,
         priority=1,
     )
-    pattern_repository.add_pattern(
+    await pattern_repository.add_pattern(
         thread_id=thread.thread_id,
         regex="hello there",
         channel_scope_mode="all_tracked",
@@ -1636,11 +1648,11 @@ async def test_tracking_service_uses_highest_priority_match_and_stops_after_firs
 @pytest.mark.asyncio
 async def test_tracking_service_skips_normal_embed_when_pattern_has_enabled_reply() -> None:
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=1000)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=1000)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    pattern_repository.add_pattern(
+    await pattern_repository.add_pattern(
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="all_tracked",
@@ -1656,7 +1668,7 @@ async def test_tracking_service_skips_normal_embed_when_pattern_has_enabled_repl
         priority=0,
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
+    await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
     notifier = FakeNotifier()
     service = PatternTrackingService(
         thread_repository=thread_repository,
@@ -1688,10 +1700,10 @@ async def test_tracking_service_skips_normal_embed_when_pattern_has_enabled_repl
 async def test_show_command_lists_patterns_in_creation_order() -> None:
     event_bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     pattern_repository = InMemoryPatternRepository()
-    pattern_repository.add_pattern(
+    await pattern_repository.add_pattern(
         thread_id=thread.thread_id,
         regex="general",
         channel_scope_mode="all_tracked",
@@ -1706,7 +1718,7 @@ async def test_show_command_lists_patterns_in_creation_order() -> None:
         disabled=False,
         priority=1,
     )
-    pattern_repository.add_pattern(
+    await pattern_repository.add_pattern(
         thread_id=thread.thread_id,
         regex="specific",
         channel_scope_mode="only_selected",
@@ -1750,7 +1762,7 @@ async def test_show_command_lists_patterns_in_creation_order() -> None:
 @pytest.mark.asyncio
 async def test_display_index_stays_stable_when_pattern_priority_changes() -> None:
     pattern_repository = InMemoryPatternRepository()
-    first = pattern_repository.add_pattern(
+    first = await pattern_repository.add_pattern(
         thread_id=1,
         regex="first",
         channel_scope_mode="all_tracked",
@@ -1765,7 +1777,7 @@ async def test_display_index_stays_stable_when_pattern_priority_changes() -> Non
         disabled=False,
         priority=1,
     )
-    second = pattern_repository.add_pattern(
+    second = await pattern_repository.add_pattern(
         thread_id=1,
         regex="second",
         channel_scope_mode="all_tracked",
@@ -1784,8 +1796,8 @@ async def test_display_index_stays_stable_when_pattern_priority_changes() -> Non
 
     assert await resolver.build_index_map(1) == {first.pattern_id: 1, second.pattern_id: 2}
 
-    pattern_repository.set_pattern_priority(thread_id=1, pattern_id=first.pattern_id, priority=9)
-    pattern_repository.set_pattern_priority(thread_id=1, pattern_id=second.pattern_id, priority=0)
+    await pattern_repository.set_pattern_priority(thread_id=1, pattern_id=first.pattern_id, priority=9)
+    await pattern_repository.set_pattern_priority(thread_id=1, pattern_id=second.pattern_id, priority=0)
 
     assert await resolver.build_index_map(1) == {first.pattern_id: 1, second.pattern_id: 2}
 
@@ -1793,11 +1805,11 @@ async def test_display_index_stays_stable_when_pattern_priority_changes() -> Non
 @pytest.mark.asyncio
 async def test_tracking_service_respects_all_except_selected_user_scope() -> None:
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=1000)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=1000)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    pattern_repository.add_pattern(
+    await pattern_repository.add_pattern(
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="all_tracked",
@@ -1842,14 +1854,14 @@ async def test_tracking_service_respects_all_except_selected_user_scope() -> Non
 @pytest.mark.asyncio
 async def test_tracking_service_respects_all_tracked_except_selected_user_scope() -> None:
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=1000)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=1000)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     tracked_user_repository = InMemoryTrackedUserRepository()
-    tracked_user_repository.add_user(thread_id=thread.thread_id, twitch_user_id="7")
-    tracked_user_repository.add_user(thread_id=thread.thread_id, twitch_user_id="8")
+    await tracked_user_repository.add_user(thread_id=thread.thread_id, twitch_user_id="7")
+    await tracked_user_repository.add_user(thread_id=thread.thread_id, twitch_user_id="8")
     pattern_repository = InMemoryPatternRepository()
-    pattern_repository.add_pattern(
+    await pattern_repository.add_pattern(
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="all_tracked",
@@ -1895,12 +1907,12 @@ async def test_tracking_service_respects_all_tracked_except_selected_user_scope(
 @pytest.mark.asyncio
 async def test_tracking_service_skips_disabled_thread() -> None:
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=1000)
-    thread_repository.set_enabled(discord_channel_id=1000, enabled=False)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=1000)
+    await thread_repository.set_enabled(discord_channel_id=1000, enabled=False)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    pattern_repository.add_pattern(
+    await pattern_repository.add_pattern(
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="all_tracked",
@@ -1944,12 +1956,12 @@ async def test_tracking_service_skips_disabled_thread() -> None:
 @pytest.mark.asyncio
 async def test_tracking_service_uses_persisted_channel_live_state_without_twitch_live_lookup() -> None:
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=1000)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=1000)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
-    channel_repository.set_live_state_for_twitch_channel(twitch_channel_id="42", is_live=True, changed_at="now")
+    await channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.set_live_state_for_twitch_channel(twitch_channel_id="42", is_live=True, changed_at="now")
     pattern_repository = InMemoryPatternRepository()
-    pattern_repository.add_pattern(
+    await pattern_repository.add_pattern(
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="all_tracked",

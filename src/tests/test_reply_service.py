@@ -59,16 +59,16 @@ class InMemoryThreadRepository(ThreadRepository):
     threads_by_channel_id: dict[int, ThreadRecord] = field(default_factory=dict)
     next_thread_id: int = 1
 
-    def get_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
+    async def get_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
         return self.threads_by_channel_id.get(discord_channel_id)
 
-    def get_by_thread_id(self, thread_id: int) -> ThreadRecord | None:
+    async def get_by_thread_id(self, thread_id: int) -> ThreadRecord | None:
         for thread in self.threads_by_channel_id.values():
             if thread.thread_id == thread_id:
                 return thread
         return None
 
-    def create(self, owner_id: int, discord_channel_id: int) -> ThreadRecord:
+    async def create(self, owner_id: int, discord_channel_id: int) -> ThreadRecord:
         thread = ThreadRecord(
             thread_id=self.next_thread_id,
             owner_id=owner_id,
@@ -81,10 +81,10 @@ class InMemoryThreadRepository(ThreadRepository):
         self.threads_by_channel_id[discord_channel_id] = thread
         return thread
 
-    def delete_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
+    async def delete_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
         return self.threads_by_channel_id.pop(discord_channel_id, None)
 
-    def set_enabled(self, *, discord_channel_id: int, enabled: bool) -> ThreadRecord | None:
+    async def set_enabled(self, *, discord_channel_id: int, enabled: bool) -> ThreadRecord | None:
         thread = self.threads_by_channel_id.get(discord_channel_id)
         if thread is None:
             return None
@@ -99,7 +99,7 @@ class InMemoryThreadRepository(ThreadRepository):
         self.threads_by_channel_id[discord_channel_id] = updated
         return updated
 
-    def set_color(self, *, discord_channel_id: int, color: str | None) -> ThreadRecord | None:
+    async def set_color(self, *, discord_channel_id: int, color: str | None) -> ThreadRecord | None:
         thread = self.threads_by_channel_id.get(discord_channel_id)
         if thread is None:
             return None
@@ -114,7 +114,7 @@ class InMemoryThreadRepository(ThreadRepository):
         self.threads_by_channel_id[discord_channel_id] = updated
         return updated
 
-    def set_account_id(self, *, discord_channel_id: int, account_id: int | None) -> ThreadRecord | None:
+    async def set_account_id(self, *, discord_channel_id: int, account_id: int | None) -> ThreadRecord | None:
         thread = self.threads_by_channel_id.get(discord_channel_id)
         if thread is None:
             return None
@@ -129,7 +129,7 @@ class InMemoryThreadRepository(ThreadRepository):
         self.threads_by_channel_id[discord_channel_id] = updated
         return updated
 
-    def list_by_owner_id(self, owner_id: int) -> list[ThreadRecord]:
+    async def list_by_owner_id(self, owner_id: int) -> list[ThreadRecord]:
         return [thread for thread in self.threads_by_channel_id.values() if thread.owner_id == owner_id]
 
 
@@ -137,20 +137,20 @@ class InMemoryThreadRepository(ThreadRepository):
 class InMemoryChannelRepository(ChannelRepository):
     channels_by_thread: dict[tuple[int, str], ChannelRecord] = field(default_factory=dict)
 
-    def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:
+    async def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:
         return self.channels_by_thread.get((thread_id, twitch_channel_id))
 
-    def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
+    async def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
         self.channels_by_thread[(thread_id, twitch_channel_id)] = ChannelRecord(
             thread_id=thread_id,
             twitch_channel_id=twitch_channel_id,
             color=None,
         )
 
-    def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:
+    async def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:
         self.channels_by_thread.pop((thread_id, twitch_channel_id), None)
 
-    def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:
+    async def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:
         key = (thread_id, twitch_channel_id)
         existing = self.channels_by_thread.get(key)
         if existing is None:
@@ -165,7 +165,7 @@ class InMemoryChannelRepository(ChannelRepository):
         self.channels_by_thread[key] = updated
         return updated
 
-    def set_live_state_for_twitch_channel(self, *, twitch_channel_id: str, is_live: bool, changed_at: str | None) -> int:
+    async def set_live_state_for_twitch_channel(self, *, twitch_channel_id: str, is_live: bool, changed_at: str | None) -> int:
         updated_rows = 0
         for key, existing in list(self.channels_by_thread.items()):
             if existing.twitch_channel_id != twitch_channel_id:
@@ -180,16 +180,16 @@ class InMemoryChannelRepository(ChannelRepository):
             updated_rows += 1
         return updated_rows
 
-    def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
+    async def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
         return sum(1 for record in self.channels_by_thread.values() if record.twitch_channel_id == twitch_channel_id)
 
-    def list_thread_ids_by_twitch_channel_id(self, twitch_channel_id: str) -> list[int]:
+    async def list_thread_ids_by_twitch_channel_id(self, twitch_channel_id: str) -> list[int]:
         return [record.thread_id for record in self.channels_by_thread.values() if record.twitch_channel_id == twitch_channel_id]
 
-    def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
+    async def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
         return [record for record in self.channels_by_thread.values() if record.thread_id == thread_id]
 
-    def list_all_twitch_channel_ids(self) -> list[str]:
+    async def list_all_twitch_channel_ids(self) -> list[str]:
         return sorted({record.twitch_channel_id for record in self.channels_by_thread.values()})
 
 
@@ -197,13 +197,13 @@ class InMemoryChannelRepository(ChannelRepository):
 class InMemoryMessageRepository(MessageRepository):
     matched_thread_ids: list[tuple[int, str | None]] = field(default_factory=list)
 
-    def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
+    async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
         return None
 
-    def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
+    async def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
         return []
 
-    def list_recent_messages_for_channel(
+    async def list_recent_messages_for_channel(
         self,
         *,
         twitch_channel_id: str,
@@ -212,10 +212,10 @@ class InMemoryMessageRepository(MessageRepository):
     ) -> list[RecentMessageRecord]:
         return []
 
-    def mark_message_matched_in_thread(self, *, thread_id: int, event: TwitchChatMessageEvent) -> None:
+    async def mark_message_matched_in_thread(self, *, thread_id: int, event: TwitchChatMessageEvent) -> None:
         self.matched_thread_ids.append((thread_id, event.message_id))
 
-    def list_recent_messages_for_thread(
+    async def list_recent_messages_for_thread(
         self,
         *,
         thread_id: int,
@@ -229,16 +229,16 @@ class InMemoryMessageRepository(MessageRepository):
 class InMemoryPatternRepository(PatternRepository):
     patterns: list[PatternRecord] = field(default_factory=list)
 
-    def find_exact_pattern(self, **kwargs) -> PatternRecord | None:  # pragma: no cover - unused here
+    async def find_exact_pattern(self, **kwargs) -> PatternRecord | None:  # pragma: no cover - unused here
         raise NotImplementedError
 
-    def add_pattern(self, **kwargs) -> PatternRecord:  # pragma: no cover - unused here
+    async def add_pattern(self, **kwargs) -> PatternRecord:  # pragma: no cover - unused here
         raise NotImplementedError
 
-    def remove_pattern(self, *, thread_id: int, pattern_id: int) -> None:
+    async def remove_pattern(self, *, thread_id: int, pattern_id: int) -> None:
         self.patterns = [pattern for pattern in self.patterns if not (pattern.thread_id == thread_id and pattern.pattern_id == pattern_id)]
 
-    def set_pattern_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool) -> PatternRecord | None:
+    async def set_pattern_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool) -> PatternRecord | None:
         for index, pattern in enumerate(self.patterns):
             if pattern.thread_id == thread_id and pattern.pattern_id == pattern_id:
                 updated = PatternRecord(
@@ -262,7 +262,7 @@ class InMemoryPatternRepository(PatternRepository):
                 return updated
         return None
 
-    def set_pattern_priority(self, *, thread_id: int, pattern_id: int, priority: int) -> PatternRecord | None:
+    async def set_pattern_priority(self, *, thread_id: int, pattern_id: int, priority: int) -> PatternRecord | None:
         for index, pattern in enumerate(self.patterns):
             if pattern.thread_id == thread_id and pattern.pattern_id == pattern_id:
                 updated = PatternRecord(
@@ -286,7 +286,7 @@ class InMemoryPatternRepository(PatternRepository):
                 return updated
         return None
 
-    def update_pattern(
+    async def update_pattern(
         self,
         *,
         thread_id: int,
@@ -326,23 +326,23 @@ class InMemoryPatternRepository(PatternRepository):
                 return updated
         return None
 
-    def list_active_patterns_for_thread(self, thread_id: int) -> list[PatternRecord]:
+    async def list_active_patterns_for_thread(self, thread_id: int) -> list[PatternRecord]:
         rows = [pattern for pattern in self.patterns if pattern.thread_id == thread_id and not pattern.disabled and pattern.notify]
         return sorted(rows, key=lambda pattern: (-pattern.priority, pattern.pattern_id))
 
-    def get_pattern_by_id(self, *, thread_id: int, pattern_id: int) -> PatternRecord | None:
+    async def get_pattern_by_id(self, *, thread_id: int, pattern_id: int) -> PatternRecord | None:
         for pattern in self.patterns:
             if pattern.thread_id == thread_id and pattern.pattern_id == pattern_id:
                 return pattern
         return None
 
-    def list_patterns_for_thread(self, thread_id: int, *, is_regex: bool | None = None) -> list[PatternRecord]:
+    async def list_patterns_for_thread(self, thread_id: int, *, is_regex: bool | None = None) -> list[PatternRecord]:
         rows = [pattern for pattern in self.patterns if pattern.thread_id == thread_id]
         if is_regex is not None:
             rows = [pattern for pattern in rows if pattern.is_regex == is_regex]
         return sorted(rows, key=lambda pattern: pattern.pattern_id)
 
-    def count_channel_scope_references(self, *, thread_id: int, twitch_channel_id: str) -> int:
+    async def count_channel_scope_references(self, *, thread_id: int, twitch_channel_id: str) -> int:
         return sum(1 for pattern in self.patterns if pattern.thread_id == thread_id and twitch_channel_id in pattern.channel_scope_ids)
 
 
@@ -350,10 +350,10 @@ class InMemoryPatternRepository(PatternRepository):
 class InMemoryReplyRepository(ReplyRepository):
     replies_by_pattern: dict[tuple[int, int], ReplyRecord] = field(default_factory=dict)
 
-    def get_by_pattern(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:
+    async def get_by_pattern(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:
         return self.replies_by_pattern.get((thread_id, pattern_id))
 
-    def add_reply(
+    async def add_reply(
         self,
         *,
         thread_id: int,
@@ -374,10 +374,10 @@ class InMemoryReplyRepository(ReplyRepository):
         self.replies_by_pattern[key] = reply
         return reply
 
-    def remove_reply(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:
+    async def remove_reply(self, *, thread_id: int, pattern_id: int) -> ReplyRecord | None:
         return self.replies_by_pattern.pop((thread_id, pattern_id), None)
 
-    def set_reply_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool) -> ReplyRecord | None:
+    async def set_reply_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool) -> ReplyRecord | None:
         key = (thread_id, pattern_id)
         existing = self.replies_by_pattern.get(key)
         if existing is None:
@@ -392,13 +392,13 @@ class InMemoryReplyRepository(ReplyRepository):
         self.replies_by_pattern[key] = updated
         return updated
 
-    def list_replies_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[ReplyRecord]:
+    async def list_replies_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[ReplyRecord]:
         rows = [reply for reply in self.replies_by_pattern.values() if reply.thread_id == thread_id]
         if not include_disabled:
             rows = [reply for reply in rows if not reply.disabled]
         return sorted(rows, key=lambda reply: reply.pattern_id)
 
-    def disable_replies_for_thread(self, thread_id: int) -> int:
+    async def disable_replies_for_thread(self, thread_id: int) -> int:
         count = 0
         for key, reply in list(self.replies_by_pattern.items()):
             if reply.thread_id == thread_id and not reply.disabled:
@@ -412,7 +412,7 @@ class InMemoryReplyRepository(ReplyRepository):
                 count += 1
         return count
 
-    def enable_replies_for_thread(self, thread_id: int) -> int:
+    async def enable_replies_for_thread(self, thread_id: int) -> int:
         count = 0
         for key, reply in list(self.replies_by_pattern.items()):
             if reply.thread_id == thread_id and reply.disabled:
@@ -432,7 +432,7 @@ class InMemoryAdapterEventRepository(AdapterEventRepository):
     events_by_id: dict[int, AdapterEventRecord] = field(default_factory=dict)
     next_event_id: int = 1
 
-    def upsert_event(
+    async def upsert_event(
         self,
         *,
         thread_id: int,
@@ -441,7 +441,7 @@ class InMemoryAdapterEventRepository(AdapterEventRepository):
         subject_id: str,
         event_key: str,
     ) -> AdapterEventRecord:
-        existing = self.get_event(
+        existing = await self.get_event(
             thread_id=thread_id,
             adapter_key=adapter_key,
             subject_type=subject_type,
@@ -473,7 +473,7 @@ class InMemoryAdapterEventRepository(AdapterEventRepository):
         self.events_by_id[record.event_id] = record
         return record
 
-    def get_event(
+    async def get_event(
         self,
         *,
         thread_id: int,
@@ -493,13 +493,13 @@ class InMemoryAdapterEventRepository(AdapterEventRepository):
                 return event
         return None
 
-    def list_events_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[AdapterEventRecord]:
+    async def list_events_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[AdapterEventRecord]:
         rows = [event for event in self.events_by_id.values() if event.thread_id == thread_id]
         if not include_disabled:
             rows = [event for event in rows if not event.disabled]
         return sorted(rows, key=lambda event: (event.event_key, event.subject_id))
 
-    def list_matching_events(
+    async def list_matching_events(
         self,
         *,
         adapter_key: str,
@@ -526,7 +526,7 @@ class InMemoryAdapterEventActionRepository(AdapterEventActionRepository):
     actions: dict[tuple[int, str], AdapterEventActionRecord] = field(default_factory=dict)
     event_repository: InMemoryAdapterEventRepository | None = None
 
-    def upsert_action(
+    async def upsert_action(
         self,
         *,
         event_id: int,
@@ -546,13 +546,13 @@ class InMemoryAdapterEventActionRepository(AdapterEventActionRepository):
         self.actions[(event_id, action_type)] = record
         return record
 
-    def get_action(self, *, event_id: int, action_type: str) -> AdapterEventActionRecord | None:
+    async def get_action(self, *, event_id: int, action_type: str) -> AdapterEventActionRecord | None:
         return self.actions.get((event_id, action_type))
 
-    def remove_action(self, *, event_id: int, action_type: str) -> AdapterEventActionRecord | None:
+    async def remove_action(self, *, event_id: int, action_type: str) -> AdapterEventActionRecord | None:
         return self.actions.pop((event_id, action_type), None)
 
-    def set_action_disabled(
+    async def set_action_disabled(
         self,
         *,
         event_id: int,
@@ -574,7 +574,7 @@ class InMemoryAdapterEventActionRepository(AdapterEventActionRepository):
         self.actions[key] = updated
         return updated
 
-    def set_action_color(
+    async def set_action_color(
         self,
         *,
         event_id: int,
@@ -596,13 +596,13 @@ class InMemoryAdapterEventActionRepository(AdapterEventActionRepository):
         self.actions[key] = updated
         return updated
 
-    def list_actions_for_event(self, event_id: int, *, include_disabled: bool = True) -> list[AdapterEventActionRecord]:
+    async def list_actions_for_event(self, event_id: int, *, include_disabled: bool = True) -> list[AdapterEventActionRecord]:
         rows = [action for action in self.actions.values() if action.event_id == event_id]
         if not include_disabled:
             rows = [action for action in rows if not action.disabled]
         return sorted(rows, key=lambda action: action.action_type)
 
-    def list_actions_for_thread(
+    async def list_actions_for_thread(
         self,
         thread_id: int,
         *,
@@ -611,8 +611,8 @@ class InMemoryAdapterEventActionRepository(AdapterEventActionRepository):
         if self.event_repository is None:
             return []
         results: list[tuple[AdapterEventRecord, AdapterEventActionRecord]] = []
-        for event in self.event_repository.list_events_for_thread(thread_id, include_disabled=include_disabled):
-            for action in self.list_actions_for_event(event.event_id, include_disabled=include_disabled):
+        for event in await self.event_repository.list_events_for_thread(thread_id, include_disabled=include_disabled):
+            for action in await self.list_actions_for_event(event.event_id, include_disabled=include_disabled):
                 results.append((event, action))
         return results
 
@@ -621,10 +621,10 @@ class InMemoryAdapterEventActionRepository(AdapterEventActionRepository):
 async def test_channel_event_command_manages_live_and_offline_notifications() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
-    channel_repository.set_live_state_for_twitch_channel(twitch_channel_id="42", is_live=True, changed_at="now")
+    await channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.set_live_state_for_twitch_channel(twitch_channel_id="42", is_live=True, changed_at="now")
     adapter_event_repository = InMemoryAdapterEventRepository()
     adapter_event_action_repository = InMemoryAdapterEventActionRepository(event_repository=adapter_event_repository)
     twitch_api = FakeTwitchAPI(
@@ -660,7 +660,7 @@ async def test_channel_event_command_manages_live_and_offline_notifications() ->
         twitch_channel_id="42",
         event_key="stream.offline",
     )
-    event = adapter_event_repository.get_event(
+    event = await adapter_event_repository.get_event(
         thread_id=thread.thread_id,
         adapter_key="twitch",
         subject_type="channel",
@@ -682,7 +682,7 @@ async def test_channel_event_command_manages_live_and_offline_notifications() ->
     )
     assert second_add_result.style == DiscordResultStyle.SUCCESS
     assert "#`2`" in second_add_result.message
-    second_event = adapter_event_repository.get_event(
+    second_event = await adapter_event_repository.get_event(
         thread_id=thread.thread_id,
         adapter_key="twitch",
         subject_type="channel",
@@ -700,7 +700,7 @@ async def test_channel_event_command_manages_live_and_offline_notifications() ->
         event_key="stream.online",
         color="#123456",
     )
-    second_action = adapter_event_action_repository.get_action(
+    second_action = await adapter_event_action_repository.get_action(
         event_id=second_event.event_id,
         action_type="discord_notify",
     )
@@ -719,7 +719,7 @@ async def test_channel_event_command_manages_live_and_offline_notifications() ->
     )
     assert remove_result.style == DiscordResultStyle.SUCCESS
     assert "#`1`" in remove_result.message
-    assert adapter_event_action_repository.get_action(event_id=event.event_id, action_type="discord_notify") is None
+    assert await adapter_event_action_repository.get_action(event_id=event.event_id, action_type="discord_notify") is None
 
     stream_pings_result = await dispatch_show_command(
         bus,
@@ -751,10 +751,10 @@ class InMemoryAccountRepository(TwitchAccountRepository):
     accounts_by_account_id: dict[int, TwitchAccountRecord] = field(default_factory=dict)
     next_account_id: int = 1
 
-    def get_by_account_id(self, account_id: int) -> TwitchAccountRecord | None:
+    async def get_by_account_id(self, account_id: int) -> TwitchAccountRecord | None:
         return self.accounts_by_account_id.get(account_id)
 
-    def create_account(
+    async def create_account(
         self,
         *,
         discord_user_id: int,
@@ -784,7 +784,7 @@ class InMemoryAccountRepository(TwitchAccountRepository):
         self.accounts_by_account_id[account_id] = record
         return record
 
-    def update_account(
+    async def update_account(
         self,
         *,
         account_id: int,
@@ -815,16 +815,16 @@ class InMemoryAccountRepository(TwitchAccountRepository):
         self.accounts_by_account_id[account_id] = updated
         return updated
 
-    def remove_by_account_id(self, account_id: int) -> bool:
+    async def remove_by_account_id(self, account_id: int) -> bool:
         return self.accounts_by_account_id.pop(account_id, None) is not None
 
-    def get_by_discord_user_id(self, discord_user_id: int) -> TwitchAccountRecord | None:
+    async def get_by_discord_user_id(self, discord_user_id: int) -> TwitchAccountRecord | None:
         matches = [account for account in self.accounts_by_account_id.values() if account.discord_user_id == discord_user_id]
         if not matches:
             return None
         return sorted(matches, key=lambda account: account.account_id)[-1]
 
-    def upsert_account(
+    async def upsert_account(
         self,
         *,
         discord_user_id: int,
@@ -837,9 +837,9 @@ class InMemoryAccountRepository(TwitchAccountRepository):
         scope: tuple[str, ...],
         token_type: str | None,
     ) -> TwitchAccountRecord:
-        existing = self.get_by_discord_user_id(discord_user_id)
+        existing = await self.get_by_discord_user_id(discord_user_id)
         if existing is None:
-            return self.create_account(
+            return await self.create_account(
                 discord_user_id=discord_user_id,
                 twitch_user_id=twitch_user_id,
                 twitch_login=twitch_login,
@@ -850,7 +850,7 @@ class InMemoryAccountRepository(TwitchAccountRepository):
                 scope=scope,
                 token_type=token_type,
             )
-        updated = self.update_account(
+        updated = await self.update_account(
             account_id=existing.account_id,
             twitch_user_id=twitch_user_id,
             twitch_login=twitch_login,
@@ -864,13 +864,13 @@ class InMemoryAccountRepository(TwitchAccountRepository):
         assert updated is not None
         return updated
 
-    def remove_by_discord_user_id(self, discord_user_id: int) -> bool:
-        existing = self.get_by_discord_user_id(discord_user_id)
+    async def remove_by_discord_user_id(self, discord_user_id: int) -> bool:
+        existing = await self.get_by_discord_user_id(discord_user_id)
         if existing is None:
             return False
-        return self.remove_by_account_id(existing.account_id)
+        return await self.remove_by_account_id(existing.account_id)
 
-    def list_accounts(self) -> list[TwitchAccountRecord]:
+    async def list_accounts(self) -> list[TwitchAccountRecord]:
         return sorted(self.accounts_by_account_id.values(), key=lambda account: account.account_id, reverse=True)
 
 
@@ -878,10 +878,10 @@ class InMemoryAccountRepository(TwitchAccountRepository):
 class InMemoryDeviceFlowRepository(TwitchDeviceFlowRepository):
     flows_by_discord_channel_id: dict[int, TwitchDeviceFlowRecord] = field(default_factory=dict)
 
-    def get_by_discord_channel_id(self, discord_channel_id: int) -> TwitchDeviceFlowRecord | None:
+    async def get_by_discord_channel_id(self, discord_channel_id: int) -> TwitchDeviceFlowRecord | None:
         return self.flows_by_discord_channel_id.get(discord_channel_id)
 
-    def upsert_pending_flow(
+    async def upsert_pending_flow(
         self,
         *,
         discord_user_id: int,
@@ -909,10 +909,10 @@ class InMemoryDeviceFlowRepository(TwitchDeviceFlowRepository):
         self.flows_by_discord_channel_id[discord_channel_id] = record
         return record
 
-    def list_pending_flows(self) -> list[TwitchDeviceFlowRecord]:
+    async def list_pending_flows(self) -> list[TwitchDeviceFlowRecord]:
         return [flow for flow in self.flows_by_discord_channel_id.values() if flow.status == "pending"]
 
-    def mark_failed(self, *, discord_channel_id: int, last_error: str) -> TwitchDeviceFlowRecord | None:
+    async def mark_failed(self, *, discord_channel_id: int, last_error: str) -> TwitchDeviceFlowRecord | None:
         existing = self.flows_by_discord_channel_id.get(discord_channel_id)
         if existing is None:
             return None
@@ -932,7 +932,7 @@ class InMemoryDeviceFlowRepository(TwitchDeviceFlowRepository):
         self.flows_by_discord_channel_id[discord_channel_id] = updated
         return updated
 
-    def touch_polled(self, *, discord_channel_id: int) -> None:
+    async def touch_polled(self, *, discord_channel_id: int) -> None:
         existing = self.flows_by_discord_channel_id.get(discord_channel_id)
         if existing is None:
             return
@@ -950,7 +950,7 @@ class InMemoryDeviceFlowRepository(TwitchDeviceFlowRepository):
             last_polled_at=datetime.now(UTC).isoformat(),
         )
 
-    def update_interval(self, *, discord_channel_id: int, interval_seconds: int) -> None:
+    async def update_interval(self, *, discord_channel_id: int, interval_seconds: int) -> None:
         existing = self.flows_by_discord_channel_id.get(discord_channel_id)
         if existing is None:
             return
@@ -968,20 +968,20 @@ class InMemoryDeviceFlowRepository(TwitchDeviceFlowRepository):
             last_polled_at=existing.last_polled_at,
         )
 
-    def remove_by_discord_channel_id(self, discord_channel_id: int) -> bool:
+    async def remove_by_discord_channel_id(self, discord_channel_id: int) -> bool:
         return self.flows_by_discord_channel_id.pop(discord_channel_id, None) is not None
 
-    def get_by_discord_user_id(self, discord_user_id: int) -> TwitchDeviceFlowRecord | None:
+    async def get_by_discord_user_id(self, discord_user_id: int) -> TwitchDeviceFlowRecord | None:
         matches = [flow for flow in self.flows_by_discord_channel_id.values() if flow.discord_user_id == discord_user_id]
         if not matches:
             return None
         return sorted(matches, key=lambda flow: flow.discord_channel_id or 0)[-1]
 
-    def remove_by_discord_user_id(self, discord_user_id: int) -> bool:
-        existing = self.get_by_discord_user_id(discord_user_id)
+    async def remove_by_discord_user_id(self, discord_user_id: int) -> bool:
+        existing = await self.get_by_discord_user_id(discord_user_id)
         if existing is None or existing.discord_channel_id is None:
             return False
-        return self.remove_by_discord_channel_id(existing.discord_channel_id)
+        return await self.remove_by_discord_channel_id(existing.discord_channel_id)
 
 
 @dataclass
@@ -1066,6 +1066,18 @@ class FakeTwitchAPI:
                 return user
         return None
 
+    async def load_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
+        return self.get_cached_user_by_id(user_id)
+
+    async def get_users_by_ids(self, user_ids: tuple[str, ...]) -> tuple[TwitchUser, ...]:
+        rows: list[TwitchUser] = []
+        for user_id in user_ids:
+            try:
+                rows.append(await self.get_user_by_id(user_id))
+            except TwitchChannelNotFoundError:
+                continue
+        return tuple(rows)
+
     async def get_channel_by_id(self, user_id: str) -> TwitchUser:
         return await self.get_user_by_id(user_id)
 
@@ -1103,7 +1115,7 @@ async def test_account_link_command_starts_device_flow() -> None:
     account_repository = InMemoryAccountRepository()
     device_flow_repository = InMemoryDeviceFlowRepository()
     thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
     twitch_api = FakeTwitchAPI(
         device_start=TwitchDeviceCodeStart(
             device_code="device-123",
@@ -1129,7 +1141,7 @@ async def test_account_link_command_starts_device_flow() -> None:
 
     assert result.style == DiscordResultStyle.INFO
     assert result.ephemeral is True
-    pending = device_flow_repository.get_by_discord_channel_id(100)
+    pending = await device_flow_repository.get_by_discord_channel_id(100)
     assert pending is not None
     assert pending.discord_channel_id == 100
     assert pending.user_code == "ABCDEFGH"
@@ -1140,9 +1152,9 @@ async def test_account_link_command_starts_device_flow() -> None:
 async def test_show_account_lists_linked_account_with_display_name_and_thumbnail() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="77",
         twitch_login="test__user",
@@ -1153,7 +1165,7 @@ async def test_show_account_lists_linked_account_with_display_name_and_thumbnail
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     bus.show = ShowCommandService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
@@ -1187,8 +1199,8 @@ async def test_device_flow_poller_links_account_after_successful_authorization()
     account_repository = InMemoryAccountRepository()
     device_flow_repository = InMemoryDeviceFlowRepository()
     thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
-    device_flow_repository.upsert_pending_flow(
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
+    await device_flow_repository.upsert_pending_flow(
         discord_user_id=200,
         discord_channel_id=100,
         device_code="device-123",
@@ -1230,13 +1242,13 @@ async def test_device_flow_poller_links_account_after_successful_authorization()
 
     await poller.poll_once()
 
-    thread = thread_repository.get_by_discord_channel_id(100)
+    thread = await thread_repository.get_by_discord_channel_id(100)
     assert thread is not None
     assert thread.account_id is not None
-    stored = account_repository.get_by_account_id(thread.account_id)
+    stored = await account_repository.get_by_account_id(thread.account_id)
     assert stored is not None
     assert stored.twitch_login == "dancedown"
-    assert device_flow_repository.get_by_discord_channel_id(100) is None
+    assert await device_flow_repository.get_by_discord_channel_id(100) is None
     assert notifier.sent[0][1].style == DiscordResultStyle.SUCCESS
 
 
@@ -1245,8 +1257,8 @@ async def test_device_flow_poller_marks_failed_authorizations() -> None:
     account_repository = InMemoryAccountRepository()
     device_flow_repository = InMemoryDeviceFlowRepository()
     thread_repository = InMemoryThreadRepository()
-    thread_repository.create(owner_id=200, discord_channel_id=100)
-    device_flow_repository.upsert_pending_flow(
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
+    await device_flow_repository.upsert_pending_flow(
         discord_user_id=200,
         discord_channel_id=100,
         device_code="device-123",
@@ -1271,7 +1283,7 @@ async def test_device_flow_poller_marks_failed_authorizations() -> None:
 
     await poller.poll_once()
 
-    pending = device_flow_repository.get_by_discord_channel_id(100)
+    pending = await device_flow_repository.get_by_discord_channel_id(100)
     assert pending is not None
     assert pending.status == "failed"
     assert pending.last_error == "access_denied"
@@ -1282,7 +1294,7 @@ async def test_device_flow_poller_marks_failed_authorizations() -> None:
 async def test_account_unlink_keeps_attached_auto_replies() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     InMemoryPatternRepository(
         patterns=[
             PatternRecord(
@@ -1305,9 +1317,9 @@ async def test_account_unlink_keeps_attached_auto_replies() -> None:
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
+    await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="77",
         twitch_login="dancedown",
@@ -1318,7 +1330,7 @@ async def test_account_unlink_keeps_attached_auto_replies() -> None:
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     bus.account = AccountCommandService(
         account_repository=account_repository,
         device_flow_repository=InMemoryDeviceFlowRepository(),
@@ -1330,7 +1342,7 @@ async def test_account_unlink_keeps_attached_auto_replies() -> None:
 
     assert result.style == DiscordResultStyle.SUCCESS
     assert result.ephemeral is False
-    reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=1)
+    reply = await reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=1)
     assert reply is not None
     assert reply.disabled is False
 
@@ -1339,7 +1351,7 @@ async def test_account_unlink_keeps_attached_auto_replies() -> None:
 async def test_reply_add_requires_linked_account() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
@@ -1389,7 +1401,7 @@ async def test_reply_add_requires_linked_account() -> None:
 async def test_reply_add_updates_pattern_reply_fields() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
@@ -1415,7 +1427,7 @@ async def test_reply_add_updates_pattern_reply_fields() -> None:
     )
     reply_repository = InMemoryReplyRepository()
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="77",
         twitch_login="dancedown",
@@ -1426,7 +1438,7 @@ async def test_reply_add_updates_pattern_reply_fields() -> None:
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     bus.reply = ReplyCommandService(
         thread_repository=thread_repository,
         pattern_repository=pattern_repository,
@@ -1445,7 +1457,7 @@ async def test_reply_add_updates_pattern_reply_fields() -> None:
     )
 
     assert result.style == DiscordResultStyle.SUCCESS
-    reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=1)
+    reply = await reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=1)
     assert reply is not None
     assert reply.reply_message == "Hi there"
     assert reply.reply_as_reply is True
@@ -1455,7 +1467,7 @@ async def test_reply_add_updates_pattern_reply_fields() -> None:
 async def test_reply_add_does_not_escape_parentheses_in_message_preview() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
@@ -1481,7 +1493,7 @@ async def test_reply_add_does_not_escape_parentheses_in_message_preview() -> Non
     )
     reply_repository = InMemoryReplyRepository()
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="77",
         twitch_login="dancedown",
@@ -1492,7 +1504,7 @@ async def test_reply_add_does_not_escape_parentheses_in_message_preview() -> Non
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     bus.reply = ReplyCommandService(
         thread_repository=thread_repository,
         pattern_repository=pattern_repository,
@@ -1518,7 +1530,7 @@ async def test_reply_add_does_not_escape_parentheses_in_message_preview() -> Non
 async def test_reply_add_rejects_overwriting_existing_auto_reply() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
@@ -1541,9 +1553,9 @@ async def test_reply_add_rejects_overwriting_existing_auto_reply() -> None:
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Existing", reply_as_reply=False)
+    await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Existing", reply_as_reply=False)
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="77",
         twitch_login="dancedown",
@@ -1554,7 +1566,7 @@ async def test_reply_add_rejects_overwriting_existing_auto_reply() -> None:
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     bus.reply = ReplyCommandService(
         thread_repository=thread_repository,
         pattern_repository=pattern_repository,
@@ -1574,7 +1586,7 @@ async def test_reply_add_rejects_overwriting_existing_auto_reply() -> None:
 
     assert result.style == DiscordResultStyle.ERROR
     assert result.ephemeral is True
-    reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=1)
+    reply = await reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=1)
     assert reply is not None
     assert reply.reply_message == "Existing"
 
@@ -1583,7 +1595,7 @@ async def test_reply_add_rejects_overwriting_existing_auto_reply() -> None:
 async def test_reply_disable_marks_reply_as_disabled() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
@@ -1606,9 +1618,9 @@ async def test_reply_disable_marks_reply_as_disabled() -> None:
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
+    await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="77",
         twitch_login="dancedown",
@@ -1619,7 +1631,7 @@ async def test_reply_disable_marks_reply_as_disabled() -> None:
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     bus.reply = ReplyCommandService(
         thread_repository=thread_repository,
         pattern_repository=pattern_repository,
@@ -1639,7 +1651,7 @@ async def test_reply_disable_marks_reply_as_disabled() -> None:
 
     assert result.style == DiscordResultStyle.SUCCESS
     assert "Hi there" in result.message
-    reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=1)
+    reply = await reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=1)
     assert reply is not None
     assert reply.disabled is True
 
@@ -1648,7 +1660,7 @@ async def test_reply_disable_marks_reply_as_disabled() -> None:
 async def test_reply_enable_marks_reply_as_enabled() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
@@ -1671,10 +1683,10 @@ async def test_reply_enable_marks_reply_as_enabled() -> None:
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
-    reply_repository.set_reply_disabled(thread_id=thread.thread_id, pattern_id=1, disabled=True)
+    await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
+    await reply_repository.set_reply_disabled(thread_id=thread.thread_id, pattern_id=1, disabled=True)
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="77",
         twitch_login="dancedown",
@@ -1685,7 +1697,7 @@ async def test_reply_enable_marks_reply_as_enabled() -> None:
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     bus.reply = ReplyCommandService(
         thread_repository=thread_repository,
         pattern_repository=pattern_repository,
@@ -1705,7 +1717,7 @@ async def test_reply_enable_marks_reply_as_enabled() -> None:
 
     assert result.style == DiscordResultStyle.SUCCESS
     assert "Hi there" in result.message
-    reply = reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=1)
+    reply = await reply_repository.get_by_pattern(thread_id=thread.thread_id, pattern_id=1)
     assert reply is not None
     assert reply.disabled is False
 
@@ -1714,7 +1726,7 @@ async def test_reply_enable_marks_reply_as_enabled() -> None:
 async def test_show_auto_replies_lists_attached_replies() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     pattern_repository = InMemoryPatternRepository(
         patterns=[
@@ -1738,7 +1750,7 @@ async def test_show_auto_replies_lists_attached_replies() -> None:
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
+    await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
     bus.show = ShowCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
@@ -1762,9 +1774,9 @@ async def test_show_auto_replies_lists_attached_replies() -> None:
 @pytest.mark.asyncio
 async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
@@ -1787,14 +1799,14 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(
+    await reply_repository.add_reply(
         thread_id=thread.thread_id,
         pattern_id=1,
         reply_message="Hi {NAME}, you wrote `{MESSAGE}` in {CHANNEL}",
         reply_as_reply=True,
     )
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="77",
         twitch_login="dancedown",
@@ -1805,7 +1817,7 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI(
         cached_users_by_id={
             "42": TwitchUser(
@@ -1853,9 +1865,9 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
 @pytest.mark.asyncio
 async def test_auto_reply_service_skips_self_reply_loops() -> None:
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
@@ -1878,9 +1890,9 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
+    await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="7",
         twitch_login="dancedown",
@@ -1891,7 +1903,7 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
     notifier = FakeNotifier()
     service = AutoReplyService(
@@ -1928,9 +1940,9 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
 @pytest.mark.asyncio
 async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_selected() -> None:
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
@@ -1953,9 +1965,9 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
+    await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="7",
         twitch_login="dancedown",
@@ -1966,7 +1978,7 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
     notifier = FakeNotifier()
     service = AutoReplyService(
@@ -2003,10 +2015,10 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
 @pytest.mark.asyncio
 async def test_auto_reply_service_skips_disabled_thread() -> None:
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
-    thread_repository.set_enabled(discord_channel_id=100, enabled=False)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
+    await thread_repository.set_enabled(discord_channel_id=100, enabled=False)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
@@ -2029,9 +2041,9 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
+    await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="77",
         twitch_login="dancedown",
@@ -2042,7 +2054,7 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
     notifier = FakeNotifier()
     service = AutoReplyService(
@@ -2079,9 +2091,9 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
 @pytest.mark.asyncio
 async def test_auto_reply_service_stops_after_first_matching_pattern_without_reply() -> None:
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
@@ -2121,9 +2133,9 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=2, reply_message="fallback", reply_as_reply=True)
+    await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=2, reply_message="fallback", reply_as_reply=True)
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="77",
         twitch_login="dancedown",
@@ -2134,7 +2146,7 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
     notifier = FakeNotifier()
     service = AutoReplyService(
@@ -2171,10 +2183,10 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
 @pytest.mark.asyncio
 async def test_auto_reply_service_uses_persisted_channel_live_state_without_live_api_calls() -> None:
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
-    channel_repository.set_live_state_for_twitch_channel(twitch_channel_id="42", is_live=True, changed_at="now")
+    await channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.set_live_state_for_twitch_channel(twitch_channel_id="42", is_live=True, changed_at="now")
     pattern_repository = InMemoryPatternRepository(
         patterns=[
             PatternRecord(
@@ -2197,9 +2209,9 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
         ]
     )
     reply_repository = InMemoryReplyRepository()
-    reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=False)
+    await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=False)
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="77",
         twitch_login="dancedown",
@@ -2210,7 +2222,7 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
     notifier = FakeNotifier()
     service = AutoReplyService(
@@ -2247,37 +2259,37 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
 @pytest.mark.asyncio
 async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_live() -> None:
     thread_repository = InMemoryThreadRepository()
-    thread = thread_repository.create(owner_id=200, discord_channel_id=100)
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
-    channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "42")
     adapter_event_repository = InMemoryAdapterEventRepository()
     adapter_event_action_repository = InMemoryAdapterEventActionRepository(event_repository=adapter_event_repository)
-    adapter_event = adapter_event_repository.upsert_event(
+    adapter_event = await adapter_event_repository.upsert_event(
         thread_id=thread.thread_id,
         adapter_key="twitch",
         subject_type="channel",
         subject_id="42",
         event_key="stream.online",
     )
-    adapter_event_action_repository.upsert_action(
+    await adapter_event_action_repository.upsert_action(
         event_id=adapter_event.event_id,
         action_type="discord_notify",
         message_template=None,
         reply_as_reply=False,
     )
-    adapter_event_action_repository.set_action_color(
+    await adapter_event_action_repository.set_action_color(
         event_id=adapter_event.event_id,
         action_type="discord_notify",
         color="#123456",
     )
-    adapter_event_action_repository.upsert_action(
+    await adapter_event_action_repository.upsert_action(
         event_id=adapter_event.event_id,
         action_type="twitch_send_message",
         message_template="YIPPIE {CHANNEL} is {STATE}",
         reply_as_reply=False,
     )
     account_repository = InMemoryAccountRepository()
-    account = account_repository.create_account(
+    account = await account_repository.create_account(
         discord_user_id=200,
         twitch_user_id="77",
         twitch_login="dancedown",
@@ -2288,7 +2300,7 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
         scope=("user:write:chat",),
         token_type="bearer",
     )
-    thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI(
         users_by_id={
             "42": TwitchUser(user_id="42", login="example", display_name="ExampleChannel"),
