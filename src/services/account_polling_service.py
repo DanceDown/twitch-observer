@@ -9,6 +9,9 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
+import psycopg
+
+from src.errors import DatabasePoolExhaustedError
 from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import (
     ThreadRecord,
@@ -245,8 +248,12 @@ class DeviceFlowPollingService:
         while not self._stop_event.is_set():
             try:
                 await self.poll_once()
-            except Exception:
-                logger.exception("Unexpected error while polling pending Twitch device logins.")
+            except DatabasePoolExhaustedError:
+                logger.error("Pending Twitch device login polling skipped because the database pool is exhausted.")
+            except psycopg.Error:
+                logger.exception("Pending Twitch device login polling failed because PostgreSQL returned an error.")
+            except TwitchAPIError:
+                logger.exception("Pending Twitch device login polling failed because Twitch returned an API error.")
             await asyncio.sleep(self.poll_interval_seconds)
 
     async def poll_once(self) -> None:
@@ -266,8 +273,26 @@ class DeviceFlowPollingService:
                     now=now,
                     notify=self._notify,
                 )
-            except Exception:
-                logger.exception("Unexpected error while processing device flow for discord_user_id=%s", pending.discord_user_id)
+            except DatabasePoolExhaustedError:
+                logger.error(
+                    "Device flow processing skipped because the database pool is exhausted for discord_user_id=%s",
+                    pending.discord_user_id,
+                )
+            except psycopg.Error:
+                logger.exception(
+                    "Device flow processing failed because PostgreSQL returned an error for discord_user_id=%s",
+                    pending.discord_user_id,
+                )
+            except TwitchAPIError:
+                logger.exception(
+                    "Device flow processing failed because Twitch returned an API error for discord_user_id=%s",
+                    pending.discord_user_id,
+                )
+            except ValueError:
+                logger.exception(
+                    "Device flow processing failed because stored timestamps are invalid for discord_user_id=%s",
+                    pending.discord_user_id,
+                )
 
     async def invalidate_account(self, discord_user_id: int) -> None:
         """Remove a broken linked account but keep configured auto-replies intact."""

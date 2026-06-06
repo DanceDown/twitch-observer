@@ -181,6 +181,13 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         permission_repository=core.permission_repository,
         localizer=core.localizer,
     )
+    shared_chat_matcher = ChatPatternMatcher(
+        thread_repository=core.thread_repository,
+        channel_repository=core.channel_repository,
+        pattern_repository=core.pattern_repository,
+        reply_repository=core.reply_repository,
+        tracked_user_repository=core.tracked_user_repository,
+    )
     pattern_tracking = PatternTrackingService(
         thread_repository=core.thread_repository,
         channel_repository=core.channel_repository,
@@ -191,6 +198,7 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         twitch_api=core.twitch_bundle,
         notifier=runtime_coordinator.tracking,
         localizer=core.localizer,
+        matcher=shared_chat_matcher,
     )
     auto_reply = AutoReplyService(
         thread_repository=core.thread_repository,
@@ -204,15 +212,10 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         tracking_notifier=runtime_coordinator.tracking,
         account_notifier=runtime_coordinator.accounts,
         token_refresh_skew_seconds=core.config.twitch_account_token_refresh_skew_seconds,
+        matcher=shared_chat_matcher,
     )
     chat_reactions = ChatMessageReactionService(
-        matcher=ChatPatternMatcher(
-            thread_repository=core.thread_repository,
-            channel_repository=core.channel_repository,
-            pattern_repository=core.pattern_repository,
-            reply_repository=core.reply_repository,
-            tracked_user_repository=core.tracked_user_repository,
-        ),
+        matcher=shared_chat_matcher,
         tracking=pattern_tracking,
         replies=auto_reply,
     )

@@ -239,9 +239,7 @@ class PostgresMessageRepository(MessageRepository):
 
     @staticmethod
     def _build_fallback_message_id(event: TwitchChatMessageEvent) -> str:
-        """Build a deterministic fallback ID when Twitch did not provide one."""
-        timestamp = event.sent_at.isoformat()
-        return f"{event.channel_login}:{event.author_login}:{timestamp}:{hash(event.content)}"
+        raise ValueError("Twitch IRC message is missing message_id.")
 
     @classmethod
     def _resolve_message_id(cls, event: TwitchChatMessageEvent) -> str:

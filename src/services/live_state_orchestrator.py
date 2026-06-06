@@ -5,7 +5,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from src.errors import DatabasePoolExhaustedError
 from src.events.event_types import TwitchChannelLiveStateChangedEvent
+from src.gateways.twitch_api import TwitchAPIError
 from src.services.channel_event_notification_service import (
     ChannelEventNotificationService,
     ChannelLiveStatePersistenceService,
@@ -27,9 +29,16 @@ class LiveStateChangeOrchestrator:
         await self.persistence.handle_change(event)
         try:
             suppressed_events = await self.auto_replies.handle_channel_live_state_changed(event)
-        except Exception:
+        except DatabasePoolExhaustedError:
+            logger.error(
+                "Channel-event auto-reply handling skipped because the database pool is exhausted twitch_channel_id=%s is_live=%s",
+                event.twitch_channel_id,
+                event.is_live,
+            )
+            suppressed_events = set()
+        except TwitchAPIError:
             logger.exception(
-                "Channel-event auto-reply handling failed twitch_channel_id=%s is_live=%s",
+                "Channel-event auto-reply handling failed because Twitch rejected the request twitch_channel_id=%s is_live=%s",
                 event.twitch_channel_id,
                 event.is_live,
             )

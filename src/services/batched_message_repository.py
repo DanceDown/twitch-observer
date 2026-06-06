@@ -9,7 +9,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol
 
+import psycopg
+
 from src.database.connection import MessageRepository, RecentMessageRecord
+from src.errors import DatabasePoolExhaustedError
 from src.events.event_types import TwitchChatMessageEvent
 
 logger = logging.getLogger(__name__)
@@ -129,7 +132,7 @@ class BatchedMessageRepository(MessageRepository):
                 message_events, thread_matches = snapshot
                 try:
                     await self._flush_snapshot(message_events=message_events, thread_matches=thread_matches)
-                except Exception:
+                except (DatabasePoolExhaustedError, psycopg.Error):
                     await self._requeue_snapshot(message_events=message_events, thread_matches=thread_matches)
                     raise
 
@@ -213,14 +216,15 @@ class BatchedMessageRepository(MessageRepository):
                 break
             try:
                 await self.flush()
-            except Exception:
-                logger.exception("Batched message write flush failed.")
+            except DatabasePoolExhaustedError:
+                logger.error("Batched message write flush failed because the database pool is exhausted.")
+            except psycopg.Error:
+                logger.exception("Batched message write flush failed because PostgreSQL returned an error.")
         await self.flush()
 
     @staticmethod
     def _build_fallback_message_id(event: TwitchChatMessageEvent) -> str:
-        timestamp = event.sent_at.isoformat()
-        return f"{event.channel_login}:{event.author_login}:{timestamp}:{hash(event.content)}"
+        raise ValueError("Twitch IRC message is missing message_id.")
 
     @classmethod
     def _resolve_message_id(cls, event: TwitchChatMessageEvent) -> str:

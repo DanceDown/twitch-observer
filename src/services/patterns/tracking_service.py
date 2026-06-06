@@ -55,6 +55,17 @@ class PatternTrackingService:
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     tracked_user_repository: TrackedUserRepository | None = None
     reply_repository: ReplyRepository | None = None
+    matcher: ChatPatternMatcher | None = None
+
+    def __post_init__(self) -> None:
+        if self.matcher is None:
+            self.matcher = ChatPatternMatcher(
+                thread_repository=self.thread_repository,
+                channel_repository=self.channel_repository,
+                pattern_repository=self.pattern_repository,
+                reply_repository=self.reply_repository,
+                tracked_user_repository=self.tracked_user_repository,
+            )
 
     async def handle_chat_message(self, event: TwitchChatMessageEvent) -> None:
         """Check all interested Discord channels for pattern matches."""
@@ -80,7 +91,7 @@ class PatternTrackingService:
             )
             return
 
-        matches = await self._matcher().find_matches(event)
+        matches = await self.matcher.find_matches(event)
         if not matches:
             logger.debug("No tracking match produced for broadcaster_id=%s", event.broadcaster_id)
             return
@@ -123,13 +134,4 @@ class PatternTrackingService:
                 channel_display_name=(None if channel_user is None else channel_user.display_name),
             ),
             channel_login=None if channel_user is None else channel_user.login,
-        )
-
-    def _matcher(self) -> ChatPatternMatcher:
-        return ChatPatternMatcher(
-            thread_repository=self.thread_repository,
-            channel_repository=self.channel_repository,
-            pattern_repository=self.pattern_repository,
-            reply_repository=self.reply_repository,
-            tracked_user_repository=self.tracked_user_repository,
         )

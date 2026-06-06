@@ -57,8 +57,19 @@ class AutoReplyService:
     account_notifier: AccountNotificationSender
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     tracked_user_repository: TrackedUserRepository | None = None
+    matcher: ChatPatternMatcher | None = None
     handled_messages: int = field(default=0, init=False)
     sent_replies: int = field(default=0, init=False)
+
+    def __post_init__(self) -> None:
+        if self.matcher is None:
+            self.matcher = ChatPatternMatcher(
+                thread_repository=self.thread_repository,
+                channel_repository=self.channel_repository,
+                pattern_repository=self.pattern_repository,
+                reply_repository=self.reply_repository,
+                tracked_user_repository=self.tracked_user_repository,
+            )
 
     async def handle_chat_message(self, event: TwitchChatMessageEvent) -> None:
         self.handled_messages += 1
@@ -77,7 +88,7 @@ class AutoReplyService:
             )
             return
 
-        matches = await self._matcher().find_matches(event)
+        matches = await self.matcher.find_matches(event)
         if not matches:
             logger.debug(
                 "No configured threads for broadcaster_id=%s when evaluating auto-replies.",
@@ -157,10 +168,6 @@ class AutoReplyService:
                 self.twitch_api,
                 event.author_login,
             )
-            channel_user = await safe_get_twitch_user_by_id(
-                self.twitch_api,
-                event.broadcaster_id,
-            )
             await self._notify_auto_reply(
                 thread=match.thread,
                 event=event,
@@ -206,10 +213,6 @@ class AutoReplyService:
                     author_user = await safe_get_twitch_user_by_login(
                         self.twitch_api,
                         event.author_login,
-                    )
-                    channel_user = await safe_get_twitch_user_by_id(
-                        self.twitch_api,
-                        event.broadcaster_id,
                     )
                     await self._notify_auto_reply(
                         thread=match.thread,
@@ -304,13 +307,4 @@ class AutoReplyService:
                 style=DiscordResultStyle.ERROR,
                 ephemeral=False,
             ),
-        )
-
-    def _matcher(self) -> ChatPatternMatcher:
-        return ChatPatternMatcher(
-            thread_repository=self.thread_repository,
-            channel_repository=self.channel_repository,
-            pattern_repository=self.pattern_repository,
-            reply_repository=self.reply_repository,
-            tracked_user_repository=self.tracked_user_repository,
         )

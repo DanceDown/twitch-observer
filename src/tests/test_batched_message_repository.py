@@ -26,7 +26,7 @@ class FakeBatchMessageRepository(MessageRepository):
         message_ids = []
         match_ids = []
         for event in message_events:
-            message_id = event.message_id or "missing"
+            message_id = _require_message_id(event)
             message_ids.append(message_id)
             self.recent_messages[message_id] = RecentMessageRecord(
                 message_id=message_id,
@@ -36,7 +36,7 @@ class FakeBatchMessageRepository(MessageRepository):
                 timestamp=event.sent_at,
             )
         for thread_id, event in thread_matches:
-            message_id = event.message_id or "missing"
+            message_id = _require_message_id(event)
             match_ids.append((thread_id, message_id))
             thread_matches_for_id = self.matched_by_thread_id.setdefault(thread_id, [])
             if message_id not in thread_matches_for_id:
@@ -44,7 +44,7 @@ class FakeBatchMessageRepository(MessageRepository):
         self.flush_batches.append((tuple(message_ids), tuple(match_ids)))
 
     async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
-        message_id = event.message_id or "missing"
+        message_id = _require_message_id(event)
         self.recent_messages[message_id] = RecentMessageRecord(
             message_id=message_id,
             twitch_channel_id=event.broadcaster_id or event.channel_login,
@@ -78,7 +78,7 @@ class FakeBatchMessageRepository(MessageRepository):
         thread_id: int,
         event: TwitchChatMessageEvent,
     ) -> None:
-        message_id = event.message_id or "missing"
+        message_id = _require_message_id(event)
         self.matched_by_thread_id.setdefault(thread_id, []).append(message_id)
 
     async def list_recent_messages_for_thread(
@@ -103,7 +103,7 @@ class FakeBatchMessageRepository(MessageRepository):
         return self.recent_messages.get(message_id)
 
 
-def _event(message_id: str, *, content: str = "hello", minutes_ago: int = 0) -> TwitchChatMessageEvent:
+def _event(message_id: str | None, *, content: str = "hello", minutes_ago: int = 0) -> TwitchChatMessageEvent:
     return TwitchChatMessageEvent(
         channel_login="example",
         author_login="alice",
@@ -158,3 +158,16 @@ async def test_batched_message_repository_flushes_immediately_when_batch_is_full
     await repository.save_twitch_message(_event("msg-4"))
 
     assert inner.flush_batches == [(("msg-3", "msg-4"), ())]
+
+
+@pytest.mark.asyncio
+async def test_batched_message_repository_requires_message_id_before_queueing() -> None:
+    repository = BatchedMessageRepository(repository=FakeBatchMessageRepository(), batch_size=50, flush_interval_seconds=60)
+
+    with pytest.raises(ValueError, match="missing message_id"):
+        await repository.save_twitch_message(_event(None))
+
+
+def _require_message_id(event: TwitchChatMessageEvent) -> str:
+    assert event.message_id is not None
+    return event.message_id

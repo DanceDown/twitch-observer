@@ -9,8 +9,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Protocol
 
+import psycopg
+
 from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import ChannelRepository
+from src.errors import DatabasePoolExhaustedError
 from src.events.event_types import TwitchChannelLiveStateChangedEvent
 from src.services.twitch_gateways import TwitchLiveMonitorGateway
 from src.services.twitch_runtime import safe_get_twitch_user_by_id
@@ -67,8 +70,10 @@ class TwitchLiveMonitorService:
         if self.refresh_on_startup:
             try:
                 await self.sync_once(notify_transitions=False)
-            except Exception:
-                logger.exception("Live monitor startup sync failed.")
+            except DatabasePoolExhaustedError:
+                logger.error("Live monitor startup sync skipped because the database pool is exhausted.")
+            except psycopg.Error:
+                logger.exception("Live monitor startup sync failed because PostgreSQL returned an error.")
 
         while not self._stop_event.is_set():
             try:
@@ -82,8 +87,10 @@ class TwitchLiveMonitorService:
 
             try:
                 await self.sync_once(notify_transitions=True)
-            except Exception:
-                logger.exception("Live monitor periodic sync failed.")
+            except DatabasePoolExhaustedError:
+                logger.error("Live monitor periodic sync skipped because the database pool is exhausted.")
+            except psycopg.Error:
+                logger.exception("Live monitor periodic sync failed because PostgreSQL returned an error.")
 
     async def sync_once(self, *, notify_transitions: bool) -> None:
         """Refresh the live state for all tracked channels."""

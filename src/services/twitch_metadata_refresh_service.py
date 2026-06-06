@@ -7,6 +7,9 @@ import contextlib
 import logging
 from dataclasses import dataclass, field
 
+import psycopg
+
+from src.errors import DatabasePoolExhaustedError
 from src.gateways.twitch_api import TwitchAPIError
 from src.services.twitch_user_directory_service import TwitchUserDirectoryService
 
@@ -65,8 +68,12 @@ class TwitchMetadataRefreshService:
             started_at = asyncio.get_running_loop().time()
             try:
                 await self.run_once()
-            except Exception:
-                logger.exception("Twitch metadata refresh pass failed.")
+            except DatabasePoolExhaustedError:
+                logger.error("Twitch metadata refresh pass skipped because the database pool is exhausted.")
+            except psycopg.Error:
+                logger.exception("Twitch metadata refresh pass failed because PostgreSQL returned an error.")
+            except TwitchAPIError:
+                logger.exception("Twitch metadata refresh pass failed because Twitch returned an API error.")
             elapsed = asyncio.get_running_loop().time() - started_at
             remaining = max(0.0, self.refresh_interval_seconds - elapsed)
             if remaining <= 0:

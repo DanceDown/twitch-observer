@@ -26,7 +26,7 @@ class InMemoryMessageRepository(MessageRepository):
     async def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
         rows = [
             RecentMessageRecord(
-                message_id=message.message_id or f"{message.channel_login}:{message.author_login}:{message.sent_at.isoformat()}",
+                message_id=_require_message_id(message),
                 twitch_channel_id=message.broadcaster_id or message.channel_login,
                 username=message.author_display_name or message.author_login,
                 content=message.content,
@@ -58,7 +58,7 @@ class InMemoryMessageRepository(MessageRepository):
         thread_id: int,
         event: TwitchChatMessageEvent,
     ) -> None:
-        message_id = event.message_id or f"{event.channel_login}:{event.author_login}:{event.sent_at.isoformat()}"
+        message_id = _require_message_id(event)
         thread_matches = self.matched_by_thread_id.setdefault(thread_id, [])
         if message_id not in thread_matches:
             thread_matches.append(message_id)
@@ -138,7 +138,13 @@ async def test_presence_service_uses_recent_message_as_status() -> None:
         max_status_length=120,
     )
 
-    event = TwitchChatMessageEvent(channel_login="channel", author_login="bob", author_display_name="Bob", content="A tracked message")
+    event = TwitchChatMessageEvent(
+        channel_login="channel",
+        author_login="bob",
+        author_display_name="Bob",
+        content="A tracked message",
+        message_id="presence-1",
+    )
 
     await ingest_service.handle_chat_message(event)
     seed(1)
@@ -200,6 +206,25 @@ async def test_postgres_message_repository_uses_null_reply_reference_when_parent
 
 
 @pytest.mark.asyncio
+async def test_postgres_message_repository_requires_message_id() -> None:
+    database = RecordingDatabase()
+    repository = PostgresMessageRepository(database=database)  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="missing message_id"):
+        await repository.save_twitch_message(
+            TwitchChatMessageEvent(
+                channel_login="channel",
+                author_login="bob",
+                author_display_name="Bob",
+                author_id="user-1",
+                broadcaster_id="channel-1",
+                message_id=None,
+                content="reply body",
+            )
+        )
+
+
+@pytest.mark.asyncio
 async def test_write_query_service_only_returns_messages_matched_in_thread() -> None:
     repository = InMemoryMessageRepository()
     ingest_service = MessageIngestService(message_repository=repository)
@@ -245,3 +270,8 @@ async def test_write_query_service_only_returns_messages_matched_in_thread() -> 
     )
 
     assert [candidate.message_id for candidate in candidates] == ["msg-matched"]
+
+
+def _require_message_id(event: TwitchChatMessageEvent) -> str:
+    assert event.message_id is not None
+    return event.message_id
