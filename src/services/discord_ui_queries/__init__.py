@@ -1,21 +1,21 @@
-"""Compatibility exports for focused Discord UI query services."""
+"""Focused query services and presentation models for Discord UI flows."""
 
-from .discord_ui_queries import (
+from .bundle import DiscordUIQueryBundle
+from .event_queries import AdapterEventQueryService
+from .pattern_queries import PatternQueryService
+from .presentations import (
     AdapterEventActionPresentation,
     AdapterEventPresentation,
-    AdapterEventQueryService,
-    DiscordUIQueryBundle,
     PatternPresentation,
-    PatternQueryService,
     ReplyPresentation,
-    ReplyQueryService,
     TrackedChannelPresentation,
-    TrackedChannelQueryService,
     TrackedUserPresentation,
-    TrackedUserQueryService,
-    WriteQueryService,
     WriteReplyCandidatePresentation,
 )
+from .reply_queries import ReplyQueryService
+from .tracked_channel_queries import TrackedChannelQueryService
+from .tracked_user_queries import TrackedUserQueryService
+from .write_queries import WriteQueryService
 
 __all__ = [
     "AdapterEventActionPresentation",
