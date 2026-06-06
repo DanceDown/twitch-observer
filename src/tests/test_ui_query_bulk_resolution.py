@@ -120,7 +120,6 @@ async def test_pattern_query_service_bulk_resolves_scope_users_once() -> None:
                     case_sensitive=False,
                     color=None,
                     disabled=False,
-                    notify=True,
                     priority=0,
                 ),
                 PatternRecord(
@@ -137,7 +136,6 @@ async def test_pattern_query_service_bulk_resolves_scope_users_once() -> None:
                     case_sensitive=False,
                     color=None,
                     disabled=False,
-                    notify=True,
                     priority=0,
                 ),
             ]

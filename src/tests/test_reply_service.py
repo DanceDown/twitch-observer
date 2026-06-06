@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from src.tests.chat_match_candidates import build_chat_match_candidates
 from src.tests.dispatch_helpers import (
     dispatch_account_command,
     dispatch_channel_event_command,
@@ -24,6 +25,7 @@ from src.database.connection import (
     AdapterEventActionRepository,
     AdapterEventRecord,
     AdapterEventRepository,
+    ChatPatternCandidateRecord,
     ChannelRecord,
     ChannelRepository,
     MessageRepository,
@@ -34,6 +36,7 @@ from src.database.connection import (
     ReplyRepository,
     ThreadRecord,
     ThreadRepository,
+    TrackedUserRepository,
     TwitchAccountRecord,
     TwitchAccountRepository,
     TwitchDeviceFlowRecord,
@@ -228,6 +231,10 @@ class InMemoryMessageRepository(MessageRepository):
 @dataclass
 class InMemoryPatternRepository(PatternRepository):
     patterns: list[PatternRecord] = field(default_factory=list)
+    thread_repository: ThreadRepository | None = None
+    channel_repository: ChannelRepository | None = None
+    tracked_user_repository: TrackedUserRepository | None = None
+    reply_repository: ReplyRepository | None = None
 
     async def find_exact_pattern(self, **kwargs) -> PatternRecord | None:  # pragma: no cover - unused here
         raise NotImplementedError
@@ -255,7 +262,6 @@ class InMemoryPatternRepository(PatternRepository):
                     case_sensitive=pattern.case_sensitive,
                     color=pattern.color,
                     disabled=disabled,
-                    notify=pattern.notify,
                     priority=pattern.priority,
                 )
                 self.patterns[index] = updated
@@ -279,7 +285,6 @@ class InMemoryPatternRepository(PatternRepository):
                     case_sensitive=pattern.case_sensitive,
                     color=pattern.color,
                     disabled=pattern.disabled,
-                    notify=pattern.notify,
                     priority=priority,
                 )
                 self.patterns[index] = updated
@@ -319,7 +324,6 @@ class InMemoryPatternRepository(PatternRepository):
                     case_sensitive=case_sensitive,
                     color=color,
                     disabled=pattern.disabled,
-                    notify=pattern.notify,
                     priority=priority,
                 )
                 self.patterns[index] = updated
@@ -327,8 +331,26 @@ class InMemoryPatternRepository(PatternRepository):
         return None
 
     async def list_active_patterns_for_thread(self, thread_id: int) -> list[PatternRecord]:
-        rows = [pattern for pattern in self.patterns if pattern.thread_id == thread_id and not pattern.disabled and pattern.notify]
+        rows = [pattern for pattern in self.patterns if pattern.thread_id == thread_id and not pattern.disabled]
         return sorted(rows, key=lambda pattern: (-pattern.priority, pattern.pattern_id))
+
+    async def list_chat_match_candidates(
+        self,
+        *,
+        broadcaster_id: str,
+        author_id: str,
+        sender_is_sub: bool,
+    ) -> list[ChatPatternCandidateRecord]:
+        return await build_chat_match_candidates(
+            patterns=self.patterns,
+            thread_repository=self.thread_repository,
+            channel_repository=self.channel_repository,
+            reply_repository=self.reply_repository,
+            tracked_user_repository=self.tracked_user_repository,
+            broadcaster_id=broadcaster_id,
+            author_id=author_id,
+            sender_is_sub=sender_is_sub,
+        )
 
     async def get_pattern_by_id(self, *, thread_id: int, pattern_id: int) -> PatternRecord | None:
         for pattern in self.patterns:
@@ -425,6 +447,20 @@ class InMemoryReplyRepository(ReplyRepository):
                 )
                 count += 1
         return count
+
+
+def wire_runtime_pattern_repository(
+    repository: InMemoryPatternRepository,
+    *,
+    thread_repository: ThreadRepository,
+    channel_repository: ChannelRepository,
+    reply_repository: ReplyRepository | None = None,
+    tracked_user_repository: TrackedUserRepository | None = None,
+) -> None:
+    repository.thread_repository = thread_repository
+    repository.channel_repository = channel_repository
+    repository.reply_repository = reply_repository
+    repository.tracked_user_repository = tracked_user_repository
 
 
 @dataclass
@@ -1311,7 +1347,6 @@ async def test_account_unlink_keeps_attached_auto_replies() -> None:
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 priority=0,
             )
         ]
@@ -1368,7 +1403,6 @@ async def test_reply_add_requires_linked_account() -> None:
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 reply_message=None,
                 reply_as_reply=False,
                 priority=0,
@@ -1418,7 +1452,6 @@ async def test_reply_add_updates_pattern_reply_fields() -> None:
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 reply_message=None,
                 reply_as_reply=False,
                 priority=0,
@@ -1484,7 +1517,6 @@ async def test_reply_add_does_not_escape_parentheses_in_message_preview() -> Non
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 reply_message=None,
                 reply_as_reply=False,
                 priority=0,
@@ -1547,7 +1579,6 @@ async def test_reply_add_rejects_overwriting_existing_auto_reply() -> None:
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 priority=0,
             )
         ]
@@ -1612,7 +1643,6 @@ async def test_reply_disable_marks_reply_as_disabled() -> None:
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 priority=0,
             )
         ]
@@ -1677,7 +1707,6 @@ async def test_reply_enable_marks_reply_as_enabled() -> None:
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 priority=0,
             )
         ]
@@ -1744,7 +1773,6 @@ async def test_show_auto_replies_lists_attached_replies() -> None:
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 priority=0,
             )
         ]
@@ -1793,7 +1821,6 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 priority=0,
             )
         ]
@@ -1804,6 +1831,12 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
         pattern_id=1,
         reply_message="Hi {NAME}, you wrote `{MESSAGE}` in {CHANNEL}",
         reply_as_reply=True,
+    )
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        reply_repository=reply_repository,
     )
     account_repository = InMemoryAccountRepository()
     account = await account_repository.create_account(
@@ -1884,7 +1917,6 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 priority=0,
             )
         ]
@@ -1959,7 +1991,6 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 priority=0,
             )
         ]
@@ -2035,7 +2066,6 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 priority=0,
             )
         ]
@@ -2110,7 +2140,6 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 priority=9,
             ),
             PatternRecord(
@@ -2127,7 +2156,6 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 priority=1,
             ),
         ]
@@ -2203,7 +2231,6 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 priority=0,
             )
         ]

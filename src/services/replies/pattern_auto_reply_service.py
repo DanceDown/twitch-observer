@@ -62,14 +62,9 @@ class AutoReplyService:
     sent_replies: int = field(default=0, init=False)
 
     def __post_init__(self) -> None:
+        self._wire_runtime_pattern_repository()
         if self.matcher is None:
-            self.matcher = ChatPatternMatcher(
-                thread_repository=self.thread_repository,
-                channel_repository=self.channel_repository,
-                pattern_repository=self.pattern_repository,
-                reply_repository=self.reply_repository,
-                tracked_user_repository=self.tracked_user_repository,
-            )
+            self.matcher = ChatPatternMatcher(pattern_repository=self.pattern_repository)
 
     async def handle_chat_message(self, event: TwitchChatMessageEvent) -> None:
         self.handled_messages += 1
@@ -117,11 +112,10 @@ class AutoReplyService:
                 match.thread.thread_id,
             )
             return
-        if event.author_id == account.twitch_user_id and match.pattern.user_scope_mode != "only_selected":
+        if event.author_id == account.twitch_user_id and not match.explicit_user_scope_match:
             logger.debug(
-                "Skipping self-triggered auto-reply for pattern %s because user_scope_mode=%s is not self-explicit.",
+                "Skipping self-triggered auto-reply for pattern %s because the match was not user-explicit.",
                 match.pattern.pattern_id,
-                match.pattern.user_scope_mode,
             )
             return
 
@@ -308,3 +302,13 @@ class AutoReplyService:
                 ephemeral=False,
             ),
         )
+
+    def _wire_runtime_pattern_repository(self) -> None:
+        for attribute, value in (
+            ("thread_repository", self.thread_repository),
+            ("channel_repository", self.channel_repository),
+            ("tracked_user_repository", self.tracked_user_repository),
+            ("reply_repository", self.reply_repository),
+        ):
+            if hasattr(self.pattern_repository, attribute):
+                setattr(self.pattern_repository, attribute, value)

@@ -109,7 +109,6 @@ class PatternRecord:
     case_sensitive: bool
     color: str | None
     disabled: bool
-    notify: bool
     priority: int
     reply_message: str | None = None
     reply_as_reply: bool = False
@@ -124,6 +123,17 @@ class ReplyRecord:
     reply_message: str
     reply_as_reply: bool
     disabled: bool
+
+
+@dataclass(slots=True, frozen=True)
+class ChatPatternCandidateRecord:
+    """Pre-filtered hot-path pattern candidate for one incoming Twitch chat message."""
+
+    thread: ThreadRecord
+    source_channel: ChannelRecord
+    pattern: PatternRecord
+    reply: ReplyRecord | None
+    explicit_user_scope_match: bool
 
 
 @dataclass(slots=True, frozen=True)

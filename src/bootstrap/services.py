@@ -182,11 +182,7 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
         localizer=core.localizer,
     )
     shared_chat_matcher = ChatPatternMatcher(
-        thread_repository=core.thread_repository,
-        channel_repository=core.channel_repository,
         pattern_repository=core.pattern_repository,
-        reply_repository=core.reply_repository,
-        tracked_user_repository=core.tracked_user_repository,
     )
     pattern_tracking = PatternTrackingService(
         thread_repository=core.thread_repository,

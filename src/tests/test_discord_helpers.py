@@ -96,7 +96,6 @@ def _pattern() -> PatternRecord:
         case_sensitive=False,
         color=None,
         disabled=False,
-        notify=True,
         priority=1,
     )
 

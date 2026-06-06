@@ -121,7 +121,6 @@ CREATE TABLE pattern (
     case_sensitive       BOOLEAN NOT NULL DEFAULT FALSE,
     color                TEXT,
     disabled             BOOLEAN NOT NULL DEFAULT FALSE,
-    notify               BOOLEAN NOT NULL DEFAULT TRUE,
     priority             SMALLINT NOT NULL DEFAULT 0,
     CONSTRAINT uniq_pattern_thread_internal_id UNIQUE (thread_id, pattern_id),
     CONSTRAINT chk_pattern_color_format CHECK (color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$'),
@@ -131,8 +130,9 @@ CREATE TABLE pattern (
 CREATE INDEX idx_pattern_thread_scope_mode
     ON pattern(thread_id, user_scope_mode);
 
-CREATE INDEX idx_pattern_notify_active
-    ON pattern(thread_id, disabled, notify);
+CREATE INDEX idx_pattern_active_hot_path
+    ON pattern(thread_id, priority DESC, pattern_id)
+    WHERE disabled = FALSE;
 
 CREATE TABLE pattern_channel_scope (
     thread_id           INTEGER NOT NULL,
@@ -169,6 +169,9 @@ CREATE TABLE pattern_user_scope (
 
 CREATE INDEX idx_pattern_user_scope_user
     ON pattern_user_scope(thread_id, twitch_user_id);
+
+CREATE INDEX idx_channel_hot_path_lookup
+    ON channel(twitch_channel_id, thread_id);
 
 ----------------------------
 -- Auto-replies

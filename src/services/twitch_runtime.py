@@ -7,10 +7,8 @@ from datetime import UTC, datetime, timedelta
 
 from src.gateways.twitch_api import TwitchAPIError, TwitchUser
 from src.database.connection import (
-    PatternRecord,
     ThreadRecord,
     ThreadRepository,
-    TrackedUserRepository,
     TwitchAccountRecord,
     TwitchAccountRepository,
 )
@@ -123,55 +121,3 @@ async def safe_get_twitch_user_by_id(twitch_lookup: TwitchUserLookup, user_id: s
         return await twitch_lookup.get_user_by_id(normalized_user_id)
     except TwitchAPIError:
         return None
-
-
-async def expand_pattern_for_tracked_users(
-    pattern: PatternRecord,
-    *,
-    thread_id: int,
-    tracked_user_repository: TrackedUserRepository | None,
-) -> PatternRecord:
-    """Resolve all tracked-user selectors to a concrete user-id list."""
-    if pattern.user_scope_mode not in {"all_tracked", "all_tracked_except_selected"}:
-        return pattern
-
-    if tracked_user_repository is None:
-        tracked_user_ids: tuple[str, ...] = ()
-    else:
-        tracked_user_ids = tuple(
-            user.twitch_user_id for user in await tracked_user_repository.list_users_for_thread(thread_id)
-        )
-    if pattern.user_scope_mode == "all_tracked_except_selected":
-        excluded_user_ids = set(pattern.user_scope_ids)
-        tracked_user_ids = tuple(user_id for user_id in tracked_user_ids if user_id not in excluded_user_ids)
-
-    return PatternRecord(
-        thread_id=pattern.thread_id,
-        pattern_id=pattern.pattern_id,
-        regex=pattern.regex,
-        channel_scope_mode=pattern.channel_scope_mode,
-        channel_scope_ids=pattern.channel_scope_ids,
-        user_scope_mode="only_selected",
-        user_scope_ids=tracked_user_ids,
-        sub_state=pattern.sub_state,
-        offline_state=pattern.offline_state,
-        is_regex=pattern.is_regex,
-        case_sensitive=pattern.case_sensitive,
-        color=pattern.color,
-        disabled=pattern.disabled,
-        notify=pattern.notify,
-        priority=pattern.priority,
-        reply_message=pattern.reply_message,
-        reply_as_reply=pattern.reply_as_reply,
-    )
-
-
-def offline_state_allows(pattern: PatternRecord, live_status: bool | None) -> bool:
-    """Return whether one pattern is allowed under the persisted live/offline state."""
-    if pattern.offline_state == "both" or live_status is None:
-        return True
-    if pattern.offline_state == "online":
-        return live_status
-    if pattern.offline_state == "offline":
-        return not live_status
-    return False

@@ -9,6 +9,7 @@ from src.events.event_types import TwitchChatMessageEvent
 from .records import (
     AdapterEventActionRecord,
     AdapterEventRecord,
+    ChatPatternCandidateRecord,
     ChannelRecord,
     PatternRecord,
     RecentMessageRecord,
@@ -443,6 +444,15 @@ class PatternRepository:
         raise NotImplementedError
 
     async def list_active_patterns_for_thread(self, thread_id: int) -> list[PatternRecord]:  # pragma: no cover
+        raise NotImplementedError
+
+    async def list_chat_match_candidates(
+        self,
+        *,
+        broadcaster_id: str,
+        author_id: str,
+        sender_is_sub: bool,
+    ) -> list[ChatPatternCandidateRecord]:  # pragma: no cover
         raise NotImplementedError
 
     async def get_pattern_by_id(

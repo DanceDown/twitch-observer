@@ -116,7 +116,6 @@ Important fields:
 - `offline_state`
 - `priority`
 - `disabled`
-- `notify`
 
 ### `pattern_channel_scope`
 

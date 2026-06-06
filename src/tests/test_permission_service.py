@@ -131,7 +131,6 @@ class InMemoryPatternRepository(PatternRepository):
             case_sensitive=kwargs["case_sensitive"],
             color=kwargs["color"],
             disabled=kwargs["disabled"],
-            notify=True,
             priority=kwargs["priority"],
         )
         self.patterns.append(record)
@@ -316,7 +315,6 @@ async def test_permission_view_allows_non_owner_to_use_show() -> None:
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 priority=0,
             )
         ]

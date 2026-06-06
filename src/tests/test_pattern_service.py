@@ -5,9 +5,11 @@ from datetime import UTC, datetime
 
 import pytest
 
+from src.tests.chat_match_candidates import build_chat_match_candidates
 from src.tests.dispatch_helpers import dispatch_pattern_command, dispatch_pattern_edit_command, dispatch_show_command
 from src.gateways.twitch_api import TwitchChannelNotFoundError, TwitchUser
 from src.database.connection import (
+    ChatPatternCandidateRecord,
     ChannelRecord,
     ChannelRepository,
     MessageRepository,
@@ -156,6 +158,10 @@ class InMemoryChannelRepository(ChannelRepository):
 class InMemoryPatternRepository(PatternRepository):
     patterns: list[PatternRecord] = field(default_factory=list)
     next_pattern_id: int = 1
+    thread_repository: ThreadRepository | None = None
+    channel_repository: ChannelRepository | None = None
+    tracked_user_repository: TrackedUserRepository | None = None
+    reply_repository: ReplyRepository | None = None
 
     async def find_exact_pattern(
         self,
@@ -218,7 +224,6 @@ class InMemoryPatternRepository(PatternRepository):
             case_sensitive=case_sensitive,
             color=color,
             disabled=disabled,
-            notify=True,
             reply_message=None,
             reply_as_reply=False,
             priority=priority,
@@ -247,7 +252,6 @@ class InMemoryPatternRepository(PatternRepository):
                     case_sensitive=pattern.case_sensitive,
                     color=pattern.color,
                     disabled=disabled,
-                    notify=pattern.notify,
                     priority=pattern.priority,
                 )
                 self.patterns[index] = updated
@@ -271,7 +275,6 @@ class InMemoryPatternRepository(PatternRepository):
                     case_sensitive=pattern.case_sensitive,
                     color=pattern.color,
                     disabled=pattern.disabled,
-                    notify=pattern.notify,
                     priority=priority,
                 )
                 self.patterns[index] = updated
@@ -311,7 +314,6 @@ class InMemoryPatternRepository(PatternRepository):
                     case_sensitive=case_sensitive,
                     color=color,
                     disabled=pattern.disabled,
-                    notify=pattern.notify,
                     priority=priority,
                 )
                 self.patterns[index] = updated
@@ -319,8 +321,26 @@ class InMemoryPatternRepository(PatternRepository):
         return None
 
     async def list_active_patterns_for_thread(self, thread_id: int) -> list[PatternRecord]:
-        rows = [pattern for pattern in self.patterns if pattern.thread_id == thread_id and not pattern.disabled and pattern.notify]
+        rows = [pattern for pattern in self.patterns if pattern.thread_id == thread_id and not pattern.disabled]
         return sorted(rows, key=lambda pattern: (-pattern.priority, pattern.pattern_id))
+
+    async def list_chat_match_candidates(
+        self,
+        *,
+        broadcaster_id: str,
+        author_id: str,
+        sender_is_sub: bool,
+    ) -> list[ChatPatternCandidateRecord]:
+        return await build_chat_match_candidates(
+            patterns=self.patterns,
+            thread_repository=self.thread_repository,
+            channel_repository=self.channel_repository,
+            reply_repository=self.reply_repository,
+            tracked_user_repository=self.tracked_user_repository,
+            broadcaster_id=broadcaster_id,
+            author_id=author_id,
+            sender_is_sub=sender_is_sub,
+        )
 
     async def get_pattern_by_id(self, *, thread_id: int, pattern_id: int) -> PatternRecord | None:
         for pattern in self.patterns:
@@ -395,6 +415,20 @@ class InMemoryTrackedUserRepository(TrackedUserRepository):
 
     async def count_pattern_scope_references(self, *, thread_id: int, twitch_user_id: str) -> int:
         return 0
+
+
+def wire_runtime_pattern_repository(
+    repository: InMemoryPatternRepository,
+    *,
+    thread_repository: ThreadRepository,
+    channel_repository: ChannelRepository,
+    tracked_user_repository: TrackedUserRepository | None = None,
+    reply_repository: ReplyRepository | None = None,
+) -> None:
+    repository.thread_repository = thread_repository
+    repository.channel_repository = channel_repository
+    repository.tracked_user_repository = tracked_user_repository
+    repository.reply_repository = reply_repository
 
 
 @dataclass
@@ -614,7 +648,6 @@ def test_pattern_presenter_keeps_scope_links_clickable_in_added_summary() -> Non
         case_sensitive=False,
         color=None,
         disabled=False,
-        notify=True,
         priority=0,
     )
 
@@ -646,7 +679,6 @@ def test_pattern_presenter_formats_updated_scope_change_without_wrapping_links_i
         case_sensitive=False,
         color=None,
         disabled=False,
-        notify=True,
         priority=0,
     )
     after = PatternRecord(
@@ -663,7 +695,6 @@ def test_pattern_presenter_formats_updated_scope_change_without_wrapping_links_i
         case_sensitive=False,
         color=None,
         disabled=False,
-        notify=True,
         priority=0,
     )
 
@@ -1390,7 +1421,6 @@ async def test_show_command_renders_where_and_who_as_bullets() -> None:
                 case_sensitive=False,
                 color=None,
                 disabled=False,
-                notify=True,
                 priority=0,
             )
         ]
@@ -1442,6 +1472,11 @@ async def test_tracking_service_sends_embed_for_matching_ping_with_pattern_color
         disabled=False,
         priority=0,
     )
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+    )
     notifier = FakeNotifier()
     service = PatternTrackingService(
         thread_repository=thread_repository,
@@ -1492,6 +1527,11 @@ async def test_tracking_service_refreshes_missing_author_profile_image_once() ->
         color=None,
         disabled=False,
         priority=0,
+    )
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
     )
     twitch_api = FakeTwitchAPI(
         cached_users_by_login={"alice": TwitchUser(user_id="7", login="alice", display_name="Alice", profile_image_url=None)},
@@ -1553,6 +1593,11 @@ async def test_tracking_service_sends_embed_for_case_sensitive_ping_match() -> N
         color=None,
         disabled=False,
         priority=0,
+    )
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
     )
     notifier = FakeNotifier()
     service = PatternTrackingService(
@@ -1617,6 +1662,11 @@ async def test_tracking_service_uses_highest_priority_match_and_stops_after_firs
         disabled=False,
         priority=9,
     )
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+    )
     notifier = FakeNotifier()
     service = PatternTrackingService(
         thread_repository=thread_repository,
@@ -1669,6 +1719,12 @@ async def test_tracking_service_skips_normal_embed_when_pattern_has_enabled_repl
     )
     reply_repository = InMemoryReplyRepository()
     await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        reply_repository=reply_repository,
+    )
     notifier = FakeNotifier()
     service = PatternTrackingService(
         thread_repository=thread_repository,
@@ -1824,6 +1880,11 @@ async def test_tracking_service_respects_all_except_selected_user_scope() -> Non
         disabled=False,
         priority=0,
     )
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+    )
     notifier = FakeNotifier()
     service = PatternTrackingService(
         thread_repository=thread_repository,
@@ -1876,6 +1937,12 @@ async def test_tracking_service_respects_all_tracked_except_selected_user_scope(
         disabled=False,
         priority=0,
     )
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        tracked_user_repository=tracked_user_repository,
+    )
     notifier = FakeNotifier()
     service = PatternTrackingService(
         thread_repository=thread_repository,
@@ -1927,6 +1994,11 @@ async def test_tracking_service_skips_disabled_thread() -> None:
         disabled=False,
         priority=0,
     )
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+    )
     notifier = FakeNotifier()
     service = PatternTrackingService(
         thread_repository=thread_repository,
@@ -1975,6 +2047,11 @@ async def test_tracking_service_uses_persisted_channel_live_state_without_twitch
         color=None,
         disabled=False,
         priority=0,
+    )
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
     )
     twitch_api = FakeTwitchAPI()
     notifier = FakeNotifier()

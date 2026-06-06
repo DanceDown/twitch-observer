@@ -23,7 +23,6 @@ def _pattern(*, pattern_id: int) -> PatternRecord:
         case_sensitive=False,
         color=None,
         disabled=False,
-        notify=True,
         priority=0,
         reply_message=None,
         reply_as_reply=False,

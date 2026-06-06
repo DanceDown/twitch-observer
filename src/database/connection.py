@@ -3,6 +3,7 @@
 from .records import (
     AdapterEventActionRecord,
     AdapterEventRecord,
+    ChatPatternCandidateRecord,
     ChannelRecord,
     PatternRecord,
     RecentMessageRecord,
@@ -35,6 +36,7 @@ __all__ = [
     "AdapterEventActionRepository",
     "AdapterEventRecord",
     "AdapterEventRepository",
+    "ChatPatternCandidateRecord",
     "ChannelRecord",
     "ChannelRepository",
     "MessageRepository",

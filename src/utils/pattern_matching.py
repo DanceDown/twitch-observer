@@ -17,6 +17,11 @@ def matches_pattern(pattern: PatternRecord, event: TwitchChatMessageEvent) -> bo
     if not _matches_sub_state(pattern.sub_state, event):
         return False
 
+    return matches_pattern_content(pattern, event)
+
+
+def matches_pattern_content(pattern: PatternRecord, event: TwitchChatMessageEvent) -> bool:
+    """Return whether only the message content matches one stored pattern."""
     flags = 0 if pattern.case_sensitive else re.IGNORECASE
     if pattern.is_regex:
         return re.search(pattern.regex, event.content, flags) is not None
