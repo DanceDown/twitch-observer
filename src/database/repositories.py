@@ -10,6 +10,7 @@ from .records import (
     AdapterEventActionRecord,
     AdapterEventRecord,
     ChatPatternCandidateRecord,
+    ChatPatternSeedRecord,
     ChannelRecord,
     PatternRecord,
     RecentMessageRecord,
@@ -446,12 +447,20 @@ class PatternRepository:
     async def list_active_patterns_for_thread(self, thread_id: int) -> list[PatternRecord]:  # pragma: no cover
         raise NotImplementedError
 
-    async def list_chat_match_candidates(
+    async def list_chat_match_seeds(
         self,
         *,
         broadcaster_id: str,
         author_id: str,
         sender_is_sub: bool,
+    ) -> list[ChatPatternSeedRecord]:  # pragma: no cover
+        raise NotImplementedError
+
+    async def hydrate_chat_match_candidates(
+        self,
+        *,
+        broadcaster_id: str,
+        seeds: tuple[ChatPatternSeedRecord, ...],
     ) -> list[ChatPatternCandidateRecord]:  # pragma: no cover
         raise NotImplementedError
 

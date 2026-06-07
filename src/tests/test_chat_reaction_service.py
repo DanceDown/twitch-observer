@@ -4,24 +4,36 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from src.database.records import ChatPatternCandidateRecord, ChannelRecord, PatternRecord, ReplyRecord, ThreadRecord
+from src.database.records import ChatPatternCandidateRecord, ChatPatternSeedRecord, ChannelRecord, PatternRecord, ReplyRecord, ThreadRecord
 from src.events.twitch_events import TwitchChatMessageEvent
 from src.services.chat import ChatMessageReactionService, ChatPatternMatch, ChatPatternMatcher
 
 
 @dataclass
 class _BatchPatternRepository:
-    candidates: list[ChatPatternCandidateRecord]
+    seeds: list[ChatPatternSeedRecord]
+    hydrated_candidates: dict[tuple[int, int], ChatPatternCandidateRecord]
+    hydrated_calls: list[tuple[tuple[int, int], ...]] = field(default_factory=list)
 
-    async def list_chat_match_candidates(
+    async def list_chat_match_seeds(
         self,
         *,
         broadcaster_id: str,
         author_id: str,
         sender_is_sub: bool,
-    ) -> list[ChatPatternCandidateRecord]:
+    ) -> list[ChatPatternSeedRecord]:
         _ = (broadcaster_id, author_id, sender_is_sub)
-        return list(self.candidates)
+        return list(self.seeds)
+
+    async def hydrate_chat_match_candidates(
+        self,
+        *,
+        broadcaster_id: str,
+        seeds: tuple[ChatPatternSeedRecord, ...],
+    ) -> list[ChatPatternCandidateRecord]:
+        _ = broadcaster_id
+        self.hydrated_calls.append(tuple((seed.thread_id, seed.pattern_id) for seed in seeds))
+        return [self.hydrated_candidates[(seed.thread_id, seed.pattern_id)] for seed in seeds]
 
 
 def _thread() -> ThreadRecord:
@@ -53,21 +65,37 @@ def _pattern(
     )
 
 
+def _seed(
+    pattern_id: int,
+    regex: str,
+    *,
+    is_regex: bool = False,
+    case_sensitive: bool = False,
+    explicit_user_scope_match: bool = False,
+) -> ChatPatternSeedRecord:
+    return ChatPatternSeedRecord(
+        thread_id=1,
+        pattern_id=pattern_id,
+        regex=regex,
+        is_regex=is_regex,
+        case_sensitive=case_sensitive,
+        priority=pattern_id,
+        explicit_user_scope_match=explicit_user_scope_match,
+    )
+
+
 @pytest.mark.asyncio
 async def test_chat_pattern_matcher_returns_first_match_with_enabled_reply() -> None:
     thread = _thread()
     source_channel = ChannelRecord(thread_id=1, twitch_channel_id="42", color=None)
     matcher = ChatPatternMatcher(
         pattern_repository=_BatchPatternRepository(
-            candidates=[
-                ChatPatternCandidateRecord(
-                    thread=thread,
-                    source_channel=source_channel,
-                    pattern=_pattern(1, "miss"),
-                    reply=None,
-                    explicit_user_scope_match=False,
-                ),
-                ChatPatternCandidateRecord(
+            seeds=[
+                _seed(1, "miss"),
+                _seed(2, "hello"),
+            ],
+            hydrated_candidates={
+                (1, 2): ChatPatternCandidateRecord(
                     thread=thread,
                     source_channel=source_channel,
                     pattern=_pattern(2, "hello"),
@@ -79,8 +107,8 @@ async def test_chat_pattern_matcher_returns_first_match_with_enabled_reply() -> 
                         disabled=False,
                     ),
                     explicit_user_scope_match=False,
-                ),
-            ]
+                )
+            },
         ),  # type: ignore[arg-type]
     )
 
@@ -99,6 +127,7 @@ async def test_chat_pattern_matcher_returns_first_match_with_enabled_reply() -> 
     assert matches[0].pattern.pattern_id == 2
     assert matches[0].reply is not None
     assert matches[0].reply.reply_message == "hi"
+    assert matcher.pattern_repository.hydrated_calls == [((1, 2),)]
 
 
 @pytest.mark.asyncio
@@ -107,22 +136,19 @@ async def test_chat_pattern_matcher_uses_batched_candidates_and_keeps_explicit_u
     source_channel = ChannelRecord(thread_id=1, twitch_channel_id="42", color=None)
     matcher = ChatPatternMatcher(
         pattern_repository=_BatchPatternRepository(
-            candidates=[
-                ChatPatternCandidateRecord(
-                    thread=thread,
-                    source_channel=source_channel,
-                    pattern=_pattern(1, "miss"),
-                    reply=None,
-                    explicit_user_scope_match=False,
-                ),
-                ChatPatternCandidateRecord(
+            seeds=[
+                _seed(1, "miss"),
+                _seed(2, "hello", explicit_user_scope_match=True),
+            ],
+            hydrated_candidates={
+                (1, 2): ChatPatternCandidateRecord(
                     thread=thread,
                     source_channel=source_channel,
                     pattern=_pattern(2, "hello"),
                     reply=ReplyRecord(thread_id=1, pattern_id=2, reply_message="pong", reply_as_reply=False, disabled=False),
                     explicit_user_scope_match=True,
-                ),
-            ]
+                )
+            },
         ),  # type: ignore[arg-type]
     )
 
@@ -141,6 +167,7 @@ async def test_chat_pattern_matcher_uses_batched_candidates_and_keeps_explicit_u
     assert matches[0].pattern.pattern_id == 2
     assert matches[0].reply is not None
     assert matches[0].explicit_user_scope_match is True
+    assert matcher.pattern_repository.hydrated_calls == [((1, 2),)]
 
 
 @pytest.mark.asyncio
@@ -149,15 +176,18 @@ async def test_chat_pattern_matcher_ignores_trailing_spaces_from_duplicate_messa
     source_channel = ChannelRecord(thread_id=1, twitch_channel_id="42", color=None)
     matcher = ChatPatternMatcher(
         pattern_repository=_BatchPatternRepository(
-            candidates=[
-                ChatPatternCandidateRecord(
+            seeds=[
+                _seed(1, r"^hello$", is_regex=True),
+            ],
+            hydrated_candidates={
+                (1, 1): ChatPatternCandidateRecord(
                     thread=thread,
                     source_channel=source_channel,
                     pattern=_pattern(1, r"^hello$", is_regex=True),
                     reply=None,
                     explicit_user_scope_match=False,
                 )
-            ]
+            },
         ),  # type: ignore[arg-type]
     )
 
@@ -174,6 +204,7 @@ async def test_chat_pattern_matcher_ignores_trailing_spaces_from_duplicate_messa
 
     assert len(matches) == 1
     assert matches[0].pattern.pattern_id == 1
+    assert matcher.pattern_repository.hydrated_calls == [((1, 1),)]
 
 
 @pytest.mark.asyncio
@@ -182,15 +213,18 @@ async def test_chat_pattern_matcher_ignores_trailing_invisible_duplicate_suffixe
     source_channel = ChannelRecord(thread_id=1, twitch_channel_id="42", color=None)
     matcher = ChatPatternMatcher(
         pattern_repository=_BatchPatternRepository(
-            candidates=[
-                ChatPatternCandidateRecord(
+            seeds=[
+                _seed(1, r"^hello$", is_regex=True),
+            ],
+            hydrated_candidates={
+                (1, 1): ChatPatternCandidateRecord(
                     thread=thread,
                     source_channel=source_channel,
                     pattern=_pattern(1, r"^hello$", is_regex=True),
                     reply=None,
                     explicit_user_scope_match=False,
                 )
-            ]
+            },
         ),  # type: ignore[arg-type]
     )
 
@@ -207,6 +241,7 @@ async def test_chat_pattern_matcher_ignores_trailing_invisible_duplicate_suffixe
 
     assert len(matches) == 1
     assert matches[0].pattern.pattern_id == 1
+    assert matcher.pattern_repository.hydrated_calls == [((1, 1),)]
 
 
 @dataclass

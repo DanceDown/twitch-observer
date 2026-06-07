@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from src.database.connection import (
     ChatPatternCandidateRecord,
+    ChatPatternSeedRecord,
     ChannelRecord,
     ChannelRepository,
     PatternRecord,
@@ -13,18 +14,17 @@ from src.database.connection import (
 )
 
 
-async def build_chat_match_candidates(
+async def build_chat_match_seeds(
     *,
     patterns: list[PatternRecord],
     thread_repository: ThreadRepository | None,
     channel_repository: ChannelRepository | None,
-    reply_repository: ReplyRepository | None,
     tracked_user_repository: TrackedUserRepository | None,
     broadcaster_id: str,
     author_id: str,
     sender_is_sub: bool,
-) -> list[ChatPatternCandidateRecord]:
-    rows: list[ChatPatternCandidateRecord] = []
+) -> list[ChatPatternSeedRecord]:
+    rows: list[ChatPatternSeedRecord] = []
     for pattern in sorted(patterns, key=lambda row: (row.thread_id, -row.priority, row.pattern_id)):
         if pattern.disabled:
             continue
@@ -53,16 +53,57 @@ async def build_chat_match_candidates(
         if not _offline_state_allows(pattern=pattern, live_status=channel.is_live):
             continue
         rows.append(
+            ChatPatternSeedRecord(
+                thread_id=pattern.thread_id,
+                pattern_id=pattern.pattern_id,
+                regex=pattern.regex,
+                is_regex=pattern.is_regex,
+                case_sensitive=pattern.case_sensitive,
+                priority=pattern.priority,
+                explicit_user_scope_match=explicit_user_scope_match,
+            )
+        )
+    return rows
+
+
+async def hydrate_chat_match_candidates(
+    *,
+    patterns: list[PatternRecord],
+    thread_repository: ThreadRepository | None,
+    channel_repository: ChannelRepository | None,
+    reply_repository: ReplyRepository | None,
+    broadcaster_id: str,
+    seeds: tuple[ChatPatternSeedRecord, ...],
+) -> list[ChatPatternCandidateRecord]:
+    rows: list[ChatPatternCandidateRecord] = []
+    if not seeds:
+        return rows
+    pattern_map = {(pattern.thread_id, pattern.pattern_id): pattern for pattern in patterns}
+    for seed in seeds:
+        pattern = pattern_map.get((seed.thread_id, seed.pattern_id))
+        if pattern is None:
+            continue
+        thread = await _get_enabled_thread(thread_repository=thread_repository, thread_id=seed.thread_id)
+        if thread is None:
+            continue
+        channel = await _get_source_channel(
+            channel_repository=channel_repository,
+            thread_id=seed.thread_id,
+            broadcaster_id=broadcaster_id,
+        )
+        if channel is None:
+            continue
+        rows.append(
             ChatPatternCandidateRecord(
                 thread=thread,
                 source_channel=channel,
                 pattern=pattern,
                 reply=await _get_enabled_reply(
                     reply_repository=reply_repository,
-                    thread_id=pattern.thread_id,
-                    pattern_id=pattern.pattern_id,
+                    thread_id=seed.thread_id,
+                    pattern_id=seed.pattern_id,
                 ),
-                explicit_user_scope_match=explicit_user_scope_match,
+                explicit_user_scope_match=seed.explicit_user_scope_match,
             )
         )
     return rows
@@ -74,7 +115,7 @@ async def _get_enabled_thread(
     thread_id: int,
 ) -> ThreadRecord | None:
     if thread_repository is None:
-        raise AssertionError("thread_repository is required for list_chat_match_candidates in tests")
+        raise AssertionError("thread_repository is required for chat match seed building in tests")
     thread = await thread_repository.get_by_thread_id(thread_id)
     if thread is None or not thread.enabled:
         return None
@@ -88,7 +129,7 @@ async def _get_source_channel(
     broadcaster_id: str,
 ) -> ChannelRecord | None:
     if channel_repository is None:
-        raise AssertionError("channel_repository is required for list_chat_match_candidates in tests")
+        raise AssertionError("channel_repository is required for chat match seed building in tests")
     return await channel_repository.get_by_thread_and_twitch_channel(thread_id, broadcaster_id)
 
 

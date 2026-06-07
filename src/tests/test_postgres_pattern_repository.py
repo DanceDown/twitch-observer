@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from src.database.records import ChatPatternSeedRecord
 from src.database.postgres import PostgresPatternRepository
 
 
@@ -31,12 +32,53 @@ class RecordingDatabase:
 
 
 @pytest.mark.asyncio
-async def test_postgres_pattern_repository_maps_chat_match_candidates() -> None:
+async def test_postgres_pattern_repository_maps_chat_match_seeds() -> None:
+    database = RecordingDatabase(
+        cursor_instance=RecordingCursor(
+            rows=[
+                (
+                    7,
+                    3,
+                    "hello",
+                    False,
+                    True,
+                    9,
+                    True,
+                )
+            ]
+        )
+    )
+    repository = PostgresPatternRepository(database=database)  # type: ignore[arg-type]
+
+    rows = await repository.list_chat_match_seeds(
+        broadcaster_id="42",
+        author_id="7",
+        sender_is_sub=True,
+    )
+
+    assert len(rows) == 1
+    seed = rows[0]
+    assert seed.thread_id == 7
+    assert seed.pattern_id == 3
+    assert seed.regex == "hello"
+    assert seed.is_regex is False
+    assert seed.case_sensitive is True
+    assert seed.priority == 9
+    assert seed.explicit_user_scope_match is True
+
+    assert len(database.cursor_instance.statements) == 1
+    _query, params = database.cursor_instance.statements[0]
+    assert params == ("42", "7", "7", "42", True, True)
+
+
+@pytest.mark.asyncio
+async def test_postgres_pattern_repository_hydrates_chat_match_candidates() -> None:
     changed_at = datetime.now(UTC)
     database = RecordingDatabase(
         cursor_instance=RecordingCursor(
             rows=[
                 (
+                    True,
                     7,
                     200,
                     1000,
@@ -66,17 +108,25 @@ async def test_postgres_pattern_repository_maps_chat_match_candidates() -> None:
                     "pong",
                     True,
                     False,
-                    True,
                 )
             ]
         )
     )
     repository = PostgresPatternRepository(database=database)  # type: ignore[arg-type]
 
-    rows = await repository.list_chat_match_candidates(
+    rows = await repository.hydrate_chat_match_candidates(
         broadcaster_id="42",
-        author_id="7",
-        sender_is_sub=True,
+        seeds=(
+            ChatPatternSeedRecord(
+                thread_id=7,
+                pattern_id=3,
+                regex="hello",
+                is_regex=False,
+                case_sensitive=True,
+                priority=9,
+                explicit_user_scope_match=True,
+            ),
+        ),
     )
 
     assert len(rows) == 1
@@ -93,5 +143,6 @@ async def test_postgres_pattern_repository_maps_chat_match_candidates() -> None:
     assert candidate.explicit_user_scope_match is True
 
     assert len(database.cursor_instance.statements) == 1
-    _query, params = database.cursor_instance.statements[0]
-    assert params == ("42", "42", "42", "7", "7", "7", "7", "7", True, True)
+    query, params = database.cursor_instance.statements[0]
+    assert "WITH matched" in query
+    assert params == (0, 7, 3, True, "42")

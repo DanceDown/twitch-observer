@@ -5,14 +5,15 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 
-from ..records import ChatPatternCandidateRecord, ChannelRecord, PatternRecord, ReplyRecord, ThreadRecord
+from ..records import ChatPatternCandidateRecord, ChatPatternSeedRecord, ChannelRecord, PatternRecord, ReplyRecord, ThreadRecord
 from ..repositories import PatternRepository
 from ._utils import require_row
 from .database import PostgresDatabase
 
 
 PatternRow = tuple
-HotPathPatternRow = tuple
+PatternSeedRow = tuple
+HydratedCandidateRow = tuple
 
 
 @dataclass(slots=True)
@@ -301,32 +302,43 @@ class PostgresPatternRepository(PatternRepository):
             rows = await cursor.fetchall()
         return await self._build_patterns_from_rows(rows)
 
-    async def list_chat_match_candidates(
+    async def list_chat_match_seeds(
         self,
         *,
         broadcaster_id: str,
         author_id: str,
         sender_is_sub: bool,
-    ) -> list[ChatPatternCandidateRecord]:
+    ) -> list[ChatPatternSeedRecord]:
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
                 SELECT
-                    t.thread_id, t.owner_id, t.discord_channel_id, t.language, t.enabled, t.color, t.account_id,
-                    c.thread_id, c.twitch_channel_id, c.color, c.is_live, c.last_live_status_at,
-                    p.thread_id, p.pattern_id, p.regex, p.channel_scope_mode, p.user_scope_mode,
-                    p.sub_state, p.offline_state, p.is_regex, p.case_sensitive, p.color, p.disabled, p.priority,
-                    r.thread_id, r.pattern_id, r.reply_message, r.reply_as_reply, r.disabled,
-                    CASE WHEN p.user_scope_mode = 'only_selected' THEN TRUE ELSE FALSE END AS explicit_user_scope_match
+                    p.thread_id,
+                    p.pattern_id,
+                    p.regex,
+                    p.is_regex,
+                    p.case_sensitive,
+                    p.priority,
+                    CASE
+                        WHEN p.user_scope_mode = 'only_selected' AND pus_selected.pattern_id IS NOT NULL THEN TRUE
+                        ELSE FALSE
+                    END AS explicit_user_scope_match
                 FROM channel AS c
                 JOIN thread AS t
                   ON t.thread_id = c.thread_id
                 JOIN pattern AS p
                   ON p.thread_id = c.thread_id
-                LEFT JOIN reply AS r
-                  ON r.thread_id = p.thread_id
-                 AND r.pattern_id = p.pattern_id
-                 AND r.disabled = FALSE
+                LEFT JOIN pattern_channel_scope AS pcs_selected
+                  ON pcs_selected.thread_id = p.thread_id
+                 AND pcs_selected.pattern_id = p.pattern_id
+                 AND pcs_selected.twitch_channel_id = %s
+                LEFT JOIN pattern_user_scope AS pus_selected
+                  ON pus_selected.thread_id = p.thread_id
+                 AND pus_selected.pattern_id = p.pattern_id
+                 AND pus_selected.twitch_user_id = %s
+                LEFT JOIN tracked_user AS tu
+                  ON tu.thread_id = p.thread_id
+                 AND tu.twitch_user_id = %s
                 WHERE c.twitch_channel_id = %s
                   AND t.enabled = TRUE
                   AND p.disabled = FALSE
@@ -334,71 +346,31 @@ class PostgresPatternRepository(PatternRepository):
                       p.channel_scope_mode = 'all_tracked'
                       OR (
                           p.channel_scope_mode = 'only_selected'
-                          AND EXISTS (
-                              SELECT 1
-                              FROM pattern_channel_scope AS pcs
-                              WHERE pcs.thread_id = p.thread_id
-                                AND pcs.pattern_id = p.pattern_id
-                                AND pcs.twitch_channel_id = %s
-                          )
+                          AND pcs_selected.pattern_id IS NOT NULL
                       )
                       OR (
                           p.channel_scope_mode = 'all_except_selected'
-                          AND NOT EXISTS (
-                              SELECT 1
-                              FROM pattern_channel_scope AS pcs
-                              WHERE pcs.thread_id = p.thread_id
-                                AND pcs.pattern_id = p.pattern_id
-                                AND pcs.twitch_channel_id = %s
-                          )
+                          AND pcs_selected.pattern_id IS NULL
                       )
                   )
                   AND (
                       p.user_scope_mode = 'all_users'
                       OR (
                           p.user_scope_mode = 'only_selected'
-                          AND EXISTS (
-                              SELECT 1
-                              FROM pattern_user_scope AS pus
-                              WHERE pus.thread_id = p.thread_id
-                                AND pus.pattern_id = p.pattern_id
-                                AND pus.twitch_user_id = %s
-                          )
+                          AND pus_selected.pattern_id IS NOT NULL
                       )
                       OR (
                           p.user_scope_mode = 'all_except_selected'
-                          AND NOT EXISTS (
-                              SELECT 1
-                              FROM pattern_user_scope AS pus
-                              WHERE pus.thread_id = p.thread_id
-                                AND pus.pattern_id = p.pattern_id
-                                AND pus.twitch_user_id = %s
-                          )
+                          AND pus_selected.pattern_id IS NULL
                       )
                       OR (
                           p.user_scope_mode = 'all_tracked'
-                          AND EXISTS (
-                              SELECT 1
-                              FROM tracked_user AS tu
-                              WHERE tu.thread_id = p.thread_id
-                                AND tu.twitch_user_id = %s
-                          )
+                          AND tu.thread_id IS NOT NULL
                       )
                       OR (
                           p.user_scope_mode = 'all_tracked_except_selected'
-                          AND EXISTS (
-                              SELECT 1
-                              FROM tracked_user AS tu
-                              WHERE tu.thread_id = p.thread_id
-                                AND tu.twitch_user_id = %s
-                          )
-                          AND NOT EXISTS (
-                              SELECT 1
-                              FROM pattern_user_scope AS pus
-                              WHERE pus.thread_id = p.thread_id
-                                AND pus.pattern_id = p.pattern_id
-                                AND pus.twitch_user_id = %s
-                          )
+                          AND tu.thread_id IS NOT NULL
+                          AND pus_selected.pattern_id IS NULL
                       )
                   )
                   AND (
@@ -416,17 +388,57 @@ class PostgresPatternRepository(PatternRepository):
                 """,
                 (
                     broadcaster_id,
+                    author_id,
+                    author_id,
                     broadcaster_id,
-                    broadcaster_id,
-                    author_id,
-                    author_id,
-                    author_id,
-                    author_id,
-                    author_id,
                     sender_is_sub,
                     sender_is_sub,
                 ),
             )
+            rows = await cursor.fetchall()
+        return [self._build_chat_match_seed_record(row) for row in rows]
+
+    async def hydrate_chat_match_candidates(
+        self,
+        *,
+        broadcaster_id: str,
+        seeds: tuple[ChatPatternSeedRecord, ...],
+    ) -> list[ChatPatternCandidateRecord]:
+        if not seeds:
+            return []
+        value_placeholders = ", ".join(["(%s, %s, %s, %s)"] * len(seeds))
+        params: list[object] = []
+        for index, seed in enumerate(seeds):
+            params.extend((index, seed.thread_id, seed.pattern_id, seed.explicit_user_scope_match))
+        params.append(broadcaster_id)
+        query = f"""
+                WITH matched(seed_order, thread_id, pattern_id, explicit_user_scope_match) AS (
+                    VALUES {value_placeholders}
+                )
+                SELECT
+                    m.explicit_user_scope_match,
+                    t.thread_id, t.owner_id, t.discord_channel_id, t.language, t.enabled, t.color, t.account_id,
+                    c.thread_id, c.twitch_channel_id, c.color, c.is_live, c.last_live_status_at,
+                    p.thread_id, p.pattern_id, p.regex, p.channel_scope_mode, p.user_scope_mode,
+                    p.sub_state, p.offline_state, p.is_regex, p.case_sensitive, p.color, p.disabled, p.priority,
+                    r.thread_id, r.pattern_id, r.reply_message, r.reply_as_reply, r.disabled
+                FROM matched AS m
+                JOIN pattern AS p
+                  ON p.thread_id = m.thread_id
+                 AND p.pattern_id = m.pattern_id
+                JOIN thread AS t
+                  ON t.thread_id = p.thread_id
+                JOIN channel AS c
+                  ON c.thread_id = p.thread_id
+                 AND c.twitch_channel_id = %s
+                LEFT JOIN reply AS r
+                  ON r.thread_id = p.thread_id
+                 AND r.pattern_id = p.pattern_id
+                 AND r.disabled = FALSE
+                ORDER BY m.seed_order
+                """
+        async with self.database.read_cursor() as cursor:
+            await cursor.execute(query, tuple(params))
             rows = await cursor.fetchall()
         return [self._build_chat_match_candidate_record(row) for row in rows]
 
@@ -581,48 +593,60 @@ class PostgresPatternRepository(PatternRepository):
         )
 
     @staticmethod
-    def _build_chat_match_candidate_record(row: HotPathPatternRow) -> ChatPatternCandidateRecord:
-        thread = ThreadRecord(
+    def _build_chat_match_seed_record(row: PatternSeedRow) -> ChatPatternSeedRecord:
+        return ChatPatternSeedRecord(
             thread_id=int(row[0]),
-            owner_id=int(row[1]),
-            discord_channel_id=int(row[2]),
-            language=row[3],
-            enabled=row[4],
-            color=row[5],
-            account_id=row[6],
+            pattern_id=int(row[1]),
+            regex=row[2],
+            is_regex=row[3],
+            case_sensitive=row[4],
+            priority=int(row[5]),
+            explicit_user_scope_match=bool(row[6]),
+        )
+
+    @staticmethod
+    def _build_chat_match_candidate_record(row: HydratedCandidateRow) -> ChatPatternCandidateRecord:
+        thread = ThreadRecord(
+            thread_id=int(row[1]),
+            owner_id=int(row[2]),
+            discord_channel_id=int(row[3]),
+            language=row[4],
+            enabled=row[5],
+            color=row[6],
+            account_id=row[7],
         )
         source_channel = ChannelRecord(
-            thread_id=int(row[7]),
-            twitch_channel_id=str(row[8]),
-            color=row[9],
-            is_live=row[10],
-            last_live_status_at=(row[11].isoformat() if row[11] is not None else None),
+            thread_id=int(row[8]),
+            twitch_channel_id=str(row[9]),
+            color=row[10],
+            is_live=row[11],
+            last_live_status_at=(row[12].isoformat() if row[12] is not None else None),
         )
         pattern = PatternRecord(
-            thread_id=int(row[12]),
-            pattern_id=int(row[13]),
-            regex=row[14],
-            channel_scope_mode=row[15],
+            thread_id=int(row[13]),
+            pattern_id=int(row[14]),
+            regex=row[15],
+            channel_scope_mode=row[16],
             channel_scope_ids=(),
-            user_scope_mode=row[16],
+            user_scope_mode=row[17],
             user_scope_ids=(),
-            sub_state=row[17],
-            offline_state=row[18],
-            is_regex=row[19],
-            case_sensitive=row[20],
-            color=row[21],
-            disabled=row[22],
-            priority=int(row[23]),
+            sub_state=row[18],
+            offline_state=row[19],
+            is_regex=row[20],
+            case_sensitive=row[21],
+            color=row[22],
+            disabled=row[23],
+            priority=int(row[24]),
         )
         reply = (
             None
-            if row[24] is None
+            if row[25] is None
             else ReplyRecord(
-                thread_id=int(row[24]),
-                pattern_id=int(row[25]),
-                reply_message=row[26],
-                reply_as_reply=row[27],
-                disabled=row[28],
+                thread_id=int(row[25]),
+                pattern_id=int(row[26]),
+                reply_message=row[27],
+                reply_as_reply=row[28],
+                disabled=row[29],
             )
         )
         return ChatPatternCandidateRecord(
@@ -630,5 +654,5 @@ class PostgresPatternRepository(PatternRepository):
             source_channel=source_channel,
             pattern=pattern,
             reply=reply,
-            explicit_user_scope_match=bool(row[29]),
+            explicit_user_scope_match=bool(row[0]),
         )

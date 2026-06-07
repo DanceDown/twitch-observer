@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from src.database.connection import (
     ChannelRecord,
     PatternRecord,
+    ChatPatternSeedRecord,
     PatternRepository,
     ReplyRecord,
     ThreadRecord,
@@ -36,26 +37,34 @@ class ChatPatternMatcher:
         if not event.broadcaster_id or not event.author_id:
             return ()
 
-        candidates = await self.pattern_repository.list_chat_match_candidates(
+        seeds = await self.pattern_repository.list_chat_match_seeds(
             broadcaster_id=event.broadcaster_id,
             author_id=event.author_id,
             sender_is_sub=is_sender_sub(event),
         )
-        matches: list[ChatPatternMatch] = []
+        matched_seeds: list[ChatPatternSeedRecord] = []
         matched_thread_ids: set[int] = set()
-        for candidate in candidates:
-            if candidate.thread.thread_id in matched_thread_ids:
+        for seed in seeds:
+            if seed.thread_id in matched_thread_ids:
                 continue
-            if not matches_pattern_content(candidate.pattern, event):
+            if not matches_pattern_content(seed, event):
                 continue
-            matches.append(
-                ChatPatternMatch(
-                    thread=candidate.thread,
-                    source_channel=candidate.source_channel,
-                    pattern=candidate.pattern,
-                    reply=candidate.reply,
-                    explicit_user_scope_match=candidate.explicit_user_scope_match,
-                )
+            matched_seeds.append(seed)
+            matched_thread_ids.add(seed.thread_id)
+        if not matched_seeds:
+            return ()
+
+        candidates = await self.pattern_repository.hydrate_chat_match_candidates(
+            broadcaster_id=event.broadcaster_id,
+            seeds=tuple(matched_seeds),
+        )
+        return tuple(
+            ChatPatternMatch(
+                thread=candidate.thread,
+                source_channel=candidate.source_channel,
+                pattern=candidate.pattern,
+                reply=candidate.reply,
+                explicit_user_scope_match=candidate.explicit_user_scope_match,
             )
-            matched_thread_ids.add(candidate.thread.thread_id)
-        return tuple(matches)
+            for candidate in candidates
+        )

@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from src.tests.chat_match_candidates import build_chat_match_candidates
+from src.tests.chat_match_candidates import build_chat_match_seeds, hydrate_chat_match_candidates
 from src.tests.dispatch_helpers import (
     dispatch_account_command,
     dispatch_channel_event_command,
@@ -26,6 +26,7 @@ from src.database.connection import (
     AdapterEventRecord,
     AdapterEventRepository,
     ChatPatternCandidateRecord,
+    ChatPatternSeedRecord,
     ChannelRecord,
     ChannelRepository,
     MessageRepository,
@@ -330,22 +331,36 @@ class InMemoryPatternRepository(PatternRepository):
         rows = [pattern for pattern in self.patterns if pattern.thread_id == thread_id and not pattern.disabled]
         return sorted(rows, key=lambda pattern: (-pattern.priority, pattern.pattern_id))
 
-    async def list_chat_match_candidates(
+    async def list_chat_match_seeds(
         self,
         *,
         broadcaster_id: str,
         author_id: str,
         sender_is_sub: bool,
-    ) -> list[ChatPatternCandidateRecord]:
-        return await build_chat_match_candidates(
+    ) -> list[ChatPatternSeedRecord]:
+        return await build_chat_match_seeds(
             patterns=self.patterns,
             thread_repository=self.thread_repository,
             channel_repository=self.channel_repository,
-            reply_repository=self.reply_repository,
             tracked_user_repository=self.tracked_user_repository,
             broadcaster_id=broadcaster_id,
             author_id=author_id,
             sender_is_sub=sender_is_sub,
+        )
+
+    async def hydrate_chat_match_candidates(
+        self,
+        *,
+        broadcaster_id: str,
+        seeds: tuple[ChatPatternSeedRecord, ...],
+    ) -> list[ChatPatternCandidateRecord]:
+        return await hydrate_chat_match_candidates(
+            patterns=self.patterns,
+            thread_repository=self.thread_repository,
+            channel_repository=self.channel_repository,
+            reply_repository=self.reply_repository,
+            broadcaster_id=broadcaster_id,
+            seeds=seeds,
         )
 
     async def get_pattern_by_id(self, *, thread_id: int, pattern_id: int) -> PatternRecord | None:

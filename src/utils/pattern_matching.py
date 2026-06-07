@@ -4,9 +4,18 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from typing import Protocol
 
 from src.database.connection import PatternRecord
 from src.events.twitch_events import TwitchChatMessageEvent
+
+
+class PatternContentRule(Protocol):
+    """Minimal rule shape needed for message-content pattern checks."""
+
+    regex: str
+    is_regex: bool
+    case_sensitive: bool
 
 
 def matches_pattern(pattern: PatternRecord, event: TwitchChatMessageEvent) -> bool:
@@ -21,7 +30,7 @@ def matches_pattern(pattern: PatternRecord, event: TwitchChatMessageEvent) -> bo
     return matches_pattern_content(pattern, event)
 
 
-def matches_pattern_content(pattern: PatternRecord, event: TwitchChatMessageEvent) -> bool:
+def matches_pattern_content(pattern: PatternContentRule, event: TwitchChatMessageEvent) -> bool:
     """Return whether only the message content matches one stored pattern."""
     content = normalize_message_content_for_pattern_matching(event.content)
     flags = 0 if pattern.case_sensitive else re.IGNORECASE

@@ -125,6 +125,19 @@ class ReplyRecord:
 
 
 @dataclass(slots=True, frozen=True)
+class ChatPatternSeedRecord:
+    """Slim hot-path seed used before Python content matching."""
+
+    thread_id: int
+    pattern_id: int
+    regex: str
+    is_regex: bool
+    case_sensitive: bool
+    priority: int
+    explicit_user_scope_match: bool
+
+
+@dataclass(slots=True, frozen=True)
 class ChatPatternCandidateRecord:
     """Pre-filtered hot-path pattern candidate for one incoming Twitch chat message."""
 
