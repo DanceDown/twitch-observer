@@ -28,7 +28,13 @@ def _thread() -> ThreadRecord:
     return ThreadRecord(thread_id=1, owner_id=1, discord_channel_id=99, enabled=True, color=None)
 
 
-def _pattern(pattern_id: int, regex: str) -> PatternRecord:
+def _pattern(
+    pattern_id: int,
+    regex: str,
+    *,
+    is_regex: bool = False,
+    case_sensitive: bool = False,
+) -> PatternRecord:
     return PatternRecord(
         thread_id=1,
         pattern_id=pattern_id,
@@ -39,8 +45,8 @@ def _pattern(pattern_id: int, regex: str) -> PatternRecord:
         user_scope_ids=(),
         sub_state="all",
         offline_state="both",
-        is_regex=False,
-        case_sensitive=False,
+        is_regex=is_regex,
+        case_sensitive=case_sensitive,
         color=None,
         disabled=False,
         priority=pattern_id,
@@ -135,6 +141,72 @@ async def test_chat_pattern_matcher_uses_batched_candidates_and_keeps_explicit_u
     assert matches[0].pattern.pattern_id == 2
     assert matches[0].reply is not None
     assert matches[0].explicit_user_scope_match is True
+
+
+@pytest.mark.asyncio
+async def test_chat_pattern_matcher_ignores_trailing_spaces_from_duplicate_message_suffixes() -> None:
+    thread = _thread()
+    source_channel = ChannelRecord(thread_id=1, twitch_channel_id="42", color=None)
+    matcher = ChatPatternMatcher(
+        pattern_repository=_BatchPatternRepository(
+            candidates=[
+                ChatPatternCandidateRecord(
+                    thread=thread,
+                    source_channel=source_channel,
+                    pattern=_pattern(1, r"^hello$", is_regex=True),
+                    reply=None,
+                    explicit_user_scope_match=False,
+                )
+            ]
+        ),  # type: ignore[arg-type]
+    )
+
+    matches = await matcher.find_matches(
+        TwitchChatMessageEvent(
+            channel_login="chan",
+            broadcaster_id="42",
+            author_login="alice",
+            author_id="7",
+            content="hello   ",
+            message_id="m-1",
+        )
+    )
+
+    assert len(matches) == 1
+    assert matches[0].pattern.pattern_id == 1
+
+
+@pytest.mark.asyncio
+async def test_chat_pattern_matcher_ignores_trailing_invisible_duplicate_suffixes() -> None:
+    thread = _thread()
+    source_channel = ChannelRecord(thread_id=1, twitch_channel_id="42", color=None)
+    matcher = ChatPatternMatcher(
+        pattern_repository=_BatchPatternRepository(
+            candidates=[
+                ChatPatternCandidateRecord(
+                    thread=thread,
+                    source_channel=source_channel,
+                    pattern=_pattern(1, r"^hello$", is_regex=True),
+                    reply=None,
+                    explicit_user_scope_match=False,
+                )
+            ]
+        ),  # type: ignore[arg-type]
+    )
+
+    matches = await matcher.find_matches(
+        TwitchChatMessageEvent(
+            channel_login="chan",
+            broadcaster_id="42",
+            author_login="alice",
+            author_id="7",
+            content="hello\u200b",
+            message_id="m-1",
+        )
+    )
+
+    assert len(matches) == 1
+    assert matches[0].pattern.pattern_id == 1
 
 
 @dataclass

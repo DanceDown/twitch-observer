@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 from src.database.connection import PatternRecord
 from src.events.event_types import TwitchChatMessageEvent
@@ -22,12 +23,25 @@ def matches_pattern(pattern: PatternRecord, event: TwitchChatMessageEvent) -> bo
 
 def matches_pattern_content(pattern: PatternRecord, event: TwitchChatMessageEvent) -> bool:
     """Return whether only the message content matches one stored pattern."""
+    content = normalize_message_content_for_pattern_matching(event.content)
     flags = 0 if pattern.case_sensitive else re.IGNORECASE
     if pattern.is_regex:
-        return re.search(pattern.regex, event.content, flags) is not None
+        return re.search(pattern.regex, content, flags) is not None
 
     escaped = re.escape(pattern.regex)
-    return re.search(rf"\b{escaped}\b", event.content, flags) is not None
+    return re.search(rf"\b{escaped}\b", content, flags) is not None
+
+
+def normalize_message_content_for_pattern_matching(content: str) -> str:
+    """Remove duplicate-message suffix chars that some chat clients append at the end."""
+    end = len(content)
+    while end > 0:
+        char = content[end - 1]
+        if char.isspace() or unicodedata.category(char) == "Cf":
+            end -= 1
+            continue
+        break
+    return content[:end]
 
 
 def is_sender_sub(event: TwitchChatMessageEvent) -> bool:
