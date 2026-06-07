@@ -9,7 +9,7 @@ import discord
 
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.localization import Localizer
-from src.services.discord_ui_query_service import TrackedChannelPresentation, WriteReplyCandidatePresentation
+from src.services.discord_ui_queries import TrackedChannelPresentation, WriteReplyCandidatePresentation
 
 from ..dispatch import dispatch_send_twitch_message
 from ..helpers import send_initial_result
@@ -128,7 +128,7 @@ class WriteModal(discord.ui.Modal):
             if not label:
                 label = candidate.username
             timestamp = candidate.timestamp.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
-            description = f"{timestamp} · {candidate.twitch_channel_id}"
+            description = f"{timestamp} - {candidate.twitch_channel_id}"
             self._reply_map[key] = WriteReplyOption(
                 message_id=candidate.message_id,
                 twitch_channel_id=candidate.twitch_channel_id,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.events.event_types import ShowConfigurationCommand
+from src.events.commands import ShowConfigurationCommand
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
 

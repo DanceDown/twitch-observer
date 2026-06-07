@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from src.events.event_types import TwitchChatMessageEvent
+from src.events.twitch_events import TwitchChatMessageEvent
 
 from .models import IRCMessage
 

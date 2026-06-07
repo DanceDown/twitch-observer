@@ -16,14 +16,22 @@ Command behavior details belong in [commands_reference.md](commands_reference.md
   - modals, menus, and component-driven forms
 - `src/entrypoints/discord/dispatch/*`
   - typed per-domain direct call helpers
-- `src/events/event_types.py`
-  - typed request DTOs, runtime DTOs, and enums
+- `src/events/commands.py`
+  - typed request DTOs for Discord-triggered service calls
+- `src/events/ui_flow.py`
+  - typed UI flow requests and decisions
+- `src/events/twitch_events.py`
+  - normalized Twitch runtime payloads
+- `src/events/pattern_scopes.py`
+  - shared typed scope enums
 - `src/services/*`
   - business logic and orchestration
 - `src/database/*`
   - schema, repository contracts, and implementations
-- `src/bootstrap/application.py`
-  - application assembly and lifecycle wiring
+- `src/bootstrap/services.py`
+  - application service and query-service assembly
+- `src/bootstrap/runtime.py`
+  - runtime worker and entrypoint assembly
 
 ## Implementation workflow
 
@@ -34,14 +42,19 @@ Command behavior details belong in [commands_reference.md](commands_reference.md
 5. Add or extend a direct dispatch helper.
 6. Implement service logic with a direct method returning `DiscordCommandResult`.
 7. Add root command registration and UI interaction entry points.
-8. Wire service/repository in `src/bootstrap/application.py`.
+8. Wire service/repository in the matching bootstrap module (`core.py`, `services.py`, or `runtime.py`).
 9. Add tests for service behavior and affected flows.
 10. Update docs for command surface and operational behavior.
 
 ## Step 1: Typed request contract
 
-Add a dedicated typed request dataclass in `src/events/event_types.py`
-containing:
+Add the DTO in the themed module that matches its responsibility:
+
+- `src/events/commands.py` for Discord command payloads
+- `src/events/ui_flow.py` for UI-flow requests/decisions
+- `src/events/twitch_events.py` for normalized runtime Twitch payloads
+
+The DTO should contain:
 
 - context identity (`discord_channel_id`, `requester_id`)
 - normalized command data
@@ -74,6 +87,7 @@ Service requirements:
 - call repositories and APIs
 - return `DiscordCommandResult`
 - never send Discord messages directly
+- when building user-facing text, pass view data into the Localizer and keep the final wording/layout in the lang files
 
 ## Step 4: Command and UI entry points
 
@@ -91,10 +105,14 @@ Rules:
 - service layer owns all business decisions
 - UI components call through the same helper path as root commands
 
-## Step 5: Wiring in `src/bootstrap/application.py`
+## Step 5: Wiring in bootstrap modules
 
 Instantiate repositories, services, pipelines/orchestrators, and entrypoints in
-`src/bootstrap/application.py`.
+the matching split bootstrap module:
+
+- `src/bootstrap/core.py` for persistence, localization, and shared gateways
+- `src/bootstrap/services.py` for application services and UI query bundles
+- `src/bootstrap/runtime.py` for background workers and runtime entrypoints
 
 If wiring is missing:
 
@@ -129,7 +147,7 @@ This keeps one authoritative source per topic and prevents duplicated guidance.
 
 ## Common failure points
 
-- command registered but service not wired in `bootstrap/application.py`
+- command registered but service not wired in the split bootstrap modules
 - typed request added but dispatch helper not implemented
 - service logic placed in adapter/UI instead of service layer
 - schema changed without repository updates

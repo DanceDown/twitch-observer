@@ -14,7 +14,7 @@ import psycopg
 from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import ChannelRepository
 from src.errors import DatabasePoolExhaustedError
-from src.events.event_types import TwitchChannelLiveStateChangedEvent
+from src.events.twitch_events import TwitchChannelLiveStateChangedEvent
 from src.services.twitch_gateways import TwitchLiveMonitorGateway
 from src.services.twitch_runtime import safe_get_twitch_user_by_id
 

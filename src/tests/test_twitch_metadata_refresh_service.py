@@ -38,7 +38,6 @@ def _cache_record(user_id: str) -> TwitchUserCacheRecord:
         display_name=f"User {user_id}",
         profile_image_url=f"https://example.com/{user_id}.png",
         updated_at="2026-01-01T00:00:00+00:00",
-        last_api_refresh_at="2026-01-01T00:00:00+00:00",
     )
 
 

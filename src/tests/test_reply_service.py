@@ -43,12 +43,8 @@ from src.database.connection import (
     TwitchDeviceFlowRepository,
 )
 from types import SimpleNamespace
-from src.events.event_types import (
-    DiscordCommandResult,
-    DiscordResultStyle,
-    TwitchChannelLiveStateChangedEvent,
-    TwitchChatMessageEvent,
-)
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
+from src.events.twitch_events import TwitchChannelLiveStateChangedEvent, TwitchChatMessageEvent
 from src.services.account_polling_service import DeviceFlowPollingService
 from src.services.account_service import AccountCommandService
 from src.services.account_support import AccountNotificationSender
@@ -684,7 +680,6 @@ async def test_channel_event_command_manages_live_and_offline_notifications() ->
         pattern_repository=InMemoryPatternRepository(),
         reply_repository=InMemoryReplyRepository(),
         twitch_api=twitch_api,  # type: ignore[arg-type]
-        adapter_event_repository=adapter_event_repository,
         adapter_event_action_repository=adapter_event_action_repository,
     )
 
@@ -1865,7 +1860,6 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        reply_repository=reply_repository,
         message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
@@ -1923,6 +1917,12 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
     )
     reply_repository = InMemoryReplyRepository()
     await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        reply_repository=reply_repository,
+    )
     account_repository = InMemoryAccountRepository()
     account = await account_repository.create_account(
         discord_user_id=200,
@@ -1942,7 +1942,6 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        reply_repository=reply_repository,
         message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
@@ -1997,6 +1996,12 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
     )
     reply_repository = InMemoryReplyRepository()
     await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        reply_repository=reply_repository,
+    )
     account_repository = InMemoryAccountRepository()
     account = await account_repository.create_account(
         discord_user_id=200,
@@ -2016,7 +2021,6 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        reply_repository=reply_repository,
         message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
@@ -2072,6 +2076,12 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
     )
     reply_repository = InMemoryReplyRepository()
     await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        reply_repository=reply_repository,
+    )
     account_repository = InMemoryAccountRepository()
     account = await account_repository.create_account(
         discord_user_id=200,
@@ -2091,7 +2101,6 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        reply_repository=reply_repository,
         message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
@@ -2162,6 +2171,12 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
     )
     reply_repository = InMemoryReplyRepository()
     await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=2, reply_message="fallback", reply_as_reply=True)
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        reply_repository=reply_repository,
+    )
     account_repository = InMemoryAccountRepository()
     account = await account_repository.create_account(
         discord_user_id=200,
@@ -2181,7 +2196,6 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        reply_repository=reply_repository,
         message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
@@ -2237,6 +2251,12 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
     )
     reply_repository = InMemoryReplyRepository()
     await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=False)
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        reply_repository=reply_repository,
+    )
     account_repository = InMemoryAccountRepository()
     account = await account_repository.create_account(
         discord_user_id=200,
@@ -2256,7 +2276,6 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        reply_repository=reply_repository,
         message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]

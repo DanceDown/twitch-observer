@@ -17,7 +17,7 @@ from src.entrypoints.discord.ui.patterns.users_modal import PatternUsersModal
 from src.entrypoints.discord.ui.reply_ui import PatternReplyAddModal
 from src.entrypoints.discord.ui.write_ui import WriteModal
 from src.localization import Localizer
-from src.services.discord_ui_query_service import (
+from src.services.discord_ui_queries import (
     AdapterEventActionPresentation,
     AdapterEventPresentation,
     PatternPresentation,

@@ -1335,7 +1335,7 @@
         "false": "fehlt"
       }
     },
-    "show_permissions": {
+    "permissions": {
       "body": {
         "template": "Die Berechtigungen f?r die einzelnen Personen sind:\n{RAW:view.user_list}\nDas waren alle Berechtigungen!",
         "placeholders": {

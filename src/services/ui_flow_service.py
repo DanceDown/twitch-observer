@@ -14,14 +14,8 @@ from src.database.connection import (
     UserPermissionRepository,
 )
 from src.discord_results import build_result, build_thread_result
-from src.events.event_types import (
-    DiscordCommandResult,
-    DiscordResultStyle,
-    DiscordUIFlowDecision,
-    RequestUIFlowCommand,
-    UIFlowKind,
-    UIFlowStep,
-)
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
+from src.events.ui_flow import DiscordUIFlowDecision, RequestUIFlowCommand, UIFlowKind, UIFlowStep
 from src.localization import Localizer
 from src.services.authz import thread_has_permission
 from src.utils.permissions import ObserverPermission

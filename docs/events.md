@@ -8,8 +8,16 @@ Instead, it uses typed DTOs at direct call boundaries:
 - `TwitchChatMessageEvent` as the normalized Twitch IRC chat input object
 - `TwitchChannelLiveStateChangedEvent` as the normalized live-state transition object
 
-These types live in `src/events/event_types.py`, but they are plain data
-contracts now, not publish/subscribe bus messages.
+These types live in focused modules now, but they are plain data contracts, not
+publish/subscribe bus messages.
+
+Current module split:
+
+- `src/events/commands.py`
+- `src/events/discord_results.py`
+- `src/events/pattern_scopes.py`
+- `src/events/twitch_events.py`
+- `src/events/ui_flow.py`
 
 ## `TwitchChatMessageEvent`
 

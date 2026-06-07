@@ -39,7 +39,9 @@ from src.entrypoints.discord.dispatch import (
     dispatch_ui_flow_decision,
     dispatch_unlink_account,
 )
-from src.events.event_types import ChannelScopeMode, OfflineScope, StreamEventKind, SubscriptionScope, UIFlowKind, UIFlowStep, UserScopeMode
+from src.events.pattern_scopes import ChannelScopeMode, OfflineScope, SubscriptionScope, UserScopeMode
+from src.events.twitch_events import StreamEventKind
+from src.events.ui_flow import UIFlowKind, UIFlowStep
 
 
 def make_services(**services):

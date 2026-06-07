@@ -10,7 +10,7 @@ from src.database.connection import (
     ThreadRecord,
     TrackedUserRepository,
 )
-from src.events.event_types import ChannelScopeMode, UserScopeMode
+from src.events.pattern_scopes import ChannelScopeMode, UserScopeMode
 from src.localization import Localizer
 from src.services.twitch_gateways import TwitchDirectoryGateway
 

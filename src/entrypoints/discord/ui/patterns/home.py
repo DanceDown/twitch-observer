@@ -5,15 +5,9 @@ from __future__ import annotations
 import discord
 
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
-from src.events.event_types import (
-    ChannelScopeMode,
-    DiscordResultStyle,
-    OfflineScope,
-    SubscriptionScope,
-    UIFlowKind,
-    UIFlowStep,
-    UserScopeMode,
-)
+from src.events.discord_results import DiscordResultStyle
+from src.events.pattern_scopes import ChannelScopeMode, OfflineScope, SubscriptionScope, UserScopeMode
+from src.events.ui_flow import UIFlowKind, UIFlowStep
 from src.localization import Localizer
 
 from ...dispatch import dispatch_add_pattern, dispatch_edit_pattern

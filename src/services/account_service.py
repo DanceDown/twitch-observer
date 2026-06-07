@@ -16,12 +16,8 @@ from src.database.connection import (
     UserPermissionRepository,
 )
 from src.discord_results import build_result, build_thread_result
-from src.events.event_types import (
-    DiscordCommandResult,
-    DiscordResultStyle,
-    StartAccountLinkCommand,
-    UnlinkAccountCommand,
-)
+from src.events.commands import StartAccountLinkCommand, UnlinkAccountCommand
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.services.account_support import AccountNotificationSender
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards

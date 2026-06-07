@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from src.events.event_types import TwitchChatMessageEvent
+from src.events.twitch_events import TwitchChatMessageEvent
 from src.services.chat import ChatMessageReactionService
 from src.services.message_ingest_service import MessageIngestService
 from src.services.twitch_user_directory_service import TwitchUserDirectoryIngestService

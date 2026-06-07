@@ -7,7 +7,7 @@ from contextlib import suppress
 import discord
 
 from src.config import AppConfig
-from src.events.event_types import DiscordCommandResult
+from src.events.discord_results import DiscordCommandResult
 from src.localization import Localizer
 from src.services.discord_presence_service import DiscordPresenceStatusSender
 from src.services.patterns import TrackingNotificationSender

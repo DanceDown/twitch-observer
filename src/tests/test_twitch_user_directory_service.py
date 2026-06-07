@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 import pytest
 
 from src.gateways.twitch_api import TwitchUser
 from src.database.connection import TwitchUserCacheRecord, TwitchUserCacheRepository
-from src.events.event_types import TwitchChatMessageEvent
+from src.events.twitch_events import TwitchChatMessageEvent
 from src.services.twitch_live_query_service import TwitchLiveQueryService
 from src.services.twitch_user_directory_service import TwitchUserDirectoryIngestService, TwitchUserDirectoryService
 
@@ -41,7 +41,6 @@ class InMemoryTwitchUserCacheRepository(TwitchUserCacheRepository):
             display_name=display_name,
             profile_image_url=profile_image_url,
             updated_at=timestamp,
-            last_api_refresh_at=timestamp,
         )
         self.by_id[twitch_user_id] = record
         return record
@@ -60,7 +59,6 @@ class InMemoryTwitchUserCacheRepository(TwitchUserCacheRepository):
             display_name=(display_name or (existing.display_name if existing is not None else twitch_login)).strip(),
             profile_image_url=None if existing is None else existing.profile_image_url,
             updated_at="chat",
-            last_api_refresh_at=None if existing is None else existing.last_api_refresh_at,
         )
         self.by_id[twitch_user_id] = record
         return record
@@ -148,8 +146,6 @@ async def test_directory_uses_persistent_cache_before_hitting_helix() -> None:
         twitch_api=twitch_api,
         repository=repository,
         memory_cache_size=2048,
-        api_refresh_interval_seconds=43200,
-        channel_api_refresh_interval_seconds=43200,
     )
 
     first = await directory.get_user_by_login("example")
@@ -182,8 +178,6 @@ async def test_directory_ingests_chat_metadata_without_any_helix_lookup() -> Non
         twitch_api=twitch_api,
         repository=repository,
         memory_cache_size=2048,
-        api_refresh_interval_seconds=43200,
-        channel_api_refresh_interval_seconds=43200,
     )
     ingest = TwitchUserDirectoryIngestService(directory=directory)
 
@@ -217,7 +211,6 @@ async def test_directory_can_force_a_fresh_login_lookup_when_requested() -> None
                 display_name="Old Name",
                 profile_image_url=None,
                 updated_at="cached",
-                last_api_refresh_at=None,
             )
         }
     )
@@ -233,8 +226,6 @@ async def test_directory_can_force_a_fresh_login_lookup_when_requested() -> None
         twitch_api=twitch_api,
         repository=repository,
         memory_cache_size=2048,
-        api_refresh_interval_seconds=43200,
-        channel_api_refresh_interval_seconds=43200,
     )
 
     refreshed = await directory.refresh_user_by_login("newname")
@@ -259,8 +250,6 @@ async def test_directory_uses_lru_memory_cache_before_repository() -> None:
         twitch_api=twitch_api,
         repository=repository,
         memory_cache_size=2,
-        api_refresh_interval_seconds=43200,
-        channel_api_refresh_interval_seconds=43200,
     )
 
     await directory.get_user_by_login("alpha")
@@ -281,8 +270,6 @@ async def test_directory_cache_only_lookup_does_not_fall_back_to_helix() -> None
         twitch_api=twitch_api,
         repository=repository,
         memory_cache_size=2048,
-        api_refresh_interval_seconds=43200,
-        channel_api_refresh_interval_seconds=43200,
     )
 
     cached = directory.get_cached_user_by_login("unknown")
@@ -301,7 +288,6 @@ async def test_directory_returns_missing_profile_image_from_cached_record_until_
                 display_name="Example",
                 profile_image_url=None,
                 updated_at="cached",
-                last_api_refresh_at=None,
             )
         }
     )
@@ -319,8 +305,6 @@ async def test_directory_returns_missing_profile_image_from_cached_record_until_
         twitch_api=twitch_api,
         repository=repository,
         memory_cache_size=2048,
-        api_refresh_interval_seconds=43200,
-        channel_api_refresh_interval_seconds=43200,
     )
 
     user = await directory.get_user_by_id("42")
@@ -342,7 +326,6 @@ async def test_directory_returns_stale_user_cache_without_implicit_refresh() -> 
                 display_name="Example",
                 profile_image_url="https://cdn.example/old.png",
                 updated_at="cached",
-                last_api_refresh_at=(datetime.now(UTC) - timedelta(seconds=120)).isoformat(),
             )
         }
     )
@@ -360,8 +343,6 @@ async def test_directory_returns_stale_user_cache_without_implicit_refresh() -> 
         twitch_api=twitch_api,
         repository=repository,
         memory_cache_size=2048,
-        api_refresh_interval_seconds=60,
-        channel_api_refresh_interval_seconds=43200,
     )
 
     user = await directory.get_user_by_id("42")
@@ -380,7 +361,6 @@ async def test_directory_returns_stale_channel_cache_without_implicit_refresh() 
                 display_name="Example",
                 profile_image_url="https://cdn.example/old.png",
                 updated_at="cached",
-                last_api_refresh_at=(datetime.now(UTC) - timedelta(seconds=120)).isoformat(),
             )
         }
     )
@@ -398,8 +378,6 @@ async def test_directory_returns_stale_channel_cache_without_implicit_refresh() 
         twitch_api=twitch_api,
         repository=repository,
         memory_cache_size=2048,
-        api_refresh_interval_seconds=43200,
-        channel_api_refresh_interval_seconds=60,
     )
 
     user = await directory.get_channel_by_id("42")
@@ -418,7 +396,6 @@ async def test_directory_keeps_fresh_channel_cache_without_refresh() -> None:
                 display_name="Example",
                 profile_image_url="https://cdn.example/current.png",
                 updated_at="cached",
-                last_api_refresh_at=(datetime.now(UTC) - timedelta(seconds=30)).isoformat(),
             )
         }
     )
@@ -436,8 +413,6 @@ async def test_directory_keeps_fresh_channel_cache_without_refresh() -> None:
         twitch_api=twitch_api,
         repository=repository,
         memory_cache_size=2048,
-        api_refresh_interval_seconds=43200,
-        channel_api_refresh_interval_seconds=60,
     )
 
     user = await directory.get_channel_by_id("42")

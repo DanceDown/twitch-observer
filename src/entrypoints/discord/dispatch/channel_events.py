@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-from src.events.event_types import (
-    AddChannelEventCommand,
-    RemoveChannelEventCommand,
-    SetChannelEventColorCommand,
-    StreamEventKind,
-)
+from src.events.commands import AddChannelEventCommand, RemoveChannelEventCommand, SetChannelEventColorCommand
+from src.events.twitch_events import StreamEventKind
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
 

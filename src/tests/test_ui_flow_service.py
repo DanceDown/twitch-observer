@@ -14,7 +14,7 @@ from src.database.connection import (
     TwitchAccountRepository,
     UserPermissionRepository,
 )
-from src.events.event_types import RequestUIFlowCommand, UIFlowKind, UIFlowStep
+from src.events.ui_flow import RequestUIFlowCommand, UIFlowKind, UIFlowStep
 from src.services.ui_flow_service import DiscordUIFlowGuardService
 
 

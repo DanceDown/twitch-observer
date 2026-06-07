@@ -7,13 +7,8 @@ from dataclasses import dataclass, field
 
 from src.database.connection import ThreadRepository, UserPermissionRepository
 from src.discord_results import build_thread_result
-from src.events.event_types import (
-    ClearPermissionsCommand,
-    DiscordCommandResult,
-    DiscordResultStyle,
-    GrantPermissionsCommand,
-    RevokePermissionsCommand,
-)
+from src.events.commands import ClearPermissionsCommand, GrantPermissionsCommand, RevokePermissionsCommand
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
 from src.utils.permissions import ObserverPermission, permissions_mask_from_values

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 import asyncio
 
 from src.database.connection import TwitchUserCacheRecord, TwitchUserCacheRepository
-from src.events.event_types import TwitchChatMessageEvent
+from src.events.twitch_events import TwitchChatMessageEvent
 from src.gateways.twitch_api import TwitchAPIClient, TwitchUser
 
 
@@ -28,8 +28,6 @@ class TwitchUserDirectoryService:
     twitch_api: TwitchAPIClient
     repository: TwitchUserCacheRepository
     memory_cache_size: int
-    api_refresh_interval_seconds: int
-    channel_api_refresh_interval_seconds: int
     _users_by_id: OrderedDict[str, TwitchUserCacheRecord] = field(default_factory=OrderedDict, init=False)
     _user_ids_by_login: dict[str, str] = field(default_factory=dict, init=False)
     _inflight_by_user_id: dict[str, asyncio.Task[TwitchUser]] = field(default_factory=dict, init=False)
@@ -200,7 +198,6 @@ class TwitchUserDirectoryService:
                     display_name=user.display_name,
                     profile_image_url=user.profile_image_url,
                     updated_at="",
-                    last_api_refresh_at="",
                 )
             )
 

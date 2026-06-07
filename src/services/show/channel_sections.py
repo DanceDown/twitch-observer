@@ -21,6 +21,7 @@ from src.services.twitch_runtime import (
 )
 
 from .support import ShowTwitchSubjectResolver, stream_state_key
+from .text import render_details, render_empty_section, render_line, render_row, render_rows, render_section
 
 
 @dataclass(slots=True)
@@ -33,11 +34,7 @@ class ShowChannelsRenderer:
         language = self.localizer.language_for_thread(thread)
         channels = await self.channel_repository.list_channels_for_thread(thread.thread_id)
         if not channels:
-            return self.localizer.text(
-                "show.channel.section",
-                language=language,
-                sources={"view": {"section_body": self.localizer.text("show.channel.empty", language=language)}},
-            )
+            return render_empty_section(self.localizer, "show.channel", language=language)
 
         await self.resolver.preload_channel_ids(tuple(channel.twitch_channel_id for channel in channels))
         rows: list[str] = []
@@ -53,38 +50,22 @@ class ShowChannelsRenderer:
                     )
                 )
             rows.append(
-                self.localizer.text(
-                    "show.channel.row",
+                render_row(
+                    self.localizer,
+                    "show.channel",
                     language=language,
-                    sources={
-                        "view": {
-                            "display_name": twitch_user.display_name,
-                            "login": twitch_user.login,
-                            "details": (
-                                ""
-                                if not details
-                                else self.localizer.text(
-                                    "show.channel.details",
-                                    language=language,
-                                    sources={"view": {"items": tuple(details)}},
-                                )
-                            ),
-                        }
+                    view={
+                        "display_name": twitch_user.display_name,
+                        "login": twitch_user.login,
+                        "details": render_details(self.localizer, "show.channel", language=language, items=tuple(details)),
                     },
                 )
             )
-        return self.localizer.text(
-            "show.channel.section",
+        return render_section(
+            self.localizer,
+            "show.channel",
             language=language,
-            sources={
-                "view": {
-                    "section_body": self.localizer.text(
-                        "show.channel.rows",
-                        language=language,
-                        sources={"view": {"items": tuple(rows)}},
-                    )
-                }
-            },
+            section_body=render_rows(self.localizer, "show.channel", language=language, items=tuple(rows)),
         )
 
 
@@ -98,11 +79,7 @@ class ShowChannelEventsRenderer:
     async def render(self, thread: ThreadRecord) -> str:
         language = self.localizer.language_for_thread(thread)
         if self.adapter_event_action_repository is None:
-            return self.localizer.text(
-                "show.channel_event.section",
-                language=language,
-                sources={"view": {"section_body": self.localizer.text("show.channel_event.empty", language=language)}},
-            )
+            return render_empty_section(self.localizer, "show.channel_event", language=language)
 
         channel_by_id = {
             channel.twitch_channel_id: channel
@@ -167,47 +144,23 @@ class ShowChannelEventsRenderer:
             if action.disabled:
                 details.append(self.localizer.text("show.channel_event.disabled", language=language))
             rows.append(
-                self.localizer.text(
-                    "show.channel_event.row",
+                render_row(
+                    self.localizer,
+                    "show.channel_event",
                     language=language,
-                    sources={
-                        "view": {
-                            "head": self.localizer.text(
-                                "show.channel_event.line",
-                                language=language,
-                                sources={"view": {"id": display_index}},
-                            ),
-                            "details": (
-                                ""
-                                if not details
-                                else self.localizer.text(
-                                    "show.channel_event.details",
-                                    language=language,
-                                    sources={"view": {"items": tuple(details)}},
-                                )
-                            ),
-                        }
+                    view={
+                        "head": render_line(self.localizer, "show.channel_event", language=language, view={"id": display_index}),
+                        "details": render_details(self.localizer, "show.channel_event", language=language, items=tuple(details)),
                     },
                 )
             )
         if not rows:
-            return self.localizer.text(
-                "show.channel_event.section",
-                language=language,
-                sources={"view": {"section_body": self.localizer.text("show.channel_event.empty", language=language)}},
-            )
-        return self.localizer.text(
-            "show.channel_event.section",
+            return render_empty_section(self.localizer, "show.channel_event", language=language)
+        return render_section(
+            self.localizer,
+            "show.channel_event",
             language=language,
-            sources={
-                "view": {
-                    "section_body": self.localizer.text(
-                        "show.channel_event.rows",
-                        language=language,
-                        sources={"view": {"items": tuple(rows)}},
-                    )
-                }
-            },
+            section_body=render_rows(self.localizer, "show.channel_event", language=language, items=tuple(rows)),
         )
 
     async def _channel_notification_actions(self, thread_id: int) -> list[tuple[AdapterEventRecord, AdapterEventActionRecord]]:

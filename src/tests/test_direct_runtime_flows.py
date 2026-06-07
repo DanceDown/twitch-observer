@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from src.events.event_types import TwitchChannelLiveStateChangedEvent, TwitchChatMessageEvent
+from src.events.twitch_events import TwitchChannelLiveStateChangedEvent, TwitchChatMessageEvent
 from src.services.chat import ChatMessageReactionService
 from src.services.chat_pipeline import ChatMessageProcessingService
 from src.services.live_state_orchestrator import LiveStateChangeOrchestrator

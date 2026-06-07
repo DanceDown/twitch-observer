@@ -6,7 +6,7 @@ import pytest
 
 from src.gateways.twitch_api import TwitchUser
 from src.database.connection import ChannelRecord, ChannelRepository, TrackedChannelStateRecord
-from src.events.event_types import TwitchChannelLiveStateChangedEvent
+from src.events.twitch_events import TwitchChannelLiveStateChangedEvent
 from src.services.twitch_live_monitor_service import TwitchLiveMonitorService
 
 

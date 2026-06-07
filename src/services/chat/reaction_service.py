@@ -6,7 +6,7 @@ from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import Protocol
 
-from src.events.event_types import TwitchChatMessageEvent
+from src.events.twitch_events import TwitchChatMessageEvent
 
 from .matcher import ChatPatternMatch, ChatPatternMatcher
 

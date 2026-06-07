@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 
 from src.database.connection import (
     AdapterEventActionRepository,
-    AdapterEventRepository,
     ChannelRepository,
     PatternRepository,
     ReplyRepository,
@@ -19,9 +18,10 @@ from src.database.connection import (
 from src.localization import Localizer
 from src.services.show import (
     ShowAccountRenderer,
+    ShowAutoRepliesRenderer,
     ShowChannelEventsRenderer,
     ShowChannelsRenderer,
-    ShowPatternsRenderer,
+    ShowPatternSectionRenderer,
     ShowPermissionsRenderer,
     ShowTwitchSubjectResolver,
     ShowUsersRenderer,
@@ -38,7 +38,6 @@ class ShowSectionRenderer:
     reply_repository: ReplyRepository | None
     twitch_api: TwitchDirectoryGateway
     tracked_user_repository: TrackedUserRepository | None = None
-    adapter_event_repository: AdapterEventRepository | None = None
     adapter_event_action_repository: AdapterEventActionRepository | None = None
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     permission_repository: UserPermissionRepository | None = None
@@ -47,7 +46,8 @@ class ShowSectionRenderer:
     _resolver: ShowTwitchSubjectResolver = field(init=False, repr=False)
     _channels: ShowChannelsRenderer = field(init=False, repr=False)
     _channel_events: ShowChannelEventsRenderer = field(init=False, repr=False)
-    _patterns: ShowPatternsRenderer = field(init=False, repr=False)
+    _patterns: ShowPatternSectionRenderer = field(init=False, repr=False)
+    _auto_replies: ShowAutoRepliesRenderer = field(init=False, repr=False)
     _users: ShowUsersRenderer = field(init=False, repr=False)
     _permissions: ShowPermissionsRenderer = field(init=False, repr=False)
     _account: ShowAccountRenderer = field(init=False, repr=False)
@@ -65,10 +65,14 @@ class ShowSectionRenderer:
             resolver=self._resolver,
             localizer=self.localizer,
         )
-        self._patterns = ShowPatternsRenderer(
+        self._patterns = ShowPatternSectionRenderer(
+            pattern_repository=self.pattern_repository,
+            resolver=self._resolver,
+            localizer=self.localizer,
+        )
+        self._auto_replies = ShowAutoRepliesRenderer(
             pattern_repository=self.pattern_repository,
             reply_repository=self.reply_repository,
-            adapter_event_repository=self.adapter_event_repository,
             adapter_event_action_repository=self.adapter_event_action_repository,
             resolver=self._resolver,
             localizer=self.localizer,
@@ -99,10 +103,10 @@ class ShowSectionRenderer:
         return await self._channel_events.render(thread)
 
     async def render_patterns_section(self, thread: ThreadRecord) -> str:
-        return await self._patterns.render_patterns(thread)
+        return await self._patterns.render(thread)
 
     async def render_auto_replies_section(self, thread: ThreadRecord) -> str:
-        return await self._patterns.render_auto_replies(thread)
+        return await self._auto_replies.render(thread)
 
     async def render_users_section(self, thread: ThreadRecord) -> str:
         return await self._users.render(thread)

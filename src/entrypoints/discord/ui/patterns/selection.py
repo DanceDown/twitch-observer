@@ -6,7 +6,7 @@ import discord
 from typing import Any
 
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.utils.discord_embeds import build_result_embed
 

@@ -11,7 +11,7 @@ from src.database.connection import (
     ReplyRecord,
     ThreadRecord,
 )
-from src.events.event_types import TwitchChatMessageEvent
+from src.events.twitch_events import TwitchChatMessageEvent
 from src.utils.pattern_matching import is_sender_sub, matches_pattern_content
 
 

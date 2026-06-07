@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.events.event_types import AddTrackedChannelCommand, RemoveTrackedChannelCommand, SetTrackedChannelColorCommand
+from src.events.commands import AddTrackedChannelCommand, RemoveTrackedChannelCommand, SetTrackedChannelColorCommand
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
 

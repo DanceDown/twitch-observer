@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from src.events.event_types import DiscordCommandResult
+from src.events.discord_results import DiscordCommandResult
 
 
 class AccountNotificationSender(Protocol):

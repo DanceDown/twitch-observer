@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import discord
 
-from src.events.event_types import DiscordResultStyle
+from src.events.discord_results import DiscordResultStyle
 
 from .state import PatternEditorMode
 

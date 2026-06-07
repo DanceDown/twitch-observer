@@ -15,16 +15,15 @@ from src.database.connection import (
     TwitchAccountRepository,
     UserPermissionRepository,
 )
-from src.events.event_types import (
+from src.events.commands import (
     AddChannelEventReplyCommand,
     AddPatternReplyCommand,
-    DiscordCommandResult,
-    DiscordResultStyle,
     RemoveChannelEventReplyCommand,
     RemovePatternReplyCommand,
     SetChannelEventReplyEnabledCommand,
     SetPatternReplyEnabledCommand,
 )
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
 from src.services.twitch_gateways import TwitchChannelStateLookup

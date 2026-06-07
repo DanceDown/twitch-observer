@@ -7,7 +7,7 @@ from typing import Protocol
 
 import discord
 
-from src.events.event_types import DiscordCommandResult
+from src.events.discord_results import DiscordCommandResult
 from src.services.account_support import AccountNotificationSender
 from src.services.channel_event_notification_service import ChannelEventNotificationSender
 from src.services.discord_presence_service import DiscordPresenceStatusSender

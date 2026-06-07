@@ -8,7 +8,7 @@ import pytest
 
 from src.config import AppConfig
 from src.entrypoints.twitch_irc import TwitchIRCEntrypoint, build_chat_message_event, parse_irc_message
-from src.events.event_types import TwitchChatMessageEvent
+from src.events.twitch_events import TwitchChatMessageEvent
 from src.gateways.twitch_irc import AnonymousTwitchIRCGateway
 
 

@@ -7,7 +7,8 @@ import re
 
 from src.database.connection import PatternRecord, ThreadRecord
 from src.discord_results import build_thread_result
-from src.events.event_types import AddPatternCommand, DiscordCommandResult, DiscordResultStyle, EditPatternCommand, SetPatternEnabledCommand
+from src.events.commands import AddPatternCommand, EditPatternCommand, SetPatternEnabledCommand
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 
 from .command_support import PatternCommandSupport
 

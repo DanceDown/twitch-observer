@@ -8,6 +8,7 @@ from src.database.connection import ThreadRecord, TwitchAccountRepository, Twitc
 from src.localization import Localizer
 
 from .support import ShowTwitchSubjectResolver
+from .text import render_rows, render_section
 
 
 @dataclass(slots=True)
@@ -79,18 +80,11 @@ class ShowAccountRenderer:
         if not rows:
             rows.append(self.localizer.text("show.account.empty", language=language))
         return (
-            self.localizer.text(
-                "show.account.section",
+            render_section(
+                self.localizer,
+                "show.account",
                 language=language,
-                sources={
-                    "view": {
-                        "section_body": self.localizer.text(
-                            "show.account.rows",
-                            language=language,
-                            sources={"view": {"items": tuple(rows)}},
-                        )
-                    }
-                },
+                section_body=render_rows(self.localizer, "show.account", language=language, items=tuple(rows)),
             ),
             thumbnail_url,
         )

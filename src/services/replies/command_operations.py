@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from src.discord_results import build_thread_result
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.services.twitch_runtime import (
     CHANNEL_SUBJECT_TYPE,
     STREAM_EVENT_KEY_TO_STATE,

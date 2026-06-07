@@ -6,7 +6,7 @@ import re
 import unicodedata
 
 from src.database.connection import PatternRecord
-from src.events.event_types import TwitchChatMessageEvent
+from src.events.twitch_events import TwitchChatMessageEvent
 
 
 def matches_pattern(pattern: PatternRecord, event: TwitchChatMessageEvent) -> bool:

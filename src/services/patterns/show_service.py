@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 
 from src.database.connection import (
     AdapterEventActionRepository,
-    AdapterEventRepository,
     ChannelRepository,
     PatternRepository,
     ReplyRepository,
@@ -17,11 +16,8 @@ from src.database.connection import (
     UserPermissionRepository,
 )
 from src.discord_results import build_result, build_thread_result
-from src.events.event_types import (
-    DiscordCommandResult,
-    DiscordResultStyle,
-    ShowConfigurationCommand,
-)
+from src.events.commands import ShowConfigurationCommand
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.services.patterns.show_renderer import ShowSectionRenderer
 from src.services.authz import thread_has_permission
@@ -39,7 +35,6 @@ class ShowCommandService:
     reply_repository: ReplyRepository
     twitch_api: TwitchDirectoryGateway
     tracked_user_repository: TrackedUserRepository | None = None
-    adapter_event_repository: AdapterEventRepository | None = None
     adapter_event_action_repository: AdapterEventActionRepository | None = None
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     permission_repository: UserPermissionRepository | None = None
@@ -54,7 +49,6 @@ class ShowCommandService:
             reply_repository=self.reply_repository,
             twitch_api=self.twitch_api,
             tracked_user_repository=self.tracked_user_repository,
-            adapter_event_repository=self.adapter_event_repository,
             adapter_event_action_repository=self.adapter_event_action_repository,
             localizer=self.localizer,
             permission_repository=self.permission_repository,

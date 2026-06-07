@@ -2,16 +2,8 @@
 
 from __future__ import annotations
 
-from src.events.event_types import (
-    AddPatternCommand,
-    ChannelScopeMode,
-    EditPatternCommand,
-    OfflineScope,
-    RemovePatternCommand,
-    SetPatternEnabledCommand,
-    SubscriptionScope,
-    UserScopeMode,
-)
+from src.events.commands import AddPatternCommand, EditPatternCommand, RemovePatternCommand, SetPatternEnabledCommand
+from src.events.pattern_scopes import ChannelScopeMode, OfflineScope, SubscriptionScope, UserScopeMode
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
 

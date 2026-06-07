@@ -8,7 +8,7 @@ import discord
 
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.discord_results import build_result
-from src.events.event_types import DiscordResultStyle
+from src.events.discord_results import DiscordResultStyle
 from src.localization import Localizer
 
 from ..dispatch import dispatch_leave_thread, dispatch_set_thread_color

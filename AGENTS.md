@@ -3,21 +3,22 @@
 ## Project Shape
 
 - Entry point and dependency wiring live in `src/main.py`.
-- Runtime flow is event-driven: adapters publish domain events, services handle business logic, repositories persist state.
-- `src/adapters/discord` contains Discord slash-command, modal, and UI integration.
-- `src/adapters/twitch_irc` contains Twitch chat intake and IRC event parsing.
-- `src/adapters/twitch_api` contains Helix-facing API clients.
+- Runtime flow is direct-call based: entrypoints normalize typed DTOs, services handle business logic, repositories persist state, and background workers trigger explicit orchestrators.
+- `src/entrypoints/discord` contains Discord slash-command, modal, and UI integration.
+- `src/entrypoints/twitch_irc` contains Twitch chat intake and IRC event parsing.
+- `src/gateways` contains Helix-facing API clients and other external integrations.
 - `src/services` contains application logic and orchestration.
 - `src/services/patterns` and `src/services/replies` split the larger runtime services by responsibility.
+- `src/events` is split by topic: `commands.py`, `discord_results.py`, `pattern_scopes.py`, `twitch_events.py`, and `ui_flow.py`.
 - `src/database/records.py` contains record dataclasses, `src/database/repositories.py` contains interfaces, and `src/database/connection.py` contains PostgreSQL implementations.
 - `docs/architecture.md` is the main architecture reference and should stay aligned with actual code flow.
 
 ## Architecture Rules
 
-- Keep business logic in services, not in adapters.
+- Keep business logic in services, not in entrypoints or gateways.
 - Prefer extending existing services and repositories over adding parallel abstractions.
 - Touch as little code as possible for feature work; preserve existing wiring and boundaries.
-- Reuse the event bus and current service composition instead of introducing direct cross-layer calls.
+- Reuse the current direct service composition, pipelines, and orchestrators instead of introducing new cross-layer shortcuts.
 - Keep hot paths cheap, especially chat-message processing and pattern matching.
 
 ## Twitch User Metadata
@@ -27,6 +28,7 @@
 - Avoid live `Get Users` calls in the hot message path unless correctness absolutely requires it.
 - Fresh Helix lookups are acceptable for explicit user-driven commands such as `/channel`, `/user`, and `/write`.
 - Profile image URLs are not available from IRC metadata; they require Helix data and should therefore be refreshed sparingly.
+- Background metadata refresh uses one shared interval (`TWITCH_METADATA_REFRESH_INTERVAL_SECONDS`) and refreshes the persistent cache in batches. There is no per-row refresh timestamp anymore.
 
 ## Live State and Auto-Replies
 
@@ -37,7 +39,7 @@
 - Linked Twitch accounts must only be used for Twitch writes and write-adjacent token validation.
 - Pattern replies and external event actions are separate concepts; avoid forcing external event actions into pattern storage.
 - External event auto-replies never support `reply_as_reply` because they do not originate from a source chat message.
-- Keep live/offline side effects event-driven so future Twitch, Discord, or other adapters can publish into the same flow.
+- Keep live/offline side effects inside the existing `LiveStateChangeOrchestrator` flow so future integrations can plug into the same runtime path without bypassing services.
 
 ## Docs
 
@@ -53,6 +55,8 @@
 - Jedes Discord Embed hat seinen eigenen Eintrag im Lang-File.
 - Variablen dürfen nie geteilt werden, auch keine Listen; sie müssen für jedes Embed neu definiert sein.
 - Variablen müssen zu 100% dynamisch sein. Wenn es nur wenige feste Optionen gibt, müssen diese als weitere Variablen im selben Scope definiert sein.
+- Text-Builder sollen nur View-Daten und optionale Fragmente vorbereiten. Die endgültige Textstruktur muss aus dem Localizer und den Lang-Files kommen, nicht aus inline zusammengesetzter Prosa im Code.
+- Optionale Textteile sollen über Lang-Variablen und Localizer-Interpolation gesteuert werden, nicht über hartcodierte Satzbausteine.
 - Aktionen sind immer getrennt zu behandeln. `added`, `removed` und `updated` haben jeweils eigene Einträge und teilen sich niemals denselben.
 
 ## Communication

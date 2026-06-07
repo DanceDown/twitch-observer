@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 
 from src.errors import DatabasePoolExhaustedError
-from src.events.event_types import TwitchChannelLiveStateChangedEvent
+from src.events.twitch_events import TwitchChannelLiveStateChangedEvent
 from src.gateways.twitch_api import TwitchAPIError
 from src.services.channel_event_notification_service import (
     ChannelEventNotificationService,

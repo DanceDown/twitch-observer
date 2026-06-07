@@ -7,7 +7,8 @@ from dataclasses import dataclass, field
 
 from src.database.connection import AdapterEventActionRepository, AdapterEventRepository, ChannelRepository, ThreadRepository
 from src.discord_results import build_thread_result
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle, TwitchChannelLiveStateChangedEvent
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
+from src.events.twitch_events import TwitchChannelLiveStateChangedEvent
 from src.localization import Localizer
 from src.services.twitch_runtime import safe_get_twitch_user_by_id
 from src.services.twitch_runtime import (

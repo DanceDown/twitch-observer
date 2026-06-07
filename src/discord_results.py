@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Mapping
 
 from src.database.records import ThreadRecord
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import LocalizationError, Localizer
 
 

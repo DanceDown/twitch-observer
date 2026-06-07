@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import discord
 
-from src.events.event_types import UIFlowKind, UIFlowStep
+from src.events.ui_flow import UIFlowKind, UIFlowStep
 from src.localization import Localizer
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 

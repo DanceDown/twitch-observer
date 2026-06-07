@@ -7,7 +7,8 @@ from dataclasses import dataclass, field
 
 from src.database.connection import ThreadRepository, TrackedUserRepository, UserPermissionRepository
 from src.discord_results import build_thread_result
-from src.events.event_types import AddTrackedUserCommand, DiscordCommandResult, DiscordResultStyle, RemoveTrackedUserCommand
+from src.events.commands import AddTrackedUserCommand, RemoveTrackedUserCommand
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
 from src.services.twitch_gateways import TwitchUserLookup

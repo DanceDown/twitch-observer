@@ -17,7 +17,7 @@ from src.gateways.twitch_api import (
 from src.database.connection import ThreadRecord, ThreadRepository, TwitchAccountRecord, TwitchAccountRepository, UserPermissionRepository
 from src.discord_results import build_result, build_thread_result
 from src.errors import DatabasePoolExhaustedError
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.services.authz import thread_has_permission
 from src.utils.permissions import ObserverPermission

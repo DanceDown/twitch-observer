@@ -57,8 +57,6 @@ async def build_core(config: AppConfig) -> ApplicationCore:
         twitch_api=raw_twitch_api,
         repository=twitch_user_cache_repository,
         memory_cache_size=config.twitch_user_cache_memory_size,
-        api_refresh_interval_seconds=config.twitch_user_cache_api_refresh_seconds,
-        channel_api_refresh_interval_seconds=config.twitch_channel_cache_api_refresh_seconds,
     )
     twitch_bundle = TwitchServiceBundle(
         directory=twitch_directory,

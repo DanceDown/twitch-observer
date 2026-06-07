@@ -12,11 +12,9 @@ from src.database.connection import (
     ChannelRepository,
     MessageRepository,
     PatternRepository,
-    ReplyRepository,
     ThreadRepository,
-    TrackedUserRepository,
 )
-from src.events.event_types import TwitchChatMessageEvent
+from src.events.twitch_events import TwitchChatMessageEvent
 from src.localization import Localizer
 from src.services.chat import ChatPatternMatcher
 from src.services.twitch_gateways import TwitchUserLookup
@@ -53,12 +51,9 @@ class PatternTrackingService:
     twitch_api: TwitchUserLookup
     notifier: TrackingNotificationSender
     localizer: Localizer = field(default_factory=Localizer.from_directory)
-    tracked_user_repository: TrackedUserRepository | None = None
-    reply_repository: ReplyRepository | None = None
     matcher: ChatPatternMatcher | None = None
 
     def __post_init__(self) -> None:
-        self._wire_runtime_pattern_repository()
         if self.matcher is None:
             self.matcher = ChatPatternMatcher(pattern_repository=self.pattern_repository)
 
@@ -130,13 +125,3 @@ class PatternTrackingService:
             ),
             channel_login=None if channel_user is None else channel_user.login,
         )
-
-    def _wire_runtime_pattern_repository(self) -> None:
-        for attribute, value in (
-            ("thread_repository", self.thread_repository),
-            ("channel_repository", self.channel_repository),
-            ("tracked_user_repository", self.tracked_user_repository),
-            ("reply_repository", self.reply_repository),
-        ):
-            if hasattr(self.pattern_repository, attribute):
-                setattr(self.pattern_repository, attribute, value)

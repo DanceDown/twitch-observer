@@ -1339,7 +1339,7 @@
         "false": "missing"
       }
     },
-    "show_permissions": {
+    "permissions": {
       "body": {
         "template": "The permissions for the specific users are:\n{RAW:view.user_list}\nThese were all permissions!",
         "placeholders": {

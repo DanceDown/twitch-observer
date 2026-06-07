@@ -61,9 +61,7 @@ def build_runtime(
     )
     metadata_refresh_service = TwitchMetadataRefreshService(
         directory=core.twitch_directory,
-        refresh_interval_seconds=float(
-            max(1, min(core.config.twitch_user_cache_api_refresh_seconds, core.config.twitch_channel_cache_api_refresh_seconds))
-        ),
+        refresh_interval_seconds=float(max(1, core.config.twitch_metadata_refresh_interval_seconds)),
         request_spacing_seconds=max(0.0, core.config.twitch_metadata_refresh_request_spacing_seconds),
         batch_size=max(1, core.config.twitch_metadata_refresh_batch_size),
     )

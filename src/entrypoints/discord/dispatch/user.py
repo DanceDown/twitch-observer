@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.events.event_types import AddTrackedUserCommand, RemoveTrackedUserCommand
+from src.events.commands import AddTrackedUserCommand, RemoveTrackedUserCommand
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
 

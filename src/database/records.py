@@ -61,7 +61,6 @@ class TwitchUserCacheRecord:
     display_name: str
     profile_image_url: str | None
     updated_at: str
-    last_api_refresh_at: str | None
 
 
 @dataclass(slots=True, frozen=True)

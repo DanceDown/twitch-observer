@@ -63,10 +63,13 @@ Important fields:
 - `twitch_login`
 - `display_name`
 - `profile_image_url`
-- `last_api_refresh_at`
 
 This cache is warmed from IRC metadata when possible and refreshed from Helix
 only when needed.
+
+The background refresh worker also revalidates the full persistent cache in
+batches on one shared interval. `updated_at` tracks when stored metadata last
+changed; the schema no longer stores a separate "last refresh" timestamp.
 
 ## Tracking scope
 

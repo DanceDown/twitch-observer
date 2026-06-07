@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import discord
 
-from src.events.event_types import ChannelScopeMode, OfflineScope, SubscriptionScope, UserScopeMode
+from src.events.pattern_scopes import ChannelScopeMode, OfflineScope, SubscriptionScope, UserScopeMode
 
 from ..helpers import normalize_optional_text, split_csv_values
 from ..ui.patterns.state import PatternFormState

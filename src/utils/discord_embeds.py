@@ -5,7 +5,8 @@ from __future__ import annotations
 import discord
 
 from src.database.connection import ChannelRecord, PatternRecord, ReplyRecord, ThreadRecord
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle, TwitchChatMessageEvent
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
+from src.events.twitch_events import TwitchChatMessageEvent
 from src.localization import Localizer
 from src.utils.discord_text import escape_discord_preserving_links
 

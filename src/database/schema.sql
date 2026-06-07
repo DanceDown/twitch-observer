@@ -37,8 +37,7 @@ CREATE TABLE twitch_user_cache (
     twitch_login         TEXT        NOT NULL,
     display_name         TEXT        NOT NULL,
     profile_image_url    TEXT,
-    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    last_api_refresh_at  TIMESTAMPTZ
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE UNIQUE INDEX idx_twitch_user_cache_login

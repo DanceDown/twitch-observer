@@ -7,7 +7,8 @@ from contextlib import suppress
 import discord
 
 from src.discord_results import build_result
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle, UIFlowKind, UIFlowStep
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
+from src.events.ui_flow import UIFlowKind, UIFlowStep
 from src.localization import Localizer
 from src.utils.discord_embeds import build_result_embed
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle

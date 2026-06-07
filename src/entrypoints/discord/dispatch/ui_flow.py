@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.events.event_types import DiscordUIFlowDecision, RequestUIFlowCommand, UIFlowKind, UIFlowStep
+from src.events.ui_flow import DiscordUIFlowDecision, RequestUIFlowCommand, UIFlowKind, UIFlowStep
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
 

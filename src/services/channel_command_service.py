@@ -8,13 +8,8 @@ from dataclasses import dataclass, field
 from src.database.connection import ChannelRepository, PatternRepository, ThreadRepository, UserPermissionRepository
 from src.discord_results import build_thread_result
 from src.errors import ApplicationInvariantError
-from src.events.event_types import (
-    AddTrackedChannelCommand,
-    DiscordCommandResult,
-    DiscordResultStyle,
-    RemoveTrackedChannelCommand,
-    SetTrackedChannelColorCommand,
-)
+from src.events.commands import AddTrackedChannelCommand, RemoveTrackedChannelCommand, SetTrackedChannelColorCommand
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.normalization import normalize_optional_color
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards

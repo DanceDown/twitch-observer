@@ -13,14 +13,13 @@ from src.database.connection import (
     PatternRecord,
     PatternRepository,
     ReplyRecord,
-    ReplyRepository,
     ThreadRecord,
     ThreadRepository,
-    TrackedUserRepository,
     TwitchAccountRepository,
 )
 from src.discord_results import build_result
-from src.events.event_types import DiscordResultStyle, TwitchChatMessageEvent
+from src.events.discord_results import DiscordResultStyle
+from src.events.twitch_events import TwitchChatMessageEvent
 from src.gateways.twitch_api import TwitchAPIError, TwitchAuthenticationError
 from src.localization import Localizer
 from src.services.account_support import AccountNotificationSender
@@ -48,7 +47,6 @@ class AutoReplyService:
     thread_repository: ThreadRepository
     channel_repository: ChannelRepository
     pattern_repository: PatternRepository
-    reply_repository: ReplyRepository
     message_repository: MessageRepository
     account_repository: TwitchAccountRepository
     twitch_api: TwitchReplyGateway
@@ -56,13 +54,11 @@ class AutoReplyService:
     tracking_notifier: TrackingNotificationSender
     account_notifier: AccountNotificationSender
     localizer: Localizer = field(default_factory=Localizer.from_directory)
-    tracked_user_repository: TrackedUserRepository | None = None
     matcher: ChatPatternMatcher | None = None
     handled_messages: int = field(default=0, init=False)
     sent_replies: int = field(default=0, init=False)
 
     def __post_init__(self) -> None:
-        self._wire_runtime_pattern_repository()
         if self.matcher is None:
             self.matcher = ChatPatternMatcher(pattern_repository=self.pattern_repository)
 
@@ -302,13 +298,3 @@ class AutoReplyService:
                 ephemeral=False,
             ),
         )
-
-    def _wire_runtime_pattern_repository(self) -> None:
-        for attribute, value in (
-            ("thread_repository", self.thread_repository),
-            ("channel_repository", self.channel_repository),
-            ("tracked_user_repository", self.tracked_user_repository),
-            ("reply_repository", self.reply_repository),
-        ):
-            if hasattr(self.pattern_repository, attribute):
-                setattr(self.pattern_repository, attribute, value)

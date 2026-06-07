@@ -5,7 +5,7 @@ from __future__ import annotations
 import discord
 
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
-from src.events.event_types import StreamEventKind
+from src.events.twitch_events import StreamEventKind
 from src.localization import Localizer
 from ..helpers import normalize_optional_text
 from ..dispatch import (

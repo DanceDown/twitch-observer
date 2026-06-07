@@ -9,15 +9,14 @@ from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import ChannelRepository, ThreadRepository, UserPermissionRepository
 from src.discord_results import build_result, build_thread_result
 from src.errors import ApplicationInvariantError
-from src.events.event_types import (
-    DiscordCommandResult,
-    DiscordResultStyle,
+from src.events.commands import (
     JoinThreadCommand,
     LeaveThreadCommand,
     SetThreadColorCommand,
     SetThreadEnabledCommand,
     SetThreadLanguageCommand,
 )
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.normalization import normalize_language, normalize_optional_color
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards

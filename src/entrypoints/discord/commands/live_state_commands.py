@@ -5,7 +5,9 @@ from __future__ import annotations
 import discord
 
 from src.discord_results import build_result
-from src.events.event_types import DiscordResultStyle, StreamEventKind, UIFlowKind, UIFlowStep
+from src.events.discord_results import DiscordResultStyle
+from src.events.twitch_events import StreamEventKind
+from src.events.ui_flow import UIFlowKind, UIFlowStep
 from src.localization import Localizer
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.services.twitch_runtime import DISCORD_NOTIFY_ACTION

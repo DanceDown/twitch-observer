@@ -5,7 +5,7 @@ from __future__ import annotations
 import discord
 
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 
 from ...dispatch import dispatch_disable_pattern, dispatch_enable_pattern, dispatch_remove_pattern

@@ -8,7 +8,7 @@ from src.tests.dispatch_helpers import dispatch_channel_command, dispatch_thread
 from src.gateways.twitch_api import TwitchAPIConfigurationError, TwitchUser
 from src.database.connection import ChannelRecord, ChannelRepository, PatternRepository, ThreadRecord, ThreadRepository
 from types import SimpleNamespace
-from src.events.event_types import DiscordResultStyle
+from src.events.discord_results import DiscordResultStyle
 from src.services.channel_command_service import ChannelCommandService
 from src.services.thread_lifecycle_service import ThreadLifecycleService
 from src.services.runtime_coordinator import TrackedChannelsChangedNotifier

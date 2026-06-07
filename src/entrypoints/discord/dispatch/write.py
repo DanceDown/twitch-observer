@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.events.event_types import SendTwitchMessageCommand
+from src.events.commands import SendTwitchMessageCommand
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
 

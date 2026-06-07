@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.services.discord_ui_query_service import (
+from src.services.discord_ui_queries import (
     AdapterEventActionPresentation,
     AdapterEventPresentation,
     DiscordUIQueryBundle,

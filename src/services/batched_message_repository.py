@@ -13,7 +13,7 @@ import psycopg
 
 from src.database.connection import MessageRepository, RecentMessageRecord
 from src.errors import DatabasePoolExhaustedError
-from src.events.event_types import TwitchChatMessageEvent
+from src.events.twitch_events import TwitchChatMessageEvent
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ import discord
 
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.discord_results import build_result
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.utils.discord_embeds import build_result_embed
 
@@ -291,7 +291,7 @@ def _show_section_item_prefix(*, localizer: Localizer, language: str, section: s
         "pings": "show.pattern.pagination.item_prefix",
         "auto_replies": "show.auto_replies.pagination.item_prefix",
         "users": "show.tracked_users.pagination.item_prefix",
-        "permissions": "show.show_permissions.pagination.item_prefix",
+        "permissions": "show.permissions.pagination.item_prefix",
         "account": "show.account.pagination.item_prefix",
     }
     return localizer.text(key_by_section.get(section, "show.channel.pagination.item_prefix"), language=language)

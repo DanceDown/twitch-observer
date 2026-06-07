@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import pytest
 
 from src.database.records import ChatPatternCandidateRecord, ChannelRecord, PatternRecord, ReplyRecord, ThreadRecord
-from src.events.event_types import TwitchChatMessageEvent
+from src.events.twitch_events import TwitchChatMessageEvent
 from src.services.chat import ChatMessageReactionService, ChatPatternMatch, ChatPatternMatcher
 
 

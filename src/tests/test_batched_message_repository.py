@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from src.database.connection import MessageRepository, RecentMessageRecord
-from src.events.event_types import TwitchChatMessageEvent
+from src.events.twitch_events import TwitchChatMessageEvent
 from src.services.batched_message_repository import BatchedMessageRepository
 
 

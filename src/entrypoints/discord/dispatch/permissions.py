@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.events.event_types import ClearPermissionsCommand, GrantPermissionsCommand, RevokePermissionsCommand
+from src.events.commands import ClearPermissionsCommand, GrantPermissionsCommand, RevokePermissionsCommand
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
 

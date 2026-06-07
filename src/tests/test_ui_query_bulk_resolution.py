@@ -8,7 +8,7 @@ from src.database.connection import ChannelRepository, PatternRepository, Thread
 from src.database.records import ChannelRecord, PatternRecord, ThreadRecord, TrackedUserRecord
 from src.gateways.twitch_api import TwitchUser
 from src.localization import Localizer
-from src.services.discord_ui_query_service import PatternQueryService, TrackedChannelQueryService, TrackedUserQueryService
+from src.services.discord_ui_queries import PatternQueryService, TrackedChannelQueryService, TrackedUserQueryService
 from src.services.patterns.show_renderer import ShowSectionRenderer
 
 

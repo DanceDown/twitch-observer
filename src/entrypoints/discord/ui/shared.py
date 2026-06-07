@@ -9,7 +9,8 @@ import discord
 
 from src.entrypoints.discord.helpers import build_public_result_embed
 from src.discord_results import build_result
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle, UIFlowKind, UIFlowStep
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
+from src.events.ui_flow import UIFlowKind, UIFlowStep
 from src.localization import DEFAULT_LANGUAGE, Localizer
 from src.utils.discord_embeds import build_result_embed
 

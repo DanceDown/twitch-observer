@@ -5,7 +5,7 @@ This guide explains how to test the full Twitch Observer feature set from two an
 1. code-level tests (what is covered, how to run),
 2. manual user-facing validation (how to see each feature and each message family in Discord/Twitch).
 
-It is written against the codebase structure (`src/bootstrap/application.py`, `src/services/*`, `src/entrypoints/discord/*`) and the localized message catalog (`lang/*.json`).
+It is written against the codebase structure (`src/bootstrap/*`, `src/services/*`, `src/entrypoints/discord/*`) and the localized message catalog (`lang/*.json`).
 
 ## 1) Test Environment Setup
 
@@ -46,7 +46,7 @@ docker compose run --rm app pytest src/tests -q
 
 Baseline from a full local suite run:
 
-- `98 passed`
+- `170 passed`
 
 ## 2.2 Targeted runs by feature area
 
@@ -71,8 +71,6 @@ docker compose run --rm app ruff format src --check
 
 ## 2.4 Coverage map (feature -> tests)
 
-- Event bus behavior:
-  - `src/tests/test_event_bus.py`
 - Discord lifecycle (`/join`, `/leave`, `/on`, `/off`, `/color`, `/language`):
   - `src/tests/test_channel_command_service.py`
 - Tracked channel management:

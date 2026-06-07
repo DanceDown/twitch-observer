@@ -9,8 +9,8 @@ import pytest
 
 from src.database.connection import MessageRepository, RecentMessageRecord, ThreadRecord
 from src.database.postgres import PostgresMessageRepository
-from src.events.event_types import TwitchChatMessageEvent
-from src.services.discord_ui_query_service import WriteQueryService
+from src.events.twitch_events import TwitchChatMessageEvent
+from src.services.discord_ui_queries import WriteQueryService
 from src.services.discord_presence_service import DiscordPresenceService, DiscordPresenceStatusSender
 from src.services.message_ingest_service import MessageIngestService
 

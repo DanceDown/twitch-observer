@@ -7,7 +7,7 @@ import discord
 import pytest
 
 from src.entrypoints.discord.commands.show_commands import register_show_commands
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 
 

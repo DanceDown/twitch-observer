@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.events.event_types import (
+from src.events.commands import (
     JoinThreadCommand,
     LeaveThreadCommand,
     SetThreadColorCommand,

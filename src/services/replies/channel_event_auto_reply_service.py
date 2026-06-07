@@ -15,9 +15,7 @@ from src.database.connection import (
     TwitchAccountRepository,
 )
 from src.localization import Localizer
-from src.events.event_types import (
-    TwitchChannelLiveStateChangedEvent,
-)
+from src.events.twitch_events import TwitchChannelLiveStateChangedEvent
 from src.services.patterns import TrackingNotificationSender
 from src.services.twitch_gateways import TwitchReplyGateway
 from src.services.twitch_runtime import (

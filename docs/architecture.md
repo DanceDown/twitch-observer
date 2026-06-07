@@ -24,6 +24,7 @@ This is the main runtime reference for the Twitch Observer.
   - persist configuration, cache, and runtime state in PostgreSQL
 - Localization
   - loads `lang/*.json` once at startup and resolves per-thread language keys
+  - code should pass view data into the localizer; final text shape belongs in the lang files
 
 ## Main inputs
 
@@ -142,6 +143,11 @@ IRC metadata updates login and display-name information without a Helix call.
 Parallel cache misses for the same user are deduplicated in-process so only one
 Helix lookup runs per key at a time. Profile images still require Helix.
 
+The persistent cache is also refreshed by `TwitchMetadataRefreshService` in
+full batched passes on one shared interval
+(`TWITCH_METADATA_REFRESH_INTERVAL_SECONDS`). The schema no longer stores a
+separate per-row "last refresh" timestamp.
+
 ### Live state
 
 `channel.is_live` is the single persisted live/offline source of truth for:
@@ -184,10 +190,18 @@ PostgreSQL drivers.
   - entrypoint and runtime worker assembly
 - `src/bootstrap/models.py`
   - shared bootstrap dataclasses
-- `src/bootstrap/application.py`
-  - compatibility wrapper exporting the split bootstrap API
 - `src/main.py`
   - thin process entrypoint
+- `src/events/commands.py`
+  - typed command payloads for Discord-triggered service calls
+- `src/events/discord_results.py`
+  - typed Discord result models
+- `src/events/pattern_scopes.py`
+  - shared typed scope enums for patterns and filters
+- `src/events/twitch_events.py`
+  - normalized Twitch chat and live-state runtime payloads
+- `src/events/ui_flow.py`
+  - typed UI flow requests and decisions
 - `src/entrypoints/`
   - runtime entrypoint exports for Discord and Twitch IRC
 - `src/gateways/`
@@ -210,6 +224,8 @@ PostgreSQL drivers.
   - grouped late-bound runtime relays
 - `src/services/patterns/`
   - split pattern command, show, and tracking services
+- `src/services/show/`
+  - focused `/show` section renderers plus tiny Localizer-first text helpers
 - `src/services/replies/`
   - split reply command, pattern auto-reply, and channel-event auto-reply services
 - `src/services/account_service.py`

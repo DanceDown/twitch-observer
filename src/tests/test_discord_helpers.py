@@ -4,7 +4,8 @@ from datetime import UTC, datetime
 
 from src.database.records import ChannelRecord, PatternRecord, ThreadRecord
 from src.entrypoints.discord.helpers import build_public_result_embed
-from src.events.event_types import DiscordCommandResult, DiscordResultStyle, TwitchChatMessageEvent
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
+from src.events.twitch_events import TwitchChatMessageEvent
 from src.localization import Localizer
 from src.utils.discord_embeds import build_channel_event_auto_reply_embed, build_tracking_embed
 

@@ -24,7 +24,8 @@ from src.database.connection import (
     TrackedUserRepository,
 )
 from types import SimpleNamespace
-from src.events.event_types import DiscordResultStyle, TwitchChatMessageEvent
+from src.events.discord_results import DiscordResultStyle
+from src.events.twitch_events import TwitchChatMessageEvent
 from src.localization import Localizer
 from src.services.patterns import (
     PatternCommandService,
@@ -1743,7 +1744,6 @@ async def test_tracking_service_skips_normal_embed_when_pattern_has_enabled_repl
         message_repository=InMemoryMessageRepository(),
         twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
         notifier=notifier,
-        reply_repository=reply_repository,
     )
 
     await service.handle_chat_message(
@@ -1957,7 +1957,6 @@ async def test_tracking_service_respects_all_tracked_except_selected_user_scope(
     service = PatternTrackingService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
-        tracked_user_repository=tracked_user_repository,
         pattern_repository=pattern_repository,
         message_repository=InMemoryMessageRepository(),
         twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]

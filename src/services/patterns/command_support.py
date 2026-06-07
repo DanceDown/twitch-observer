@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from src.database.connection import ChannelRepository, PatternRepository, ThreadRecord, TrackedUserRepository
-from src.events.event_types import ChannelScopeMode, OfflineScope, SubscriptionScope, UserScopeMode
+from src.events.pattern_scopes import ChannelScopeMode, OfflineScope, SubscriptionScope, UserScopeMode
 from src.localization import Localizer
 from src.services.patterns.display_index import PatternDisplayIndexResolver
 from src.services.patterns.filters import PatternFilterResolver

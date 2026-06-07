@@ -421,7 +421,7 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
-                SELECT twitch_user_id, twitch_login, display_name, profile_image_url, updated_at, last_api_refresh_at
+                SELECT twitch_user_id, twitch_login, display_name, profile_image_url, updated_at
                 FROM twitch_user_cache
                 WHERE twitch_user_id = %s
                 """,
@@ -439,7 +439,7 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
-                SELECT twitch_user_id, twitch_login, display_name, profile_image_url, updated_at, last_api_refresh_at
+                SELECT twitch_user_id, twitch_login, display_name, profile_image_url, updated_at
                 FROM twitch_user_cache
                 WHERE twitch_login = %s
                 """,
@@ -474,10 +474,9 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
                     twitch_login,
                     display_name,
                     profile_image_url,
-                    updated_at,
-                    last_api_refresh_at
+                    updated_at
                 )
-                VALUES (%s, %s, %s, %s, NOW(), NOW())
+                VALUES (%s, %s, %s, %s, NOW())
                 ON CONFLICT (twitch_user_id)
                 DO UPDATE SET
                     twitch_login = EXCLUDED.twitch_login,
@@ -489,9 +488,8 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
                           OR twitch_user_cache.profile_image_url IS DISTINCT FROM EXCLUDED.profile_image_url
                         THEN NOW()
                         ELSE twitch_user_cache.updated_at
-                    END,
-                    last_api_refresh_at = NOW()
-                RETURNING twitch_user_id, twitch_login, display_name, profile_image_url, updated_at, last_api_refresh_at
+                    END
+                RETURNING twitch_user_id, twitch_login, display_name, profile_image_url, updated_at
                 """,
                 (
                     twitch_user_id,
@@ -528,10 +526,9 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
                     twitch_login,
                     display_name,
                     profile_image_url,
-                    updated_at,
-                    last_api_refresh_at
+                    updated_at
                 )
-                VALUES (%s, %s, %s, NULL, NOW(), NULL)
+                VALUES (%s, %s, %s, NULL, NOW())
                 ON CONFLICT (twitch_user_id)
                 DO UPDATE SET
                     twitch_login = EXCLUDED.twitch_login,
@@ -542,7 +539,7 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
                         THEN NOW()
                         ELSE twitch_user_cache.updated_at
                     END
-                RETURNING twitch_user_id, twitch_login, display_name, profile_image_url, updated_at, last_api_refresh_at
+                RETURNING twitch_user_id, twitch_login, display_name, profile_image_url, updated_at
                 """,
                 (
                     twitch_user_id,
@@ -561,7 +558,7 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
-                SELECT twitch_user_id, twitch_login, display_name, profile_image_url, updated_at, last_api_refresh_at
+                SELECT twitch_user_id, twitch_login, display_name, profile_image_url, updated_at
                 FROM twitch_user_cache
                 ORDER BY twitch_user_id
                 """
@@ -597,10 +594,9 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
                         twitch_login,
                         display_name,
                         profile_image_url,
-                        updated_at,
-                        last_api_refresh_at
+                        updated_at
                     )
-                    VALUES (%s, %s, %s, %s, NOW(), NOW())
+                    VALUES (%s, %s, %s, %s, NOW())
                     ON CONFLICT (twitch_user_id)
                     DO UPDATE SET
                         twitch_login = EXCLUDED.twitch_login,
@@ -612,8 +608,7 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
                               OR twitch_user_cache.profile_image_url IS DISTINCT FROM EXCLUDED.profile_image_url
                             THEN NOW()
                             ELSE twitch_user_cache.updated_at
-                        END,
-                        last_api_refresh_at = NOW()
+                        END
                     """,
                     normalized_records,
                 )
@@ -626,5 +621,4 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
             display_name=row[2],
             profile_image_url=row[3],
             updated_at=row[4].isoformat(),
-            last_api_refresh_at=row[5].isoformat() if row[5] is not None else None,
         )

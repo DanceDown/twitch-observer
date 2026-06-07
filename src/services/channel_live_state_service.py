@@ -14,13 +14,8 @@ from src.database.connection import (
     UserPermissionRepository,
 )
 from src.discord_results import build_thread_result
-from src.events.event_types import (
-    AddChannelEventCommand,
-    DiscordCommandResult,
-    DiscordResultStyle,
-    RemoveChannelEventCommand,
-    SetChannelEventColorCommand,
-)
+from src.events.commands import AddChannelEventCommand, RemoveChannelEventCommand, SetChannelEventColorCommand
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.normalization import normalize_optional_color
 from src.services.channel_event_display_index import ChannelEventDisplayIndexResolver
