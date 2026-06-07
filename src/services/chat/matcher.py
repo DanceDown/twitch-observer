@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from src.database.connection import (
     ChannelRecord,
@@ -13,7 +13,7 @@ from src.database.connection import (
     ThreadRecord,
 )
 from src.events.twitch_events import TwitchChatMessageEvent
-from src.utils.pattern_matching import is_sender_sub, matches_pattern_content
+from src.utils.pattern_matching import PatternCompileCache, is_sender_sub, matches_pattern_content
 
 
 @dataclass(slots=True, frozen=True)
@@ -32,6 +32,12 @@ class ChatPatternMatcher:
     """Resolve the first matching pattern per interested thread for one chat message."""
 
     pattern_repository: PatternRepository
+    compile_cache_size: int = 512
+    compile_cache: PatternCompileCache | None = field(default=None, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.compile_cache is None:
+            self.compile_cache = PatternCompileCache(max_entries=self.compile_cache_size)
 
     async def find_matches(self, event: TwitchChatMessageEvent) -> tuple[ChatPatternMatch, ...]:
         if not event.broadcaster_id or not event.author_id:
@@ -47,7 +53,7 @@ class ChatPatternMatcher:
         for seed in seeds:
             if seed.thread_id in matched_thread_ids:
                 continue
-            if not matches_pattern_content(seed, event):
+            if not matches_pattern_content(seed, event, compile_cache=self.compile_cache):
                 continue
             matched_seeds.append(seed)
             matched_thread_ids.add(seed.thread_id)

@@ -54,6 +54,9 @@ class AppConfig:
         default_factory=lambda: _get_float("TWITCH_IRC_CONNECTION_CHECK_INTERVAL_SECONDS", "10")
     )
     twitch_user_cache_memory_size: int = field(default_factory=lambda: _get_int("TWITCH_USER_CACHE_MEMORY_SIZE", "2048"))
+    twitch_pattern_compile_cache_size: int = field(
+        default_factory=lambda: _get_int("TWITCH_PATTERN_COMPILE_CACHE_SIZE", "512")
+    )
     twitch_metadata_refresh_interval_seconds: int = field(
         default_factory=lambda: _get_int("TWITCH_METADATA_REFRESH_INTERVAL_SECONDS", "43200")
     )

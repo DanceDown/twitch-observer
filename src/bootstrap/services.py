@@ -60,7 +60,10 @@ def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> Appl
     ui_queries = _build_ui_queries(core)
     runtime_coordinator = ApplicationRuntimeCoordinator()
     discord_bundle = _build_discord_bundle(core, gateways, runtime_coordinator)
-    shared_chat_matcher = ChatPatternMatcher(pattern_repository=core.pattern_repository)
+    shared_chat_matcher = ChatPatternMatcher(
+        pattern_repository=core.pattern_repository,
+        compile_cache_size=core.config.twitch_pattern_compile_cache_size,
+    )
     chat_processing = _build_chat_processing_services(
         core,
         runtime_coordinator=runtime_coordinator,

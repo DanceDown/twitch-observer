@@ -9,6 +9,18 @@ def test_app_config_uses_default_metadata_refresh_interval(monkeypatch) -> None:
     assert config.twitch_metadata_refresh_interval_seconds == 43200
 
 
+def test_app_config_uses_default_pattern_compile_cache_size(monkeypatch) -> None:
+    monkeypatch.delenv("TWITCH_PATTERN_COMPILE_CACHE_SIZE", raising=False)
+    config = AppConfig()
+    assert config.twitch_pattern_compile_cache_size == 512
+
+
+def test_app_config_reads_pattern_compile_cache_size(monkeypatch) -> None:
+    monkeypatch.setenv("TWITCH_PATTERN_COMPILE_CACHE_SIZE", "1024")
+    config = AppConfig()
+    assert config.twitch_pattern_compile_cache_size == 1024
+
+
 def test_app_config_uses_default_metadata_refresh_request_spacing(monkeypatch) -> None:
     monkeypatch.delenv("TWITCH_METADATA_REFRESH_REQUEST_SPACING_SECONDS", raising=False)
     config = AppConfig()
