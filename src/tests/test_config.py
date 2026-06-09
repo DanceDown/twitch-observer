@@ -9,6 +9,18 @@ def test_app_config_uses_default_metadata_refresh_interval(monkeypatch) -> None:
     assert config.twitch_metadata_refresh_interval_seconds == 43200
 
 
+def test_app_config_uses_default_presence_watchdog_interval(monkeypatch) -> None:
+    monkeypatch.delenv("DISCORD_PRESENCE_WATCHDOG_INTERVAL_SECONDS", raising=False)
+    config = AppConfig()
+    assert config.discord_presence_watchdog_interval_seconds == 60
+
+
+def test_app_config_uses_default_presence_stale_after(monkeypatch) -> None:
+    monkeypatch.delenv("DISCORD_PRESENCE_STALE_AFTER_SECONDS", raising=False)
+    config = AppConfig()
+    assert config.discord_presence_stale_after_seconds == 180
+
+
 def test_app_config_uses_default_pattern_compile_cache_size(monkeypatch) -> None:
     monkeypatch.delenv("TWITCH_PATTERN_COMPILE_CACHE_SIZE", raising=False)
     config = AppConfig()

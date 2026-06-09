@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from random import seed
 from contextlib import asynccontextmanager
+import logging
 
 import pytest
 
@@ -170,6 +172,149 @@ async def test_presence_service_keeps_current_status_when_no_recent_message_exis
     await service.poll_once()
 
     assert notifier.statuses == ["old status"]
+
+
+@pytest.mark.asyncio
+async def test_presence_service_avoids_immediately_reusing_last_status_when_alternatives_exist() -> None:
+    repository = InMemoryMessageRepository()
+    notifier = FakePresenceNotifier()
+    service = DiscordPresenceService(
+        message_repository=repository,
+        notifier=notifier,
+        poll_interval_seconds=60,
+        lookback_minutes=5,
+        message_limit=50,
+        max_status_length=120,
+    )
+
+    await repository.save_twitch_message(
+        TwitchChatMessageEvent(
+            channel_login="channel",
+            author_login="alice",
+            author_display_name="Alice",
+            content="First message",
+            message_id="presence-a",
+        )
+    )
+    await repository.save_twitch_message(
+        TwitchChatMessageEvent(
+            channel_login="channel",
+            author_login="bob",
+            author_display_name="Bob",
+            content="Second message",
+            message_id="presence-b",
+        )
+    )
+
+    service._last_status_text = '"First message" ~Alice'
+    seed(1)
+    await service.poll_once()
+
+    assert notifier.statuses
+    assert notifier.statuses[-1] == '"Second message" ~Bob'
+
+
+@pytest.mark.asyncio
+async def test_presence_service_reuses_only_status_when_no_alternative_exists() -> None:
+    repository = InMemoryMessageRepository()
+    notifier = FakePresenceNotifier()
+    service = DiscordPresenceService(
+        message_repository=repository,
+        notifier=notifier,
+        poll_interval_seconds=60,
+        lookback_minutes=5,
+        message_limit=50,
+        max_status_length=120,
+    )
+
+    await repository.save_twitch_message(
+        TwitchChatMessageEvent(
+            channel_login="channel",
+            author_login="alice",
+            author_display_name="Alice",
+            content="Only message",
+            message_id="presence-single",
+        )
+    )
+
+    service._last_status_text = '"Only message" ~Alice'
+    await service.poll_once()
+
+    assert notifier.statuses
+    assert notifier.statuses[-1] == '"Only message" ~Alice'
+
+
+@pytest.mark.asyncio
+async def test_presence_watchdog_restarts_missing_worker() -> None:
+    repository = InMemoryMessageRepository()
+    notifier = FakePresenceNotifier()
+    service = DiscordPresenceService(
+        message_repository=repository,
+        notifier=notifier,
+        poll_interval_seconds=60,
+        watchdog_interval_seconds=60,
+        stale_after_seconds=180,
+        lookback_minutes=5,
+        message_limit=50,
+        max_status_length=120,
+    )
+
+    await service._watchdog_once()
+
+    assert service._task is not None
+    assert service._task.done() is False
+
+    await service.stop()
+
+
+@pytest.mark.asyncio
+async def test_presence_watchdog_restarts_done_worker() -> None:
+    repository = InMemoryMessageRepository()
+    notifier = FakePresenceNotifier()
+    service = DiscordPresenceService(
+        message_repository=repository,
+        notifier=notifier,
+        poll_interval_seconds=60,
+        watchdog_interval_seconds=60,
+        stale_after_seconds=180,
+        lookback_minutes=5,
+        message_limit=50,
+        max_status_length=120,
+    )
+    old_task = asyncio.create_task(asyncio.sleep(0), name="done-presence-worker")
+    await old_task
+    service._task = old_task
+
+    await service._watchdog_once()
+
+    assert service._task is not None
+    assert service._task is not old_task
+    assert service._task.done() is False
+
+    await service.stop()
+
+
+@pytest.mark.asyncio
+async def test_presence_watchdog_warns_when_worker_is_stale(caplog: pytest.LogCaptureFixture) -> None:
+    repository = InMemoryMessageRepository()
+    notifier = FakePresenceNotifier()
+    service = DiscordPresenceService(
+        message_repository=repository,
+        notifier=notifier,
+        poll_interval_seconds=60,
+        watchdog_interval_seconds=60,
+        stale_after_seconds=180,
+        lookback_minutes=5,
+        message_limit=50,
+        max_status_length=120,
+    )
+    service._task = asyncio.current_task()
+    service._last_poll_finished_at = datetime.now(UTC) - timedelta(seconds=181)
+
+    with caplog.at_level(logging.WARNING):
+        await service._watchdog_once()
+
+    assert "appears stale" in caplog.text
 
 
 @pytest.mark.asyncio

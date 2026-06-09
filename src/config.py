@@ -84,6 +84,12 @@ class AppConfig:
     discord_presence_poll_interval_seconds: float = field(
         default_factory=lambda: _get_float("DISCORD_PRESENCE_POLL_INTERVAL_SECONDS", "60")
     )
+    discord_presence_watchdog_interval_seconds: float = field(
+        default_factory=lambda: _get_float("DISCORD_PRESENCE_WATCHDOG_INTERVAL_SECONDS", "60")
+    )
+    discord_presence_stale_after_seconds: float = field(
+        default_factory=lambda: _get_float("DISCORD_PRESENCE_STALE_AFTER_SECONDS", "180")
+    )
     discord_presence_lookback_minutes: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_LOOKBACK_MINUTES", "5"))
     discord_presence_message_limit: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_MESSAGE_LIMIT", "50"))
     discord_presence_max_status_length: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_MAX_STATUS_LENGTH", "120"))
