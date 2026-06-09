@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import suppress
 
+import aiohttp
 import discord
 
 from src.config import AppConfig
@@ -88,5 +89,5 @@ class DiscordEntrypoint(TrackingNotificationSender, DiscordPresenceStatusSender)
         """Update the bot's visible global Discord custom status."""
         if not self._config.discord_bot_token or not self._client.is_ready():
             return
-        with suppress(discord.HTTPException):
+        with suppress(discord.HTTPException, discord.ConnectionClosed, aiohttp.ClientConnectionError):
             await self._client.set_status_text(text)
