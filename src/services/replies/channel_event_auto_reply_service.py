@@ -4,18 +4,20 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from src.gateways.twitch_api import TwitchAPIError, TwitchAuthenticationError
 from src.database.connection import (
-    ChannelRecord,
     AdapterEventActionRepository,
     AdapterEventRepository,
+    ChannelRecord,
     ChannelRepository,
+    MessageRepository,
     ThreadRepository,
     TwitchAccountRepository,
 )
 from src.localization import Localizer
-from src.events.twitch_events import TwitchChannelLiveStateChangedEvent
+from src.events.twitch_events import TwitchChannelLiveStateChangedEvent, TwitchChatMessageEvent
 from src.services.patterns import TrackingNotificationSender
 from src.services.twitch_gateways import TwitchReplyGateway
 from src.services.twitch_runtime import (
@@ -43,6 +45,7 @@ class ChannelEventAutoReplyService:
     channel_repository: ChannelRepository
     adapter_event_repository: AdapterEventRepository
     adapter_event_action_repository: AdapterEventActionRepository
+    message_repository: MessageRepository
     account_repository: TwitchAccountRepository
     twitch_api: TwitchReplyGateway
     tracking_notifier: TrackingNotificationSender
@@ -118,12 +121,22 @@ class ChannelEventAutoReplyService:
                 state=event_state,
             )
             try:
-                await self.twitch_api.send_chat_message(
+                sent_message_id = await self.twitch_api.send_chat_message(
                     access_token=account.access_token,
                     client_id=account.client_id,
                     sender_id=account.twitch_user_id,
                     broadcaster_id=event.twitch_channel_id,
                     message=rendered_message,
+                )
+                await self.message_repository.save_bot_twitch_message(
+                    self._build_sent_message_event(
+                        channel_login=channel_login or event.twitch_channel_id,
+                        author_login=account.twitch_login,
+                        author_id=account.twitch_user_id,
+                        broadcaster_id=event.twitch_channel_id,
+                        message_id=sent_message_id,
+                        content=rendered_message,
+                    )
                 )
                 await self._notify_auto_reply(
                     thread=thread,
@@ -146,12 +159,22 @@ class ChannelEventAutoReplyService:
                 )
                 if refreshed is None:
                     continue
-                await self.twitch_api.send_chat_message(
+                sent_message_id = await self.twitch_api.send_chat_message(
                     access_token=refreshed.access_token,
                     client_id=refreshed.client_id,
                     sender_id=refreshed.twitch_user_id,
                     broadcaster_id=event.twitch_channel_id,
                     message=rendered_message,
+                )
+                await self.message_repository.save_bot_twitch_message(
+                    self._build_sent_message_event(
+                        channel_login=channel_login or event.twitch_channel_id,
+                        author_login=refreshed.twitch_login,
+                        author_id=refreshed.twitch_user_id,
+                        broadcaster_id=event.twitch_channel_id,
+                        message_id=sent_message_id,
+                        content=rendered_message,
+                    )
                 )
                 await self._notify_auto_reply(
                     thread=thread,
@@ -211,4 +234,25 @@ class ChannelEventAutoReplyService:
                 channel_icon_url=channel_icon_url,
             ),
             channel_login=channel_login,
+        )
+
+    @staticmethod
+    def _build_sent_message_event(
+        *,
+        channel_login: str,
+        author_login: str,
+        author_id: str,
+        broadcaster_id: str,
+        message_id: str,
+        content: str,
+    ) -> TwitchChatMessageEvent:
+        return TwitchChatMessageEvent(
+            channel_login=channel_login,
+            author_login=author_login,
+            author_display_name=author_login,
+            author_id=author_id,
+            broadcaster_id=broadcaster_id,
+            message_id=message_id,
+            content=content,
+            sent_at=datetime.now(UTC),
         )

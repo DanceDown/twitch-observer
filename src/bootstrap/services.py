@@ -319,6 +319,7 @@ def _build_live_state_services(
         channel_repository=core.channel_repository,
         adapter_event_repository=core.adapter_event_repository,
         adapter_event_action_repository=core.adapter_event_action_repository,
+        message_repository=core.message_repository,
         account_repository=core.account_repository,
         twitch_api=core.twitch_bundle,
         tracking_notifier=runtime_coordinator.tracking,

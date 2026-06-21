@@ -61,6 +61,10 @@ class BatchedMessageRepository(MessageRepository):
         if should_flush_now:
             await self.flush()
 
+    async def save_bot_twitch_message(self, event: TwitchChatMessageEvent) -> None:
+        await self.flush()
+        await self.repository.save_bot_twitch_message(event)
+
     async def mark_message_matched_in_thread(
         self,
         *,

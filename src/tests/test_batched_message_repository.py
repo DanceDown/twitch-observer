@@ -16,6 +16,7 @@ class FakeBatchMessageRepository(MessageRepository):
     recent_messages: dict[str, RecentMessageRecord] = field(default_factory=dict)
     matched_by_thread_id: dict[int, list[str]] = field(default_factory=dict)
     flush_batches: list[tuple[tuple[str, ...], tuple[tuple[int, str], ...]]] = field(default_factory=list)
+    saved_bot_message_ids: list[str] = field(default_factory=list)
 
     async def flush_write_batch(
         self,
@@ -52,6 +53,11 @@ class FakeBatchMessageRepository(MessageRepository):
             content=event.content,
             timestamp=event.sent_at,
         )
+
+    async def save_bot_twitch_message(self, event: TwitchChatMessageEvent) -> None:
+        message_id = _require_message_id(event)
+        self.saved_bot_message_ids.append(message_id)
+        await self.save_twitch_message(event)
 
     async def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
         rows = [row for row in self.recent_messages.values() if row.timestamp >= since]
@@ -158,6 +164,18 @@ async def test_batched_message_repository_flushes_immediately_when_batch_is_full
     await repository.save_twitch_message(_event("msg-4"))
 
     assert inner.flush_batches == [(("msg-3", "msg-4"), ())]
+
+
+@pytest.mark.asyncio
+async def test_batched_message_repository_flushes_pending_inbound_messages_before_bot_save() -> None:
+    inner = FakeBatchMessageRepository()
+    repository = BatchedMessageRepository(repository=inner, batch_size=50, flush_interval_seconds=60)
+
+    await repository.save_twitch_message(_event("msg-5"))
+    await repository.save_bot_twitch_message(_event("bot-msg-1", content="bot reply"))
+
+    assert inner.flush_batches == [(("msg-5",), ())]
+    assert inner.saved_bot_message_ids == ["bot-msg-1"]
 
 
 @pytest.mark.asyncio

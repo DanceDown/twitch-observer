@@ -196,9 +196,13 @@ class InMemoryChannelRepository(ChannelRepository):
 @dataclass
 class InMemoryMessageRepository(MessageRepository):
     matched_thread_ids: list[tuple[int, str | None]] = field(default_factory=list)
+    saved_bot_messages: list[TwitchChatMessageEvent] = field(default_factory=list)
 
     async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
         return None
+
+    async def save_bot_twitch_message(self, event: TwitchChatMessageEvent) -> None:
+        self.saved_bot_messages.append(event)
 
     async def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
         return []
@@ -1871,11 +1875,12 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
         },
     )
     notifier = FakeNotifier()
+    message_repository = InMemoryMessageRepository()
     service = AutoReplyService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        message_repository=InMemoryMessageRepository(),
+        message_repository=message_repository,
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
         token_refresh_skew_seconds=30,
@@ -1901,6 +1906,10 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
     assert len(twitch_api.sent_messages) == 1
     assert twitch_api.sent_messages[0]["message"] == "Hi Alice, you wrote `hello there` in ExampleChannel"
     assert twitch_api.sent_messages[0]["reply_parent_message_id"] == "msg-1"
+    assert len(message_repository.saved_bot_messages) == 1
+    assert message_repository.saved_bot_messages[0].message_id == "sent-1"
+    assert message_repository.saved_bot_messages[0].reply_parent_message_id == "msg-1"
+    assert message_repository.saved_bot_messages[0].author_id == "77"
     assert len(notifier.tracking_embeds) == 1
 
 
@@ -2368,11 +2377,13 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
         }
     )
     notifier = FakeNotifier()
+    message_repository = InMemoryMessageRepository()
     service = ChannelEventAutoReplyService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         adapter_event_repository=adapter_event_repository,
         adapter_event_action_repository=adapter_event_action_repository,
+        message_repository=message_repository,
         account_repository=account_repository,
         twitch_api=twitch_api,  # type: ignore[arg-type]
         tracking_notifier=notifier,
@@ -2391,6 +2402,10 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
     assert len(twitch_api.sent_messages) == 1
     assert twitch_api.sent_messages[0]["broadcaster_id"] == "42"
     assert twitch_api.sent_messages[0]["message"] == "YIPPIE ExampleChannel is online"
+    assert len(message_repository.saved_bot_messages) == 1
+    assert message_repository.saved_bot_messages[0].message_id == "sent-1"
+    assert message_repository.saved_bot_messages[0].author_id == "77"
+    assert message_repository.saved_bot_messages[0].channel_login == "example"
     assert len(notifier.tracking_embeds) == 1
     tracking_embed = notifier.tracking_embeds[0][1]
     assert tracking_embed.color.value == 0x123456

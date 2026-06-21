@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from src.database.connection import (
@@ -138,13 +139,24 @@ class AutoReplyService:
                 )
                 or account
             )
-            await self.twitch_api.send_chat_message(
+            sent_message_id = await self.twitch_api.send_chat_message(
                 access_token=account.access_token,
                 client_id=account.client_id,
                 sender_id=account.twitch_user_id,
                 broadcaster_id=event.broadcaster_id,
                 message=rendered_reply_message,
                 reply_parent_message_id=(event.message_id if matching_reply.reply_as_reply else None),
+            )
+            await self.message_repository.save_bot_twitch_message(
+                self._build_sent_message_event(
+                    channel_login=(event.channel_login if channel_user is None else channel_user.login),
+                    author_login=account.twitch_login,
+                    author_id=account.twitch_user_id,
+                    broadcaster_id=event.broadcaster_id,
+                    message_id=sent_message_id,
+                    content=rendered_reply_message,
+                    reply_parent_message_id=(event.message_id if matching_reply.reply_as_reply else None),
+                )
             )
             self.sent_replies += 1
             logger.debug(
@@ -184,13 +196,24 @@ class AutoReplyService:
             )
             if refreshed is not None:
                 try:
-                    await self.twitch_api.send_chat_message(
+                    sent_message_id = await self.twitch_api.send_chat_message(
                         access_token=refreshed.access_token,
                         client_id=refreshed.client_id,
                         sender_id=refreshed.twitch_user_id,
                         broadcaster_id=event.broadcaster_id,
                         message=rendered_reply_message,
                         reply_parent_message_id=(event.message_id if matching_reply.reply_as_reply else None),
+                    )
+                    await self.message_repository.save_bot_twitch_message(
+                        self._build_sent_message_event(
+                            channel_login=(event.channel_login if channel_user is None else channel_user.login),
+                            author_login=refreshed.twitch_login,
+                            author_id=refreshed.twitch_user_id,
+                            broadcaster_id=event.broadcaster_id,
+                            message_id=sent_message_id,
+                            content=rendered_reply_message,
+                            reply_parent_message_id=(event.message_id if matching_reply.reply_as_reply else None),
+                        )
                     )
                     self.sent_replies += 1
                     logger.debug(
@@ -285,6 +308,29 @@ class AutoReplyService:
         rendered = template.replace("{NAME}", event.author_display_name or event.author_login)
         rendered = rendered.replace("{CHANNEL}", channel_name or event.channel_login)
         return rendered.replace("{MESSAGE}", event.content)
+
+    @staticmethod
+    def _build_sent_message_event(
+        *,
+        channel_login: str,
+        author_login: str,
+        author_id: str,
+        broadcaster_id: str,
+        message_id: str,
+        content: str,
+        reply_parent_message_id: str | None,
+    ) -> TwitchChatMessageEvent:
+        return TwitchChatMessageEvent(
+            channel_login=channel_login,
+            author_login=author_login,
+            author_display_name=author_login,
+            author_id=author_id,
+            broadcaster_id=broadcaster_id,
+            message_id=message_id,
+            content=content,
+            reply_parent_message_id=reply_parent_message_id,
+            sent_at=datetime.now(UTC),
+        )
 
     async def _notify_account_expired(self, discord_channel_id: int) -> None:
         await self.account_notifier.send_account_result(

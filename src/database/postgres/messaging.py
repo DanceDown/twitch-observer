@@ -20,6 +20,18 @@ class PostgresMessageRepository(MessageRepository):
 
     async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
         """Persist one incoming Twitch message if it has not been stored yet."""
+        await self._save_message(event, is_bot=False)
+
+    async def save_bot_twitch_message(self, event: TwitchChatMessageEvent) -> None:
+        """Persist one bot-originated Twitch message if it has not been stored yet."""
+        await self._save_message(event, is_bot=True)
+
+    async def _save_message(
+        self,
+        event: TwitchChatMessageEvent,
+        *,
+        is_bot: bool,
+    ) -> None:
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -41,11 +53,11 @@ class PostgresMessageRepository(MessageRepository):
                     %s,
                     %s,
                     (SELECT message_id FROM message WHERE message_id = %s),
-                    FALSE
+                    %s
                 )
                 ON CONFLICT (message_id) DO NOTHING
                 """,
-                self._build_message_params(event),
+                self._build_message_params(event, is_bot=is_bot),
             )
 
     async def flush_write_batch(
@@ -80,11 +92,11 @@ class PostgresMessageRepository(MessageRepository):
                             %s,
                             %s,
                             (SELECT message_id FROM message WHERE message_id = %s),
-                            FALSE
+                            %s
                         )
                         ON CONFLICT (message_id) DO NOTHING
                         """,
-                        tuple(self._build_message_params(event) for event in message_events),
+                        tuple(self._build_message_params(event, is_bot=False) for event in message_events),
                     )
                 if thread_matches:
                     await cursor.executemany(
@@ -246,7 +258,12 @@ class PostgresMessageRepository(MessageRepository):
         return event.message_id or cls._build_fallback_message_id(event)
 
     @classmethod
-    def _build_message_params(cls, event: TwitchChatMessageEvent) -> tuple[object, ...]:
+    def _build_message_params(
+        cls,
+        event: TwitchChatMessageEvent,
+        *,
+        is_bot: bool,
+    ) -> tuple[object, ...]:
         return (
             cls._resolve_message_id(event),
             event.broadcaster_id or event.channel_login,
@@ -255,4 +272,5 @@ class PostgresMessageRepository(MessageRepository):
             event.author_display_name or event.author_login,
             event.content,
             event.reply_parent_message_id,
+            is_bot,
         )

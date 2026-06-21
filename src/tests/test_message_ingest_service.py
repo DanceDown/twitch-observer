@@ -20,10 +20,14 @@ from src.services.message_ingest_service import MessageIngestService
 @dataclass
 class InMemoryMessageRepository(MessageRepository):
     messages: list[TwitchChatMessageEvent] = field(default_factory=list)
+    bot_messages: list[TwitchChatMessageEvent] = field(default_factory=list)
     matched_by_thread_id: dict[int, list[str]] = field(default_factory=dict)
 
     async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
         self.messages.append(event)
+
+    async def save_bot_twitch_message(self, event: TwitchChatMessageEvent) -> None:
+        self.bot_messages.append(event)
 
     async def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
         rows = [
@@ -347,7 +351,29 @@ async def test_postgres_message_repository_uses_null_reply_reference_when_parent
         "Bob",
         "reply body",
         "missing-parent",
+        False,
     )
+
+
+@pytest.mark.asyncio
+async def test_postgres_message_repository_marks_bot_messages_with_true_flag() -> None:
+    database = RecordingDatabase()
+    repository = PostgresMessageRepository(database=database)  # type: ignore[arg-type]
+    event = TwitchChatMessageEvent(
+        channel_login="channel",
+        author_login="bot-account",
+        author_display_name="BotAccount",
+        author_id="bot-1",
+        broadcaster_id="channel-1",
+        message_id="bot-msg-1",
+        content="hello from bot",
+    )
+
+    await repository.save_bot_twitch_message(event)
+
+    assert len(database.cursor_instance.statements) == 1
+    _, params = database.cursor_instance.statements[0]
+    assert params[-1] is True
 
 
 @pytest.mark.asyncio

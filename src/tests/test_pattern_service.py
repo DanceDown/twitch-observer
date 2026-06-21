@@ -454,6 +454,9 @@ class InMemoryMessageRepository(MessageRepository):
     async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
         return None
 
+    async def save_bot_twitch_message(self, event: TwitchChatMessageEvent) -> None:
+        return None
+
     async def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
         return []
 

@@ -31,6 +31,9 @@ class MessageRepository:
     async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:  # pragma: no cover - interface
         raise NotImplementedError
 
+    async def save_bot_twitch_message(self, event: TwitchChatMessageEvent) -> None:  # pragma: no cover - interface
+        raise NotImplementedError
+
     async def list_recent_messages(
         self,
         *,
