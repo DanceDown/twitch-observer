@@ -21,6 +21,20 @@ def test_build_show_pages_repeats_header_and_keeps_items_together() -> None:
     assert pages[1].endswith(item_three)
 
 
+def test_build_show_pages_keeps_collecting_items_after_first_page_break() -> None:
+    item_one = "- one\n  detail"
+    item_two = "- two\n  detail"
+    item_three = "- six\n  detail"
+    item_four = "- ten\n  detail"
+    first_page = f"**Pings**\n{item_one}\n{item_two}"
+    second_page = f"**Pings**\n{item_three}\n{item_four}"
+    message = f"{first_page}\n{item_three}\n{item_four}"
+
+    pages = build_show_pages(message, description_limit=len(first_page), item_prefix="- ")
+
+    assert pages == (first_page, second_page)
+
+
 def test_build_show_pages_splits_oversized_single_item_when_needed() -> None:
     pages = build_show_pages("**Pings**\n- " + ("x" * 25), description_limit=20, item_prefix="- ")
 

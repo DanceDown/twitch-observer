@@ -36,28 +36,42 @@ def build_show_pages(
     if not items:
         return _split_plain_text(normalized, description_limit)
 
-    prefix = f"{header}\n" if header else ""
-    available_item_length = max(1, description_limit - len(prefix))
+    page_prefix = f"{header}\n" if header else ""
+    available_item_length = max(1, description_limit - len(page_prefix))
     pages: list[str] = []
     current_items: list[str] = []
     for item in items:
+        # Keep appending full bullet blocks while the page still fits.
         candidate_items = [*current_items, item]
-        candidate_body = "\n".join(candidate_items)
-        candidate_page = f"{prefix}{candidate_body}" if prefix else candidate_body
+        candidate_page = _render_show_page(page_prefix, candidate_items)
         if len(candidate_page) <= description_limit:
             current_items = candidate_items
             continue
+
+        # The next item no longer fits. Finalize the current page first.
         if current_items:
-            current_body = "\n".join(current_items)
-            pages.append(f"{prefix}{current_body}" if prefix else current_body)
+            pages.append(_render_show_page(page_prefix, current_items))
             current_items = []
+
+        # If the item fits on a fresh page, start the next page with it.
+        single_item_page = _render_show_page(page_prefix, (item,))
+        if len(single_item_page) <= description_limit:
+            current_items = [item]
+            continue
+
+        # Only split inside an item when one single item is too large by itself.
         for oversized_part in _split_plain_text(item, available_item_length):
-            pages.append(f"{prefix}{oversized_part}" if prefix else oversized_part)
+            pages.append(_render_show_page(page_prefix, (oversized_part,)))
 
     if current_items:
-        current_body = "\n".join(current_items)
-        pages.append(f"{prefix}{current_body}" if prefix else current_body)
+        pages.append(_render_show_page(page_prefix, current_items))
     return tuple(pages)
+
+
+def _render_show_page(page_prefix: str, items: tuple[str, ...] | list[str]) -> str:
+    """Combine the repeated section header with one or more already-grouped items."""
+    body = "\n".join(items)
+    return f"{page_prefix}{body}" if page_prefix else body
 
 
 def _extract_show_header_and_items(message: str, *, item_prefix: str) -> tuple[str, tuple[str, ...]]:
