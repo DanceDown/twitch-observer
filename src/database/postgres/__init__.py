@@ -2,11 +2,12 @@
 
 from .adapter_event_actions import PostgresAdapterEventActionRepository
 from .adapter_events import PostgresAdapterEventRepository
-from .patterns import PostgresPatternRepository
-from .replies import PostgresReplyRepository
 from .database import PostgresDatabase
 from .messaging import PostgresMessageRepository
+from .migrations import PostgresMigrationRunner
+from .patterns import PostgresPatternRepository
 from .permissions import PostgresUserPermissionRepository
+from .replies import PostgresReplyRepository
 from .threads import (
     PostgresChannelRepository,
     PostgresThreadRepository,
@@ -26,6 +27,7 @@ __all__ = [
     "PostgresChannelRepository",
     "PostgresDatabase",
     "PostgresMessageRepository",
+    "PostgresMigrationRunner",
     "PostgresThreadRepository",
     "PostgresTrackedUserRepository",
     "PostgresTwitchAccountRepository",

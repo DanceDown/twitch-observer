@@ -6,7 +6,6 @@ import pytest
 
 from src.database.connection import (
     ChannelRecord,
-    ChannelRepository,
     PatternRepository,
     ReplyRepository,
     ThreadRecord,
@@ -16,6 +15,7 @@ from src.database.connection import (
 )
 from src.events.ui_flow import RequestUIFlowCommand, UIFlowKind, UIFlowStep
 from src.services.ui_flow_service import DiscordUIFlowGuardService
+from src.tests.in_memory_channels import InMemoryChannelRepository as BaseInMemoryChannelRepository
 
 
 @dataclass
@@ -35,14 +35,13 @@ class InMemoryThreadRepository(ThreadRepository):
 
 
 @dataclass
-class InMemoryChannelRepository(ChannelRepository):
+class InMemoryChannelRepository(BaseInMemoryChannelRepository):
     channels: list[ChannelRecord] = field(default_factory=list)
 
     async def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
-        return [channel for channel in self.channels if channel.thread_id == thread_id]
-
-    async def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:
-        return None
+        if self.channels:
+            return [channel for channel in self.channels if channel.thread_id == thread_id]
+        return await super().list_channels_for_thread(thread_id)
 
 
 class EmptyPatternRepository(PatternRepository):

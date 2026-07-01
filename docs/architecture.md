@@ -51,7 +51,7 @@ This is the main runtime reference for the Twitch Observer.
 ### Live-state flow
 
 1. `TwitchLiveMonitorService` periodically polls Helix `Get Streams` for all tracked channels.
-2. It compares the result with persisted `channel.is_live`.
+2. It compares the result with persisted `tracked_channel_state.is_live`.
 3. First-seen state is stored silently.
 4. Actual transitions are forwarded directly to `LiveStateChangeOrchestrator`.
 5. The orchestrator runs, in order:
@@ -87,6 +87,11 @@ A row in `channel` means:
 - read this Twitch chat on IRC
 - poll this channel for live/offline state
 - allow patterns to scope to it
+
+The per-thread `channel` row owns subscription and presentation state such as
+the optional color override. The app-owned live/offline state itself is stored
+globally in `tracked_channel_state` and is joined back into `ChannelRecord`
+reads when a thread needs it.
 
 It does not mean:
 
@@ -150,7 +155,7 @@ separate per-row "last refresh" timestamp.
 
 ### Live state
 
-`channel.is_live` is the single persisted live/offline source of truth for:
+`tracked_channel_state.is_live` is the single persisted live/offline source of truth for:
 
 - pattern `offline_state` filtering
 - `/show`
@@ -179,6 +184,9 @@ The message hot path never calls `Get Streams`.
 
 This keeps repository access bounded even though the app still uses synchronous
 PostgreSQL drivers.
+
+At startup, `build_core()` opens the pool, applies ordered SQL migrations from
+`src/database/migrations/`, and only then wires repositories and services.
 
 ## Implementation notes
 
@@ -211,7 +219,7 @@ PostgreSQL drivers.
 - `src/database/repositories.py`
   - repository interfaces used by services and tests
 - `src/database/postgres/`
-  - PostgreSQL pool and repository implementations split by persistence responsibility
+  - PostgreSQL pool, migration runner, and repository implementations split by persistence responsibility
 - `src/entrypoints/discord/dispatch/`
   - typed per-domain direct call helpers used by Discord entrypoints and UI
 - `src/entrypoints/discord/ui/patterns/`

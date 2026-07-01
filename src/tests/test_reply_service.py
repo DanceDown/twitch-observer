@@ -27,7 +27,6 @@ from src.database.connection import (
     AdapterEventRepository,
     ChatPatternCandidateRecord,
     ChatPatternSeedRecord,
-    ChannelRecord,
     ChannelRepository,
     MessageRepository,
     PatternRecord,
@@ -52,6 +51,7 @@ from src.services.account_support import AccountNotificationSender
 from src.services.channel_live_state_service import ChannelEventCommandService
 from src.services.patterns import ShowCommandService
 from src.services.replies import AutoReplyService, ChannelEventAutoReplyService, ReplyCommandService
+from src.tests.in_memory_channels import InMemoryChannelRepository as BaseInMemoryChannelRepository
 
 
 @dataclass
@@ -133,64 +133,8 @@ class InMemoryThreadRepository(ThreadRepository):
         return [thread for thread in self.threads_by_channel_id.values() if thread.owner_id == owner_id]
 
 
-@dataclass
-class InMemoryChannelRepository(ChannelRepository):
-    channels_by_thread: dict[tuple[int, str], ChannelRecord] = field(default_factory=dict)
-
-    async def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:
-        return self.channels_by_thread.get((thread_id, twitch_channel_id))
-
-    async def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
-        self.channels_by_thread[(thread_id, twitch_channel_id)] = ChannelRecord(
-            thread_id=thread_id,
-            twitch_channel_id=twitch_channel_id,
-            color=None,
-        )
-
-    async def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:
-        self.channels_by_thread.pop((thread_id, twitch_channel_id), None)
-
-    async def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:
-        key = (thread_id, twitch_channel_id)
-        existing = self.channels_by_thread.get(key)
-        if existing is None:
-            return None
-        updated = ChannelRecord(
-            thread_id=existing.thread_id,
-            twitch_channel_id=existing.twitch_channel_id,
-            color=color,
-            is_live=existing.is_live,
-            last_live_status_at=existing.last_live_status_at,
-        )
-        self.channels_by_thread[key] = updated
-        return updated
-
-    async def set_live_state_for_twitch_channel(self, *, twitch_channel_id: str, is_live: bool, changed_at: str | None) -> int:
-        updated_rows = 0
-        for key, existing in list(self.channels_by_thread.items()):
-            if existing.twitch_channel_id != twitch_channel_id:
-                continue
-            self.channels_by_thread[key] = ChannelRecord(
-                thread_id=existing.thread_id,
-                twitch_channel_id=existing.twitch_channel_id,
-                color=existing.color,
-                is_live=is_live,
-                last_live_status_at=changed_at,
-            )
-            updated_rows += 1
-        return updated_rows
-
-    async def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
-        return sum(1 for record in self.channels_by_thread.values() if record.twitch_channel_id == twitch_channel_id)
-
-    async def list_thread_ids_by_twitch_channel_id(self, twitch_channel_id: str) -> list[int]:
-        return [record.thread_id for record in self.channels_by_thread.values() if record.twitch_channel_id == twitch_channel_id]
-
-    async def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
-        return [record for record in self.channels_by_thread.values() if record.thread_id == thread_id]
-
-    async def list_all_twitch_channel_ids(self) -> list[str]:
-        return sorted({record.twitch_channel_id for record in self.channels_by_thread.values()})
+class InMemoryChannelRepository(BaseInMemoryChannelRepository):
+    pass
 
 
 @dataclass

@@ -8,6 +8,7 @@ from src.database.postgres import (
     PostgresAdapterEventRepository,
     PostgresChannelRepository,
     PostgresDatabase,
+    PostgresMigrationRunner,
     PostgresMessageRepository,
     PostgresPatternRepository,
     PostgresReplyRepository,
@@ -35,6 +36,7 @@ async def build_core(config: AppConfig) -> ApplicationCore:
     localizer = Localizer.from_directory()
     database = PostgresDatabase(config)
     await database.open()
+    await PostgresMigrationRunner(database=database).apply_pending()
     raw_message_repository = PostgresMessageRepository(database)
     message_repository = BatchedMessageRepository(
         repository=raw_message_repository,

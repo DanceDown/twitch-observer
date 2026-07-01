@@ -292,7 +292,7 @@ class TwitchUserCacheRepository:
 
 
 class ChannelRepository:
-    """Persistence interface for per-thread Twitch channel subscriptions."""
+    """Persistence interface for per-thread channel subscriptions plus joined global live state."""
 
     async def get_by_thread_and_twitch_channel(
         self,

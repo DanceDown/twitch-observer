@@ -111,16 +111,53 @@ class PostgresThreadRepository(ThreadRepository):
         )
 
     async def delete_by_discord_channel_id(self, discord_channel_id: int) -> ThreadRecord | None:
-        async with self.database.async_cursor() as cursor:
-            await cursor.execute(
-                """
-                DELETE FROM thread
-                WHERE discord_channel_id = %s
-                RETURNING thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
-                """,
-                (discord_channel_id,),
-            )
-            row = await cursor.fetchone()
+        async with self.database.async_transaction() as connection:
+            async with connection.cursor() as cursor:
+                await cursor.execute(
+                    """
+                    SELECT thread_id, owner_id, discord_channel_id, language, enabled, color, account_id
+                    FROM thread
+                    WHERE discord_channel_id = %s
+                    """,
+                    (discord_channel_id,),
+                )
+                row = await cursor.fetchone()
+                if row is None:
+                    return None
+
+                await cursor.execute(
+                    """
+                    SELECT twitch_channel_id
+                    FROM channel
+                    WHERE thread_id = %s
+                    ORDER BY twitch_channel_id
+                    """,
+                    (row[0],),
+                )
+                removed_channel_rows = await cursor.fetchall()
+                removed_channel_ids = [str(channel_row[0]) for channel_row in removed_channel_rows]
+
+                await cursor.execute(
+                    """
+                    DELETE FROM thread
+                    WHERE discord_channel_id = %s
+                    """,
+                    (discord_channel_id,),
+                )
+
+                if removed_channel_ids:
+                    await cursor.execute(
+                        """
+                        DELETE FROM tracked_channel_state AS tcs
+                        WHERE tcs.twitch_channel_id = ANY(%s)
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM channel AS c
+                              WHERE c.twitch_channel_id = tcs.twitch_channel_id
+                          )
+                        """,
+                        (removed_channel_ids,),
+                    )
         if row is None:
             return None
         return ThreadRecord(
@@ -240,43 +277,63 @@ class PostgresChannelRepository(ChannelRepository):
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
-                SELECT thread_id, twitch_channel_id, color, is_live, last_live_status_at
-                FROM channel
-                WHERE thread_id = %s AND twitch_channel_id = %s
+                SELECT c.thread_id, c.twitch_channel_id, c.color, tcs.is_live, tcs.last_live_status_at
+                FROM channel AS c
+                LEFT JOIN tracked_channel_state AS tcs
+                  ON tcs.twitch_channel_id = c.twitch_channel_id
+                WHERE c.thread_id = %s AND c.twitch_channel_id = %s
                 """,
                 (thread_id, twitch_channel_id),
             )
             row = await cursor.fetchone()
         if row is None:
             return None
-        return ChannelRecord(
-            thread_id=row[0],
-            twitch_channel_id=row[1],
-            color=row[2],
-            is_live=row[3],
-            last_live_status_at=row[4].isoformat() if row[4] is not None else None,
-        )
+        return self._build_channel_record(row)
 
     async def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
-        async with self.database.async_cursor() as cursor:
-            await cursor.execute(
-                """
-                INSERT INTO channel (thread_id, twitch_channel_id)
-                VALUES (%s, %s)
-                ON CONFLICT (thread_id, twitch_channel_id) DO NOTHING
-                """,
-                (thread_id, twitch_channel_id),
-            )
+        async with self.database.async_transaction() as connection:
+            async with connection.cursor() as cursor:
+                await cursor.execute(
+                    """
+                    INSERT INTO channel (thread_id, twitch_channel_id)
+                    VALUES (%s, %s)
+                    ON CONFLICT (thread_id, twitch_channel_id) DO NOTHING
+                    """,
+                    (thread_id, twitch_channel_id),
+                )
+                await cursor.execute(
+                    """
+                    INSERT INTO tracked_channel_state (twitch_channel_id)
+                    VALUES (%s)
+                    ON CONFLICT (twitch_channel_id) DO NOTHING
+                    """,
+                    (twitch_channel_id,),
+                )
 
     async def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:
-        async with self.database.async_cursor() as cursor:
-            await cursor.execute(
-                """
-                DELETE FROM channel
-                WHERE thread_id = %s AND twitch_channel_id = %s
-                """,
-                (thread_id, twitch_channel_id),
-            )
+        async with self.database.async_transaction() as connection:
+            async with connection.cursor() as cursor:
+                await cursor.execute(
+                    """
+                    DELETE FROM channel
+                    WHERE thread_id = %s AND twitch_channel_id = %s
+                    """,
+                    (thread_id, twitch_channel_id),
+                )
+                if cursor.rowcount <= 0:
+                    return
+                await cursor.execute(
+                    """
+                    DELETE FROM tracked_channel_state AS tcs
+                    WHERE tcs.twitch_channel_id = %s
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM channel AS c
+                          WHERE c.twitch_channel_id = %s
+                      )
+                    """,
+                    (twitch_channel_id, twitch_channel_id),
+                )
 
     async def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:
         async with self.database.async_cursor() as cursor:
@@ -285,20 +342,14 @@ class PostgresChannelRepository(ChannelRepository):
                 UPDATE channel
                 SET color = %s
                 WHERE thread_id = %s AND twitch_channel_id = %s
-                RETURNING thread_id, twitch_channel_id, color, is_live, last_live_status_at
+                RETURNING thread_id
                 """,
                 (color, thread_id, twitch_channel_id),
             )
             row = await cursor.fetchone()
         if row is None:
             return None
-        return ChannelRecord(
-            thread_id=row[0],
-            twitch_channel_id=row[1],
-            color=row[2],
-            is_live=row[3],
-            last_live_status_at=row[4].isoformat() if row[4] is not None else None,
-        )
+        return await self.get_by_thread_and_twitch_channel(thread_id, twitch_channel_id)
 
     async def set_live_state_for_twitch_channel(
         self,
@@ -311,7 +362,7 @@ class PostgresChannelRepository(ChannelRepository):
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
-                UPDATE channel
+                UPDATE tracked_channel_state
                 SET is_live = %s,
                     last_live_status_at = %s
                 WHERE twitch_channel_id = %s
@@ -351,31 +402,24 @@ class PostgresChannelRepository(ChannelRepository):
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
-                SELECT thread_id, twitch_channel_id, color, is_live, last_live_status_at
-                FROM channel
-                WHERE thread_id = %s
-                ORDER BY twitch_channel_id
+                SELECT c.thread_id, c.twitch_channel_id, c.color, tcs.is_live, tcs.last_live_status_at
+                FROM channel AS c
+                LEFT JOIN tracked_channel_state AS tcs
+                  ON tcs.twitch_channel_id = c.twitch_channel_id
+                WHERE c.thread_id = %s
+                ORDER BY c.twitch_channel_id
                 """,
                 (thread_id,),
             )
             rows = await cursor.fetchall()
-        return [
-            ChannelRecord(
-                thread_id=row[0],
-                twitch_channel_id=row[1],
-                color=row[2],
-                is_live=row[3],
-                last_live_status_at=row[4].isoformat() if row[4] is not None else None,
-            )
-            for row in rows
-        ]
+        return [self._build_channel_record(row) for row in rows]
 
     async def list_all_twitch_channel_ids(self) -> list[str]:
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
-                SELECT DISTINCT twitch_channel_id
-                FROM channel
+                SELECT twitch_channel_id
+                FROM tracked_channel_state
                 ORDER BY twitch_channel_id
                 """
             )
@@ -386,11 +430,8 @@ class PostgresChannelRepository(ChannelRepository):
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
-                SELECT twitch_channel_id,
-                       BOOL_OR(is_live) FILTER (WHERE is_live IS NOT NULL),
-                       MAX(last_live_status_at)
-                FROM channel
-                GROUP BY twitch_channel_id
+                SELECT twitch_channel_id, is_live, last_live_status_at
+                FROM tracked_channel_state
                 ORDER BY twitch_channel_id
                 """
             )
@@ -403,6 +444,16 @@ class PostgresChannelRepository(ChannelRepository):
             )
             for row in rows
         ]
+
+    @staticmethod
+    def _build_channel_record(row: tuple) -> ChannelRecord:
+        return ChannelRecord(
+            thread_id=int(row[0]),
+            twitch_channel_id=str(row[1]),
+            color=row[2],
+            is_live=row[3],
+            last_live_status_at=row[4].isoformat() if row[4] is not None else None,
+        )
 
 
 @dataclass(slots=True)

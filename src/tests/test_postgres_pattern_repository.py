@@ -121,7 +121,8 @@ async def test_postgres_pattern_repository_maps_chat_match_seeds() -> None:
     assert seed.explicit_user_scope_match is True
 
     assert len(database.cursor_instance.statements) == 1
-    _query, params = database.cursor_instance.statements[0]
+    query, params = database.cursor_instance.statements[0]
+    assert "tracked_channel_state" in query
     assert params == ("42", "7", "7", "42", True, True)
 
 
@@ -199,6 +200,7 @@ async def test_postgres_pattern_repository_hydrates_chat_match_candidates() -> N
     assert len(database.cursor_instance.statements) == 1
     query, params = database.cursor_instance.statements[0]
     assert "WITH matched" in query
+    assert "tracked_channel_state" in query
     assert params == (0, 7, 3, True, "42")
 
 

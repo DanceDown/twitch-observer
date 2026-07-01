@@ -87,14 +87,18 @@ CREATE TABLE channel (
     thread_id           INTEGER NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,
     twitch_channel_id   TEXT NOT NULL,
     color               TEXT,
-    is_live             BOOLEAN,
-    last_live_status_at TIMESTAMPTZ,
     PRIMARY KEY (thread_id, twitch_channel_id),
     CONSTRAINT chk_channel_color_format CHECK (color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$')
 );
 
 CREATE INDEX idx_channel_twitch_channel_id
     ON channel(twitch_channel_id);
+
+CREATE TABLE tracked_channel_state (
+    twitch_channel_id   TEXT PRIMARY KEY,
+    is_live             BOOLEAN,
+    last_live_status_at TIMESTAMPTZ
+);
 
 CREATE TABLE tracked_user (
     thread_id         INTEGER NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,

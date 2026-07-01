@@ -65,7 +65,7 @@ class TwitchUserCacheRecord:
 
 @dataclass(slots=True, frozen=True)
 class ChannelRecord:
-    """Persisted Twitch channel subscription for one thread."""
+    """Persisted Twitch channel subscription for one thread plus joined global live state."""
 
     thread_id: int
     twitch_channel_id: str
@@ -76,7 +76,7 @@ class ChannelRecord:
 
 @dataclass(slots=True, frozen=True)
 class TrackedChannelStateRecord:
-    """Distinct tracked Twitch channel plus its persisted live state."""
+    """Global persisted live-state snapshot for one tracked Twitch broadcaster."""
 
     twitch_channel_id: str
     is_live: bool | None

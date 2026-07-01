@@ -6,13 +6,14 @@ import pytest
 
 from src.tests.dispatch_helpers import dispatch_channel_command, dispatch_thread_command
 from src.gateways.twitch_api import TwitchAPIConfigurationError, TwitchUser
-from src.database.connection import ChannelRecord, ChannelRepository, PatternRepository, ThreadRecord, ThreadRepository
+from src.database.connection import PatternRepository, ThreadRecord, ThreadRepository
 from types import SimpleNamespace
 from src.events.discord_results import DiscordResultStyle
 from src.services.channel_command_service import ChannelCommandService
 from src.services.thread_lifecycle_service import ThreadLifecycleService
 from src.services.runtime_coordinator import TrackedChannelsChangedNotifier
 from src.services.twitch_gateways import TwitchIRCChannelGateway
+from src.tests.in_memory_channels import InMemoryChannelRepository as BaseInMemoryChannelRepository
 
 
 @dataclass
@@ -89,40 +90,8 @@ class InMemoryThreadRepository(ThreadRepository):
         return updated
 
 
-@dataclass
-class InMemoryChannelRepository(ChannelRepository):
-    channels_by_thread: dict[tuple[int, str], ChannelRecord] = field(default_factory=dict)
-
-    async def get_by_thread_and_twitch_channel(self, thread_id: int, twitch_channel_id: str) -> ChannelRecord | None:
-        return self.channels_by_thread.get((thread_id, twitch_channel_id))
-
-    async def add_channel(self, thread_id: int, twitch_channel_id: str) -> None:
-        self.channels_by_thread[(thread_id, twitch_channel_id)] = ChannelRecord(
-            thread_id=thread_id,
-            twitch_channel_id=twitch_channel_id,
-            color=None,
-        )
-
-    async def remove_channel(self, thread_id: int, twitch_channel_id: str) -> None:
-        self.channels_by_thread.pop((thread_id, twitch_channel_id), None)
-
-    async def set_color(self, *, thread_id: int, twitch_channel_id: str, color: str | None) -> ChannelRecord | None:
-        key = (thread_id, twitch_channel_id)
-        existing = self.channels_by_thread.get(key)
-        if existing is None:
-            return None
-        updated = ChannelRecord(thread_id=existing.thread_id, twitch_channel_id=existing.twitch_channel_id, color=color)
-        self.channels_by_thread[key] = updated
-        return updated
-
-    async def count_threads_by_twitch_channel_id(self, twitch_channel_id: str) -> int:
-        return sum(1 for record in self.channels_by_thread.values() if record.twitch_channel_id == twitch_channel_id)
-
-    async def list_thread_ids_by_twitch_channel_id(self, twitch_channel_id: str) -> list[int]:
-        return [record.thread_id for record in self.channels_by_thread.values() if record.twitch_channel_id == twitch_channel_id]
-
-    async def list_channels_for_thread(self, thread_id: int) -> list[ChannelRecord]:
-        return [record for record in self.channels_by_thread.values() if record.thread_id == thread_id]
+class InMemoryChannelRepository(BaseInMemoryChannelRepository):
+    pass
 
 
 @dataclass

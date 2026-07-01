@@ -419,6 +419,8 @@ class PostgresPatternRepository(PatternRepository):
                         ELSE FALSE
                     END AS explicit_user_scope_match
                 FROM channel AS c
+                LEFT JOIN tracked_channel_state AS tcs
+                  ON tcs.twitch_channel_id = c.twitch_channel_id
                 JOIN thread AS t
                   ON t.thread_id = c.thread_id
                 JOIN pattern AS p
@@ -475,9 +477,9 @@ class PostgresPatternRepository(PatternRepository):
                   )
                   AND (
                       p.offline_state = 'both'
-                      OR c.is_live IS NULL
-                      OR (p.offline_state = 'online' AND c.is_live = TRUE)
-                      OR (p.offline_state = 'offline' AND c.is_live = FALSE)
+                      OR tcs.is_live IS NULL
+                      OR (p.offline_state = 'online' AND tcs.is_live = TRUE)
+                      OR (p.offline_state = 'offline' AND tcs.is_live = FALSE)
                   )
                 ORDER BY t.thread_id, p.priority DESC, p.pattern_id
                 """,
@@ -513,7 +515,7 @@ class PostgresPatternRepository(PatternRepository):
                 SELECT
                     m.explicit_user_scope_match,
                     t.thread_id, t.owner_id, t.discord_channel_id, t.language, t.enabled, t.color, t.account_id,
-                    c.thread_id, c.twitch_channel_id, c.color, c.is_live, c.last_live_status_at,
+                    c.thread_id, c.twitch_channel_id, c.color, tcs.is_live, tcs.last_live_status_at,
                     p.thread_id, p.pattern_id, p.regex, p.channel_scope_mode, p.user_scope_mode,
                     p.sub_state, p.offline_state, p.is_regex, p.case_sensitive, p.color, p.disabled, p.priority,
                     r.thread_id, r.pattern_id, r.reply_message, r.reply_as_reply, r.disabled
@@ -526,6 +528,8 @@ class PostgresPatternRepository(PatternRepository):
                 JOIN channel AS c
                   ON c.thread_id = p.thread_id
                  AND c.twitch_channel_id = %s
+                LEFT JOIN tracked_channel_state AS tcs
+                  ON tcs.twitch_channel_id = c.twitch_channel_id
                 LEFT JOIN reply AS r
                   ON r.thread_id = p.thread_id
                  AND r.pattern_id = p.pattern_id

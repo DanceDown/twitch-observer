@@ -5,10 +5,16 @@ see [src/database/schema.sql](../src/database/schema.sql).
 
 ## Current schema assumption
 
-The project currently treats `schema.sql` as the canonical schema definition.
-During the current test phase, incompatible local schema drift should be solved
-by resetting local persisted database state instead of carrying forward runtime
-schema evolution layers.
+`schema.sql` defines the latest fresh-install schema.
+
+At application startup, the app applies ordered SQL migrations from
+`src/database/migrations/` and records them in `schema_migrations`.
+
+This means:
+
+- a brand-new database gets the newest shape from `schema.sql`
+- an existing database is upgraded in place on restart
+- each migration file should stay idempotent when possible
 
 ## Design goals
 
@@ -82,14 +88,28 @@ Important fields:
 - `thread_id`
 - `twitch_channel_id`
 - optional color override
-- `is_live`
-- `last_live_status_at`
 
 One tracked channel means:
 
 - the IRC adapter should read that chat when needed
 - patterns may scope to that channel
 - the live monitor should include it in batched `Get Streams` polling
+
+This table is the per-thread subscription/config layer. It does not own the
+global live/offline state anymore.
+
+### `tracked_channel_state`
+
+Stores the app-owned global live-state snapshot per tracked broadcaster.
+
+Important fields:
+
+- `twitch_channel_id`
+- `is_live`
+- `last_live_status_at`
+
+This table is the single persisted source of truth for live/offline state.
+Thread-scoped channel reads join this state back in as needed.
 
 ### `tracked_user`
 
