@@ -3,7 +3,9 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
+import psycopg
 import pytest
 
 from src.database.records import ChatPatternSeedRecord
@@ -29,6 +31,58 @@ class RecordingDatabase:
     @asynccontextmanager
     async def read_cursor(self) -> RecordingCursor:
         yield self.cursor_instance
+
+
+class FakePatternSequenceUniqueViolation(psycopg.errors.UniqueViolation):
+    @property
+    def diag(self) -> object:
+        return SimpleNamespace(constraint_name="pattern_pkey")
+
+
+@dataclass
+class TransactionCursor:
+    statements: list[tuple[str, tuple[object, ...]]] = field(default_factory=list)
+    rows: list[tuple[object, ...]] = field(default_factory=list)
+    fail_on_first_execute: bool = False
+    _execute_calls: int = 0
+
+    async def execute(self, query: str, params: tuple[object, ...]) -> None:
+        self.statements.append((query, params))
+        self._execute_calls += 1
+        if self.fail_on_first_execute and self._execute_calls == 1:
+            raise FakePatternSequenceUniqueViolation("duplicate key value violates unique constraint pattern_pkey")
+
+    async def executemany(self, query: str, params_seq: list[tuple[object, ...]]) -> None:
+        self.statements.append((query, tuple(params_seq)))
+
+    async def fetchone(self) -> tuple[object, ...] | None:
+        return self.rows.pop(0) if self.rows else None
+
+
+@dataclass
+class RecordingConnection:
+    cursor_instance: TransactionCursor
+
+    @asynccontextmanager
+    async def cursor(self) -> TransactionCursor:
+        yield self.cursor_instance
+
+
+@dataclass
+class RecordingWriteDatabase:
+    transaction_cursors: list[TransactionCursor]
+    reset_cursor: RecordingCursor = field(default_factory=RecordingCursor)
+    _transaction_index: int = 0
+
+    @asynccontextmanager
+    async def async_transaction(self) -> RecordingConnection:
+        connection = RecordingConnection(cursor_instance=self.transaction_cursors[self._transaction_index])
+        self._transaction_index += 1
+        yield connection
+
+    @asynccontextmanager
+    async def async_cursor(self) -> RecordingCursor:
+        yield self.reset_cursor
 
 
 @pytest.mark.asyncio
@@ -146,3 +200,53 @@ async def test_postgres_pattern_repository_hydrates_chat_match_candidates() -> N
     query, params = database.cursor_instance.statements[0]
     assert "WITH matched" in query
     assert params == (0, 7, 3, True, "42")
+
+
+@pytest.mark.asyncio
+async def test_postgres_pattern_repository_repairs_desynced_pattern_sequence_and_retries_insert() -> None:
+    first_insert_cursor = TransactionCursor(fail_on_first_execute=True)
+    second_insert_cursor = TransactionCursor(
+        rows=[
+            (
+                7,
+                26,
+                "hello",
+                "all_tracked",
+                "all_users",
+                "all",
+                "both",
+                False,
+                False,
+                None,
+                False,
+                0,
+            )
+        ]
+    )
+    database = RecordingWriteDatabase(transaction_cursors=[first_insert_cursor, second_insert_cursor])
+    repository = PostgresPatternRepository(database=database)  # type: ignore[arg-type]
+
+    pattern = await repository.add_pattern(
+        thread_id=7,
+        regex="hello",
+        channel_scope_mode="all_tracked",
+        channel_scope_ids=(),
+        user_scope_mode="all_users",
+        user_scope_ids=(),
+        sub_state="all",
+        offline_state="both",
+        is_regex=False,
+        case_sensitive=False,
+        color=None,
+        disabled=False,
+        priority=0,
+    )
+
+    assert pattern.pattern_id == 26
+    assert len(first_insert_cursor.statements) == 1
+    assert len(second_insert_cursor.statements) == 1
+    assert len(database.reset_cursor.statements) == 1
+    reset_query, reset_params = database.reset_cursor.statements[0]
+    assert "pg_get_serial_sequence('pattern', 'pattern_id')" in reset_query
+    assert "SELECT MAX(pattern_id) FROM pattern" in reset_query
+    assert reset_params == ()

@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 
+import psycopg
+
 from ..records import ChatPatternCandidateRecord, ChatPatternSeedRecord, ChannelRecord, PatternRecord, ReplyRecord, ThreadRecord
 from ..repositories import PatternRepository
 from ._utils import require_row
@@ -21,6 +23,7 @@ class PostgresPatternRepository(PatternRepository):
     """Store and retrieve ping/regex rules."""
 
     database: PostgresDatabase
+    _PATTERN_SEQUENCE_CONSTRAINT_NAMES = frozenset({"pattern_pkey", "uniq_pattern_thread_internal_id"})
 
     async def find_exact_pattern(
         self,
@@ -90,6 +93,84 @@ class PostgresPatternRepository(PatternRepository):
         disabled: bool,
         priority: int,
     ) -> PatternRecord:
+        row = await self._insert_pattern_with_retry(
+            thread_id=thread_id,
+            regex=regex,
+            channel_scope_mode=channel_scope_mode,
+            channel_scope_ids=channel_scope_ids,
+            user_scope_mode=user_scope_mode,
+            user_scope_ids=user_scope_ids,
+            sub_state=sub_state,
+            offline_state=offline_state,
+            is_regex=is_regex,
+            case_sensitive=case_sensitive,
+            color=color,
+            disabled=disabled,
+            priority=priority,
+        )
+        return self._build_pattern_record(
+            row,
+            channel_scope_ids=tuple(sorted(channel_scope_ids)),
+            user_scope_ids=tuple(sorted(user_scope_ids)),
+        )
+
+    async def _insert_pattern_with_retry(
+        self,
+        *,
+        thread_id: int,
+        regex: str,
+        channel_scope_mode: str,
+        channel_scope_ids: tuple[str, ...],
+        user_scope_mode: str,
+        user_scope_ids: tuple[str, ...],
+        sub_state: str,
+        offline_state: str,
+        is_regex: bool,
+        case_sensitive: bool,
+        color: str | None,
+        disabled: bool,
+        priority: int,
+    ) -> PatternRow:
+        for attempt in range(2):
+            try:
+                return await self._insert_pattern_once(
+                    thread_id=thread_id,
+                    regex=regex,
+                    channel_scope_mode=channel_scope_mode,
+                    channel_scope_ids=channel_scope_ids,
+                    user_scope_mode=user_scope_mode,
+                    user_scope_ids=user_scope_ids,
+                    sub_state=sub_state,
+                    offline_state=offline_state,
+                    is_regex=is_regex,
+                    case_sensitive=case_sensitive,
+                    color=color,
+                    disabled=disabled,
+                    priority=priority,
+                )
+            except psycopg.errors.UniqueViolation as error:
+                if attempt > 0 or not self._is_pattern_sequence_conflict(error):
+                    raise
+                await self._reset_pattern_id_sequence()
+        raise RuntimeError("Pattern insert retry exhausted unexpectedly.")
+
+    async def _insert_pattern_once(
+        self,
+        *,
+        thread_id: int,
+        regex: str,
+        channel_scope_mode: str,
+        channel_scope_ids: tuple[str, ...],
+        user_scope_mode: str,
+        user_scope_ids: tuple[str, ...],
+        sub_state: str,
+        offline_state: str,
+        is_regex: bool,
+        case_sensitive: bool,
+        color: str | None,
+        disabled: bool,
+        priority: int,
+    ) -> PatternRow:
         async with self.database.async_transaction() as connection:
             async with connection.cursor() as cursor:
                 await cursor.execute(
@@ -136,11 +217,25 @@ class PostgresPatternRepository(PatternRepository):
                         """,
                         [(thread_id, persisted_pattern_id, twitch_user_id) for twitch_user_id in user_scope_ids],
                     )
-        return self._build_pattern_record(
-            row,
-            channel_scope_ids=tuple(sorted(channel_scope_ids)),
-            user_scope_ids=tuple(sorted(user_scope_ids)),
-        )
+        return row
+
+    async def _reset_pattern_id_sequence(self) -> None:
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
+                """
+                SELECT setval(
+                    pg_get_serial_sequence('pattern', 'pattern_id'),
+                    COALESCE((SELECT MAX(pattern_id) FROM pattern), 0) + 1,
+                    FALSE
+                )
+                """,
+                (),
+            )
+
+    @classmethod
+    def _is_pattern_sequence_conflict(cls, error: psycopg.errors.UniqueViolation) -> bool:
+        constraint_name = getattr(getattr(error, "diag", None), "constraint_name", None)
+        return constraint_name in cls._PATTERN_SEQUENCE_CONSTRAINT_NAMES
 
     async def remove_pattern(self, *, thread_id: int, pattern_id: int) -> None:
         async with self.database.async_cursor() as cursor:
