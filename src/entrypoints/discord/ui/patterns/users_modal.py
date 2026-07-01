@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import discord
+from src.entrypoints.discord.helpers import defer_interaction_response
 
 from ...ui_data import TrackedUserPresentation
 from ..selects import window_with_included_items
@@ -79,6 +80,7 @@ class PatternUsersModal(discord.ui.Modal):
         self.add_item(self.users)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        await defer_interaction_response(interaction)
         state = self._parent_view.state
         state.user_scope_mode = self.scope.component.value
         if state.user_scope_mode in {"all_users", "all_tracked"}:
@@ -88,5 +90,4 @@ class PatternUsersModal(discord.ui.Modal):
             state.selected_users = list(self.users.component.values)
             name_by_login = {user.login: user.display_name for user in self._tracked_users}
             state.selected_user_names = [name_by_login.get(login, login) for login in state.selected_users]
-        await interaction.response.defer()
         await self._parent_view.rerender()

@@ -17,7 +17,7 @@ from ..dispatch import (
     dispatch_remove_channel_event_reply,
     dispatch_remove_pattern_reply,
 )
-from ..helpers import complete_bound_result, normalize_optional_text
+from ..helpers import complete_bound_result, defer_interaction_response, normalize_optional_text
 from ..ui_data import (
     AdapterEventActionPresentation,
     AdapterEventPresentation,
@@ -164,6 +164,7 @@ class PatternReplyAddModal(discord.ui.Modal):
         self.add_item(self.mode)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        await defer_interaction_response(interaction, ephemeral=True)
         _, pattern_id = _decode_target(self.pattern.component.values[0])
         result = await dispatch_add_pattern_reply(
             self._services,
@@ -259,6 +260,7 @@ class EventReplyAddModal(discord.ui.Modal):
         self.add_item(self.adapter_event)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        await defer_interaction_response(interaction, ephemeral=True)
         _, adapter_event_id = _decode_target(self.adapter_event.component.values[0])
         result = await dispatch_add_channel_event_reply(
             self._services,
@@ -347,6 +349,7 @@ class ReplyActionModal(discord.ui.Modal):
         self.add_item(self.reply)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        await defer_interaction_response(interaction, ephemeral=True)
         target_type, identifier = _decode_target(self.reply.component.values[0])
         if target_type == "pattern":
             if self._action == "remove":

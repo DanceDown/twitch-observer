@@ -7,7 +7,7 @@ import discord
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.events.twitch_events import StreamEventKind
 from src.localization import Localizer
-from ..helpers import normalize_optional_text
+from ..helpers import defer_interaction_response, normalize_optional_text
 from ..dispatch import (
     dispatch_add_channel_event,
     dispatch_remove_channel_event,
@@ -89,6 +89,7 @@ class ChannelEventModal(discord.ui.Modal):
         self.add_item(self.channel)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        await defer_interaction_response(interaction, ephemeral=True)
         result = await dispatch_add_channel_event(
             self._services,
             discord_channel_id=self._discord_channel_id,
@@ -147,6 +148,7 @@ class ChannelEventActionModal(discord.ui.Modal):
         self.add_item(self.notification)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        await defer_interaction_response(interaction, ephemeral=True)
         twitch_channel_id, event_key = self.notification.component.values[0].split(":", 1)
         if self._action != "remove":
             raise ValueError(f"Unsupported live ping action `{self._action}`.")
@@ -215,6 +217,7 @@ class ChannelEventColorModal(discord.ui.Modal):
         self.add_item(self.color)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        await defer_interaction_response(interaction, ephemeral=True)
         twitch_channel_id, event_key = self.notification.component.values[0].split(":", 1)
         result = await dispatch_set_channel_event_color(
             self._services,

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import discord
 
+from src.entrypoints.discord.helpers import defer_interaction_response
 from src.events.discord_results import DiscordResultStyle
 
 from .state import PatternEditorMode
@@ -76,6 +77,7 @@ class PatternOptionsModal(discord.ui.Modal):
         self.add_item(self.priority)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        await defer_interaction_response(interaction)
         self._parent_view.state.sub_state = self.sub_state.component.value
         self._parent_view.state.offline_state = self.offline_state.component.value
         normalized = self.priority.value.strip()
@@ -105,5 +107,4 @@ class PatternOptionsModal(discord.ui.Modal):
             self._parent_view.state.priority = parsed
         elif self._parent_view.mode is PatternEditorMode.EDIT:
             self._parent_view.state.priority = None
-        await interaction.response.defer()
         await self._parent_view.rerender()

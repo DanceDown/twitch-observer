@@ -12,7 +12,7 @@ from src.localization import Localizer
 from src.services.discord_ui_queries import TrackedChannelPresentation, WriteReplyCandidatePresentation
 
 from ..dispatch import dispatch_send_twitch_message
-from ..helpers import send_initial_result
+from ..helpers import defer_interaction_response, send_initial_result
 from .selects import window_with_included_items
 
 _NO_REPLY_VALUE = "__none__"
@@ -149,6 +149,7 @@ class WriteModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Dispatch one manual Twitch send request."""
+        await defer_interaction_response(interaction, ephemeral=True)
         selected_reply = self.reply_target.component.values[0]
         reply_parent_message_id = None if selected_reply == _NO_REPLY_VALUE else selected_reply
         result = await dispatch_send_twitch_message(

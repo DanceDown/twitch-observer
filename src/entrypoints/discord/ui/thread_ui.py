@@ -12,7 +12,7 @@ from src.events.discord_results import DiscordResultStyle
 from src.localization import Localizer
 
 from ..dispatch import dispatch_leave_thread, dispatch_set_thread_color
-from ..helpers import normalize_optional_text, send_initial_result
+from ..helpers import defer_interaction_response, normalize_optional_text, send_initial_result
 
 
 class LeaveConfirmationModal(discord.ui.Modal):
@@ -47,6 +47,7 @@ class LeaveConfirmationModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Validate the confirmation phrase and dispatch the destructive leave action."""
+        await defer_interaction_response(interaction, ephemeral=True)
         if self.confirmation.value.strip() != self._localizer.text(
             "discord.thread_modal.confirm_leave_placeholder",
             language=self._language,
@@ -102,6 +103,7 @@ class ThreadColorModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Dispatch the chosen color update for the current thread."""
+        await defer_interaction_response(interaction, ephemeral=True)
         result = await dispatch_set_thread_color(
             self._services,
             discord_channel_id=self._discord_channel_id,

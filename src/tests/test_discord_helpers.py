@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from dataclasses import dataclass, field
+from types import SimpleNamespace
+
+import discord
+import pytest
 
 from src.database.records import ChannelRecord, PatternRecord, ThreadRecord
-from src.entrypoints.discord.helpers import build_public_result_embed
+from src.entrypoints.discord.helpers import build_public_result_embed, complete_bound_result, send_initial_result
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.events.twitch_events import TwitchChatMessageEvent
 from src.localization import Localizer
@@ -44,6 +49,111 @@ def test_public_actor_embed_keeps_plain_body_when_no_user_placeholder_exists() -
 
     assert embed.description is not None
     assert embed.description == "Added a ping."
+
+
+class FakeUnknownInteractionError(discord.NotFound):
+    code = 10062
+
+    def __init__(self) -> None:
+        pass
+
+
+@dataclass
+class FakeResponse:
+    done: bool = False
+    fail_defer: bool = False
+
+    def is_done(self) -> bool:
+        return self.done
+
+    async def defer(self, *, ephemeral: bool = False) -> None:
+        _ = ephemeral
+        if self.fail_defer:
+            raise FakeUnknownInteractionError()
+        self.done = True
+
+    async def send_message(self, *, embed: discord.Embed, ephemeral: bool, view: object | None = None) -> None:
+        _ = (embed, ephemeral, view)
+        self.done = True
+
+
+@dataclass
+class FakeChannel:
+    sent_embeds: list[discord.Embed] = field(default_factory=list)
+
+    async def send(self, *, embed: discord.Embed) -> None:
+        self.sent_embeds.append(embed)
+
+
+@dataclass
+class FakeBoundMessage:
+    edited_embed: discord.Embed | None = None
+    edited_view: object | None = None
+    deleted: bool = False
+
+    async def edit(self, *, embed: discord.Embed | None = None, view: object | None = None) -> None:
+        self.edited_embed = embed
+        self.edited_view = view
+
+    async def delete(self) -> None:
+        self.deleted = True
+
+
+@dataclass
+class FakeInteraction:
+    response: FakeResponse
+    channel: FakeChannel | None = None
+    locale: str = "en-US"
+    user: object = field(default_factory=lambda: SimpleNamespace(id=123))
+    deleted_original_response: bool = False
+
+    async def edit_original_response(self, *, embed: discord.Embed) -> None:
+        _ = embed
+
+    async def delete_original_response(self) -> None:
+        self.deleted_original_response = True
+
+
+@pytest.mark.asyncio
+async def test_send_initial_result_posts_public_result_even_when_defer_hits_unknown_interaction() -> None:
+    interaction = FakeInteraction(
+        response=FakeResponse(done=False, fail_defer=True),
+        channel=FakeChannel(),
+    )
+    result = DiscordCommandResult(
+        title="Ping Added",
+        message="Added a ping.",
+        style=DiscordResultStyle.SUCCESS,
+        ephemeral=False,
+    )
+
+    await send_initial_result(interaction, result)
+
+    assert interaction.channel is not None
+    assert len(interaction.channel.sent_embeds) == 1
+    assert interaction.channel.sent_embeds[0].description == "Added a ping."
+    assert interaction.deleted_original_response is False
+
+
+@pytest.mark.asyncio
+async def test_complete_bound_result_posts_public_result_even_when_defer_hits_unknown_interaction() -> None:
+    interaction = FakeInteraction(
+        response=FakeResponse(done=False, fail_defer=True),
+        channel=FakeChannel(),
+    )
+    bound_message = FakeBoundMessage()
+    result = DiscordCommandResult(
+        title="Ping Added",
+        message="Added a ping.",
+        style=DiscordResultStyle.SUCCESS,
+        ephemeral=False,
+    )
+
+    await complete_bound_result(interaction, bound_message=bound_message, result=result)
+
+    assert interaction.channel is not None
+    assert len(interaction.channel.sent_embeds) == 1
+    assert bound_message.deleted is True
 
 
 def test_tracking_embed_author_name_is_not_escaped() -> None:

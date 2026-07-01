@@ -8,7 +8,7 @@ from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.localization import Localizer
 
 from ..dispatch import dispatch_add_tracked_user, dispatch_remove_tracked_user
-from ..helpers import complete_bound_result
+from ..helpers import complete_bound_result, defer_interaction_response
 from ..ui_data import TrackedUserPresentation
 from .selects import window_with_included_items
 
@@ -40,6 +40,7 @@ class UserNameModal(discord.ui.Modal):
         self.add_item(self.twitch_name)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        await defer_interaction_response(interaction, ephemeral=True)
         result = await dispatch_add_tracked_user(
             self._services,
             discord_channel_id=self._discord_channel_id,
@@ -93,6 +94,7 @@ class UserSelectionModal(discord.ui.Modal):
         self.add_item(self.user)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        await defer_interaction_response(interaction, ephemeral=True)
         result = await dispatch_remove_tracked_user(
             self._services,
             discord_channel_id=self._discord_channel_id,

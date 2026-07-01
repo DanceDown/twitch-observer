@@ -10,7 +10,7 @@ from src.localization import Localizer
 from src.utils.permissions import PERMISSION_CHOICES
 
 from ..dispatch import dispatch_clear_permissions, dispatch_grant_permissions, dispatch_revoke_permissions
-from ..helpers import complete_bound_result
+from ..helpers import complete_bound_result, defer_interaction_response
 
 
 def _permission_option_label(*, localizer: Localizer, language: str, value: str) -> str:
@@ -71,6 +71,7 @@ class PermissionModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Dispatch one permission-management action."""
+        await defer_interaction_response(interaction, ephemeral=True)
         selected_user = self.user.component.values[0]
         permissions = () if self.permission is None else tuple(self.permission.component.values)
         if self._action == "grant":

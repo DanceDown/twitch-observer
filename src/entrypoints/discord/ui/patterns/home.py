@@ -5,6 +5,7 @@ from __future__ import annotations
 import discord
 
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
+from src.entrypoints.discord.helpers import defer_interaction_response
 from src.events.discord_results import DiscordResultStyle
 from src.events.pattern_scopes import ChannelScopeMode, OfflineScope, SubscriptionScope, UserScopeMode
 from src.events.ui_flow import UIFlowKind, UIFlowStep
@@ -155,7 +156,7 @@ class PatternHomeView(BaseFormView):
             discord_channel_id=self._discord_channel_id,
         ):
             return
-        await interaction.response.send_modal(PatternBasicsModal(parent=self))
+        await self.open_modal(interaction, PatternBasicsModal(parent=self))
 
     @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def channels(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
@@ -174,7 +175,7 @@ class PatternHomeView(BaseFormView):
                 self.result("discord.pattern_ui.errors.no_channels", style=DiscordResultStyle.ERROR, ephemeral=True),
             )
             return
-        await interaction.response.send_modal(PatternChannelsModal(parent=self, tracked_channels=tracked_channels))
+        await self.open_modal(interaction, PatternChannelsModal(parent=self, tracked_channels=tracked_channels))
 
     @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def users(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
@@ -193,7 +194,7 @@ class PatternHomeView(BaseFormView):
                 self.result("discord.pattern_ui.errors.no_users", style=DiscordResultStyle.ERROR, ephemeral=True),
             )
             return
-        await interaction.response.send_modal(PatternUsersModal(parent=self, tracked_users=tracked_users))
+        await self.open_modal(interaction, PatternUsersModal(parent=self, tracked_users=tracked_users))
 
     @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def options(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
@@ -205,7 +206,7 @@ class PatternHomeView(BaseFormView):
             discord_channel_id=self._discord_channel_id,
         ):
             return
-        await interaction.response.send_modal(PatternOptionsModal(parent=self))
+        await self.open_modal(interaction, PatternOptionsModal(parent=self))
 
     @discord.ui.button(label="_", style=discord.ButtonStyle.success)
     async def save(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
@@ -217,6 +218,7 @@ class PatternHomeView(BaseFormView):
             discord_channel_id=self._discord_channel_id,
         ):
             return
+        await defer_interaction_response(interaction, ephemeral=True)
         if self.state.channel_scope_mode in {"only_selected", "all_except_selected"} and not self.state.selected_channels:
             await self.finish_with_interaction(
                 interaction,

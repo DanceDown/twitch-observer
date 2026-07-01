@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import discord
+from src.entrypoints.discord.helpers import defer_interaction_response
 
 if TYPE_CHECKING:
     from .home import PatternHomeView
@@ -66,10 +67,10 @@ class PatternBasicsModal(discord.ui.Modal):
         self.add_item(self.color)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        await defer_interaction_response(interaction)
         self._parent_view.state.pattern_text = self.pattern_text.value.strip()
         self._parent_view.state.is_regex = self.mode.component.value == "regex"
         self._parent_view.state.case_sensitive = "case_sensitive" in self.case_sensitive.component.values
         color_value = self.color.value.strip()
         self._parent_view.state.color = color_value or None
-        await interaction.response.defer()
         await self._parent_view.rerender()

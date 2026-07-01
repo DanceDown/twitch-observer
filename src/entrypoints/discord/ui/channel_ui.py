@@ -8,7 +8,7 @@ from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.localization import Localizer
 
 from ..dispatch import dispatch_add_tracked_channel, dispatch_remove_tracked_channel, dispatch_set_tracked_channel_color
-from ..helpers import complete_bound_result, normalize_optional_text
+from ..helpers import complete_bound_result, defer_interaction_response, normalize_optional_text
 from ..ui_data import TrackedChannelPresentation
 from .selects import window_with_included_items
 
@@ -41,6 +41,7 @@ class ChannelNameModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Dispatch the entered Twitch channel name."""
+        await defer_interaction_response(interaction, ephemeral=True)
         result = await dispatch_add_tracked_channel(
             self._services,
             discord_channel_id=self._discord_channel_id,
@@ -112,6 +113,7 @@ class ChannelSelectionModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Dispatch the selected tracked-channel action."""
+        await defer_interaction_response(interaction, ephemeral=True)
         login = self.channel.component.values[0]
         if self._action == "color":
             result = await dispatch_set_tracked_channel_color(

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 
-from src.database.connection import PatternRecord, ThreadRecord
+from src.database.connection import ThreadRecord
 from src.discord_results import build_thread_result
 from src.events.commands import AddPatternCommand, EditPatternCommand, SetPatternEnabledCommand
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle

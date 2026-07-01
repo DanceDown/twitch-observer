@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import discord
+from src.entrypoints.discord.helpers import defer_interaction_response
 
 from ...ui_data import TrackedChannelPresentation
 from ..selects import window_with_included_items
@@ -69,6 +70,7 @@ class PatternChannelsModal(discord.ui.Modal):
         self.add_item(self.channels)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        await defer_interaction_response(interaction)
         self._parent_view.state.channel_scope_mode = self.scope.component.value
         if self.scope.component.value == "all_tracked":
             self._parent_view.state.selected_channels.clear()
@@ -79,5 +81,4 @@ class PatternChannelsModal(discord.ui.Modal):
             self._parent_view.state.selected_channel_names = [
                 name_by_login.get(login, login) for login in self._parent_view.state.selected_channels
             ]
-        await interaction.response.defer()
         await self._parent_view.rerender()

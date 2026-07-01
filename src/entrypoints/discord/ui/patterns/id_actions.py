@@ -5,6 +5,7 @@ from __future__ import annotations
 import discord
 
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
+from src.entrypoints.discord.helpers import defer_interaction_response
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 
@@ -63,6 +64,7 @@ class PatternIdActionView(BaseFormView):
         return self.form_embed("discord.pattern_ui.action.embed", sources={"view": {"action": action_label}})
 
     async def run_action(self, interaction: discord.Interaction, pattern_id: int) -> None:
+        await defer_interaction_response(interaction, ephemeral=True)
         if self._action is PatternActionKind.REMOVE:
             result = await dispatch_remove_pattern(
                 self._services,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import suppress
+import logging
 
 import discord
 
@@ -15,10 +16,64 @@ from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
 from .dispatch import dispatch_ui_flow_decision
 
+logger = logging.getLogger(__name__)
+
 
 def build_public_result_embed(result: DiscordCommandResult) -> discord.Embed:
     """Render one public result embed without additional body rewriting."""
     return build_result_embed(result)
+
+
+async def defer_interaction_response(
+    interaction: discord.Interaction,
+    *,
+    ephemeral: bool = False,
+) -> bool:
+    """Try to acknowledge one interaction without crashing on expired tokens."""
+    if interaction.response.is_done():
+        return True
+    try:
+        await interaction.response.defer(ephemeral=ephemeral)
+        return True
+    except discord.HTTPException as error:
+        if _is_unknown_interaction_error(error):
+            logger.warning("Discord interaction expired before defer; continuing with fallback handling.")
+            return False
+        raise
+
+
+async def send_message_response(
+    interaction: discord.Interaction,
+    *,
+    embed: discord.Embed,
+    ephemeral: bool,
+    view: discord.ui.View | None = None,
+) -> bool:
+    """Try to send one interaction message response without crashing on expired tokens."""
+    if interaction.response.is_done():
+        return False
+    try:
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
+        return True
+    except discord.HTTPException as error:
+        if _is_unknown_interaction_error(error):
+            logger.warning("Discord interaction expired before send_message; continuing with fallback handling.")
+            return False
+        raise
+
+
+async def send_modal_response(interaction: discord.Interaction, modal: discord.ui.Modal) -> bool:
+    """Try to open one modal without crashing on expired interaction tokens."""
+    if interaction.response.is_done():
+        return False
+    try:
+        await interaction.response.send_modal(modal)
+        return True
+    except discord.HTTPException as error:
+        if _is_unknown_interaction_error(error):
+            logger.warning("Discord interaction expired before send_modal; skipping modal open.")
+            return False
+        raise
 
 
 async def send_initial_result(interaction: discord.Interaction, result: DiscordCommandResult) -> None:
@@ -29,34 +84,63 @@ async def send_initial_result(interaction: discord.Interaction, result: DiscordC
             with suppress(discord.HTTPException):
                 await interaction.edit_original_response(embed=embed)
             return
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await send_message_response(interaction, embed=embed, ephemeral=True)
         return
 
     public_embed = build_public_result_embed(result)
-    if interaction.response.is_done():
-        if interaction.channel is not None:
-            try:
-                await interaction.channel.send(embed=public_embed)
-            except discord.Forbidden:
-                fallback_embed = build_result_embed(_missing_channel_access_result(interaction))
-                with suppress(discord.HTTPException):
-                    await interaction.edit_original_response(embed=fallback_embed)
-                return
-        with suppress(discord.HTTPException):
-            await interaction.delete_original_response()
-        return
-
-    await interaction.response.defer(ephemeral=True)
+    response_ready = interaction.response.is_done() or await defer_interaction_response(interaction, ephemeral=True)
     if interaction.channel is not None:
         try:
             await interaction.channel.send(embed=public_embed)
         except discord.Forbidden:
+            if response_ready:
+                fallback_embed = build_result_embed(_missing_channel_access_result(interaction))
+                with suppress(discord.HTTPException):
+                    await interaction.edit_original_response(embed=fallback_embed)
+            return
+    if response_ready:
+        with suppress(discord.HTTPException):
+            await interaction.delete_original_response()
+
+
+async def complete_bound_result(
+    interaction: discord.Interaction,
+    *,
+    bound_message: discord.InteractionMessage | None,
+    result: DiscordCommandResult,
+) -> None:
+    """Finish one interactive form flow using its bound root message when available."""
+    if bound_message is None:
+        await send_initial_result(interaction, result)
+        return
+
+    embed = build_result_embed(result)
+    if result.ephemeral:
+        await defer_interaction_response(interaction, ephemeral=True)
+        await bound_message.edit(embed=embed, view=None)
+        return
+
+    with suppress(discord.HTTPException):
+        await bound_message.edit(view=None)
+    response_ready = interaction.response.is_done() or await defer_interaction_response(interaction, ephemeral=True)
+    if interaction.channel is not None:
+        try:
+            await interaction.channel.send(embed=build_public_result_embed(result))
+        except discord.Forbidden:
             fallback_embed = build_result_embed(_missing_channel_access_result(interaction))
             with suppress(discord.HTTPException):
-                await interaction.edit_original_response(embed=fallback_embed)
+                await bound_message.edit(embed=fallback_embed, view=None)
             return
+    if response_ready:
+        with suppress(discord.HTTPException):
+            await interaction.delete_original_response()
     with suppress(discord.HTTPException):
-        await interaction.delete_original_response()
+        await bound_message.delete()
+
+
+def _is_unknown_interaction_error(error: discord.HTTPException) -> bool:
+    """Return whether Discord rejected the interaction because its token already expired."""
+    return getattr(error, "code", None) == 10062
 
 
 async def ensure_ui_flow_allowed(
@@ -80,55 +164,6 @@ async def ensure_ui_flow_allowed(
     if decision.result is not None:
         await send_initial_result(interaction, decision.result)
     return False
-
-
-async def complete_bound_result(
-    interaction: discord.Interaction,
-    *,
-    bound_message: discord.InteractionMessage | None,
-    result: DiscordCommandResult,
-) -> None:
-    """Finish one interactive form flow using its bound root message when available."""
-    embed = build_result_embed(result)
-    if bound_message is None:
-        if interaction.response.is_done():
-            if result.ephemeral:
-                with suppress(discord.HTTPException):
-                    await interaction.edit_original_response(embed=embed)
-            elif interaction.channel is not None:
-                await interaction.channel.send(embed=build_public_result_embed(result))
-        else:
-            if result.ephemeral:
-                await interaction.response.send_message(embed=embed, ephemeral=True)
-            else:
-                await interaction.response.defer(ephemeral=True)
-                if interaction.channel is not None:
-                    await interaction.channel.send(embed=build_public_result_embed(result))
-                with suppress(discord.HTTPException):
-                    await interaction.delete_original_response()
-        return
-
-    if result.ephemeral:
-        if interaction.response.is_done():
-            await bound_message.edit(embed=embed, view=None)
-        else:
-            await interaction.response.defer(ephemeral=True)
-            await bound_message.edit(embed=embed, view=None)
-        return
-
-    with suppress(discord.HTTPException):
-        await bound_message.edit(view=None)
-    if interaction.response.is_done():
-        if interaction.channel is not None:
-            await interaction.channel.send(embed=build_public_result_embed(result))
-    else:
-        await interaction.response.defer(ephemeral=True)
-        if interaction.channel is not None:
-            await interaction.channel.send(embed=build_public_result_embed(result))
-    with suppress(discord.HTTPException):
-        await interaction.delete_original_response()
-    with suppress(discord.HTTPException):
-        await bound_message.delete()
 
 
 def command_unavailable_result() -> DiscordCommandResult:

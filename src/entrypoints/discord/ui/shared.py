@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from contextlib import suppress
 from typing import TYPE_CHECKING
 
 import discord
 
-from src.entrypoints.discord.helpers import build_public_result_embed
+from src.entrypoints.discord.helpers import (
+    complete_bound_result,
+    defer_interaction_response,
+    send_message_response,
+    send_modal_response,
+)
 from src.discord_results import build_result
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.events.ui_flow import UIFlowKind, UIFlowStep
@@ -33,8 +37,8 @@ async def start_form(
     view: BaseFormView,
 ) -> None:
     """Send the original ephemeral interaction response and bind the view message."""
-    await interaction.response.send_message(embed=view.render_embed(), view=view, ephemeral=True)
-    view.bound_message = await interaction.original_response()
+    if await send_message_response(interaction, embed=view.render_embed(), view=view, ephemeral=True):
+        view.bound_message = await interaction.original_response()
 
 
 async def resolve_context_language(
@@ -134,46 +138,7 @@ class BaseFormView(discord.ui.View):
         result: DiscordCommandResult,
     ) -> None:
         """Finish one form flow while preserving public success visibility."""
-        embed = build_result_embed(result)
-        if self.bound_message is None:
-            if interaction.response.is_done():
-                if result.ephemeral:
-                    with suppress(discord.HTTPException):
-                        await interaction.edit_original_response(embed=embed)
-                elif interaction.channel is not None:
-                    await interaction.channel.send(embed=build_public_result_embed(result))
-            else:
-                if result.ephemeral:
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
-                else:
-                    await interaction.response.defer(ephemeral=True)
-                    if interaction.channel is not None:
-                        await interaction.channel.send(embed=build_public_result_embed(result))
-                    with suppress(discord.HTTPException):
-                        await interaction.delete_original_response()
-            return
-
-        if result.ephemeral:
-            if interaction.response.is_done():
-                await self.bound_message.edit(embed=embed, view=None)
-            else:
-                await interaction.response.defer(ephemeral=True)
-                await self.bound_message.edit(embed=embed, view=None)
-            return
-
-        with suppress(discord.HTTPException):
-            await self.bound_message.edit(view=None)
-        if interaction.response.is_done():
-            if interaction.channel is not None:
-                await interaction.channel.send(embed=build_public_result_embed(result))
-        else:
-            await interaction.response.defer(ephemeral=True)
-            if interaction.channel is not None:
-                await interaction.channel.send(embed=build_public_result_embed(result))
-        with suppress(discord.HTTPException):
-            await interaction.delete_original_response()
-        with suppress(discord.HTTPException):
-            await self.bound_message.delete()
+        await complete_bound_result(interaction, bound_message=self.bound_message, result=result)
 
     async def ensure_step_allowed(
         self,
@@ -202,6 +167,15 @@ class BaseFormView(discord.ui.View):
         """Refresh the original interaction response with the current form state."""
         if self.bound_message is not None:
             await self.bound_message.edit(embed=self.render_embed(), view=self)
+
+    async def defer_and_rerender(self, interaction: discord.Interaction) -> None:
+        """Acknowledge one modal submit when possible and then refresh the root form."""
+        await defer_interaction_response(interaction)
+        await self.rerender()
+
+    async def open_modal(self, interaction: discord.Interaction, modal: discord.ui.Modal) -> None:
+        """Try to open the next modal without bubbling expired-interaction errors."""
+        await send_modal_response(interaction, modal)
 
     def render_embed(self) -> discord.Embed:
         """Render the current form state into one Discord embed."""
