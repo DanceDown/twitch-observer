@@ -55,3 +55,15 @@ def test_app_config_uses_default_message_write_flush_interval(monkeypatch) -> No
     monkeypatch.delenv("TWITCH_MESSAGE_WRITE_FLUSH_INTERVAL_SECONDS", raising=False)
     config = AppConfig()
     assert config.twitch_message_write_flush_interval_seconds == 0.25
+
+
+def test_app_config_uses_default_discord_delivery_max_attempts(monkeypatch) -> None:
+    monkeypatch.delenv("DISCORD_DELIVERY_MAX_ATTEMPTS", raising=False)
+    config = AppConfig()
+    assert config.discord_delivery_max_attempts == 10
+
+
+def test_app_config_reads_discord_delivery_max_attempts(monkeypatch) -> None:
+    monkeypatch.setenv("DISCORD_DELIVERY_MAX_ATTEMPTS", "5")
+    config = AppConfig()
+    assert config.discord_delivery_max_attempts == 5

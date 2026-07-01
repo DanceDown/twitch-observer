@@ -8,6 +8,7 @@ import logging
 import discord
 
 from src.discord_results import build_result
+from src.entrypoints.discord.delivery import send_embed_with_retries
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.events.ui_flow import UIFlowKind, UIFlowStep
 from src.localization import Localizer
@@ -89,18 +90,33 @@ async def send_initial_result(interaction: discord.Interaction, result: DiscordC
 
     public_embed = build_public_result_embed(result)
     response_ready = interaction.response.is_done() or await defer_interaction_response(interaction, ephemeral=True)
+    public_sent = False
     if interaction.channel is not None:
         try:
-            await interaction.channel.send(embed=public_embed)
+            public_sent = await send_embed_with_retries(
+                interaction.channel,
+                embed=public_embed,
+                purpose="public interaction result",
+            )
         except discord.Forbidden:
             if response_ready:
                 fallback_embed = build_result_embed(_missing_channel_access_result(interaction))
                 with suppress(discord.HTTPException):
                     await interaction.edit_original_response(embed=fallback_embed)
             return
+        except discord.NotFound:
+            logger.warning(
+                "Discord channel disappeared before one public interaction result could be sent channel_id=%s.",
+                interaction.channel_id,
+            )
+    if public_sent:
+        if response_ready:
+            with suppress(discord.HTTPException):
+                await interaction.delete_original_response()
+        return
     if response_ready:
         with suppress(discord.HTTPException):
-            await interaction.delete_original_response()
+            await interaction.edit_original_response(embed=public_embed)
 
 
 async def complete_bound_result(
@@ -123,19 +139,34 @@ async def complete_bound_result(
     with suppress(discord.HTTPException):
         await bound_message.edit(view=None)
     response_ready = interaction.response.is_done() or await defer_interaction_response(interaction, ephemeral=True)
+    public_sent = False
     if interaction.channel is not None:
         try:
-            await interaction.channel.send(embed=build_public_result_embed(result))
+            public_sent = await send_embed_with_retries(
+                interaction.channel,
+                embed=build_public_result_embed(result),
+                purpose="bound public interaction result",
+            )
         except discord.Forbidden:
             fallback_embed = build_result_embed(_missing_channel_access_result(interaction))
             with suppress(discord.HTTPException):
                 await bound_message.edit(embed=fallback_embed, view=None)
             return
-    if response_ready:
+        except discord.NotFound:
+            logger.warning(
+                "Discord channel disappeared before one bound public interaction result could be sent channel_id=%s.",
+                interaction.channel_id,
+            )
+    if public_sent:
+        if response_ready:
+            with suppress(discord.HTTPException):
+                await interaction.delete_original_response()
         with suppress(discord.HTTPException):
-            await interaction.delete_original_response()
+            await bound_message.delete()
+        return
     with suppress(discord.HTTPException):
-        await bound_message.delete()
+        await bound_message.edit(embed=embed, view=None)
+    return
 
 
 def _is_unknown_interaction_error(error: discord.HTTPException) -> bool:

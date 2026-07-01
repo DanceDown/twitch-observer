@@ -26,6 +26,11 @@ def _get_bool(name: str, default: str) -> bool:
     return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def get_discord_delivery_max_attempts() -> int:
+    """Read the configured Discord delivery retry limit with one safe minimum."""
+    return max(1, _get_int("DISCORD_DELIVERY_MAX_ATTEMPTS", "10"))
+
+
 @dataclass(slots=True)
 class AppConfig:
     """Central runtime configuration for entrypoints, gateways, database and services."""
@@ -93,6 +98,7 @@ class AppConfig:
     discord_presence_lookback_minutes: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_LOOKBACK_MINUTES", "5"))
     discord_presence_message_limit: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_MESSAGE_LIMIT", "50"))
     discord_presence_max_status_length: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_MAX_STATUS_LENGTH", "120"))
+    discord_delivery_max_attempts: int = field(default_factory=get_discord_delivery_max_attempts)
     twitch_message_write_batch_size: int = field(default_factory=lambda: _get_int("TWITCH_MESSAGE_WRITE_BATCH_SIZE", "50"))
     twitch_message_write_flush_interval_seconds: float = field(
         default_factory=lambda: _get_float("TWITCH_MESSAGE_WRITE_FLUSH_INTERVAL_SECONDS", "0.25")

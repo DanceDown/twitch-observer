@@ -6,6 +6,7 @@ import logging
 import discord
 
 from src.config import AppConfig
+from src.entrypoints.discord.delivery import send_embed_with_retries
 from src.localization import Localizer
 from src.utils.discord_embeds import build_result_embed
 
@@ -108,7 +109,12 @@ class ObserverDiscordClient(discord.Client):
         if user is None:
             user = await self.fetch_user(discord_user_id)
         channel = user.dm_channel or await user.create_dm()
-        await channel.send(embed=build_result_embed(result))
+        await send_embed_with_retries(
+            channel,
+            embed=build_result_embed(result),
+            purpose="direct user result",
+            max_attempts=self._config.discord_delivery_max_attempts,
+        )
 
     async def send_channel_result(self, discord_channel_id: int, result) -> None:
         """Send a result embed to the originating Discord channel when possible."""
@@ -116,4 +122,9 @@ class ObserverDiscordClient(discord.Client):
         if channel is None:
             channel = await self.fetch_channel(discord_channel_id)
         if isinstance(channel, discord.TextChannel | discord.Thread | discord.DMChannel):
-            await channel.send(embed=build_result_embed(result))
+            await send_embed_with_retries(
+                channel,
+                embed=build_result_embed(result),
+                purpose="runtime channel result",
+                max_attempts=self._config.discord_delivery_max_attempts,
+            )

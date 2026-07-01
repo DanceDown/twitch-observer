@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 
+import aiohttp
 import discord
 import pytest
 
@@ -80,8 +81,12 @@ class FakeResponse:
 @dataclass
 class FakeChannel:
     sent_embeds: list[discord.Embed] = field(default_factory=list)
+    send_failures_before_success: int = 0
 
     async def send(self, *, embed: discord.Embed) -> None:
+        if self.send_failures_before_success > 0:
+            self.send_failures_before_success -= 1
+            raise aiohttp.ClientConnectionError("temporary send failure")
         self.sent_embeds.append(embed)
 
 
@@ -106,9 +111,10 @@ class FakeInteraction:
     locale: str = "en-US"
     user: object = field(default_factory=lambda: SimpleNamespace(id=123))
     deleted_original_response: bool = False
+    edited_original_embed: discord.Embed | None = None
 
     async def edit_original_response(self, *, embed: discord.Embed) -> None:
-        _ = embed
+        self.edited_original_embed = embed
 
     async def delete_original_response(self) -> None:
         self.deleted_original_response = True
@@ -154,6 +160,92 @@ async def test_complete_bound_result_posts_public_result_even_when_defer_hits_un
     assert interaction.channel is not None
     assert len(interaction.channel.sent_embeds) == 1
     assert bound_message.deleted is True
+
+
+@pytest.mark.asyncio
+async def test_send_initial_result_retries_transient_public_send_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_sleep(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setenv("DISCORD_DELIVERY_MAX_ATTEMPTS", "3")
+    monkeypatch.setattr("src.entrypoints.discord.delivery.asyncio.sleep", fake_sleep)
+    interaction = FakeInteraction(
+        response=FakeResponse(done=False, fail_defer=False),
+        channel=FakeChannel(send_failures_before_success=1),
+    )
+    result = DiscordCommandResult(
+        title="Ping Added",
+        message="Added a ping.",
+        style=DiscordResultStyle.SUCCESS,
+        ephemeral=False,
+    )
+
+    await send_initial_result(interaction, result)
+
+    assert interaction.channel is not None
+    assert len(interaction.channel.sent_embeds) == 1
+    assert interaction.deleted_original_response is True
+    assert interaction.edited_original_embed is None
+
+
+@pytest.mark.asyncio
+async def test_send_initial_result_keeps_result_visible_when_public_send_never_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_sleep(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setenv("DISCORD_DELIVERY_MAX_ATTEMPTS", "3")
+    monkeypatch.setattr("src.entrypoints.discord.delivery.asyncio.sleep", fake_sleep)
+    interaction = FakeInteraction(
+        response=FakeResponse(done=False, fail_defer=False),
+        channel=FakeChannel(send_failures_before_success=3),
+    )
+    result = DiscordCommandResult(
+        title="Ping Added",
+        message="Added a ping.",
+        style=DiscordResultStyle.SUCCESS,
+        ephemeral=False,
+    )
+
+    await send_initial_result(interaction, result)
+
+    assert interaction.channel is not None
+    assert interaction.channel.sent_embeds == []
+    assert interaction.deleted_original_response is False
+    assert interaction.edited_original_embed is not None
+    assert interaction.edited_original_embed.description == "Added a ping."
+
+
+@pytest.mark.asyncio
+async def test_complete_bound_result_keeps_bound_message_when_public_send_never_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_sleep(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setenv("DISCORD_DELIVERY_MAX_ATTEMPTS", "3")
+    monkeypatch.setattr("src.entrypoints.discord.delivery.asyncio.sleep", fake_sleep)
+    interaction = FakeInteraction(
+        response=FakeResponse(done=False, fail_defer=False),
+        channel=FakeChannel(send_failures_before_success=3),
+    )
+    bound_message = FakeBoundMessage()
+    result = DiscordCommandResult(
+        title="Ping Added",
+        message="Added a ping.",
+        style=DiscordResultStyle.SUCCESS,
+        ephemeral=False,
+    )
+
+    await complete_bound_result(interaction, bound_message=bound_message, result=result)
+
+    assert interaction.channel is not None
+    assert interaction.channel.sent_embeds == []
+    assert interaction.deleted_original_response is False
+    assert bound_message.deleted is False
+    assert bound_message.edited_embed is not None
+    assert bound_message.edited_embed.description == "Added a ping."
 
 
 def test_tracking_embed_author_name_is_not_escaped() -> None:
