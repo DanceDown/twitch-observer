@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
@@ -1080,6 +1081,40 @@ class FakeTwitchAPI:
 
     async def is_user_live(self, user_id: str) -> bool:
         return self.live_by_user_id.get(user_id, False)
+
+
+@dataclass
+class BlockingLiveEventTwitchAPI(FakeTwitchAPI):
+    expected_calls: int = 2
+    release_send: asyncio.Event = field(default_factory=asyncio.Event)
+    all_sends_started: asyncio.Event = field(default_factory=asyncio.Event)
+    started_sender_ids: list[str] = field(default_factory=list)
+
+    async def send_chat_message(
+        self,
+        *,
+        access_token: str,
+        client_id: str,
+        sender_id: str,
+        broadcaster_id: str,
+        message: str,
+        reply_parent_message_id: str | None = None,
+    ) -> str:
+        self.started_sender_ids.append(sender_id)
+        if len(self.started_sender_ids) >= self.expected_calls:
+            self.all_sends_started.set()
+        await self.release_send.wait()
+        self.sent_messages.append(
+            {
+                "access_token": access_token,
+                "client_id": client_id,
+                "sender_id": sender_id,
+                "broadcaster_id": broadcaster_id,
+                "message": message,
+                "reply_parent_message_id": reply_parent_message_id,
+            }
+        )
+        return f"sent-{sender_id}"
 
 
 @dataclass
@@ -2356,3 +2391,113 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
     assert "https://www.twitch.tv/example" in tracking_embed.description
     assert "Ping" not in tracking_embed.description
     assert any(field.value == "YIPPIE ExampleChannel is online" for field in tracking_embed.fields)
+
+
+@pytest.mark.asyncio
+async def test_channel_event_auto_reply_service_sends_multiple_thread_replies_in_parallel() -> None:
+    thread_repository = InMemoryThreadRepository()
+    first_thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
+    second_thread = await thread_repository.create(owner_id=201, discord_channel_id=101)
+    channel_repository = InMemoryChannelRepository()
+    await channel_repository.add_channel(first_thread.thread_id, "42")
+    await channel_repository.add_channel(second_thread.thread_id, "42")
+    adapter_event_repository = InMemoryAdapterEventRepository()
+    adapter_event_action_repository = InMemoryAdapterEventActionRepository(event_repository=adapter_event_repository)
+
+    first_event = await adapter_event_repository.upsert_event(
+        thread_id=first_thread.thread_id,
+        adapter_key="twitch",
+        subject_type="channel",
+        subject_id="42",
+        event_key="stream.online",
+    )
+    second_event = await adapter_event_repository.upsert_event(
+        thread_id=second_thread.thread_id,
+        adapter_key="twitch",
+        subject_type="channel",
+        subject_id="42",
+        event_key="stream.online",
+    )
+    for event_id in (first_event.event_id, second_event.event_id):
+        await adapter_event_action_repository.upsert_action(
+            event_id=event_id,
+            action_type="discord_notify",
+            message_template=None,
+            reply_as_reply=False,
+        )
+        await adapter_event_action_repository.upsert_action(
+            event_id=event_id,
+            action_type="twitch_send_message",
+            message_template="YIPPIE {CHANNEL} is {STATE}",
+            reply_as_reply=False,
+        )
+
+    account_repository = InMemoryAccountRepository()
+    first_account = await account_repository.create_account(
+        discord_user_id=200,
+        twitch_user_id="77",
+        twitch_login="dancedown",
+        client_id="client-123",
+        access_token="oauth:test-token-1",
+        refresh_token=None,
+        expires_at=None,
+        scope=("user:write:chat",),
+        token_type="bearer",
+    )
+    second_account = await account_repository.create_account(
+        discord_user_id=201,
+        twitch_user_id="88",
+        twitch_login="dancedown2",
+        client_id="client-456",
+        access_token="oauth:test-token-2",
+        refresh_token=None,
+        expires_at=None,
+        scope=("user:write:chat",),
+        token_type="bearer",
+    )
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=first_account.account_id)
+    await thread_repository.set_account_id(discord_channel_id=101, account_id=second_account.account_id)
+
+    twitch_api = BlockingLiveEventTwitchAPI(
+        users_by_id={
+            "42": TwitchUser(user_id="42", login="example", display_name="ExampleChannel"),
+        },
+        expected_calls=2,
+    )
+    notifier = FakeNotifier()
+    message_repository = InMemoryMessageRepository()
+    service = ChannelEventAutoReplyService(
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        adapter_event_repository=adapter_event_repository,
+        adapter_event_action_repository=adapter_event_action_repository,
+        message_repository=message_repository,
+        account_repository=account_repository,
+        twitch_api=twitch_api,  # type: ignore[arg-type]
+        tracking_notifier=notifier,
+        token_refresh_skew_seconds=30,
+    )
+
+    task = asyncio.create_task(
+        service.handle_channel_live_state_changed(
+            TwitchChannelLiveStateChangedEvent(
+                twitch_channel_id="42",
+                twitch_channel_login="example",
+                is_live=True,
+            )
+        )
+    )
+
+    await asyncio.wait_for(twitch_api.all_sends_started.wait(), timeout=1.0)
+    assert set(twitch_api.started_sender_ids) == {"77", "88"}
+
+    twitch_api.release_send.set()
+    suppressed = await task
+
+    assert suppressed == {
+        (first_thread.thread_id, first_event.event_id),
+        (second_thread.thread_id, second_event.event_id),
+    }
+    assert len(twitch_api.sent_messages) == 2
+    assert len(message_repository.saved_bot_messages) == 2
+    assert len(notifier.tracking_embeds) == 2
