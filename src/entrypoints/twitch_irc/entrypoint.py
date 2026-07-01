@@ -49,7 +49,8 @@ class TwitchIRCEntrypoint:
         if event is None:
             return
         logger.debug(
-            "Built Twitch chat event channel=%s author=%s broadcaster_id=%s message_id=%s content=%r",
+            "Built Twitch chat event kind=%s channel=%s author=%s broadcaster_id=%s message_id=%s content=%r",
+            event.message_kind,
             event.channel_login,
             event.author_login,
             event.broadcaster_id,

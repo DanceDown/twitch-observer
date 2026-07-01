@@ -38,31 +38,58 @@ def parse_irc_message(raw_line: str) -> IRCMessage:
 
 
 def build_chat_message_event(message: IRCMessage) -> TwitchChatMessageEvent | None:
-    """Convert a parsed IRC PRIVMSG into the app's normalized chat event."""
-    if message.command != "PRIVMSG" or not message.params or message.trailing is None:
+    """Convert supported Twitch IRC message types into the app's normalized chat event."""
+    if not message.params:
         return None
 
-    channel_login = message.params[0].lstrip("#").lower()
-    author_login = _parse_prefix_nick(message.prefix)
-    display_name = message.tags.get("display-name") or author_login
-    timestamp_ms = message.tags.get("tmi-sent-ts")
-    sent_at = datetime.now(UTC)
-    if timestamp_ms and timestamp_ms.isdigit():
-        sent_at = datetime.fromtimestamp(int(timestamp_ms) / 1000, tz=UTC)
+    if message.command == "PRIVMSG":
+        return _build_privmsg_event(message)
+    if message.command == "USERNOTICE":
+        return _build_usernotice_event(message)
+    return None
+
+
+def _build_privmsg_event(message: IRCMessage) -> TwitchChatMessageEvent | None:
+    if message.trailing is None:
+        return None
 
     normalized_content = _normalize_irc_chat_content(message.trailing)
-
     return TwitchChatMessageEvent(
-        channel_login=channel_login,
-        author_login=author_login,
-        author_display_name=display_name,
+        channel_login=_parse_channel_login(message.params[0]),
+        author_login=_parse_prefix_nick(message.prefix),
+        author_display_name=(message.tags.get("display-name") or _parse_prefix_nick(message.prefix)),
         content=normalized_content,
         message_id=message.tags.get("id"),
         broadcaster_id=message.tags.get("room-id"),
         author_id=message.tags.get("user-id"),
         color=message.tags.get("color") or None,
         reply_parent_message_id=message.tags.get("reply-parent-msg-id"),
-        sent_at=sent_at,
+        message_kind=_resolve_privmsg_kind(message.trailing),
+        sent_at=_parse_sent_at(message.tags.get("tmi-sent-ts")),
+        raw_line=message.raw,
+        raw_tags=message.tags,
+    )
+
+
+def _build_usernotice_event(message: IRCMessage) -> TwitchChatMessageEvent:
+    author_login = (message.tags.get("login") or _parse_prefix_nick(message.prefix)).lower()
+    display_name = message.tags.get("display-name") or author_login
+    user_text = None if message.trailing is None else _normalize_irc_chat_content(message.trailing)
+    system_message = message.tags.get("system-msg") or None
+
+    return TwitchChatMessageEvent(
+        channel_login=_parse_channel_login(message.params[0]),
+        author_login=author_login,
+        author_display_name=display_name,
+        content=_build_usernotice_content(system_message=system_message, user_text=user_text),
+        message_id=message.tags.get("id"),
+        broadcaster_id=message.tags.get("room-id"),
+        author_id=message.tags.get("user-id"),
+        color=message.tags.get("color") or None,
+        message_kind="usernotice",
+        notice_type=message.tags.get("msg-id") or None,
+        system_message=system_message,
+        sent_at=_parse_sent_at(message.tags.get("tmi-sent-ts")),
         raw_line=message.raw,
         raw_tags=message.tags,
     )
@@ -90,10 +117,33 @@ def _decode_tag_value(value: str) -> str:
 def _parse_prefix_nick(prefix: str | None) -> str:
     if not prefix:
         return ""
-    return prefix.split("!", 1)[0]
+    return prefix.split("!", 1)[0].lower()
+
+
+def _parse_channel_login(channel_param: str) -> str:
+    return channel_param.lstrip("#").lower()
+
+
+def _parse_sent_at(timestamp_ms: str | None) -> datetime:
+    if timestamp_ms and timestamp_ms.isdigit():
+        return datetime.fromtimestamp(int(timestamp_ms) / 1000, tz=UTC)
+    return datetime.now(UTC)
 
 
 def _normalize_irc_chat_content(content: str) -> str:
     if content.startswith("\x01ACTION ") and content.endswith("\x01"):
         return content[8:-1]
     return content
+
+
+def _resolve_privmsg_kind(content: str) -> str:
+    if content.startswith("\x01ACTION ") and content.endswith("\x01"):
+        return "action"
+    return "privmsg"
+
+
+def _build_usernotice_content(*, system_message: str | None, user_text: str | None) -> str:
+    parts = [part for part in (system_message, user_text) if part]
+    if not parts:
+        return ""
+    return "\n\n".join(parts)

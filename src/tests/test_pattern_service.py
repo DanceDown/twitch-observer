@@ -2050,3 +2050,59 @@ async def test_tracking_service_uses_persisted_channel_live_state_without_twitch
 
     assert len(notifier.sent) == 1
     assert twitch_api.live_requests == []
+
+
+@pytest.mark.asyncio
+async def test_tracking_service_matches_usernotice_system_message_content() -> None:
+    thread_repository = InMemoryThreadRepository()
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=1000)
+    channel_repository = InMemoryChannelRepository()
+    await channel_repository.add_channel(thread.thread_id, "42")
+    pattern_repository = InMemoryPatternRepository()
+    await pattern_repository.add_pattern(
+        thread_id=thread.thread_id,
+        regex="gifted a Tier 1 sub",
+        channel_scope_mode="all_tracked",
+        channel_scope_ids=(),
+        user_scope_mode="all_users",
+        user_scope_ids=(),
+        sub_state="all",
+        offline_state="both",
+        is_regex=False,
+        case_sensitive=False,
+        color=None,
+        disabled=False,
+        priority=0,
+    )
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+    )
+    notifier = FakeNotifier()
+    service = PatternTrackingService(
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        pattern_repository=pattern_repository,
+        message_repository=InMemoryMessageRepository(),
+        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        notifier=notifier,
+    )
+
+    await service.handle_chat_message(
+        TwitchChatMessageEvent(
+            channel_login="example",
+            author_login="gifter",
+            author_display_name="Gifter",
+            author_id="7",
+            broadcaster_id="42",
+            content="Gifter gifted a Tier 1 sub to Viewer!",
+            system_message="Gifter gifted a Tier 1 sub to Viewer!",
+            message_kind="usernotice",
+            notice_type="subgift",
+            sent_at=datetime.now(UTC),
+            raw_tags={"badges": ""},
+        )
+    )
+
+    assert len(notifier.sent) == 1

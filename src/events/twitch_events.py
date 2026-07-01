@@ -31,6 +31,9 @@ class TwitchChatMessageEvent:
     author_id: str | None = None
     color: str | None = None
     reply_parent_message_id: str | None = None
+    message_kind: str = "privmsg"
+    notice_type: str | None = None
+    system_message: str | None = None
     sent_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     raw_line: str | None = None
     raw_tags: dict[str, str] = field(default_factory=dict)

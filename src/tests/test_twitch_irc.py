@@ -53,6 +53,7 @@ def test_build_chat_message_event_maps_irc_privmsg_to_domain_event() -> None:
     assert event.reply_parent_message_id == "def456"
     assert event.broadcaster_id == "999"
     assert event.author_id == "777"
+    assert event.message_kind == "privmsg"
 
 
 def test_build_chat_message_event_normalizes_ctcp_action_payload() -> None:
@@ -65,6 +66,52 @@ def test_build_chat_message_event_normalizes_ctcp_action_payload() -> None:
 
     assert event is not None
     assert event.content == "waves hello"
+    assert event.message_kind == "action"
+
+
+def test_build_chat_message_event_maps_usernotice_with_system_and_user_text() -> None:
+    raw_line = (
+        "@badge-info=;badges=staff/1;color=#008000;display-name=ronni;emotes=;"
+        "id=db25007f-7a18-43eb-9379-80131e44d633;login=ronni;msg-id=resub;"
+        "room-id=12345678;subscriber=1;system-msg=ronni\\shas\\ssubscribed\\sfor\\s6\\smonths!;"
+        "tmi-sent-ts=1507246572675;user-id=87654321 "
+        ":tmi.twitch.tv USERNOTICE #dallas :Great stream -- keep it up!"
+    )
+
+    event = build_chat_message_event(parse_irc_message(raw_line))
+
+    assert event is not None
+    assert event.channel_login == "dallas"
+    assert event.author_login == "ronni"
+    assert event.author_display_name == "ronni"
+    assert event.message_kind == "usernotice"
+    assert event.notice_type == "resub"
+    assert event.system_message == "ronni has subscribed for 6 months!"
+    assert event.content == "ronni has subscribed for 6 months!\n\nGreat stream -- keep it up!"
+    assert event.message_id == "db25007f-7a18-43eb-9379-80131e44d633"
+    assert event.broadcaster_id == "12345678"
+    assert event.author_id == "87654321"
+
+
+def test_build_chat_message_event_maps_usernotice_without_user_text_to_system_message() -> None:
+    raw_line = (
+        "@badge-info=;badges=staff/1,premium/1;color=#0000FF;display-name=TWW2;emotes=;"
+        "id=e9176cd8-5e22-4684-ad40-ce53c2561c5e;login=tww2;msg-id=subgift;"
+        "room-id=19571752;subscriber=0;"
+        "system-msg=TWW2\\sgifted\\sa\\sTier\\s1\\ssub\\sto\\sMr_Woodchuck!;"
+        "tmi-sent-ts=1521159445153;user-id=87654321 "
+        ":tmi.twitch.tv USERNOTICE #forstycup"
+    )
+
+    event = build_chat_message_event(parse_irc_message(raw_line))
+
+    assert event is not None
+    assert event.channel_login == "forstycup"
+    assert event.author_login == "tww2"
+    assert event.message_kind == "usernotice"
+    assert event.notice_type == "subgift"
+    assert event.system_message == "TWW2 gifted a Tier 1 sub to Mr_Woodchuck!"
+    assert event.content == "TWW2 gifted a Tier 1 sub to Mr_Woodchuck!"
 
 
 @pytest.mark.asyncio
@@ -80,6 +127,25 @@ async def test_twitch_irc_entrypoint_forwards_privmsg_to_pipeline() -> None:
 
     assert len(processor.messages) == 1
     assert processor.messages[0].content == "Hello world!"
+
+
+@pytest.mark.asyncio
+async def test_twitch_irc_entrypoint_forwards_usernotice_to_pipeline() -> None:
+    config = AppConfig()
+    processor = FakeMessageProcessor()
+    entrypoint = TwitchIRCEntrypoint(AnonymousTwitchIRCGateway(config=config), message_processor=processor)
+
+    await entrypoint.handle_line(
+        "@display-name=ronni;id=db25007f-7a18-43eb-9379-80131e44d633;login=ronni;msg-id=resub;"
+        "room-id=12345678;system-msg=ronni\\shas\\ssubscribed\\sfor\\s6\\smonths!;"
+        "tmi-sent-ts=1507246572675;user-id=87654321 "
+        ":tmi.twitch.tv USERNOTICE #dallas :Great stream -- keep it up!"
+    )
+
+    assert len(processor.messages) == 1
+    assert processor.messages[0].message_kind == "usernotice"
+    assert processor.messages[0].notice_type == "resub"
+    assert processor.messages[0].content == "ronni has subscribed for 6 months!\n\nGreat stream -- keep it up!"
 
 
 @pytest.mark.asyncio
