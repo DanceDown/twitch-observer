@@ -26,6 +26,12 @@ def build_result_embed(result: DiscordCommandResult) -> discord.Embed:
     )
     if result.thumbnail_url:
         embed.set_thumbnail(url=result.thumbnail_url)
+    if result.author_name:
+        embed.set_author(
+            name=result.author_name,
+            url=result.author_url,
+            icon_url=result.author_icon_url,
+        )
     if result.footer:
         embed.set_footer(text=result.footer)
     return embed

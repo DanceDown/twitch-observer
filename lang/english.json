@@ -1444,6 +1444,9 @@
       "description_offline": "[`{CODE:view.channel.display_name}`](https://www.twitch.tv/{RAW:view.channel.login}) is now offline <a:Lurk:1497684902135463986>",
       "reply_field": "Reply"
     },
+    "channel_event_notification_embed": {
+      "author_name": "{RAW:view.channel.display_name}"
+    },
     "shared": {
       "form_locked": {
         "title": "Form Locked",

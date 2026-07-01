@@ -49,6 +49,7 @@ from src.events.twitch_events import TwitchChannelLiveStateChangedEvent, TwitchC
 from src.services.account_polling_service import DeviceFlowPollingService
 from src.services.account_service import AccountCommandService
 from src.services.account_support import AccountNotificationSender
+from src.services.channel_event_notification_service import ChannelEventNotificationService
 from src.services.channel_live_state_service import ChannelEventCommandService
 from src.services.patterns import ShowCommandService
 from src.services.replies import AutoReplyService, ChannelEventAutoReplyService, ReplyCommandService
@@ -2391,6 +2392,64 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
     assert "https://www.twitch.tv/example" in tracking_embed.description
     assert "Ping" not in tracking_embed.description
     assert any(field.value == "YIPPIE ExampleChannel is online" for field in tracking_embed.fields)
+
+
+@pytest.mark.asyncio
+async def test_channel_event_notification_service_includes_channel_author_and_thumbnail() -> None:
+    thread_repository = InMemoryThreadRepository()
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
+    channel_repository = InMemoryChannelRepository()
+    await channel_repository.add_channel(thread.thread_id, "42")
+    adapter_event_repository = InMemoryAdapterEventRepository()
+    adapter_event_action_repository = InMemoryAdapterEventActionRepository(event_repository=adapter_event_repository)
+    adapter_event = await adapter_event_repository.upsert_event(
+        thread_id=thread.thread_id,
+        adapter_key="twitch",
+        subject_type="channel",
+        subject_id="42",
+        event_key="stream.online",
+    )
+    await adapter_event_action_repository.upsert_action(
+        event_id=adapter_event.event_id,
+        action_type="discord_notify",
+        message_template=None,
+        reply_as_reply=False,
+    )
+
+    notifier = FakeNotifier()
+    service = ChannelEventNotificationService(
+        thread_repository=thread_repository,
+        adapter_event_repository=adapter_event_repository,
+        adapter_event_action_repository=adapter_event_action_repository,
+        channel_repository=channel_repository,
+        twitch_api=FakeTwitchAPI(
+            users_by_id={
+                "42": TwitchUser(
+                    user_id="42",
+                    login="example",
+                    display_name="ExampleChannel",
+                    profile_image_url="https://example.test/channel.png",
+                )
+            }
+        ),
+        notifier=notifier,
+    )
+
+    await service.handle_change(
+        TwitchChannelLiveStateChangedEvent(
+            twitch_channel_id="42",
+            twitch_channel_login="example",
+            is_live=True,
+        )
+    )
+
+    assert len(notifier.channel_results) == 1
+    discord_channel_id, result = notifier.channel_results[0]
+    assert discord_channel_id == 100
+    assert result.author_name == "ExampleChannel"
+    assert result.author_url == "https://www.twitch.tv/example"
+    assert result.author_icon_url == "https://example.test/channel.png"
+    assert result.thumbnail_url == "https://example.test/channel.png"
 
 
 @pytest.mark.asyncio

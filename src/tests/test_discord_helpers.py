@@ -13,7 +13,7 @@ from src.entrypoints.discord.helpers import build_public_result_embed, complete_
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.events.twitch_events import TwitchChatMessageEvent
 from src.localization import Localizer
-from src.utils.discord_embeds import build_channel_event_auto_reply_embed, build_tracking_embed
+from src.utils.discord_embeds import build_channel_event_auto_reply_embed, build_result_embed, build_tracking_embed
 
 
 def test_public_actor_embed_keeps_direct_user_placeholder_without_duplicate_prefix() -> None:
@@ -273,6 +273,24 @@ def test_channel_event_embed_author_name_is_not_escaped() -> None:
     )
 
     assert embed.author.name == "Channel_*Name*"
+
+
+def test_result_embed_supports_author_and_thumbnail_metadata() -> None:
+    embed = build_result_embed(
+        DiscordCommandResult(
+            title="Channel Is Live",
+            message="ExampleChannel is now live",
+            thumbnail_url="https://example.test/channel.png",
+            author_name="Channel_*Name*",
+            author_url="https://www.twitch.tv/channel",
+            author_icon_url="https://example.test/channel.png",
+        )
+    )
+
+    assert embed.author.name == "Channel_*Name*"
+    assert embed.author.url == "https://www.twitch.tv/channel"
+    assert embed.author.icon_url == "https://example.test/channel.png"
+    assert embed.thumbnail.url == "https://example.test/channel.png"
 
 
 def _thread() -> ThreadRecord:

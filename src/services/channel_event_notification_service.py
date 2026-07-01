@@ -89,6 +89,7 @@ class ChannelEventNotificationService:
             (None if channel_user is None else channel_user.display_name) or event.twitch_channel_login or event.twitch_channel_id
         )
         channel_login = (None if channel_user is None else channel_user.login) or event.twitch_channel_login or event.twitch_channel_id
+        channel_icon_url = None if channel_user is None else channel_user.profile_image_url
         for configured_event in configured_events:
             if suppressed_events and (configured_event.thread_id, configured_event.event_id) in suppressed_events:
                 continue
@@ -102,15 +103,30 @@ class ChannelEventNotificationService:
             
             if notify_action is None or notify_action.disabled:
                 continue
+            language = self.localizer.language_for_thread(thread)
             await self.notifier.send_channel_result(
                 thread.discord_channel_id,
                 build_thread_result(
                     self.localizer,
                     "results.channel_event.went_live" if event.is_live else "results.channel_event.went_offline",
                     thread=thread,
+                    thumbnail_url=channel_icon_url,
                     color=notify_action.color,
                     style=DiscordResultStyle.INFO,
                     ephemeral=False,
+                    author_name=self.localizer.text(
+                        "discord.channel_event_notification_embed.author_name",
+                        language=language,
+                        sources={
+                            "view": {
+                                "channel": {
+                                    "display_name": channel_display_name,
+                                }
+                            }
+                        },
+                    ),
+                    author_url=None if not channel_login else f"https://www.twitch.tv/{channel_login}",
+                    author_icon_url=channel_icon_url,
                     sources={
                         "view": {
                             "channel": {

@@ -26,3 +26,6 @@ class DiscordCommandResult:
     thumbnail_url: str | None = None
     color: str | None = None
     language: str | None = None
+    author_name: str | None = None
+    author_url: str | None = None
+    author_icon_url: str | None = None
