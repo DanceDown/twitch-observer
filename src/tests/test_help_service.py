@@ -88,6 +88,30 @@ async def test_help_service_falls_back_to_overview_and_language_hint() -> None:
 
 
 @pytest.mark.asyncio
+async def test_help_service_renders_regex_focused_tips_section() -> None:
+    service = HelpCommandService(
+        thread_repository=FakeThreadRepository(),
+        localizer=Localizer.from_directory(),
+    )
+
+    result = await service.handle_command(
+        HelpCommand(
+            discord_channel_id=None,
+            requester_id=200,
+            language_hint="english",
+            section="tips",
+        )
+    )
+
+    assert result.style == DiscordResultStyle.INFO
+    assert result.ephemeral is True
+    assert ".*" in result.message
+    assert "^Your text$" in result.message
+    assert "^!song$" in result.message
+    assert "hello|hi|hey" in result.message
+
+
+@pytest.mark.asyncio
 async def test_help_dispatch_calls_help_service_directly() -> None:
     help_service = FakeHelpService()
     services = make_services(help=help_service)
