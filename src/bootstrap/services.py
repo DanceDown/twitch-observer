@@ -23,6 +23,7 @@ from src.services.discord_ui_queries import (
     TrackedUserQueryService,
     WriteQueryService,
 )
+from src.services.help_service import HelpCommandService
 from src.services.live_state_orchestrator import LiveStateChangeOrchestrator
 from src.services.message_ingest_service import MessageIngestService
 from src.services.patterns import PatternCommandService, PatternTrackingService, ShowCommandService
@@ -196,6 +197,10 @@ def _build_discord_bundle(
         permission_repository=core.permission_repository,
         localizer=core.localizer,
     )
+    help_service = HelpCommandService(
+        thread_repository=core.thread_repository,
+        localizer=core.localizer,
+    )
     write_service = TwitchWriteCommandService(
         thread_repository=core.thread_repository,
         channel_repository=core.channel_repository,
@@ -244,6 +249,7 @@ def _build_discord_bundle(
         permission=permission_service,
         account=account_service,
         reply=reply_service,
+        help=help_service,
         write=write_service,
         show=show_service,
         channel_event=channel_event_service,

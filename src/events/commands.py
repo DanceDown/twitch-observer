@@ -311,3 +311,13 @@ class ShowConfigurationCommand:
     discord_channel_id: int
     requester_id: int
     sections: tuple[str, ...]
+
+
+@dataclass(slots=True, frozen=True)
+class HelpCommand:
+    """Render one beginner-friendly help section."""
+
+    discord_channel_id: int | None
+    requester_id: int
+    language_hint: str | None
+    section: str | None

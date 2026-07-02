@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from src.services.account_service import AccountCommandService
     from src.services.channel_command_service import ChannelCommandService
     from src.services.channel_live_state_service import ChannelEventCommandService
+    from src.services.help_service import HelpCommandService
     from src.services.patterns.command_service import PatternCommandService
     from src.services.patterns.show_service import ShowCommandService
     from src.services.permission_service import PermissionCommandService
@@ -30,6 +31,7 @@ class DiscordServiceBundle:
     permission: PermissionCommandService
     account: AccountCommandService
     reply: ReplyCommandService
+    help: HelpCommandService
     write: TwitchWriteCommandService
     show: ShowCommandService
     channel_event: ChannelEventCommandService

@@ -232,13 +232,7 @@ def split_csv_values(value: str | None) -> tuple[str, ...]:
 def _missing_channel_access_result(interaction: discord.Interaction) -> DiscordCommandResult:
     """Build one localized channel-access error result for public-send failures."""
     localizer = Localizer.from_directory()
-    locale_value = str(interaction.locale).lower()
-    if locale_value.startswith("de"):
-        language = "german"
-    elif locale_value.startswith("en"):
-        language = "english"
-    else:
-        language = localizer.default_language
+    language = resolve_interaction_language(localizer, interaction)
     return build_result(
         localizer,
         "results.thread.missing_channel_access",
@@ -246,3 +240,13 @@ def _missing_channel_access_result(interaction: discord.Interaction) -> DiscordC
         style=DiscordResultStyle.ERROR,
         ephemeral=True,
     )
+
+
+def resolve_interaction_language(localizer: Localizer, interaction: discord.Interaction) -> str:
+    """Best-effort language selection from the user's Discord locale."""
+    locale_value = str(interaction.locale).lower()
+    if locale_value.startswith("de"):
+        return "german"
+    if locale_value.startswith("en"):
+        return "english"
+    return localizer.default_language

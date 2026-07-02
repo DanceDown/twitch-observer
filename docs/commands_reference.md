@@ -33,6 +33,30 @@ Important detail:
 
 ## Lifecycle and context commands
 
+### `/help`
+
+Show a beginner-friendly explanation of how to use the bot.
+
+Behavior:
+
+- without a section, it shows the general introduction
+- with a section, it jumps directly to one topic
+- long help text paginates when needed
+
+Sections:
+
+- `overview`
+- `first_steps`
+- `channels`
+- `users`
+- `pings`
+- `auto_replies`
+- `live_pings`
+- `write`
+- `account`
+- `permissions`
+- `tips`
+
 ### `/join`
 
 Connect the active Discord channel/thread/DM as a configuration root.

@@ -14,6 +14,7 @@ from .service_bundle import DiscordServiceBundle
 from .commands import (
     register_account_commands,
     register_channel_commands,
+    register_help_commands,
     register_live_state_commands,
     register_pattern_commands,
     register_permission_commands,
@@ -60,6 +61,7 @@ class ObserverDiscordClient(discord.Client):
         register_permission_commands(self.tree, self._services, self._ui_data_provider, self._localizer)
         register_account_commands(self.tree, self._services, self._ui_data_provider, self._localizer)
         register_reply_commands(self.tree, self._services, self._ui_data_provider, self._localizer)
+        register_help_commands(self.tree, self._services, self._ui_data_provider, self._localizer)
         register_write_commands(
             self.tree,
             self._services,

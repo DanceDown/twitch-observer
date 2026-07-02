@@ -264,6 +264,63 @@
         "footer": ""
       }
     },
+    "help": {
+      "overview": {
+        "title": "Hilfe",
+        "body": "**Was dieser Bot macht**\n- Er beobachtet Twitch-Chats und kann auf Nachrichten, Live-Status-Änderungen und manuelle Befehle reagieren.\n- Jeder Discord-Channel, Thread oder DM-Bereich hat seine eigene Konfiguration.\n  Änderungen hier gelten also nur für genau diesen Ort.\n\n**Wie du Befehle benutzen solltest**\n- In den meisten Fällen gibst du zuerst keine Parameter an.\n  Öffne einfach `/channel`, `/user`, `/ping`, `/reply`, `/liveping`, `/permission`, `/account`, `/write` oder `/show` und nutze die UI, die sich dann öffnet.\n- Direkte Parameter sind vor allem dann praktisch, wenn du schon genau weißt, was du ändern willst.\n  Sie helfen auch, wenn du viele Channels, Nutzer, Pings oder Replies hast und Discord nicht mehr alles bequem in einer Liste zeigt.\n\n**Ein typischer Anfänger-Ablauf**\n- Starte mit `/join`, damit der Bot diesen Discord-Ort verwalten darf.\n- Füge mit `/channel` die Twitch-Channels hinzu, die dich interessieren.\n- Erstelle mit `/ping` Pings für Namen, Wörter oder Muster, die für dich wichtig sind.\n- Ergänze `/reply`, `/liveping`, `/account` oder `/write` erst später, wenn du mehr als einfache Discord-Pings möchtest.\n\n**Wenn du etwas prüfen willst**\n- Mit `/show` siehst du, was hier gerade gespeichert ist.\n- Mit `/help section:...` springst du direkt zu einem Thema wie `pings`, `auto_replies` oder `tips`.",
+        "footer": ""
+      },
+      "first_steps": {
+        "title": "Hilfe: Erste Schritte",
+        "body": "**Eine einfache erste Einrichtung**\n- Nutze `/join` in dem Discord-Channel oder Thread, in dem der Bot arbeiten soll.\n- Falls nötig, ändere mit `/language` die Sprache.\n- Füge mit `/channel` mindestens einen Twitch-Channel hinzu.\n- Erstelle mit `/ping` deinen ersten Ping.\n- Nutze `/show`, um zu prüfen, ob alles so gespeichert wurde, wie du es wolltest.\n\n**Ein guter erster Test**\n- Beobachte genau einen Twitch-Channel.\n- Erstelle einen einfachen Ping für deinen eigenen Namen oder ein anderes leichtes Wort.\n- Warte auf eine passende Twitch-Nachricht und prüfe, ob der Discord-Ping hier erscheint.\n\n**Halte es am Anfang simpel**\n- Du brauchst am ersten Tag keine Nutzer, Replies, Farben, Berechtigungen oder Live-Pings.\n- Sorge zuerst dafür, dass ein Channel und ein Ping funktionieren, und ergänze dann Schritt für Schritt mehr.",
+        "footer": ""
+      },
+      "channels": {
+        "title": "Hilfe: Channels",
+        "body": "**Wofür beobachtete Channels da sind**\n- Beobachtete Channels sind die Twitch-Channels, die für diesen Discord-Ort relevant sind.\n- Sie sind die Grundlage für normale Pings, Live-/Offline-Pings und manuelle Twitch-Nachrichten.\n\n**So benutzt du sie**\n- Öffne `/channel` ohne Parameter und nutze die UI.\n- Füge jeden Twitch-Channel hinzu, der hier beobachtet werden soll.\n- Entferne Channels, die du nicht mehr brauchst.\n\n**Gut zu wissen**\n- Ein Channel kann noch von gespeicherten Pings benutzt werden.\n  Dann musst du diese Pings zuerst entfernen oder anpassen.\n- Wenn du nur einen Twitch-Channel beobachtest, lass es am Anfang dabei.\n  Eine kleine Konfiguration ist leichter zu verstehen.",
+        "footer": ""
+      },
+      "users": {
+        "title": "Hilfe: Nutzer",
+        "body": "**Wofür beobachtete Nutzer da sind**\n- Beobachtete Nutzer sind optional.\n- Sie helfen dir, wenn ein Ping nur auf bestimmte Twitch-Nutzer reagieren soll.\n\n**Wann du dieses Feature brauchst**\n- Du willst nur Pings für einen bestimmten Streamer, Mod, Freund oder bekannten Namen.\n- Du möchtest bestimmte Personen vom Auslösen eines Pings ausschließen.\n\n**Wann du es ignorieren kannst**\n- Wenn dir egal ist, wer die Twitch-Nachricht geschrieben hat, brauchst du `/user` gar nicht.\n- Viele einfache Setups funktionieren komplett ohne beobachtete Nutzer.\n\n**So benutzt du es**\n- Öffne `/user` und füge die Twitch-Namen hinzu, die du dir merken willst.\n- Diese gespeicherten Nutzer kannst du später in `/ping` verwenden, wenn ein Ping nur auf bestimmte Personen reagieren soll.",
+        "footer": ""
+      },
+      "pings": {
+        "title": "Hilfe: Pings",
+        "body": "**Was ein Ping ist**\n- Ein Ping beobachtet den Twitch-Chat nach Text, der dir wichtig ist.\n- Wenn etwas passt, sendet der Bot hier eine Discord-Nachricht.\n\n**Der einfache Einstieg**\n- Öffne `/ping` ohne Parameter und fülle die UI aus.\n- Starte möglichst mit einem normalen Wort-Ping.\n  Regex ist optional und nur dann sinnvoll, wenn du wirklich spezielles Matching brauchst.\n\n**Was du einstellen kannst**\n- Welche Twitch-Channels ihn auslösen dürfen\n- Welche Nutzer ihn auslösen dürfen\n- Ob der Abo-Status wichtig ist\n- Ob er nur live, nur offline oder immer auslösen soll\n- Optionale Farbe und Priorität\n\n**Gute Anfänger-Beispiele**\n- Dein eigener Username\n- Ein Team- oder Clan-Tag\n- Eine kurze Phrase, die dir wichtig ist\n\n**Wichtig**\n- Wenn der Bot nach einem Treffer auch in Twitch schreiben soll, ergänze danach `/reply`.\n- Nutze `/show`, wenn du deine gespeicherten Pings prüfen möchtest.",
+        "footer": ""
+      },
+      "auto_replies": {
+        "title": "Hilfe: Auto-Replies",
+        "body": "**Was Auto-Replies machen**\n- Auto-Replies lassen den Bot automatisch eine Twitch-Nachricht schreiben.\n- Das kann nach einem normalen Ping-Treffer oder nach einem Live-/Offline-Event passieren.\n\n**Wann du sie nutzen solltest**\n- Du willst eine Chat-Antwort, ohne jedes Mal selbst zu tippen.\n- Du willst bei Live- oder Offline-Events automatisch eine Nachricht in Twitch senden.\n\n**Wichtige Voraussetzung**\n- Auto-Replies brauchen ein verknüpftes Twitch-Konto.\n- Wenn du nur Discord-Pings und keine Twitch-Nachricht willst, kannst du dieses Feature ignorieren.\n\n**So kannst du es dir merken**\n- `/ping` oder `/liveping` entscheidet, wann etwas auslöst.\n- `/reply` entscheidet, ob der Bot zusätzlich etwas in Twitch schreibt.\n\n**Guter Anfänger-Tipp**\n- Prüfe zuerst, ob der Ping oder das Live-Event für sich allein funktioniert.\n- Ergänze den Auto-Reply erst danach.",
+        "footer": ""
+      },
+      "live_pings": {
+        "title": "Hilfe: Live-Pings",
+        "body": "**Was Live-Pings sind**\n- Live-Pings senden eine Discord-Nachricht, wenn ein beobachteter Twitch-Channel live geht.\n- Offline-Pings machen dasselbe, wenn dieser Channel wieder offline geht.\n\n**Wann sie nützlich sind**\n- Du willst diesen Discord-Ort über Start und Ende eines Streams informieren.\n- Du willst für verschiedene beobachtete Channels eigene Live-/Offline-Hinweise.\n\n**So benutzt du sie**\n- Füge den Twitch-Channel zuerst mit `/channel` hinzu.\n- Öffne `/liveping` und wähle `Live` oder `Offline`.\n- Optionale Farben können helfen, solche Meldungen schneller zu erkennen.\n\n**Gut zu wissen**\n- Das ist getrennt von Twitches eigenen Follower-Benachrichtigungen.\n- Wenn zusätzlich eine Twitch-Chat-Nachricht gesendet werden soll, ergänze danach einen Event-Auto-Reply.",
+        "footer": ""
+      },
+      "write": {
+        "title": "Hilfe: Schreiben",
+        "body": "**Was `/write` macht**\n- Mit `/write` kannst du eine manuelle Twitch-Chat-Nachricht über das verknüpfte Konto senden.\n- Das ist nützlich für schnelle Tests oder für Nachrichten, die du genau jetzt absichtlich senden willst.\n\n**Wann du es benutzen solltest**\n- Du willst testen, ob das verknüpfte Twitch-Konto erfolgreich schreiben kann.\n- Du willst eine Nachricht senden, ohne auf einen Ping oder ein Event zu warten.\n- Du willst direkt auf eine aktuelle Twitch-Nachricht antworten.\n\n**Wichtige Voraussetzung**\n- `/write` braucht ein verknüpftes Twitch-Konto.\n- Wenn noch kein Konto verbunden ist, starte zuerst mit `/account`.",
+        "footer": ""
+      },
+      "account": {
+        "title": "Hilfe: Konto",
+        "body": "**Wofür das verknüpfte Twitch-Konto da ist**\n- Das verknüpfte Twitch-Konto brauchst du nur dann, wenn der Bot in Twitch schreiben soll.\n- Dazu gehören `/write` und alle Auto-Replies.\n\n**Wann du es nicht brauchst**\n- Wenn du nur Discord-Benachrichtigungen, Pings und Live-/Offline-Hinweise willst, kannst du `/account` ignorieren.\n\n**So benutzt du es**\n- Öffne `/account` und wähle `Connect`.\n- Folge den Twitch-Login-Schritten.\n- Danach kannst du mit `/reply` oder `/write` weitermachen.\n\n**Gut zu wissen**\n- Wenn du das Konto trennst, werden gespeicherte Replies nicht gelöscht.\n- Sie können nur so lange keine Twitch-Nachrichten senden, bis wieder ein Konto verbunden ist.",
+        "footer": ""
+      },
+      "permissions": {
+        "title": "Hilfe: Berechtigungen",
+        "body": "**Wofür Berechtigungen da sind**\n- Berechtigungen legen fest, wer diesen Bot an diesem Discord-Ort ebenfalls verwalten darf.\n- Das ist praktisch, wenn mehrere Personen dieselbe Konfiguration pflegen sollen.\n\n**Wann du es ignorieren kannst**\n- Wenn nur du dieses Setup verwaltest, brauchst du `/permission` meistens nicht.\n\n**So benutzt du es**\n- Vergib kleine Berechtigungen, wenn jemand nur bei einem Teil helfen soll.\n- Vergib `admin` nur dann, wenn jemand wirklich alles dürfen soll.\n- Nutze `Clear`, wenn du alle Sonderrechte einer Person wieder entfernen willst.",
+        "footer": ""
+      },
+      "tips": {
+        "title": "Hilfe: Hilfreiche Tipps",
+        "body": "**Kurze Tipps**\n- `.*` als Regex matcht jede einzelne Nachricht.\n  Nutze das nur, wenn wirklich alles auslösen soll.\n- Wenn du nur ein einfaches Wort oder einen Username willst, nutze kein Regex.\n  Ein normaler Ping ist leichter zu pflegen.\n- Starte klein.\n  Ein Channel und ein Ping reichen für den ersten Test.\n- Nutze `/show`, wenn du unsicher bist, was gerade gespeichert ist.\n- Nutze `/off`, um den Bot zu pausieren, ohne deine Konfiguration zu löschen.\n- Nutze `/leave` nur dann, wenn du dieses komplette Discord-Setup wirklich entfernen willst.\n- Wenn Listen lang werden, sparen direkte Command-Parameter und angezeigte IDs viel Klickarbeit.",
+        "footer": ""
+      }
+    },
     "account": {
       "permission_denied": {
         "title": "Keine Berechtigung",

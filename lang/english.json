@@ -264,6 +264,63 @@
         "footer": ""
       }
     },
+    "help": {
+      "overview": {
+        "title": "Help",
+        "body": "**What this bot does**\n- It watches Twitch chats and can react to messages, live status changes, and manual commands.\n- Every Discord channel, thread, or DM keeps its own setup.\n  Changes here only affect this exact place.\n\n**How you should use commands**\n- In most cases, do not fill in parameters first.\n  Just open `/channel`, `/user`, `/ping`, `/reply`, `/liveping`, `/permission`, `/account`, `/write`, or `/show` and use the UI that opens.\n- Direct parameters are mainly useful when you already know exactly what to change.\n  They also help once you have many channels, users, pings, or replies and Discord no longer shows everything comfortably in one list.\n\n**Typical beginner flow**\n- Start with `/join` so the bot may manage this Discord place.\n- Add the Twitch channels you care about with `/channel`.\n- Create pings with `/ping` for names, words, or patterns that matter to you.\n- Add `/reply`, `/liveping`, `/account`, or `/write` later if you want more than simple Discord pings.\n\n**When you want to check things**\n- Use `/show` to see what is currently saved here.\n- Use `/help section:...` to jump directly into a topic like `pings`, `auto_replies`, or `tips`.",
+        "footer": ""
+      },
+      "first_steps": {
+        "title": "Help: First Steps",
+        "body": "**A simple first setup**\n- Use `/join` in the Discord channel or thread where the bot should work.\n- If needed, change the language with `/language`.\n- Add at least one Twitch channel with `/channel`.\n- Create your first ping with `/ping`.\n- Use `/show` to confirm that everything was saved the way you wanted.\n\n**A good first test**\n- Track one Twitch channel.\n- Make one simple ping for your own name or another easy word.\n- Wait for a matching Twitch message and confirm that the Discord ping appears here.\n\n**Keep it simple at the start**\n- You do not need users, replies, colors, permissions, or live pings on day one.\n- First get one channel and one ping working, then add more features step by step.",
+        "footer": ""
+      },
+      "channels": {
+        "title": "Help: Channels",
+        "body": "**What tracked channels are**\n- Tracked channels are the Twitch channels this Discord place cares about.\n- They are the base for normal pings, live/offline pings, and manual Twitch writes.\n\n**How to use them**\n- Open `/channel` without parameters and use the UI.\n- Add every Twitch channel that should be watched here.\n- Remove channels you no longer need.\n\n**Good to know**\n- A channel can still be in use by saved pings.\n  In that case, remove or change those pings first.\n- If you only track one Twitch channel, keep it that way until you really need more.\n  A smaller setup is easier to understand.",
+        "footer": ""
+      },
+      "users": {
+        "title": "Help: Users",
+        "body": "**What tracked users are for**\n- Tracked users are optional.\n- They help when a ping should only care about specific Twitch users.\n\n**When you need this feature**\n- You only want pings for one streamer, mod, friend, or known username.\n- You want to exclude certain people from triggering a ping.\n\n**When you can ignore it**\n- If you do not care who wrote the Twitch message, you do not need `/user` at all.\n- Many simple setups work perfectly fine without tracked users.\n\n**How to use it**\n- Open `/user` and add the Twitch names you want to remember.\n- Use those saved users later inside `/ping` when you narrow a ping down to specific people.",
+        "footer": ""
+      },
+      "pings": {
+        "title": "Help: Pings",
+        "body": "**What a ping is**\n- A ping watches Twitch chat for text that matters to you.\n- When it matches, the bot sends a Discord message here.\n\n**The easy way to start**\n- Open `/ping` without parameters and fill out the UI.\n- Start with a normal word ping when possible.\n  Regex is optional and only useful when you really need special matching.\n\n**What you can control**\n- Which Twitch channels may trigger it\n- Which users may trigger it\n- Whether it should care about subscriber state\n- Whether it should trigger while the streamer is live, offline, or both\n- Optional color and priority\n\n**Good beginner examples**\n- Your own username\n- A team tag or clan tag\n- A short catchphrase that you really care about\n\n**Important**\n- If you want the bot to also write in Twitch chat after a ping match, add `/reply` afterwards.\n- Use `/show` when you want to review the pings you already saved.",
+        "footer": ""
+      },
+      "auto_replies": {
+        "title": "Help: Auto-Replies",
+        "body": "**What auto-replies do**\n- Auto-replies let the bot write a Twitch message automatically.\n- They can happen after a normal ping match or after a live/offline event.\n\n**When you should use them**\n- You want a chat response without typing it yourself every time.\n- You want a message to be sent when a tracked channel goes live or offline.\n\n**Important requirement**\n- Auto-replies need a linked Twitch account.\n- If you only want Discord pings and no Twitch message, you can skip this feature.\n\n**How to think about it**\n- `/ping` or `/liveping` decides when something should trigger.\n- `/reply` decides whether the bot should also write something in Twitch chat.\n\n**Good beginner advice**\n- First make sure the ping or live event works on its own.\n- Only then add the auto-reply on top.",
+        "footer": ""
+      },
+      "live_pings": {
+        "title": "Help: Live Pings",
+        "body": "**What live pings are**\n- Live pings send a Discord message when a tracked Twitch channel goes live.\n- Offline pings do the same when that channel goes offline again.\n\n**When they are useful**\n- You want this Discord place to be notified about a streamer starting or ending.\n- You want different tracked channels to have their own live/offline notices.\n\n**How to use them**\n- Add the Twitch channel first with `/channel`.\n- Open `/liveping` and choose whether you want a `Live` or `Offline` ping.\n- Optional colors can make those notices easier to spot.\n\n**Good to know**\n- This is separate from Twitch's own follower notifications.\n- If you also want a Twitch chat message on live/offline events, add an event auto-reply afterwards.",
+        "footer": ""
+      },
+      "write": {
+        "title": "Help: Write",
+        "body": "**What `/write` does**\n- `/write` lets you send one manual Twitch chat message from the linked account.\n- It is useful for quick tests or for messages you want to send on purpose right now.\n\n**When to use it**\n- You want to test whether the linked Twitch account can write successfully.\n- You want to send a message without waiting for a ping or event.\n- You want to reply to a recent Twitch message directly.\n\n**Important requirement**\n- `/write` needs a linked Twitch account.\n- If no account is connected yet, start with `/account` first.",
+        "footer": ""
+      },
+      "account": {
+        "title": "Help: Account",
+        "body": "**What the linked Twitch account is for**\n- The linked Twitch account is only needed when the bot should write in Twitch chat.\n- That includes `/write` and all auto-replies.\n\n**When you do not need it**\n- If you only want Discord notifications, pings, and live/offline notices, you can ignore `/account`.\n\n**How to use it**\n- Open `/account` and choose `Connect`.\n- Follow the Twitch login steps.\n- Come back and continue with `/reply` or `/write` afterwards.\n\n**Good to know**\n- Disconnecting the account does not delete your saved replies.\n- They simply cannot send Twitch messages until an account is linked again.",
+        "footer": ""
+      },
+      "permissions": {
+        "title": "Help: Permissions",
+        "body": "**What permissions are for**\n- Permissions decide who else may manage this bot setup in this Discord place.\n- This is helpful when more than one person should maintain the same configuration.\n\n**When you can ignore it**\n- If you are the only person managing this setup, you usually do not need `/permission`.\n\n**How to use it**\n- Grant small permissions when someone should only help with one part.\n- Grant `admin` only when someone should be allowed to do everything.\n- Use `Clear` if you want to remove all special permissions from one user again.",
+        "footer": ""
+      },
+      "tips": {
+        "title": "Help: Helpful Tips",
+        "body": "**Quick tips**\n- `.*` as a regex matches every single message.\n  Use it only when you really want a trigger for everything.\n- If you only want a simple word or username, do not use regex.\n  A normal ping is easier to maintain.\n- Start small.\n  One channel and one ping are enough for the first test.\n- Use `/show` whenever you are unsure what is currently saved.\n- Use `/off` to pause the bot without deleting your setup.\n- Use `/leave` only when you truly want to remove this whole Discord setup.\n- When lists become long, direct command parameters and shown IDs save a lot of clicking.",
+        "footer": ""
+      }
+    },
     "account": {
       "permission_denied": {
         "title": "Permission Denied",

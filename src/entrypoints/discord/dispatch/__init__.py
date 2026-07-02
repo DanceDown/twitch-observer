@@ -7,6 +7,7 @@ from .channel_events import (
     dispatch_remove_channel_event,
     dispatch_set_channel_event_color,
 )
+from .help import dispatch_help
 from .patterns import (
     dispatch_add_pattern,
     dispatch_disable_pattern,
@@ -50,6 +51,7 @@ __all__ = [
     "dispatch_disable_pattern",
     "dispatch_disable_pattern_reply",
     "dispatch_disable_thread",
+    "dispatch_help",
     "dispatch_edit_pattern",
     "dispatch_enable_channel_event_reply",
     "dispatch_enable_pattern",
