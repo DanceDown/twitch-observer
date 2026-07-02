@@ -109,6 +109,7 @@ async def test_help_service_renders_regex_focused_tips_section() -> None:
     assert "^Your text$" in result.message
     assert "^!song$" in result.message
     assert "hello|hi|hey" in result.message
+    assert "\\bword\\b" in result.message
 
 
 @pytest.mark.asyncio
