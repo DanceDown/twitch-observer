@@ -15,6 +15,8 @@ from src.events.twitch_events import TwitchChatMessageEvent
 from src.localization import Localizer
 from src.utils.discord_embeds import build_channel_event_auto_reply_embed, build_result_embed, build_tracking_embed
 
+_MISSING = object()
+
 
 def test_public_actor_embed_keeps_direct_user_placeholder_without_duplicate_prefix() -> None:
     localizer = Localizer.from_directory()
@@ -63,6 +65,7 @@ class FakeUnknownInteractionError(discord.NotFound):
 class FakeResponse:
     done: bool = False
     fail_defer: bool = False
+    fail_on_none_view: bool = False
 
     def is_done(self) -> bool:
         return self.done
@@ -73,7 +76,9 @@ class FakeResponse:
             raise FakeUnknownInteractionError()
         self.done = True
 
-    async def send_message(self, *, embed: discord.Embed, ephemeral: bool, view: object | None = None) -> None:
+    async def send_message(self, *, embed: discord.Embed, ephemeral: bool, view: object = _MISSING) -> None:
+        if self.fail_on_none_view and view is None:
+            raise AttributeError("'NoneType' object has no attribute 'is_finished'")
         _ = (embed, ephemeral, view)
         self.done = True
 
@@ -139,6 +144,24 @@ async def test_send_initial_result_posts_public_result_even_when_defer_hits_unkn
     assert len(interaction.channel.sent_embeds) == 1
     assert interaction.channel.sent_embeds[0].description == "Added a ping."
     assert interaction.deleted_original_response is False
+
+
+@pytest.mark.asyncio
+async def test_send_initial_result_ephemeral_omits_none_view_when_sending_response() -> None:
+    interaction = FakeInteraction(
+        response=FakeResponse(done=False, fail_on_none_view=True),
+    )
+    result = DiscordCommandResult(
+        title="Missing Channel Access",
+        message="I can't access this channel.",
+        style=DiscordResultStyle.ERROR,
+        ephemeral=True,
+    )
+
+    await send_initial_result(interaction, result)
+
+    assert interaction.response.done is True
+    assert interaction.edited_original_embed is None
 
 
 @pytest.mark.asyncio

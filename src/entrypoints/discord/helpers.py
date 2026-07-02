@@ -54,7 +54,13 @@ async def send_message_response(
     if interaction.response.is_done():
         return False
     try:
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
+        send_kwargs: dict[str, object] = {
+            "embed": embed,
+            "ephemeral": ephemeral,
+        }
+        if view is not None:
+            send_kwargs["view"] = view
+        await interaction.response.send_message(**send_kwargs)
         return True
     except discord.HTTPException as error:
         if _is_unknown_interaction_error(error):
