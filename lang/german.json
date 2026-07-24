@@ -1487,7 +1487,7 @@
   },
   "discord": {
     "tracking_embed": {
-      "footer_channel": "Kanal: {view.channel_name}",
+      "footer_channel": "Kanal: {RAW:view.channel_name}",
       "reply_field": "Antwort"
     },
     "channel_event_reply_embed": {
@@ -1734,7 +1734,7 @@
         "empty_message": "Keine Konfigurationseinträge gefunden <:ShrugMan:1497685241962430717>",
         "previous": "Zurück",
         "next": "Weiter",
-        "footer": "Seite {view.current}/{view.total}",
+        "footer": "Seite {RAW:view.current}/{RAW:view.total}",
         "locked": {
           "title": "Paginator gesperrt",
           "body": "Du kannst diese Seiten nicht umblättern <a:Tssk:1497685026945630208>",

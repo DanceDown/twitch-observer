@@ -1491,7 +1491,7 @@
   },
   "discord": {
     "tracking_embed": {
-      "footer_channel": "Channel: {view.channel_name}",
+      "footer_channel": "Channel: {RAW:view.channel_name}",
       "reply_field": "Reply"
     },
     "channel_event_reply_embed": {
@@ -1738,7 +1738,7 @@
         "empty_message": "No configuration entries found <:ShrugMan:1497685241962430717>",
         "previous": "Previous",
         "next": "Next",
-        "footer": "Page {view.current}/{view.total}",
+        "footer": "Page {RAW:view.current}/{RAW:view.total}",
         "locked": {
           "title": "Paginator Locked",
           "body": "You can't turn those pages <a:Tssk:1497685026945630208>",
