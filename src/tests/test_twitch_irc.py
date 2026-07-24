@@ -209,6 +209,57 @@ async def test_twitch_irc_gateway_logs_when_no_initial_channels_are_configured(c
 
 
 @pytest.mark.asyncio
+async def test_twitch_irc_gateway_read_loop_stops_on_connection_reset() -> None:
+    config = AppConfig()
+    gateway = AnonymousTwitchIRCGateway(config=config)
+
+    class ResetReader:
+        def at_eof(self) -> bool:
+            return False
+
+        async def readline(self) -> bytes:
+            raise ConnectionResetError("reset by peer")
+
+    gateway._reader = ResetReader()  # type: ignore[assignment]
+
+    await gateway._read_loop()
+
+
+@pytest.mark.asyncio
+async def test_twitch_irc_gateway_stop_read_task_ignores_connection_reset() -> None:
+    config = AppConfig()
+    gateway = AnonymousTwitchIRCGateway(config=config)
+    loop = asyncio.get_running_loop()
+    gateway._read_task = loop.create_future()  # type: ignore[assignment]
+    gateway._read_task.set_exception(ConnectionResetError("reset by peer"))
+
+    await gateway._stop_read_task()
+
+    assert gateway._read_task is None
+
+
+@pytest.mark.asyncio
+async def test_twitch_irc_gateway_close_connection_ignores_wait_closed_reset() -> None:
+    config = AppConfig()
+    gateway = AnonymousTwitchIRCGateway(config=config)
+
+    class ResetWriter:
+        def close(self) -> None:
+            return None
+
+        async def wait_closed(self) -> None:
+            raise ConnectionResetError("reset by peer")
+
+    gateway._writer = ResetWriter()  # type: ignore[assignment]
+    gateway._joined_channels.add("example")
+
+    await gateway._close_connection(preserve_channels=True)
+
+    assert gateway._writer is None
+    assert gateway._pending_channels == {"example"}
+
+
+@pytest.mark.asyncio
 async def test_twitch_irc_gateway_reconnects_before_join_when_read_loop_stopped() -> None:
     config = AppConfig()
     gateway = AnonymousTwitchIRCGateway(config=config)

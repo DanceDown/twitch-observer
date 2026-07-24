@@ -131,7 +131,11 @@ class AnonymousTwitchIRCGateway:
         if reader is None:
             raise RuntimeError("Twitch IRC read loop started without an active reader.")
         while not reader.at_eof():
-            raw_bytes = await reader.readline()
+            try:
+                raw_bytes = await reader.readline()
+            except OSError as error:
+                logger.warning("Twitch IRC read loop stopped after connection error: %s", error)
+                break
             if not raw_bytes:
                 break
             raw_line = raw_bytes.decode("utf-8", errors="replace")
@@ -202,8 +206,8 @@ class AnonymousTwitchIRCGateway:
             self._pending_channels.update(self._joined_channels)
         self._joined_channels.clear()
         if writer is not None:
-            writer.close()
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(OSError):
+                writer.close()
                 await writer.wait_closed()
 
     def _ensure_read_task(self) -> None:
@@ -219,7 +223,7 @@ class AnonymousTwitchIRCGateway:
         if task is None:
             return
         task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
+        with contextlib.suppress(asyncio.CancelledError, OSError):
             await task
 
     def _is_connection_ready(self) -> bool:
