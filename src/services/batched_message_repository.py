@@ -50,11 +50,13 @@ class BatchedMessageRepository(MessageRepository):
     async def stop(self) -> None:
         self._stop_event.set()
         self._wake_event.set()
-        if self._task is not None:
+        had_task = self._task is not None
+        if had_task:
             with contextlib.suppress(asyncio.CancelledError):
                 await self._task
             self._task = None
-        await self.flush()
+        else:
+            await self._flush_for_shutdown()
 
     async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
         should_flush_now = await self._enqueue_message(event)
@@ -222,9 +224,35 @@ class BatchedMessageRepository(MessageRepository):
                 await self.flush()
             except DatabasePoolExhaustedError:
                 logger.error("Batched message write flush failed because the database pool is exhausted.")
-            except psycopg.Error:
-                logger.exception("Batched message write flush failed because PostgreSQL returned an error.")
-        await self.flush()
+            except psycopg.Error as error:
+                self._log_postgres_flush_error(error)
+        await self._flush_for_shutdown()
+
+    async def _flush_for_shutdown(self) -> None:
+        try:
+            await self.flush()
+        except DatabasePoolExhaustedError:
+            logger.warning(
+                "Final batched message write flush skipped during shutdown because the database pool is exhausted."
+            )
+        except psycopg.Error as error:
+            if _is_transient_postgres_disconnect(error):
+                logger.warning(
+                    "Final batched message write flush skipped during shutdown because PostgreSQL is unavailable: %s",
+                    _compact_error_message(error),
+                )
+                return
+            logger.exception("Final batched message write flush failed during shutdown.")
+
+    @staticmethod
+    def _log_postgres_flush_error(error: psycopg.Error) -> None:
+        if _is_transient_postgres_disconnect(error):
+            logger.warning(
+                "Batched message write flush failed because PostgreSQL is temporarily unavailable; pending writes were requeued: %s",
+                _compact_error_message(error),
+            )
+            return
+        logger.exception("Batched message write flush failed because PostgreSQL returned an error.")
 
     @staticmethod
     def _build_fallback_message_id(event: TwitchChatMessageEvent) -> str:
@@ -233,3 +261,20 @@ class BatchedMessageRepository(MessageRepository):
     @classmethod
     def _resolve_message_id(cls, event: TwitchChatMessageEvent) -> str:
         return event.message_id or cls._build_fallback_message_id(event)
+
+
+def _is_transient_postgres_disconnect(error: psycopg.Error) -> bool:
+    message = str(error).lower()
+    transient_fragments = (
+        "server closed the connection unexpectedly",
+        "database system is shutting down",
+        "connection is lost",
+        "connection failed",
+        "terminating connection due to administrator command",
+        "consuming input failed",
+    )
+    return isinstance(error, psycopg.OperationalError) and any(fragment in message for fragment in transient_fragments)
+
+
+def _compact_error_message(error: BaseException) -> str:
+    return " ".join(str(error).split())

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
+import psycopg
 import pytest
 
 from src.database.connection import MessageRepository, RecentMessageRecord
@@ -109,6 +111,26 @@ class FakeBatchMessageRepository(MessageRepository):
         return self.recent_messages.get(message_id)
 
 
+@dataclass
+class FailingBatchMessageRepository(FakeBatchMessageRepository):
+    error: psycopg.Error = field(
+        default_factory=lambda: psycopg.OperationalError(
+            "consuming input failed: server closed the connection unexpectedly"
+        )
+    )
+    flush_attempts: int = 0
+
+    async def flush_write_batch(
+        self,
+        *,
+        message_events: tuple[TwitchChatMessageEvent, ...],
+        thread_matches: tuple[tuple[int, TwitchChatMessageEvent], ...],
+    ) -> None:
+        _ = message_events, thread_matches
+        self.flush_attempts += 1
+        raise self.error
+
+
 def _event(message_id: str | None, *, content: str = "hello", minutes_ago: int = 0) -> TwitchChatMessageEvent:
     return TwitchChatMessageEvent(
         channel_login="example",
@@ -184,6 +206,43 @@ async def test_batched_message_repository_requires_message_id_before_queueing() 
 
     with pytest.raises(ValueError, match="missing message_id"):
         await repository.save_twitch_message(_event(None))
+
+
+@pytest.mark.asyncio
+async def test_batched_message_repository_stop_logs_transient_postgres_disconnect_as_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    inner = FailingBatchMessageRepository()
+    repository = BatchedMessageRepository(repository=inner, batch_size=50, flush_interval_seconds=60)
+
+    await repository.save_twitch_message(_event("msg-db-down"))
+
+    with caplog.at_level(logging.WARNING):
+        await repository.stop()
+
+    assert inner.flush_attempts == 1
+    assert "Final batched message write flush skipped during shutdown" in caplog.text
+    assert repository._pending_messages.keys() == {"msg-db-down"}
+    assert all(record.exc_info is None for record in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_batched_message_repository_background_requeues_transient_postgres_disconnect(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    inner = FailingBatchMessageRepository()
+    repository = BatchedMessageRepository(repository=inner, batch_size=50, flush_interval_seconds=0.01)
+
+    await repository.start()
+    with caplog.at_level(logging.WARNING):
+        await repository.save_twitch_message(_event("msg-retry"))
+        await asyncio.sleep(0.03)
+        await repository.stop()
+
+    assert inner.flush_attempts >= 1
+    assert "pending writes were requeued" in caplog.text
+    assert repository._pending_messages.keys() == {"msg-retry"}
+    assert all(record.exc_info is None for record in caplog.records)
 
 
 def _require_message_id(event: TwitchChatMessageEvent) -> str:
