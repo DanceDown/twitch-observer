@@ -21,6 +21,18 @@ def test_app_config_uses_default_presence_stale_after(monkeypatch) -> None:
     assert config.discord_presence_stale_after_seconds == 180
 
 
+def test_app_config_uses_default_presence_update_timeout(monkeypatch) -> None:
+    monkeypatch.delenv("DISCORD_PRESENCE_UPDATE_TIMEOUT_SECONDS", raising=False)
+    config = AppConfig()
+    assert config.discord_presence_update_timeout_seconds == 15
+
+
+def test_app_config_reads_presence_update_timeout(monkeypatch) -> None:
+    monkeypatch.setenv("DISCORD_PRESENCE_UPDATE_TIMEOUT_SECONDS", "7.5")
+    config = AppConfig()
+    assert config.discord_presence_update_timeout_seconds == 7.5
+
+
 def test_app_config_uses_default_pattern_compile_cache_size(monkeypatch) -> None:
     monkeypatch.delenv("TWITCH_PATTERN_COMPILE_CACHE_SIZE", raising=False)
     config = AppConfig()

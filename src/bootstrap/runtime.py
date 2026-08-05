@@ -80,6 +80,7 @@ def build_runtime(
         poll_interval_seconds=core.config.discord_presence_poll_interval_seconds,
         watchdog_interval_seconds=core.config.discord_presence_watchdog_interval_seconds,
         stale_after_seconds=core.config.discord_presence_stale_after_seconds,
+        status_update_timeout_seconds=core.config.discord_presence_update_timeout_seconds,
         lookback_minutes=core.config.discord_presence_lookback_minutes,
         message_limit=core.config.discord_presence_message_limit,
         max_status_length=core.config.discord_presence_max_status_length,

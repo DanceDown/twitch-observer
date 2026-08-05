@@ -96,7 +96,12 @@ class ObserverDiscordClient(discord.Client):
         if channel is None:
             channel = await self.fetch_channel(discord_channel_id)
         if isinstance(channel, discord.TextChannel | discord.Thread | discord.DMChannel):
-            await channel.send(embed=embed)
+            await send_embed_with_retries(
+                channel,
+                embed=embed,
+                purpose="tracking embed",
+                max_attempts=self._config.discord_delivery_max_attempts,
+            )
 
     async def set_status_text(self, text: str) -> None:
         """Update the bot's global Discord custom status text."""

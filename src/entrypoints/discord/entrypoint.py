@@ -59,7 +59,7 @@ class DiscordEntrypoint(TrackingNotificationSender, DiscordPresenceStatusSender)
         """Send a tracking embed through the Discord client."""
         if not self._config.discord_bot_token or not self._client.is_ready():
             return
-        with suppress(discord.HTTPException):
+        with suppress(discord.HTTPException, aiohttp.ClientError, TimeoutError, OSError):
             await self._client.send_tracking_embed(discord_channel_id, embed, channel_login=channel_login)
 
     async def send_account_result(

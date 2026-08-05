@@ -28,6 +28,15 @@ class _RecordingPresenceClient:
         self.calls.append(text)
 
 
+class _RaisingTrackingClient:
+    def is_ready(self) -> bool:
+        return True
+
+    async def send_tracking_embed(self, discord_channel_id: int, embed, *, channel_login: str | None = None) -> None:
+        _ = discord_channel_id, embed, channel_login
+        raise aiohttp.ServerDisconnectedError()
+
+
 @pytest.mark.asyncio
 async def test_discord_entrypoint_ignores_presence_update_during_reconnect() -> None:
     entrypoint = object.__new__(DiscordEntrypoint)
@@ -47,3 +56,12 @@ async def test_discord_entrypoint_updates_presence_when_client_is_ready() -> Non
     await entrypoint.set_status_text("hello")
 
     assert client.calls == ["hello"]
+
+
+@pytest.mark.asyncio
+async def test_discord_entrypoint_ignores_tracking_update_during_transient_disconnect() -> None:
+    entrypoint = object.__new__(DiscordEntrypoint)
+    entrypoint._config = SimpleNamespace(discord_bot_token="token")
+    entrypoint._client = _RaisingTrackingClient()
+
+    await entrypoint.send_tracking_embed(123, object())

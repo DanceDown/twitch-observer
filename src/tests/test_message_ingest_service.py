@@ -101,6 +101,21 @@ class FakePresenceNotifier(DiscordPresenceStatusSender):
         self.statuses.append(text)
 
 
+class HangingPresenceNotifier(DiscordPresenceStatusSender):
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+        self.cancelled = False
+
+    async def set_status_text(self, text: str) -> None:
+        _ = text
+        self.started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
+
+
 @dataclass
 class RecordingCursor:
     statements: list[tuple[str, tuple[object, ...]]] = field(default_factory=list)
@@ -249,6 +264,38 @@ async def test_presence_service_reuses_only_status_when_no_alternative_exists() 
 
 
 @pytest.mark.asyncio
+async def test_presence_service_times_out_stuck_status_update(caplog: pytest.LogCaptureFixture) -> None:
+    repository = InMemoryMessageRepository()
+    notifier = HangingPresenceNotifier()
+    service = DiscordPresenceService(
+        message_repository=repository,
+        notifier=notifier,
+        poll_interval_seconds=60,
+        status_update_timeout_seconds=0.01,
+        lookback_minutes=5,
+        message_limit=50,
+        max_status_length=120,
+    )
+    await repository.save_twitch_message(
+        TwitchChatMessageEvent(
+            channel_login="channel",
+            author_login="alice",
+            author_display_name="Alice",
+            content="Stuck update",
+            message_id="presence-stuck",
+        )
+    )
+
+    with caplog.at_level(logging.WARNING):
+        await service.poll_once()
+
+    assert notifier.started.is_set()
+    assert notifier.cancelled is True
+    assert service._last_status_text is None
+    assert "Discord presence update timed out" in caplog.text
+
+
+@pytest.mark.asyncio
 async def test_presence_watchdog_restarts_missing_worker() -> None:
     repository = InMemoryMessageRepository()
     notifier = FakePresenceNotifier()
@@ -299,7 +346,7 @@ async def test_presence_watchdog_restarts_done_worker() -> None:
 
 
 @pytest.mark.asyncio
-async def test_presence_watchdog_warns_when_worker_is_stale(caplog: pytest.LogCaptureFixture) -> None:
+async def test_presence_watchdog_restarts_stale_worker(caplog: pytest.LogCaptureFixture) -> None:
     repository = InMemoryMessageRepository()
     notifier = FakePresenceNotifier()
     service = DiscordPresenceService(
@@ -312,13 +359,22 @@ async def test_presence_watchdog_warns_when_worker_is_stale(caplog: pytest.LogCa
         message_limit=50,
         max_status_length=120,
     )
-    service._task = asyncio.current_task()
+    never_finished = asyncio.Event()
+    old_task = asyncio.create_task(never_finished.wait(), name="stale-presence-worker")
+    service._task = old_task
     service._last_poll_finished_at = datetime.now(UTC) - timedelta(seconds=181)
 
     with caplog.at_level(logging.WARNING):
         await service._watchdog_once()
+    await asyncio.sleep(0)
 
     assert "appears stale" in caplog.text
+    assert service._task is not None
+    assert service._task is not old_task
+    assert service._task.done() is False
+    assert old_task.cancelled() is True
+
+    await service.stop()
 
 
 @pytest.mark.asyncio
