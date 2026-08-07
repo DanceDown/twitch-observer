@@ -1,11 +1,33 @@
+# Local environment and credentials
 .env
+.env.*
+!.env.example
+*.local
+*.secret
+secrets/
+src/.env
+src/.env.*
+
+# Local runtime state
 .data/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Python and test caches
 __pycache__/
+*.py[cod]
 .pytest_cache/
+.ruff_cache/
+
+# Local tools and editors
 .tmp/
 .venv/
-.venv-1/
-*.pyc
-src/.env
-.ruff_cache
-.vscode
+.venv-*/
+.vscode/
+.codex/
+.agents/
+
+# Local Docker overrides can contain secrets or host-only paths
+docker-compose.override.yml

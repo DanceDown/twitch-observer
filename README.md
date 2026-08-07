@@ -90,3 +90,6 @@ At minimum the application needs:
 - [docs/adding_commands.md](docs/adding_commands.md)
 - [docs/development.md](docs/development.md)
 - [docs/testing_playbook.md](docs/testing_playbook.md)
+- [docs/privacy_policy.md](docs/privacy_policy.md)
+- [docs/terms_of_service.md](docs/terms_of_service.md)
+- [docs/repository_security.md](docs/repository_security.md)

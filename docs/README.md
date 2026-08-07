@@ -27,6 +27,11 @@ duplicate maintenance.
   - `testing_playbook.md`
 - Command/feature extension workflow:
   - `adding_commands.md`
+- Public legal templates:
+  - `privacy_policy.md`
+  - `terms_of_service.md`
+- Public repository safety:
+  - `repository_security.md`
 
 ## Editing rules
 
