@@ -7,11 +7,12 @@ from types import SimpleNamespace
 import discord
 import pytest
 
-from src.database.connection import AdapterEventActionRecord, AdapterEventRecord
+from src.database.connection import AdapterEventActionRecord, AdapterEventRecord, PatternRecord
 from src.entrypoints.discord.commands.live_state_commands import register_live_state_commands
 from src.entrypoints.discord.commands.write_commands import register_write_commands
 from src.entrypoints.discord.ui.live_state_ui import ChannelEventActionModal, ChannelEventModal
 from src.entrypoints.discord.ui.patterns.channels_modal import PatternChannelsModal
+from src.entrypoints.discord.ui.patterns.selection import PatternPickerView
 from src.entrypoints.discord.ui.patterns.state import PatternFormState
 from src.entrypoints.discord.ui.patterns.users_modal import PatternUsersModal
 from src.entrypoints.discord.ui.reply_ui import PatternReplyAddModal
@@ -157,6 +158,21 @@ class _FakeLiveProvider:
 
 
 @dataclass
+class _FakePatternProvider:
+    language: str = "german"
+    patterns: list[PatternPresentation] = field(default_factory=list)
+
+    async def get_thread_language(self, _discord_channel_id: int) -> str:
+        return self.language
+
+    async def list_patterns(self, _discord_channel_id: int) -> list[PatternPresentation]:
+        return list(self.patterns)
+
+    async def get_pattern(self, _discord_channel_id: int, pattern_id: int) -> PatternPresentation | None:
+        return next((pattern for pattern in self.patterns if pattern.pattern.pattern_id == pattern_id), None)
+
+
+@dataclass
 class _FakeResponse:
     modal: object | None = None
 
@@ -165,10 +181,72 @@ class _FakeResponse:
 
 
 @dataclass
+class _FakeDeferredResponse:
+    done: bool = False
+    defer_ephemeral: bool | None = None
+
+    def is_done(self) -> bool:
+        return self.done
+
+    async def defer(self, *, ephemeral: bool = False) -> None:
+        self.done = True
+        self.defer_ephemeral = ephemeral
+
+
+@dataclass
+class _FakeEditableMessage:
+    edited_embed: discord.Embed | None = None
+    edited_view: object | None = None
+
+    async def edit(self, *, embed: discord.Embed | None = None, view: object | None = None) -> None:
+        self.edited_embed = embed
+        self.edited_view = view
+
+
+@dataclass
 class _FakeInteraction:
     channel_id: int = 100
     user: object = field(default_factory=lambda: SimpleNamespace(id=200))
     response: _FakeResponse = field(default_factory=_FakeResponse)
+
+
+@dataclass
+class _FakeDeferredInteraction:
+    channel_id: int = 100
+    user: object = field(default_factory=lambda: SimpleNamespace(id=200))
+    response: _FakeDeferredResponse = field(default_factory=_FakeDeferredResponse)
+    original_message: _FakeEditableMessage = field(default_factory=_FakeEditableMessage)
+
+    async def edit_original_response(self, *, embed: discord.Embed, view: object | None = None) -> _FakeEditableMessage:
+        self.original_message.edited_embed = embed
+        self.original_message.edited_view = view
+        return self.original_message
+
+
+def _pattern_presentation(pattern_id: int) -> PatternPresentation:
+    return PatternPresentation(
+        display_index=1,
+        pattern=PatternRecord(
+            thread_id=1,
+            pattern_id=pattern_id,
+            regex="hello",
+            channel_scope_mode="all_tracked",
+            channel_scope_ids=(),
+            user_scope_mode="all_users",
+            user_scope_ids=(),
+            sub_state="all",
+            offline_state="both",
+            is_regex=False,
+            case_sensitive=False,
+            color=None,
+            disabled=False,
+            priority=0,
+        ),
+        channel_logins=(),
+        channel_display_names=(),
+        user_logins=(),
+        user_display_names=(),
+    )
 
 
 def test_write_modal_includes_selected_items_beyond_first_25() -> None:
@@ -272,6 +350,29 @@ def test_live_state_modals_include_selected_items_beyond_first_25() -> None:
 
     assert "29" in [option.value for option in add_modal.channel.component.options]
     assert "29:stream.online" in [option.value for option in action_modal.notification.component.options]
+
+
+@pytest.mark.asyncio
+async def test_pattern_edit_selection_opens_editor_after_deferred_modal_submit() -> None:
+    localizer = Localizer.from_directory()
+    provider = _FakePatternProvider(patterns=[_pattern_presentation(14)])
+    picker = PatternPickerView(
+        owner_id=200,
+        language="german",
+        services=object(),  # type: ignore[arg-type]
+        data_provider=provider,  # type: ignore[arg-type]
+        discord_channel_id=100,
+        localizer=localizer,
+    )
+    interaction = _FakeDeferredInteraction()
+
+    await picker.submit_selection(interaction, 14)  # type: ignore[arg-type]
+
+    assert interaction.response.defer_ephemeral is True
+    editor_view = interaction.original_message.edited_view
+    assert editor_view is not None
+    assert editor_view.bound_message is interaction.original_message
+    assert editor_view.state.pattern_id == 14
 
 
 @pytest.mark.asyncio
