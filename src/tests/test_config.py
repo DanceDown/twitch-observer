@@ -69,6 +69,18 @@ def test_app_config_uses_default_message_write_flush_interval(monkeypatch) -> No
     assert config.twitch_message_write_flush_interval_seconds == 0.25
 
 
+def test_app_config_uses_default_message_write_spool_path(monkeypatch) -> None:
+    monkeypatch.delenv("TWITCH_MESSAGE_WRITE_SPOOL_PATH", raising=False)
+    config = AppConfig()
+    assert config.twitch_message_write_spool_path == ".data/message-write-spool.json"
+
+
+def test_app_config_allows_disabling_message_write_spool(monkeypatch) -> None:
+    monkeypatch.setenv("TWITCH_MESSAGE_WRITE_SPOOL_PATH", "")
+    config = AppConfig()
+    assert config.twitch_message_write_spool_path is None
+
+
 def test_app_config_uses_default_discord_delivery_max_attempts(monkeypatch) -> None:
     monkeypatch.delenv("DISCORD_DELIVERY_MAX_ATTEMPTS", raising=False)
     config = AppConfig()

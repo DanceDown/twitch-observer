@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import psycopg
 import pytest
 
 from src.database.connection import MessageRepository, RecentMessageRecord
+from src.errors import DatabasePoolExhaustedError
 from src.events.twitch_events import TwitchChatMessageEvent
 from src.services.batched_message_repository import BatchedMessageRepository
 
@@ -129,6 +132,21 @@ class FailingBatchMessageRepository(FakeBatchMessageRepository):
         raise self.error
 
 
+@dataclass
+class PoolExhaustedBatchMessageRepository(FakeBatchMessageRepository):
+    flush_attempts: int = 0
+
+    async def flush_write_batch(
+        self,
+        *,
+        message_events: tuple[TwitchChatMessageEvent, ...],
+        thread_matches: tuple[tuple[int, TwitchChatMessageEvent], ...],
+    ) -> None:
+        _ = message_events, thread_matches
+        self.flush_attempts += 1
+        raise DatabasePoolExhaustedError("pool exhausted")
+
+
 def _event(message_id: str | None, *, content: str = "hello", minutes_ago: int = 0) -> TwitchChatMessageEvent:
     return TwitchChatMessageEvent(
         channel_login="example",
@@ -223,10 +241,12 @@ async def test_batched_message_repository_requires_message_id_before_queueing() 
 
 @pytest.mark.asyncio
 async def test_batched_message_repository_stop_logs_transient_postgres_disconnect_as_warning(
+    tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     inner = FailingBatchMessageRepository()
-    repository = BatchedMessageRepository(repository=inner, batch_size=50, flush_interval_seconds=60)
+    spool_path = tmp_path / "message-spool.json"
+    repository = BatchedMessageRepository(repository=inner, batch_size=50, flush_interval_seconds=60, spool_path=str(spool_path))
 
     await repository.save_twitch_message(_event("msg-db-down"))
 
@@ -235,8 +255,58 @@ async def test_batched_message_repository_stop_logs_transient_postgres_disconnec
 
     assert inner.flush_attempts == 1
     assert "Final batched message write flush skipped during shutdown" in caplog.text
+    assert "pending writes were spooled" in caplog.text
+    assert spool_path.exists()
     assert repository._pending_messages.keys() == {"msg-db-down"}
     assert all(record.exc_info is None for record in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_batched_message_repository_replays_spooled_shutdown_writes_on_start(tmp_path: Path) -> None:
+    spool_path = tmp_path / "message-spool.json"
+    failing_inner = FailingBatchMessageRepository()
+    failing_repository = BatchedMessageRepository(
+        repository=failing_inner,
+        batch_size=50,
+        flush_interval_seconds=60,
+        spool_path=str(spool_path),
+    )
+    event = _event("msg-spooled")
+
+    await failing_repository.save_twitch_message(event)
+    await failing_repository.mark_message_matched_in_thread(thread_id=7, event=event)
+    await failing_repository.stop()
+
+    payload = json.loads(spool_path.read_text(encoding="utf-8"))
+    assert [item["message_id"] for item in payload["messages"]] == ["msg-spooled"]
+    assert [item["event"]["message_id"] for item in payload["thread_matches"]] == ["msg-spooled"]
+
+    recovered_inner = FakeBatchMessageRepository()
+    recovered_repository = BatchedMessageRepository(
+        repository=recovered_inner,
+        batch_size=50,
+        flush_interval_seconds=60,
+        spool_path=str(spool_path),
+    )
+
+    await recovered_repository.start()
+    await recovered_repository.stop()
+
+    assert recovered_inner.flush_batches == [(("msg-spooled",), ((7, "msg-spooled"),))]
+    assert not spool_path.exists()
+
+
+@pytest.mark.asyncio
+async def test_batched_message_repository_spools_pending_writes_when_pool_is_exhausted_on_stop(tmp_path: Path) -> None:
+    inner = PoolExhaustedBatchMessageRepository()
+    spool_path = tmp_path / "message-spool.json"
+    repository = BatchedMessageRepository(repository=inner, batch_size=50, flush_interval_seconds=60, spool_path=str(spool_path))
+
+    await repository.save_twitch_message(_event("msg-pool-down"))
+    await repository.stop()
+
+    assert inner.flush_attempts == 1
+    assert spool_path.exists()
 
 
 @pytest.mark.asyncio

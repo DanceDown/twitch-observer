@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Protocol
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any, Protocol
 
 import psycopg
 
@@ -16,6 +18,7 @@ from src.errors import DatabasePoolExhaustedError
 from src.events.twitch_events import TwitchChatMessageEvent
 
 logger = logging.getLogger(__name__)
+_SPOOL_VERSION = 1
 
 
 class _BatchMessageWriteRepository(Protocol):
@@ -34,6 +37,7 @@ class BatchedMessageRepository(MessageRepository):
     repository: MessageRepository
     batch_size: int = 50
     flush_interval_seconds: float = 0.25
+    spool_path: str | None = None
     _pending_messages: dict[str, TwitchChatMessageEvent] = field(default_factory=dict, init=False)
     _pending_matches: dict[tuple[int, str], tuple[int, TwitchChatMessageEvent]] = field(default_factory=dict, init=False)
     _queue_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
@@ -41,8 +45,10 @@ class BatchedMessageRepository(MessageRepository):
     _wake_event: asyncio.Event = field(default_factory=asyncio.Event, init=False)
     _stop_event: asyncio.Event = field(default_factory=asyncio.Event, init=False)
     _task: asyncio.Task[None] | None = field(default=None, init=False)
+    _spool_restore_pending: bool = field(default=False, init=False)
 
     async def start(self) -> None:
+        await self._restore_spooled_writes()
         if self._task is None:
             self._stop_event.clear()
             self._task = asyncio.create_task(self._run_loop(), name="message-write-batcher")
@@ -138,6 +144,7 @@ class BatchedMessageRepository(MessageRepository):
                 except (DatabasePoolExhaustedError, psycopg.Error):
                     await self._requeue_snapshot(message_events=message_events, thread_matches=thread_matches)
                     raise
+                await self._clear_restored_spool_after_success()
 
     async def _enqueue_message(self, event: TwitchChatMessageEvent) -> bool:
         async with self._queue_lock:
@@ -181,6 +188,12 @@ class BatchedMessageRepository(MessageRepository):
             for thread_id, event in thread_matches:
                 self._pending_matches.setdefault((thread_id, self._resolve_message_id(event)), (thread_id, event))
             self._wake_event.set()
+
+    async def _snapshot_pending(
+        self,
+    ) -> tuple[tuple[TwitchChatMessageEvent, ...], tuple[tuple[int, TwitchChatMessageEvent], ...]]:
+        async with self._queue_lock:
+            return tuple(self._pending_messages.values()), tuple(self._pending_matches.values())
 
     async def _flush_snapshot(
         self,
@@ -228,15 +241,77 @@ class BatchedMessageRepository(MessageRepository):
         try:
             await self.flush()
         except DatabasePoolExhaustedError:
-            logger.warning("Final batched message write flush skipped during shutdown because the database pool is exhausted.")
+            spooled_path = await self._spool_pending_writes()
+            logger.warning(
+                "Final batched message write flush skipped during shutdown because the database pool is exhausted%s.",
+                _spooled_hint(spooled_path),
+            )
         except psycopg.Error as error:
+            spooled_path = await self._spool_pending_writes()
             if _is_transient_postgres_disconnect(error):
                 logger.warning(
-                    "Final batched message write flush skipped during shutdown because PostgreSQL is unavailable: %s",
+                    "Final batched message write flush skipped during shutdown because PostgreSQL is unavailable%s: %s",
+                    _spooled_hint(spooled_path),
                     _compact_error_message(error),
                 )
                 return
-            logger.exception("Final batched message write flush failed during shutdown.")
+            logger.exception("Final batched message write flush failed during shutdown%s.", _spooled_hint(spooled_path))
+
+    async def _restore_spooled_writes(self) -> None:
+        path = self._spool_file_path()
+        if path is None or not path.exists():
+            return
+        try:
+            message_events, thread_matches = _read_spool_file(path)
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            logger.exception("Could not read batched message write spool %s; leaving it in place.", path)
+            return
+        if not message_events and not thread_matches:
+            _remove_spool_file(path)
+            return
+        await self._requeue_snapshot(message_events=message_events, thread_matches=thread_matches)
+        self._spool_restore_pending = True
+        try:
+            await self.flush()
+        except DatabasePoolExhaustedError:
+            logger.warning("Could not replay batched message write spool because the database pool is exhausted; retrying in background.")
+        except psycopg.Error as error:
+            if _is_transient_postgres_disconnect(error):
+                logger.warning(
+                    "Could not replay batched message write spool because PostgreSQL is unavailable; retrying in background: %s",
+                    _compact_error_message(error),
+                )
+                return
+            logger.exception("Could not replay batched message write spool because PostgreSQL returned an error; retrying in background.")
+
+    async def _spool_pending_writes(self) -> Path | None:
+        path = self._spool_file_path()
+        if path is None:
+            return None
+        message_events, thread_matches = await self._snapshot_pending()
+        if not message_events and not thread_matches:
+            return None
+        try:
+            _write_spool_file(path, message_events=message_events, thread_matches=thread_matches)
+        except OSError:
+            logger.exception("Could not spool pending batched message writes to %s.", path)
+            return None
+        return path
+
+    async def _clear_restored_spool_after_success(self) -> None:
+        if not self._spool_restore_pending:
+            return
+        path = self._spool_file_path()
+        if path is not None:
+            _remove_spool_file(path)
+        self._spool_restore_pending = False
+        logger.info("Replayed spooled batched message writes into PostgreSQL.")
+
+    def _spool_file_path(self) -> Path | None:
+        if self.spool_path is None:
+            return None
+        normalized_path = self.spool_path.strip()
+        return Path(normalized_path) if normalized_path else None
 
     @staticmethod
     def _log_postgres_flush_error(error: psycopg.Error) -> None:
@@ -272,3 +347,130 @@ def _is_transient_postgres_disconnect(error: psycopg.Error) -> bool:
 
 def _compact_error_message(error: BaseException) -> str:
     return " ".join(str(error).split())
+
+
+def _spooled_hint(spooled_path: Path | None) -> str:
+    return f"; pending writes were spooled to {spooled_path}" if spooled_path is not None else ""
+
+
+def _write_spool_file(
+    path: Path,
+    *,
+    message_events: tuple[TwitchChatMessageEvent, ...],
+    thread_matches: tuple[tuple[int, TwitchChatMessageEvent], ...],
+) -> None:
+    payload = {
+        "version": _SPOOL_VERSION,
+        "messages": [_event_to_payload(event) for event in message_events],
+        "thread_matches": [
+            {
+                "thread_id": thread_id,
+                "event": _event_to_payload(event),
+            }
+            for thread_id, event in thread_matches
+        ],
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = path.with_name(f"{path.name}.tmp")
+    temporary_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    temporary_path.replace(path)
+
+
+def _read_spool_file(path: Path) -> tuple[tuple[TwitchChatMessageEvent, ...], tuple[tuple[int, TwitchChatMessageEvent], ...]]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("Batched message write spool payload must be an object.")
+    if payload.get("version") != _SPOOL_VERSION:
+        raise ValueError(f"Unsupported batched message write spool version: {payload.get('version')!r}.")
+    messages = payload.get("messages", [])
+    thread_matches = payload.get("thread_matches", [])
+    if not isinstance(messages, list) or not isinstance(thread_matches, list):
+        raise ValueError("Batched message write spool lists are malformed.")
+    return (
+        tuple(_event_from_payload(message) for message in messages),
+        tuple(_thread_match_from_payload(match) for match in thread_matches),
+    )
+
+
+def _remove_spool_file(path: Path) -> bool:
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return True
+    except OSError:
+        logger.exception("Could not remove batched message write spool %s.", path)
+        return False
+    return True
+
+
+def _thread_match_from_payload(payload: Any) -> tuple[int, TwitchChatMessageEvent]:
+    if not isinstance(payload, dict):
+        raise ValueError("Batched message write spool thread match must be an object.")
+    return int(payload["thread_id"]), _event_from_payload(payload["event"])
+
+
+def _event_to_payload(event: TwitchChatMessageEvent) -> dict[str, Any]:
+    return {
+        "channel_login": event.channel_login,
+        "author_login": event.author_login,
+        "content": event.content,
+        "author_display_name": event.author_display_name,
+        "message_id": event.message_id,
+        "broadcaster_id": event.broadcaster_id,
+        "author_id": event.author_id,
+        "color": event.color,
+        "reply_parent_message_id": event.reply_parent_message_id,
+        "message_kind": event.message_kind,
+        "notice_type": event.notice_type,
+        "system_message": event.system_message,
+        "sent_at": event.sent_at.isoformat(),
+        "raw_line": event.raw_line,
+        "raw_tags": dict(event.raw_tags),
+    }
+
+
+def _event_from_payload(payload: Any) -> TwitchChatMessageEvent:
+    if not isinstance(payload, dict):
+        raise ValueError("Batched message write spool event must be an object.")
+    return TwitchChatMessageEvent(
+        channel_login=_required_str(payload, "channel_login"),
+        author_login=_required_str(payload, "author_login"),
+        content=_required_str(payload, "content"),
+        author_display_name=_optional_str(payload, "author_display_name"),
+        message_id=_optional_str(payload, "message_id"),
+        broadcaster_id=_optional_str(payload, "broadcaster_id"),
+        author_id=_optional_str(payload, "author_id"),
+        color=_optional_str(payload, "color"),
+        reply_parent_message_id=_optional_str(payload, "reply_parent_message_id"),
+        message_kind=_required_str(payload, "message_kind"),
+        notice_type=_optional_str(payload, "notice_type"),
+        system_message=_optional_str(payload, "system_message"),
+        sent_at=_datetime_from_payload(payload["sent_at"]),
+        raw_line=_optional_str(payload, "raw_line"),
+        raw_tags=_raw_tags_from_payload(payload.get("raw_tags", {})),
+    )
+
+
+def _required_str(payload: dict[str, Any], key: str) -> str:
+    value = payload[key]
+    if value is None:
+        raise ValueError(f"Batched message write spool field {key!r} is missing.")
+    return str(value)
+
+
+def _optional_str(payload: dict[str, Any], key: str) -> str | None:
+    value = payload.get(key)
+    return None if value is None else str(value)
+
+
+def _datetime_from_payload(value: Any) -> datetime:
+    parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed
+
+
+def _raw_tags_from_payload(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    return {str(key): str(item) for key, item in value.items()}

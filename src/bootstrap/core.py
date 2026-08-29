@@ -42,6 +42,7 @@ async def build_core(config: AppConfig) -> ApplicationCore:
         repository=raw_message_repository,
         batch_size=max(1, config.twitch_message_write_batch_size),
         flush_interval_seconds=max(0.0, config.twitch_message_write_flush_interval_seconds),
+        spool_path=config.twitch_message_write_spool_path,
     )
     thread_repository = PostgresThreadRepository(database)
     channel_repository = PostgresChannelRepository(database)

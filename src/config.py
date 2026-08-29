@@ -119,6 +119,9 @@ class AppConfig:
     twitch_message_write_flush_interval_seconds: float = field(
         default_factory=lambda: _get_float("TWITCH_MESSAGE_WRITE_FLUSH_INTERVAL_SECONDS", "0.25")
     )
+    twitch_message_write_spool_path: str | None = field(
+        default_factory=lambda: os.getenv("TWITCH_MESSAGE_WRITE_SPOOL_PATH", ".data/message-write-spool.json").strip() or None
+    )
     discord_write_reply_candidate_max_age_minutes: int = field(
         default_factory=lambda: _get_int("DISCORD_WRITE_REPLY_CANDIDATE_MAX_AGE_MINUTES", "1440")
     )

@@ -29,6 +29,7 @@ services:
       args:
         INSTALL_DEV: ${INSTALL_DEV:-false}
     restart: unless-stopped
+    stop_grace_period: 90s
     env_file:
       - .env
     depends_on:

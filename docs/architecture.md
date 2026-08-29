@@ -184,6 +184,15 @@ ordered delivery queue preserves Discord message order per Discord thread.
 Shared Helix refresh tasks are shielded from per-message lookup timeouts so a
 timed-out worker does not cancel cache warming for later messages.
 
+### Message write buffering
+
+Twitch chat messages and thread-match markers are buffered by
+`BatchedMessageRepository` and flushed frequently
+(`TWITCH_MESSAGE_WRITE_FLUSH_INTERVAL_SECONDS`) or when the batch size is
+reached. Runtime PostgreSQL disconnects requeue the pending writes in memory.
+If PostgreSQL is already unavailable during final shutdown, the pending writes
+are stored in `TWITCH_MESSAGE_WRITE_SPOOL_PATH` and replayed on the next start.
+
 ## Twitch auth model
 
 - App credentials
