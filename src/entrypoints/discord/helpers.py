@@ -69,25 +69,6 @@ async def send_message_response(
         raise
 
 
-async def edit_original_response(
-    interaction: discord.Interaction,
-    *,
-    embed: discord.Embed,
-    view: discord.ui.View | None = None,
-) -> discord.InteractionMessage | None:
-    """Try to edit one acknowledged interaction response without crashing on expired tokens."""
-    try:
-        edit_kwargs: dict[str, object] = {"embed": embed}
-        if view is not None:
-            edit_kwargs["view"] = view
-        return await interaction.edit_original_response(**edit_kwargs)
-    except discord.HTTPException as error:
-        if _is_unknown_interaction_error(error):
-            logger.warning("Discord interaction expired before edit_original_response; skipping edit.")
-            return None
-        raise
-
-
 async def send_modal_response(interaction: discord.Interaction, modal: discord.ui.Modal) -> bool:
     """Try to open one modal without crashing on expired interaction tokens."""
     if interaction.response.is_done():

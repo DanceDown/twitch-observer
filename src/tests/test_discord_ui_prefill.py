@@ -181,16 +181,18 @@ class _FakeResponse:
 
 
 @dataclass
-class _FakeDeferredResponse:
-    done: bool = False
-    defer_ephemeral: bool | None = None
+class _FakeModalSubmitResponse:
+    sent_embed: discord.Embed | None = None
+    sent_view: object | None = None
+    ephemeral: bool | None = None
 
     def is_done(self) -> bool:
-        return self.done
+        return self.sent_embed is not None
 
-    async def defer(self, *, ephemeral: bool = False) -> None:
-        self.done = True
-        self.defer_ephemeral = ephemeral
+    async def send_message(self, *, embed: discord.Embed, view: object, ephemeral: bool) -> None:
+        self.sent_embed = embed
+        self.sent_view = view
+        self.ephemeral = ephemeral
 
 
 @dataclass
@@ -211,15 +213,13 @@ class _FakeInteraction:
 
 
 @dataclass
-class _FakeDeferredInteraction:
+class _FakeModalSubmitInteraction:
     channel_id: int = 100
     user: object = field(default_factory=lambda: SimpleNamespace(id=200))
-    response: _FakeDeferredResponse = field(default_factory=_FakeDeferredResponse)
+    response: _FakeModalSubmitResponse = field(default_factory=_FakeModalSubmitResponse)
     original_message: _FakeEditableMessage = field(default_factory=_FakeEditableMessage)
 
-    async def edit_original_response(self, *, embed: discord.Embed, view: object | None = None) -> _FakeEditableMessage:
-        self.original_message.edited_embed = embed
-        self.original_message.edited_view = view
+    async def original_response(self) -> _FakeEditableMessage:
         return self.original_message
 
 
@@ -353,7 +353,7 @@ def test_live_state_modals_include_selected_items_beyond_first_25() -> None:
 
 
 @pytest.mark.asyncio
-async def test_pattern_edit_selection_opens_editor_after_deferred_modal_submit() -> None:
+async def test_pattern_edit_selection_opens_editor_with_ephemeral_modal_submit_response() -> None:
     localizer = Localizer.from_directory()
     provider = _FakePatternProvider(patterns=[_pattern_presentation(14)])
     picker = PatternPickerView(
@@ -364,12 +364,12 @@ async def test_pattern_edit_selection_opens_editor_after_deferred_modal_submit()
         discord_channel_id=100,
         localizer=localizer,
     )
-    interaction = _FakeDeferredInteraction()
+    interaction = _FakeModalSubmitInteraction()
 
     await picker.submit_selection(interaction, 14)  # type: ignore[arg-type]
 
-    assert interaction.response.defer_ephemeral is True
-    editor_view = interaction.original_message.edited_view
+    assert interaction.response.ephemeral is True
+    editor_view = interaction.response.sent_view
     assert editor_view is not None
     assert editor_view.bound_message is interaction.original_message
     assert editor_view.state.pattern_id == 14

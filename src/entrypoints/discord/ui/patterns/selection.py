@@ -6,7 +6,7 @@ import discord
 from typing import Any
 
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
-from src.entrypoints.discord.helpers import defer_interaction_response, edit_original_response, send_initial_result, send_message_response
+from src.entrypoints.discord.helpers import send_initial_result
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.utils.discord_embeds import build_result_embed
@@ -56,7 +56,6 @@ class PatternPickerView(BaseFormView):
         return self.form_embed("discord.pattern_ui.edit")
 
     async def submit_selection(self, interaction: discord.Interaction, pattern_id: int) -> None:
-        await defer_interaction_response(interaction, ephemeral=True)
         pattern = await self._data_provider.get_pattern(self._discord_channel_id, pattern_id)
         if pattern is None:
             result = self.result(
@@ -104,11 +103,8 @@ class PatternPickerView(BaseFormView):
         if self.bound_message is not None:
             await self.bound_message.edit(embed=view.render_embed(), view=view)
             return
-        if interaction.response.is_done():
-            view.bound_message = await edit_original_response(interaction, embed=view.render_embed(), view=view)
-            return
-        if await send_message_response(interaction, embed=view.render_embed(), view=view, ephemeral=True):
-            view.bound_message = await interaction.original_response()
+        await interaction.response.send_message(embed=view.render_embed(), view=view, ephemeral=True)
+        view.bound_message = await interaction.original_response()
 
 
 def _merge_state_overrides(target: PatternFormState, overrides: dict[str, Any]) -> None:
