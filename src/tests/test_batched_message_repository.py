@@ -114,9 +114,7 @@ class FakeBatchMessageRepository(MessageRepository):
 @dataclass
 class FailingBatchMessageRepository(FakeBatchMessageRepository):
     error: psycopg.Error = field(
-        default_factory=lambda: psycopg.OperationalError(
-            "consuming input failed: server closed the connection unexpectedly"
-        )
+        default_factory=lambda: psycopg.OperationalError("consuming input failed: server closed the connection unexpectedly")
     )
     flush_attempts: int = 0
 
@@ -185,6 +183,21 @@ async def test_batched_message_repository_flushes_immediately_when_batch_is_full
     await repository.save_twitch_message(_event("msg-3"))
     await repository.save_twitch_message(_event("msg-4"))
 
+    assert inner.flush_batches == [(("msg-3", "msg-4"), ())]
+
+
+@pytest.mark.asyncio
+async def test_batched_message_repository_defers_full_batch_flush_when_worker_is_running() -> None:
+    inner = FakeBatchMessageRepository()
+    repository = BatchedMessageRepository(repository=inner, batch_size=2, flush_interval_seconds=60)
+
+    await repository.start()
+    await repository.save_twitch_message(_event("msg-3"))
+    await repository.save_twitch_message(_event("msg-4"))
+
+    assert inner.flush_batches == []
+
+    await repository.stop()
     assert inner.flush_batches == [(("msg-3", "msg-4"), ())]
 
 

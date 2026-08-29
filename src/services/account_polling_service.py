@@ -49,10 +49,10 @@ class DeviceFlowPollProcessor:
         """Process one pending flow if it is due and still valid."""
         if self._is_expired(pending, now):
             await self.device_flow_repository.mark_failed(
-                    discord_channel_id=pending.discord_channel_id or 0,
-                    last_error="The Twitch login code expired before it was confirmed.",
-                )
-            
+                discord_channel_id=pending.discord_channel_id or 0,
+                last_error="The Twitch login code expired before it was confirmed.",
+            )
+
             await notify(
                 pending.discord_user_id,
                 await self._result_for_pending(
@@ -77,17 +77,17 @@ class DeviceFlowPollProcessor:
             return
         if result.status == "slow_down":
             await self.device_flow_repository.update_interval(
-                    discord_channel_id=pending.discord_channel_id or 0,
-                    interval_seconds=pending.interval_seconds + int(result.interval or 0),
-                )
-            
+                discord_channel_id=pending.discord_channel_id or 0,
+                interval_seconds=pending.interval_seconds + int(result.interval or 0),
+            )
+
             return
         if result.status == "failed":
             await self.device_flow_repository.mark_failed(
-                    discord_channel_id=pending.discord_channel_id or 0,
-                    last_error=result.error_message or "The Twitch login was denied or expired.",
-                )
-            
+                discord_channel_id=pending.discord_channel_id or 0,
+                last_error=result.error_message or "The Twitch login was denied or expired.",
+            )
+
             await notify(
                 pending.discord_user_id,
                 await self._result_for_pending(
@@ -105,10 +105,10 @@ class DeviceFlowPollProcessor:
         validated = await self.twitch_api.validate_user_access_token(result.token_bundle.access_token)
         if "user:write:chat" not in validated.scopes:
             await self.device_flow_repository.mark_failed(
-                    discord_channel_id=pending.discord_channel_id or 0,
-                    last_error="The linked Twitch token is missing `user:write:chat`.",
-                )
-            
+                discord_channel_id=pending.discord_channel_id or 0,
+                last_error="The linked Twitch token is missing `user:write:chat`.",
+            )
+
             await notify(
                 pending.discord_user_id,
                 await self._result_for_pending(
@@ -129,32 +129,32 @@ class DeviceFlowPollProcessor:
         )
         if thread is None:
             await self.device_flow_repository.mark_failed(
-                    discord_channel_id=pending.discord_channel_id or 0,
-                    last_error="The Discord channel is no longer joined.",
-                )
-            
+                discord_channel_id=pending.discord_channel_id or 0,
+                last_error="The Discord channel is no longer joined.",
+            )
+
             return
 
         if thread.account_id is not None:
             await self.account_repository.remove_by_account_id(thread.account_id)
 
         stored = await self.account_repository.create_account(
-                discord_user_id=pending.discord_user_id,
-                twitch_user_id=validated.user_id,
-                twitch_login=validated.login,
-                client_id=validated.client_id,
-                access_token=result.token_bundle.access_token,
-                refresh_token=result.token_bundle.refresh_token,
-                expires_at=expires_at,
-                scope=result.token_bundle.scope,
-                token_type=result.token_bundle.token_type,
-            )
-        
+            discord_user_id=pending.discord_user_id,
+            twitch_user_id=validated.user_id,
+            twitch_login=validated.login,
+            client_id=validated.client_id,
+            access_token=result.token_bundle.access_token,
+            refresh_token=result.token_bundle.refresh_token,
+            expires_at=expires_at,
+            scope=result.token_bundle.scope,
+            token_type=result.token_bundle.token_type,
+        )
+
         await self.thread_repository.set_account_id(
-                discord_channel_id=thread.discord_channel_id,
-                account_id=stored.account_id,
-            )
-        
+            discord_channel_id=thread.discord_channel_id,
+            account_id=stored.account_id,
+        )
+
         await self.device_flow_repository.remove_by_discord_channel_id(thread.discord_channel_id)
         await notify(
             pending.discord_user_id,

@@ -59,13 +59,13 @@ class ChannelEventAutoReplyService:
     ) -> set[tuple[int, int]]:
         event_key = STREAM_ONLINE_EVENT_KEY if event.is_live else STREAM_OFFLINE_EVENT_KEY
         configured_events = await self.adapter_event_repository.list_matching_events(
-                adapter_key=TWITCH_ADAPTER_KEY,
-                subject_type=CHANNEL_SUBJECT_TYPE,
-                subject_id=event.twitch_channel_id,
-                event_key=event_key,
-                include_disabled=False,
-            )
-        
+            adapter_key=TWITCH_ADAPTER_KEY,
+            subject_type=CHANNEL_SUBJECT_TYPE,
+            subject_id=event.twitch_channel_id,
+            event_key=event_key,
+            include_disabled=False,
+        )
+
         if not configured_events:
             return set()
 
@@ -127,11 +127,7 @@ class ChannelEventAutoReplyService:
         if thread is None or not thread.enabled:
             return None
 
-        account = (
-            await self.account_repository.get_by_account_id(thread.account_id)
-            if thread.account_id is not None
-            else None
-        )
+        account = await self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
         if account is None or not account.access_token:
             return None
 

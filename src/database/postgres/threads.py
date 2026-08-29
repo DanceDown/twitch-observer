@@ -362,12 +362,18 @@ class PostgresChannelRepository(ChannelRepository):
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
-                UPDATE tracked_channel_state
-                SET is_live = %s,
-                    last_live_status_at = %s
-                WHERE twitch_channel_id = %s
+                INSERT INTO tracked_channel_state (twitch_channel_id, is_live, last_live_status_at)
+                SELECT %s, %s, %s
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM channel
+                    WHERE twitch_channel_id = %s
+                )
+                ON CONFLICT (twitch_channel_id) DO UPDATE
+                SET is_live = EXCLUDED.is_live,
+                    last_live_status_at = EXCLUDED.last_live_status_at
                 """,
-                (is_live, effective_changed_at, twitch_channel_id),
+                (twitch_channel_id, is_live, effective_changed_at, twitch_channel_id),
             )
             return cursor.rowcount
 
@@ -418,8 +424,8 @@ class PostgresChannelRepository(ChannelRepository):
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
-                SELECT twitch_channel_id
-                FROM tracked_channel_state
+                SELECT DISTINCT twitch_channel_id
+                FROM channel
                 ORDER BY twitch_channel_id
                 """
             )
@@ -430,9 +436,14 @@ class PostgresChannelRepository(ChannelRepository):
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
-                SELECT twitch_channel_id, is_live, last_live_status_at
-                FROM tracked_channel_state
-                ORDER BY twitch_channel_id
+                SELECT tracked.twitch_channel_id, tcs.is_live, tcs.last_live_status_at
+                FROM (
+                    SELECT DISTINCT twitch_channel_id
+                    FROM channel
+                ) AS tracked
+                LEFT JOIN tracked_channel_state AS tcs
+                  ON tcs.twitch_channel_id = tracked.twitch_channel_id
+                ORDER BY tracked.twitch_channel_id
                 """
             )
             rows = await cursor.fetchall()

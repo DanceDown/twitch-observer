@@ -34,6 +34,7 @@ class TwitchMetadataRefreshService:
 
     async def start(self) -> None:
         if self._task is None:
+            self._stop_event.clear()
             self._task = asyncio.create_task(self._run_loop(), name="twitch-metadata-refresh")
 
     async def stop(self) -> None:
@@ -74,6 +75,8 @@ class TwitchMetadataRefreshService:
                 logger.exception("Twitch metadata refresh pass failed because PostgreSQL returned an error.")
             except TwitchAPIError:
                 logger.exception("Twitch metadata refresh pass failed because Twitch returned an API error.")
+            except Exception:
+                logger.exception("Twitch metadata refresh pass failed unexpectedly; the refresh loop will continue.")
             elapsed = asyncio.get_running_loop().time() - started_at
             remaining = max(0.0, self.refresh_interval_seconds - elapsed)
             if remaining <= 0:

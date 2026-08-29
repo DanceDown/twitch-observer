@@ -65,7 +65,11 @@ class ShowAutoRepliesRenderer:
             if pattern is None:
                 continue
             display_index = pattern_display_indices.get(pattern.pattern_id, pattern.pattern_id)
-            rows.append(self._build_pattern_reply_row(display_index=display_index, trigger_text=pattern.regex, reply_text=reply.reply_message, language=language))
+            rows.append(
+                self._build_pattern_reply_row(
+                    display_index=display_index, trigger_text=pattern.regex, reply_text=reply.reply_message, language=language
+                )
+            )
         for adapter_event, action in adapter_event_actions:
             rows.append(await self._build_event_reply_row(adapter_event, action, language=language))
         if not rows:

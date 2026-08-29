@@ -75,10 +75,7 @@ class DiscordPresenceService:
             messages = await self.message_repository.list_recent_messages(since=since, limit=self.message_limit)
             if not messages:
                 return
-            candidate_texts = [
-                self._format_status(message.content, message.username)
-                for message in messages
-            ]
+            candidate_texts = [self._format_status(message.content, message.username) for message in messages]
             available_texts = tuple(dict.fromkeys(text for text in candidate_texts if text))
             if not available_texts:
                 return

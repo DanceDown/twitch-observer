@@ -260,7 +260,7 @@ CREATE TABLE message (
 );
 
 CREATE TABLE thread_message_match (
-    thread_id          BIGINT NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,
+    thread_id          INTEGER NOT NULL REFERENCES thread(thread_id) ON DELETE CASCADE,
     message_id         TEXT NOT NULL REFERENCES message(message_id) ON DELETE CASCADE,
     PRIMARY KEY (thread_id, message_id)
 );
@@ -273,3 +273,9 @@ CREATE INDEX idx_message_channel
 
 CREATE INDEX idx_message_timestamp
     ON message(timestamp);
+
+CREATE INDEX idx_message_channel_timestamp
+    ON message(twitch_channel_id, timestamp DESC);
+
+CREATE INDEX idx_thread_message_match_message
+    ON thread_message_match(message_id);

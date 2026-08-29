@@ -32,8 +32,15 @@ class _RaisingTrackingClient:
     def is_ready(self) -> bool:
         return True
 
-    async def send_tracking_embed(self, discord_channel_id: int, embed, *, channel_login: str | None = None) -> None:
-        _ = discord_channel_id, embed, channel_login
+    async def send_tracking_embed(
+        self,
+        discord_channel_id: int,
+        embed,
+        *,
+        channel_login: str | None = None,
+        thread_id: int | None = None,
+    ) -> None:
+        _ = discord_channel_id, embed, channel_login, thread_id
         raise aiohttp.ServerDisconnectedError()
 
 

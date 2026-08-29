@@ -55,8 +55,10 @@ class DiscordEntrypoint(TrackingNotificationSender, DiscordPresenceStatusSender)
         embed: discord.Embed,
         *,
         channel_login: str | None = None,
+        thread_id: int | None = None,
     ) -> None:
         """Send a tracking embed through the Discord client."""
+        _ = thread_id
         if not self._config.discord_bot_token or not self._client.is_ready():
             return
         with suppress(discord.HTTPException, aiohttp.ClientError, TimeoutError, OSError):

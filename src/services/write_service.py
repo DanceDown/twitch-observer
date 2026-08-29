@@ -75,7 +75,7 @@ class TwitchWriteCommandService:
             raise ValueError(self.localizer.text("results.write.message_too_long", language=thread.language))
         twitch_channel = await self.twitch_api.refresh_channel_by_login(command.twitch_channel_login)
         tracked_channel = await self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_channel.user_id)
-        
+
         if tracked_channel is None:
             return build_thread_result(
                 self.localizer,
@@ -122,7 +122,7 @@ class TwitchWriteCommandService:
                 if thread.account_id is not None:
                     await self.account_repository.remove_by_account_id(thread.account_id)
                     await self.thread_repository.set_account_id(discord_channel_id=thread.discord_channel_id, account_id=None)
-                    
+
                 return build_thread_result(
                     self.localizer,
                     "results.write.account_expired",

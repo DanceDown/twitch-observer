@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import suppress
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 
 from src.entrypoints.discord import DiscordEntrypoint
@@ -14,6 +14,7 @@ from src.services.batched_message_repository import BatchedMessageRepository
 from src.services.account_polling_service import DeviceFlowPollingService
 from src.services.discord_presence_service import DiscordPresenceService
 from src.services.irc_bootstrap_service import IRCBootstrapService
+from src.services.tracking_delivery_queue import OrderedTrackingDeliveryService
 from src.services.twitch_metadata_refresh_service import TwitchMetadataRefreshService
 from src.services.twitch_live_monitor_service import TwitchLiveMonitorService
 
@@ -42,6 +43,13 @@ def build_runtime(
     gateways: ApplicationGateways,
 ) -> ApplicationRuntime:
     message_write_batcher = core.message_repository if isinstance(core.message_repository, BatchedMessageRepository) else None
+    tracking_delivery_queue = OrderedTrackingDeliveryService(
+        sender=services.runtime_coordinator.tracking.sender,
+        stop_timeout_seconds=core.config.discord_tracking_delivery_stop_timeout_seconds,
+    )
+    services.runtime_coordinator.tracking.bind(tracking_delivery_queue)
+    services.chat_pipeline.completion_notifier = tracking_delivery_queue
+    services.chat_reactions.completion_notifier = tracking_delivery_queue
     live_monitor_service = TwitchLiveMonitorService(
         channel_repository=core.channel_repository,
         twitch_api=core.twitch_bundle,
@@ -92,6 +100,8 @@ def build_runtime(
         irc_bootstrap_service=irc_bootstrap_service,
         device_flow_poller=device_flow_poller,
         presence_service=presence_service,
+        chat_pipeline=services.chat_pipeline,
+        tracking_delivery_queue=tracking_delivery_queue,
     )
 
 
@@ -109,8 +119,10 @@ async def start_runtime(
     *,
     task_failure_callback: Callable[[asyncio.Task[object]], None] | None = None,
 ) -> None:
+    await runtime.tracking_delivery_queue.start()
     if runtime.message_write_batcher is not None:
         await runtime.message_write_batcher.start()
+    await runtime.chat_pipeline.start()
     runtime.twitch_irc_task = asyncio.create_task(entrypoints.twitch_irc.start(), name="twitch-irc-entrypoint")
     runtime.discord_task = asyncio.create_task(entrypoints.discord.start(), name="discord-entrypoint")
     if task_failure_callback is not None:
@@ -130,19 +142,21 @@ async def stop_runtime(core: ApplicationCore, entrypoints: ApplicationEntrypoint
         with suppress(asyncio.CancelledError):
             await runtime.twitch_irc_task
         runtime.twitch_irc_task = None
-    if runtime.discord_task is not None:
-        runtime.discord_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await runtime.discord_task
-        runtime.discord_task = None
     await runtime.live_monitor_service.stop()
     await runtime.metadata_refresh_service.stop()
     await runtime.irc_bootstrap_service.stop_periodic_sync()
     await runtime.device_flow_poller.stop()
     await runtime.presence_service.stop()
+    await runtime.chat_pipeline.stop()
+    await runtime.tracking_delivery_queue.stop()
     if runtime.message_write_batcher is not None:
         await runtime.message_write_batcher.stop()
     await core.twitch_bundle.close()
+    if runtime.discord_task is not None:
+        runtime.discord_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await runtime.discord_task
+        runtime.discord_task = None
     await entrypoints.discord.stop()
     await entrypoints.twitch_irc.stop()
     await core.database.close()

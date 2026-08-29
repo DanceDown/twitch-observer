@@ -41,12 +41,20 @@ This is the main runtime reference for the Twitch Observer.
 
 1. `TwitchIRCEntrypoint` receives a Twitch `PRIVMSG`.
 2. It normalizes the line into `TwitchChatMessageEvent`.
-3. It forwards that DTO into `ChatMessageProcessingService`.
-4. The chat pipeline runs, in order:
+3. It enqueues that DTO into `ChatMessageProcessingService`, so IRC reading
+   and PING/PONG handling are not blocked by Discord, Twitch API, or database
+   work.
+4. Background chat workers run the pipeline, in order:
    - `MessageIngestService`
    - `TwitchUserDirectoryIngestService`
-   - `PatternTrackingService`
-   - `AutoReplyService`
+   - `ChatMessageReactionService`
+5. `ChatMessageReactionService` evaluates matching once and then dispatches
+   prepared matches to tracking or auto-reply handling.
+6. `ChatMessageReactionService` reserves matched Discord threads before slow
+   side effects such as metadata lookups or Twitch writes.
+7. Tracking embeds are handed to `OrderedTrackingDeliveryService`, which keeps
+   Discord delivery in IRC message order per Discord thread even though worker
+   processing happens in parallel.
 
 ### Live-state flow
 
@@ -56,8 +64,8 @@ This is the main runtime reference for the Twitch Observer.
 4. Actual transitions are forwarded directly to `LiveStateChangeOrchestrator`.
 5. The orchestrator runs, in order:
    - `ChannelLiveStatePersistenceService`
-   - `ChannelEventNotificationService`
    - `ChannelEventAutoReplyService`
+   - `ChannelEventNotificationService`
 6. Runtime-side notifications go through small relays from
    `ApplicationRuntimeCoordinator`.
 
@@ -91,7 +99,9 @@ A row in `channel` means:
 The per-thread `channel` row owns subscription and presentation state such as
 the optional color override. The app-owned live/offline state itself is stored
 globally in `tracked_channel_state` and is joined back into `ChannelRecord`
-reads when a thread needs it.
+reads when a thread needs it. Runtime channel discovery is still based on
+`channel`, so missing `tracked_channel_state` rows do not make tracked channels
+disappear from IRC or live monitoring.
 
 It does not mean:
 
@@ -145,6 +155,8 @@ It uses:
 - Helix fallback only when needed
 
 IRC metadata updates login and display-name information without a Helix call.
+Repeated identical IRC metadata is skipped in memory to avoid writing the same
+cache row for every chat message.
 Parallel cache misses for the same user are deduplicated in-process so only one
 Helix lookup runs per key at a time. Profile images still require Helix.
 
@@ -163,6 +175,14 @@ separate per-row "last refresh" timestamp.
 - event-driven Twitch auto-replies
 
 The message hot path never calls `Get Streams`.
+Pattern tracking and pattern auto-reply notification embeds use cached Twitch
+user metadata first. When visual metadata such as profile images is missing, the
+chat worker may run a bounded Helix user lookup
+(`TWITCH_CHAT_METADATA_LOOKUP_TIMEOUT_SECONDS`). A slow lookup delays only that
+message's prepared Discord notification; other workers can continue, and the
+ordered delivery queue preserves Discord message order per Discord thread.
+Shared Helix refresh tasks are shielded from per-message lookup timeouts so a
+timed-out worker does not cancel cache warming for later messages.
 
 ## Twitch auth model
 
@@ -226,6 +246,8 @@ At startup, `build_core()` opens the pool, applies ordered SQL migrations from
   - split guided ping UI flow
 - `src/services/chat_pipeline.py`
   - ordered Twitch chat processing pipeline
+- `src/services/tracking_delivery_queue.py`
+  - ordered Discord tracking delivery after parallel chat processing
 - `src/services/live_state_orchestrator.py`
   - ordered live/offline side effects
 - `src/services/runtime_coordinator.py`

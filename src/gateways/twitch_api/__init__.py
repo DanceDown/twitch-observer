@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import aiohttp
 
@@ -111,19 +112,17 @@ class TwitchAPIClient:
 
         await self.start()
         token = await self._get_app_access_token()
-        session = self._require_session()
-
-        async with session.get(
+        status, payload = await self._request_json(
+            "GET",
             f"{self._config.twitch_api_base_url}/users",
             params={"login": normalized_login},
             headers={
                 "Client-Id": self._config.twitch_client_id,
                 "Authorization": f"Bearer {token}",
             },
-        ) as response:
-            payload = await response.json()
+        )
 
-        if response.status >= 400:
+        if status >= 400:
             message = payload.get("message", "Twitch API request failed.")
             raise TwitchAPIError(message)
 
@@ -147,19 +146,17 @@ class TwitchAPIClient:
 
         await self.start()
         token = await self._get_app_access_token()
-        session = self._require_session()
-
-        async with session.get(
+        status, payload = await self._request_json(
+            "GET",
             f"{self._config.twitch_api_base_url}/users",
             params={"id": normalized_user_id},
             headers={
                 "Client-Id": self._config.twitch_client_id,
                 "Authorization": f"Bearer {token}",
             },
-        ) as response:
-            payload = await response.json()
+        )
 
-        if response.status >= 400:
+        if status >= 400:
             message = payload.get("message", "Twitch API request failed.")
             raise TwitchAPIError(message)
 
@@ -180,20 +177,18 @@ class TwitchAPIClient:
 
         await self.start()
         token = await self._get_app_access_token()
-        session = self._require_session()
-
         params: list[tuple[str, str]] = [("id", user_id) for user_id in normalized_user_ids]
-        async with session.get(
+        status, payload = await self._request_json(
+            "GET",
             f"{self._config.twitch_api_base_url}/users",
             params=params,
             headers={
                 "Client-Id": self._config.twitch_client_id,
                 "Authorization": f"Bearer {token}",
             },
-        ) as response:
-            payload = await response.json()
+        )
 
-        if response.status >= 400:
+        if status >= 400:
             message = payload.get("message", "Twitch API request failed.")
             raise TwitchAPIError(message)
 
@@ -216,20 +211,18 @@ class TwitchAPIClient:
 
         await self.start()
         token = await self._get_app_access_token()
-        session = self._require_session()
-
         params: list[tuple[str, str]] = [("user_id", user_id) for user_id in normalized_ids]
-        async with session.get(
+        status, payload = await self._request_json(
+            "GET",
             f"{self._config.twitch_api_base_url}/streams",
             params=params,
             headers={
                 "Client-Id": self._config.twitch_client_id,
                 "Authorization": f"Bearer {token}",
             },
-        ) as response:
-            payload = await response.json()
+        )
 
-        if response.status >= 400:
+        if status >= 400:
             message = payload.get("message", "Twitch API request failed.")
             raise TwitchAPIError(message)
 
@@ -242,14 +235,13 @@ class TwitchAPIClient:
             raise TwitchAuthenticationError("Please provide a Twitch user access token.")
 
         await self.start()
-        session = self._require_session()
-        async with session.get(
+        status, payload = await self._request_json(
+            "GET",
             f"{self._config.twitch_auth_base_url}/validate",
             headers={"Authorization": f"OAuth {normalized_token}"},
-        ) as response:
-            payload = await response.json()
+        )
 
-        if response.status >= 400:
+        if status >= 400:
             message = payload.get("message", "The provided Twitch token is invalid.")
             raise TwitchAuthenticationError(message)
 
@@ -268,17 +260,16 @@ class TwitchAPIClient:
             raise TwitchAPIConfigurationError("Twitch Device Code Flow requires TWITCH_CLIENT_ID.")
 
         await self.start()
-        session = self._require_session()
-        async with session.post(
+        status, payload = await self._request_json(
+            "POST",
             f"{self._config.twitch_auth_base_url}/device",
             data={
                 "client_id": self._config.twitch_client_id,
                 "scopes": " ".join(scopes),
             },
-        ) as response:
-            payload = await response.json()
+        )
 
-        if response.status >= 400:
+        if status >= 400:
             message = payload.get("message", "Could not start the Twitch device login.")
             raise TwitchDeviceFlowError(message)
 
@@ -301,8 +292,8 @@ class TwitchAPIClient:
             raise TwitchAPIConfigurationError("Twitch Device Code Flow requires TWITCH_CLIENT_ID.")
 
         await self.start()
-        session = self._require_session()
-        async with session.post(
+        status, payload = await self._request_json(
+            "POST",
             f"{self._config.twitch_auth_base_url}/token",
             data={
                 "client_id": self._config.twitch_client_id,
@@ -310,10 +301,9 @@ class TwitchAPIClient:
                 "device_code": device_code,
                 "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
             },
-        ) as response:
-            payload = await response.json()
+        )
 
-        if response.status < 400:
+        if status < 400:
             return TwitchDevicePollResult(
                 status="success",
                 token_bundle=TwitchUserTokenBundle(
@@ -355,14 +345,13 @@ class TwitchAPIClient:
             form_data["client_secret"] = self._config.twitch_client_secret
 
         await self.start()
-        session = self._require_session()
-        async with session.post(
+        status, payload = await self._request_json(
+            "POST",
             f"{self._config.twitch_auth_base_url}/token",
             data=form_data,
-        ) as response:
-            payload = await response.json()
+        )
 
-        if response.status >= 400:
+        if status >= 400:
             message = payload.get("message", "Could not refresh the Twitch access token.")
             raise TwitchAuthenticationError(message)
 
@@ -390,7 +379,6 @@ class TwitchAPIClient:
             raise TwitchAuthenticationError("Missing linked Twitch access token.")
 
         await self.start()
-        session = self._require_session()
         request_body: dict[str, str] = {
             "broadcaster_id": broadcaster_id,
             "sender_id": sender_id,
@@ -399,7 +387,8 @@ class TwitchAPIClient:
         if reply_parent_message_id:
             request_body["reply_parent_message_id"] = reply_parent_message_id
 
-        async with session.post(
+        status, payload = await self._request_json(
+            "POST",
             f"{self._config.twitch_api_base_url}/chat/messages",
             headers={
                 "Client-Id": client_id,
@@ -407,12 +396,11 @@ class TwitchAPIClient:
                 "Content-Type": "application/json",
             },
             json=request_body,
-        ) as response:
-            payload = await response.json()
+        )
 
-        if response.status >= 400:
+        if status >= 400:
             message_text = payload.get("message", "Could not send the Twitch chat message.")
-            if response.status in {401, 403}:
+            if status in {401, 403}:
                 raise TwitchAuthenticationError(message_text)
             raise TwitchAPIError(message_text)
 
@@ -434,18 +422,17 @@ class TwitchAPIClient:
             return self._app_access_token
 
         await self.start()
-        session = self._require_session()
-        async with session.post(
+        status, payload = await self._request_json(
+            "POST",
             f"{self._config.twitch_auth_base_url}/token",
             params={
                 "client_id": self._config.twitch_client_id,
                 "client_secret": self._config.twitch_client_secret,
                 "grant_type": "client_credentials",
             },
-        ) as response:
-            payload = await response.json()
+        )
 
-        if response.status >= 400:
+        if status >= 400:
             message = payload.get("message", "Could not authenticate against Twitch.")
             raise TwitchAPIError(message)
 
@@ -455,6 +442,25 @@ class TwitchAPIClient:
             seconds=max(0, expires_in - self._config.twitch_app_access_token_refresh_skew_seconds)
         )
         return self._app_access_token
+
+    async def _request_json(self, method: str, url: str, **kwargs: Any) -> tuple[int, dict[str, Any]]:
+        session = self._require_session()
+        request = session.get if method == "GET" else session.post
+        try:
+            async with request(url, **kwargs) as response:
+                try:
+                    payload = await response.json()
+                except (aiohttp.ClientError, ValueError) as error:
+                    if response.status >= 400:
+                        return response.status, {"message": _compact_error_message(error)}
+                    raise TwitchAPIError(f"Twitch API response could not be decoded: {_compact_error_message(error)}") from error
+                if not isinstance(payload, dict):
+                    raise TwitchAPIError("Twitch API returned an unexpected response.")
+                return response.status, payload
+        except TwitchAPIError:
+            raise
+        except (aiohttp.ClientError, TimeoutError, OSError, ValueError) as error:
+            raise TwitchAPIError(f"Twitch API request failed: {_compact_error_message(error)}") from error
 
     def _require_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
@@ -468,3 +474,7 @@ def _normalize_access_token(access_token: str) -> str:
     if normalized.lower().startswith("oauth:"):
         normalized = normalized[6:]
     return normalized
+
+
+def _compact_error_message(error: BaseException) -> str:
+    return " ".join(str(error).split())

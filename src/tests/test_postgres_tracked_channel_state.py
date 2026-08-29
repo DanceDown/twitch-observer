@@ -10,12 +10,7 @@ import pytest
 from src.config import AppConfig
 from src.database.postgres import PostgresChannelRepository, PostgresDatabase, PostgresThreadRepository
 
-MIGRATION_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "database"
-    / "migrations"
-    / "2026-07-01-normalize_tracked_channel_state.sql"
-)
+MIGRATION_PATH = Path(__file__).resolve().parents[1] / "database" / "migrations" / "2026-07-01-normalize_tracked_channel_state.sql"
 EXPECTED_FIRST_CHANGE_AT = datetime.fromisoformat("2026-07-01T12:00:00+00:00")
 EXPECTED_SECOND_CHANGE_AT = datetime.fromisoformat("2026-07-01T13:00:00+00:00")
 
@@ -135,6 +130,47 @@ async def test_postgres_thread_repository_delete_cleans_orphaned_global_channel_
 
         assert deleted is not None
         assert await _count_state_rows(config, twitch_channel_id) == 0
+    finally:
+        await _delete_test_rows(config, twitch_channel_id, (discord_channel_id,))
+        await database.close()
+
+
+@pytest.mark.asyncio
+async def test_postgres_channel_repository_lists_channels_when_global_state_row_is_missing() -> None:
+    config = AppConfig()
+    await _ensure_tracked_channel_state_table(config)
+    database = PostgresDatabase(config)
+    await database.open()
+    thread_repository = PostgresThreadRepository(database=database)
+    channel_repository = PostgresChannelRepository(database=database)
+    twitch_channel_id = f"tracked-missing-state-{uuid4()}"
+    discord_channel_id = _unique_discord_channel_id()
+
+    try:
+        thread = await thread_repository.create(owner_id=1, discord_channel_id=discord_channel_id)
+        await channel_repository.add_channel(thread.thread_id, twitch_channel_id)
+
+        async with await psycopg.AsyncConnection.connect(config.postgres_dsn) as connection:
+            async with connection.cursor() as cursor:
+                await cursor.execute(
+                    "DELETE FROM tracked_channel_state WHERE twitch_channel_id = %s",
+                    (twitch_channel_id,),
+                )
+            await connection.commit()
+
+        assert twitch_channel_id in await channel_repository.list_all_twitch_channel_ids()
+        states = await channel_repository.list_distinct_channel_states()
+        state = next(row for row in states if row.twitch_channel_id == twitch_channel_id)
+        assert state.is_live is None
+
+        updated_rows = await channel_repository.set_live_state_for_twitch_channel(
+            twitch_channel_id=twitch_channel_id,
+            is_live=True,
+            changed_at="2026-07-01T12:00:00+00:00",
+        )
+
+        assert updated_rows == 1
+        assert await _count_state_rows(config, twitch_channel_id) == 1
     finally:
         await _delete_test_rows(config, twitch_channel_id, (discord_channel_id,))
         await database.close()

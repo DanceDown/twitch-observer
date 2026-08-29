@@ -60,4 +60,8 @@ class TwitchIRCEntrypoint:
         if self._message_processor is None:
             logger.warning("Dropping Twitch chat message because no chat pipeline is configured yet.")
             return
+        enqueue = getattr(self._message_processor, "enqueue", None)
+        if enqueue is not None:
+            await enqueue(event)
+            return
         await self._message_processor.process(event)

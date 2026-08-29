@@ -37,11 +37,7 @@ async def handle_pattern_action(
 
     display_id = await support.display_index(thread.thread_id, pattern.pattern_id) or pattern.pattern_id
     if action == "add":
-        linked_account = (
-            await account_repository.get_by_account_id(thread.account_id)
-            if thread.account_id is not None
-            else None
-        )
+        linked_account = await account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
         if linked_account is None:
             return build_thread_result(
                 localizer,
@@ -84,9 +80,7 @@ async def handle_pattern_action(
                     "user_id": command.requester_id,
                     "id": display_id,
                     "mode": support.text(
-                        "results.reply.added_pattern.mode.reply"
-                        if created.reply_as_reply
-                        else "results.reply.added_pattern.mode.message",
+                        "results.reply.added_pattern.mode.reply" if created.reply_as_reply else "results.reply.added_pattern.mode.message",
                         language=thread.language,
                     ),
                     "message": created.reply_message,
@@ -236,11 +230,7 @@ async def handle_event_action(
     )
 
     if action == "add":
-        linked_account = (
-            await account_repository.get_by_account_id(thread.account_id)
-            if thread.account_id is not None
-            else None
-        )
+        linked_account = await account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
         if linked_account is None:
             return build_thread_result(
                 localizer,

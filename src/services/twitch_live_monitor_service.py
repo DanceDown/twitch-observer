@@ -49,6 +49,7 @@ class TwitchLiveMonitorService:
     async def start(self) -> None:
         """Start the live monitor loop once."""
         if self._task is None:
+            self._stop_event.clear()
             self._task = asyncio.create_task(self._run_loop(), name="twitch-live-monitor")
 
     async def stop(self) -> None:
@@ -74,6 +75,10 @@ class TwitchLiveMonitorService:
                 logger.error("Live monitor startup sync skipped because the database pool is exhausted.")
             except psycopg.Error:
                 logger.exception("Live monitor startup sync failed because PostgreSQL returned an error.")
+            except TwitchAPIError as error:
+                logger.warning("Live monitor startup sync skipped because Twitch is unavailable: %s", error)
+            except Exception:
+                logger.exception("Live monitor startup sync failed unexpectedly; periodic sync will continue.")
 
         while not self._stop_event.is_set():
             try:
@@ -91,6 +96,10 @@ class TwitchLiveMonitorService:
                 logger.error("Live monitor periodic sync skipped because the database pool is exhausted.")
             except psycopg.Error:
                 logger.exception("Live monitor periodic sync failed because PostgreSQL returned an error.")
+            except TwitchAPIError as error:
+                logger.warning("Live monitor periodic sync skipped because Twitch is unavailable: %s", error)
+            except Exception:
+                logger.exception("Live monitor periodic sync failed unexpectedly; the monitor will continue.")
 
     async def sync_once(self, *, notify_transitions: bool) -> None:
         """Refresh the live state for all tracked channels."""
@@ -118,11 +127,11 @@ class TwitchLiveMonitorService:
 
             if not notify_transitions or previous.is_live is None:
                 await self.channel_repository.set_live_state_for_twitch_channel(
-                        twitch_channel_id=twitch_channel_id,
-                        is_live=current_is_live,
-                        changed_at=changed_at.isoformat(),
-                    )
-                
+                    twitch_channel_id=twitch_channel_id,
+                    is_live=current_is_live,
+                    changed_at=changed_at.isoformat(),
+                )
+
                 continue
 
             twitch_user = await safe_get_twitch_user_by_id(self.twitch_api, twitch_channel_id)
@@ -132,4 +141,32 @@ class TwitchLiveMonitorService:
                 is_live=current_is_live,
                 changed_at=changed_at,
             )
-            await self.on_change.handle_change(event)
+            try:
+                await self.on_change.handle_change(event)
+            except asyncio.CancelledError:
+                raise
+            except DatabasePoolExhaustedError:
+                logger.error(
+                    "Live-state transition skipped because the database pool is exhausted twitch_channel_id=%s is_live=%s",
+                    twitch_channel_id,
+                    current_is_live,
+                )
+            except psycopg.Error:
+                logger.exception(
+                    "Live-state transition failed because PostgreSQL returned an error twitch_channel_id=%s is_live=%s",
+                    twitch_channel_id,
+                    current_is_live,
+                )
+            except TwitchAPIError as error:
+                logger.warning(
+                    "Live-state transition failed because Twitch is unavailable twitch_channel_id=%s is_live=%s: %s",
+                    twitch_channel_id,
+                    current_is_live,
+                    error,
+                )
+            except Exception:
+                logger.exception(
+                    "Live-state transition failed unexpectedly twitch_channel_id=%s is_live=%s",
+                    twitch_channel_id,
+                    current_is_live,
+                )

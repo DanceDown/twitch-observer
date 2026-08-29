@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     from src.services.twitch_service_bundle import TwitchServiceBundle
     from src.services.twitch_metadata_refresh_service import TwitchMetadataRefreshService
     from src.services.twitch_live_monitor_service import TwitchLiveMonitorService
+    from src.services.tracking_delivery_queue import OrderedTrackingDeliveryService
     from src.services.twitch_user_directory_service import TwitchUserDirectoryIngestService, TwitchUserDirectoryService
 
 
@@ -107,6 +108,8 @@ class ApplicationRuntime:
     irc_bootstrap_service: IRCBootstrapService
     device_flow_poller: DeviceFlowPollingService
     presence_service: DiscordPresenceService
+    chat_pipeline: ChatMessageProcessingService
+    tracking_delivery_queue: OrderedTrackingDeliveryService
     message_write_batcher: BatchedMessageRepository | None = None
     twitch_irc_task: asyncio.Task[None] | None = None
     discord_task: asyncio.Task[None] | None = None

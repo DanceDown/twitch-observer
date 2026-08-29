@@ -64,9 +64,7 @@ class PatternHomeView(BaseFormView):
                 sources={
                     "view": {
                         "mode": self.text(
-                            "discord.pattern_ui.summary.mode_regex"
-                            if self.state.is_regex
-                            else "discord.pattern_ui.summary.mode_word"
+                            "discord.pattern_ui.summary.mode_regex" if self.state.is_regex else "discord.pattern_ui.summary.mode_word"
                         )
                     }
                 },
@@ -103,11 +101,7 @@ class PatternHomeView(BaseFormView):
             ),
             self.text(
                 "discord.pattern_ui.summary.stream_state",
-                sources={
-                    "view": {
-                        "value": offline_state_text(self._localizer, self.language, self.state.offline_state)
-                    }
-                },
+                sources={"view": {"value": offline_state_text(self._localizer, self.language, self.state.offline_state)}},
             ),
             self.text(
                 "discord.pattern_ui.summary.case_sensitive",
@@ -123,11 +117,7 @@ class PatternHomeView(BaseFormView):
             ),
             self.text(
                 "discord.pattern_ui.summary.color",
-                sources={
-                    "view": {
-                        "value": self.state.color or self.text("discord.pattern_ui.summary.color_inherited")
-                    }
-                },
+                sources={"view": {"value": self.state.color or self.text("discord.pattern_ui.summary.color_inherited")}},
             ),
             self.text(
                 "discord.pattern_ui.summary.priority",

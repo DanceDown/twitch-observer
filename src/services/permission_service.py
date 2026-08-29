@@ -74,10 +74,10 @@ class PermissionCommandService:
         if denied is not None:
             return denied
         removed = await self.permission_repository.remove_by_user_and_thread(
-                discord_user_id=command.target_user_id,
-                thread_id=thread.thread_id,
-            )
-        
+            discord_user_id=command.target_user_id,
+            thread_id=thread.thread_id,
+        )
+
         return build_thread_result(
             self.localizer,
             "results.permission.cleared" if removed else "results.permission.none_found",
@@ -101,17 +101,17 @@ class PermissionCommandService:
         requested_permissions = tuple(dict.fromkeys(command.permissions))
         permission_mask = permissions_mask_from_values(requested_permissions)
         current = await self.permission_repository.get_by_user_and_thread(
-                discord_user_id=command.target_user_id,
-                thread_id=thread.thread_id,
-            )
-        
+            discord_user_id=command.target_user_id,
+            thread_id=thread.thread_id,
+        )
+
         current_mask = 0 if current is None else current.permissions
         updated = await self.permission_repository.upsert_permissions(
-                discord_user_id=command.target_user_id,
-                thread_id=thread.thread_id,
-                permissions=current_mask | permission_mask,
-            )
-        
+            discord_user_id=command.target_user_id,
+            thread_id=thread.thread_id,
+            permissions=current_mask | permission_mask,
+        )
+
         return build_thread_result(
             self.localizer,
             "results.permission.granted",
@@ -139,10 +139,10 @@ class PermissionCommandService:
         requested_permissions = tuple(dict.fromkeys(command.permissions))
         permission_mask = permissions_mask_from_values(requested_permissions)
         current = await self.permission_repository.get_by_user_and_thread(
-                discord_user_id=command.target_user_id,
-                thread_id=thread.thread_id,
-            )
-        
+            discord_user_id=command.target_user_id,
+            thread_id=thread.thread_id,
+        )
+
         current_mask = 0 if current is None else current.permissions
         matched_mask = current_mask & permission_mask
         if not matched_mask:
@@ -165,17 +165,17 @@ class PermissionCommandService:
         new_mask = current_mask & ~permission_mask
         if new_mask == 0:
             await self.permission_repository.remove_by_user_and_thread(
-                    discord_user_id=command.target_user_id,
-                    thread_id=thread.thread_id,
-                )
-            
+                discord_user_id=command.target_user_id,
+                thread_id=thread.thread_id,
+            )
+
         else:
             await self.permission_repository.upsert_permissions(
-                    discord_user_id=command.target_user_id,
-                    thread_id=thread.thread_id,
-                    permissions=new_mask,
-                )
-            
+                discord_user_id=command.target_user_id,
+                thread_id=thread.thread_id,
+                permissions=new_mask,
+            )
+
         return build_thread_result(
             self.localizer,
             "results.permission.revoked",

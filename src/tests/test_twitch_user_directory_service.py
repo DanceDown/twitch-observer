@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -15,6 +16,7 @@ from src.services.twitch_user_directory_service import TwitchUserDirectoryIngest
 @dataclass
 class InMemoryTwitchUserCacheRepository(TwitchUserCacheRepository):
     by_id: dict[str, TwitchUserCacheRecord] = field(default_factory=dict)
+    observe_calls: int = 0
 
     async def get_by_user_id(self, twitch_user_id: str) -> TwitchUserCacheRecord | None:
         return self.by_id.get(twitch_user_id)
@@ -52,6 +54,7 @@ class InMemoryTwitchUserCacheRepository(TwitchUserCacheRepository):
         twitch_login: str,
         display_name: str | None,
     ) -> TwitchUserCacheRecord:
+        self.observe_calls += 1
         existing = self.by_id.get(twitch_user_id)
         record = TwitchUserCacheRecord(
             twitch_user_id=twitch_user_id,
@@ -84,6 +87,7 @@ class FakeTwitchAPI:
     login_requests: list[str] = field(default_factory=list)
     id_requests: list[str] = field(default_factory=list)
     live_requests: list[list[str]] = field(default_factory=list)
+    delay_seconds: float = 0
 
     async def start(self) -> None:
         return None
@@ -94,11 +98,15 @@ class FakeTwitchAPI:
     async def get_user_by_login(self, login: str) -> TwitchUser:
         normalized = login.strip().lower()
         self.login_requests.append(normalized)
+        if self.delay_seconds:
+            await asyncio.sleep(self.delay_seconds)
         return self.users_by_login[normalized]
 
     async def get_user_by_id(self, user_id: str) -> TwitchUser:
         normalized = user_id.strip()
         self.id_requests.append(normalized)
+        if self.delay_seconds:
+            await asyncio.sleep(self.delay_seconds)
         return self.users_by_id[normalized]
 
     async def get_live_user_ids(self, user_ids: list[str]) -> set[str]:
@@ -197,6 +205,32 @@ async def test_directory_ingests_chat_metadata_without_any_helix_lookup() -> Non
 
     assert author.display_name == "Alice"
     assert broadcaster.login == "broadcaster"
+    assert twitch_api.login_requests == []
+    assert twitch_api.id_requests == []
+
+
+@pytest.mark.asyncio
+async def test_directory_skips_duplicate_chat_metadata_writes_after_memory_warmup() -> None:
+    repository = InMemoryTwitchUserCacheRepository()
+    twitch_api = FakeTwitchAPI()
+    directory = TwitchUserDirectoryService(
+        twitch_api=twitch_api,
+        repository=repository,
+        memory_cache_size=2048,
+    )
+    event = TwitchChatMessageEvent(
+        channel_login="broadcaster",
+        author_login="alice",
+        author_display_name="Alice",
+        author_id="7",
+        broadcaster_id="42",
+        content="hello",
+    )
+
+    await directory.observe_chat_message(event)
+    await directory.observe_chat_message(event)
+
+    assert repository.observe_calls == 2
     assert twitch_api.login_requests == []
     assert twitch_api.id_requests == []
 
@@ -314,6 +348,38 @@ async def test_directory_returns_missing_profile_image_from_cached_record_until_
     cached_record = await repository.get_by_user_id("42")
     assert cached_record is not None
     assert cached_record.profile_image_url is None
+
+
+@pytest.mark.asyncio
+async def test_directory_singleflight_refresh_survives_waiter_timeout() -> None:
+    repository = InMemoryTwitchUserCacheRepository()
+    twitch_api = FakeTwitchAPI(
+        users_by_login={
+            "example": TwitchUser(
+                user_id="42",
+                login="example",
+                display_name="Example",
+                profile_image_url="https://cdn.example/avatar.png",
+            )
+        },
+        delay_seconds=0.05,
+    )
+    directory = TwitchUserDirectoryService(
+        twitch_api=twitch_api,
+        repository=repository,
+        memory_cache_size=2048,
+    )
+
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(directory.refresh_user_by_login("example"), timeout=0.01)
+
+    user = await directory.refresh_user_by_login("example")
+
+    assert user.profile_image_url == "https://cdn.example/avatar.png"
+    assert twitch_api.login_requests == ["example"]
+    cached_record = await repository.get_by_user_id("42")
+    assert cached_record is not None
+    assert cached_record.profile_image_url == "https://cdn.example/avatar.png"
 
 
 @pytest.mark.asyncio

@@ -100,12 +100,8 @@ class ShowPatternSectionRenderer:
         if pattern.case_sensitive:
             details.append(self.localizer.text("show.pattern.case_sensitive", language=language))
         if pattern.color:
-            details.append(
-                self.localizer.text("show.pattern.custom_color", language=language, sources={"view": {"color": pattern.color}})
-            )
-        details.append(
-            self.localizer.text("show.pattern.priority", language=language, sources={"view": {"priority": pattern.priority}})
-        )
+            details.append(self.localizer.text("show.pattern.custom_color", language=language, sources={"view": {"color": pattern.color}}))
+        details.append(self.localizer.text("show.pattern.priority", language=language, sources={"view": {"priority": pattern.priority}}))
         if pattern.disabled:
             details.append(self.localizer.text("show.pattern.disabled", language=language))
         return details

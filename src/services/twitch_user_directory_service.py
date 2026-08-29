@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
+from contextlib import suppress
 from dataclasses import dataclass, field
-import asyncio
 
 from src.database.connection import TwitchUserCacheRecord, TwitchUserCacheRepository
 from src.events.twitch_events import TwitchChatMessageEvent
@@ -130,22 +131,52 @@ class TwitchUserDirectoryService:
     async def observe_chat_message(self, event: TwitchChatMessageEvent) -> None:
         """Warm the cache from IRC metadata without touching the Twitch API."""
         if event.author_id:
-            record = await self.repository.observe_from_chat(
-                    twitch_user_id=event.author_id,
-                    twitch_login=event.author_login,
-                    display_name=event.author_display_name or event.author_login,
-                )
-            
-            self._remember_record(record)
+            await self._observe_chat_identity(
+                twitch_user_id=event.author_id,
+                twitch_login=event.author_login,
+                display_name=event.author_display_name or event.author_login,
+            )
         if event.broadcaster_id:
             existing_broadcaster = self.get_cached_user_by_id(event.broadcaster_id)
-            record = await self.repository.observe_from_chat(
-                    twitch_user_id=event.broadcaster_id,
-                    twitch_login=event.channel_login,
-                    display_name=None if existing_broadcaster is None else existing_broadcaster.display_name,
-                )
-            
-            self._remember_record(record)
+            await self._observe_chat_identity(
+                twitch_user_id=event.broadcaster_id,
+                twitch_login=event.channel_login,
+                display_name=None if existing_broadcaster is None else existing_broadcaster.display_name,
+            )
+
+    async def _observe_chat_identity(
+        self,
+        *,
+        twitch_user_id: str,
+        twitch_login: str,
+        display_name: str | None,
+    ) -> None:
+        cached = self._get_record_from_memory_by_id(twitch_user_id.strip())
+        if cached is not None and self._chat_identity_matches(
+            cached,
+            twitch_login=twitch_login,
+            display_name=display_name,
+        ):
+            return
+        record = await self.repository.observe_from_chat(
+            twitch_user_id=twitch_user_id,
+            twitch_login=twitch_login,
+            display_name=display_name,
+        )
+        self._remember_record(record)
+
+    @staticmethod
+    def _chat_identity_matches(
+        record: TwitchUserCacheRecord,
+        *,
+        twitch_login: str,
+        display_name: str | None,
+    ) -> bool:
+        if record.twitch_login != twitch_login.strip().lower():
+            return False
+        if display_name is None:
+            return True
+        return record.display_name == display_name.strip()
 
     async def _get_or_load_record_by_login(self, login: str) -> TwitchUserCacheRecord | None:
         cached = self._get_record_from_memory_by_login(login)
@@ -211,24 +242,24 @@ class TwitchUserDirectoryService:
     async def _refresh_user_by_login_uncached(self, login: str) -> TwitchUser:
         user = await self.twitch_api.get_user_by_login(login)
         record = await self.repository.upsert_from_api(
-                twitch_user_id=user.user_id,
-                twitch_login=user.login,
-                display_name=user.display_name,
-                profile_image_url=user.profile_image_url,
-            )
-        
+            twitch_user_id=user.user_id,
+            twitch_login=user.login,
+            display_name=user.display_name,
+            profile_image_url=user.profile_image_url,
+        )
+
         self._remember_record(record)
         return user
 
     async def _refresh_user_by_id_uncached(self, user_id: str) -> TwitchUser:
         user = await self.twitch_api.get_user_by_id(user_id)
         record = await self.repository.upsert_from_api(
-                twitch_user_id=user.user_id,
-                twitch_login=user.login,
-                display_name=user.display_name,
-                profile_image_url=user.profile_image_url,
-            )
-        
+            twitch_user_id=user.user_id,
+            twitch_login=user.login,
+            display_name=user.display_name,
+            profile_image_url=user.profile_image_url,
+        )
+
         self._remember_record(record)
         return user
 
@@ -239,14 +270,11 @@ class TwitchUserDirectoryService:
     ) -> TwitchUser:
         inflight = self._inflight_by_login.get(key)
         if inflight is not None:
-            return await inflight
+            return await asyncio.shield(inflight)
         task = asyncio.create_task(loader())
         self._inflight_by_login[key] = task
-        try:
-            return await task
-        finally:
-            if self._inflight_by_login.get(key) is task:
-                self._inflight_by_login.pop(key, None)
+        task.add_done_callback(lambda done: self._forget_login_task(key, done))
+        return await asyncio.shield(task)
 
     async def _run_singleflight_user_id(
         self,
@@ -255,14 +283,23 @@ class TwitchUserDirectoryService:
     ) -> TwitchUser:
         inflight = self._inflight_by_user_id.get(key)
         if inflight is not None:
-            return await inflight
+            return await asyncio.shield(inflight)
         task = asyncio.create_task(loader())
         self._inflight_by_user_id[key] = task
-        try:
-            return await task
-        finally:
-            if self._inflight_by_user_id.get(key) is task:
-                self._inflight_by_user_id.pop(key, None)
+        task.add_done_callback(lambda done: self._forget_user_id_task(key, done))
+        return await asyncio.shield(task)
+
+    def _forget_login_task(self, key: str, task: asyncio.Task[TwitchUser]) -> None:
+        if self._inflight_by_login.get(key) is task:
+            self._inflight_by_login.pop(key, None)
+        with suppress(asyncio.CancelledError, Exception):
+            task.exception()
+
+    def _forget_user_id_task(self, key: str, task: asyncio.Task[TwitchUser]) -> None:
+        if self._inflight_by_user_id.get(key) is task:
+            self._inflight_by_user_id.pop(key, None)
+        with suppress(asyncio.CancelledError, Exception):
+            task.exception()
 
 
 @dataclass(slots=True)

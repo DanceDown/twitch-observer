@@ -445,6 +445,9 @@ class FakeTwitchAPI:
         except KeyError as error:
             raise TwitchChannelNotFoundError(f"Unknown Twitch login: {normalized}") from error
 
+    async def refresh_user_by_login(self, login: str) -> TwitchUser:
+        return await self.get_user_by_login(login)
+
     async def get_user_by_id(self, user_id: str) -> TwitchUser:
         if self.error is not None:
             raise self.error
@@ -452,6 +455,9 @@ class FakeTwitchAPI:
             if user.user_id == user_id:
                 return user
         raise TwitchChannelNotFoundError(f"Unknown Twitch user id: {user_id}")
+
+    async def refresh_user_by_id(self, user_id: str) -> TwitchUser:
+        return await self.get_user_by_id(user_id)
 
     async def get_channel_by_id(self, user_id: str) -> TwitchUser:
         return await self.get_user_by_id(user_id)
@@ -467,6 +473,9 @@ class FakeTwitchAPI:
             if user.user_id == user_id:
                 return user
         return None
+
+    async def load_cached_user_by_login(self, login: str) -> TwitchUser | None:
+        return self.get_cached_user_by_login(login)
 
     async def load_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
         return self.get_cached_user_by_id(user_id)
@@ -489,7 +498,15 @@ class FakeTwitchAPI:
 class FakeNotifier(TrackingNotificationSender):
     sent: list[tuple[int, object]] = field(default_factory=list)
 
-    async def send_tracking_embed(self, discord_channel_id: int, embed, *, channel_login: str | None = None) -> None:
+    async def send_tracking_embed(
+        self,
+        discord_channel_id: int,
+        embed,
+        *,
+        channel_login: str | None = None,
+        thread_id: int | None = None,
+    ) -> None:
+        _ = channel_login, thread_id
         self.sent.append((discord_channel_id, embed))
 
 
@@ -1480,7 +1497,7 @@ async def test_tracking_service_sends_embed_for_matching_ping_with_pattern_color
 
 
 @pytest.mark.asyncio
-async def test_tracking_service_refreshes_missing_author_profile_image_once() -> None:
+async def test_tracking_service_refreshes_missing_author_profile_image_for_tracking_embed() -> None:
     thread_repository = InMemoryThreadRepository()
     thread = await thread_repository.create(owner_id=200, discord_channel_id=1000)
     channel_repository = InMemoryChannelRepository()

@@ -82,10 +82,21 @@ class InMemoryChannelRepository(ChannelRepository):
         ]
 
     async def list_all_twitch_channel_ids(self) -> list[str]:
-        return sorted(self.states_by_channel_id)
+        return sorted({record.twitch_channel_id for record in self.channels_by_thread.values()})
 
     async def list_distinct_channel_states(self) -> list[TrackedChannelStateRecord]:
-        return [self.states_by_channel_id[channel_id] for channel_id in sorted(self.states_by_channel_id)]
+        channel_ids = sorted({record.twitch_channel_id for record in self.channels_by_thread.values()})
+        return [
+            self.states_by_channel_id.get(
+                channel_id,
+                TrackedChannelStateRecord(
+                    twitch_channel_id=channel_id,
+                    is_live=None,
+                    last_live_status_at=None,
+                ),
+            )
+            for channel_id in channel_ids
+        ]
 
     def _joined_record(self, record: ChannelRecord) -> ChannelRecord:
         state = self.states_by_channel_id.get(record.twitch_channel_id)

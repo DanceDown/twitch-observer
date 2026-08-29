@@ -19,6 +19,9 @@ class FakeMessageProcessor:
     async def process(self, message: TwitchChatMessageEvent) -> None:
         self.messages.append(message)
 
+    async def enqueue(self, message: TwitchChatMessageEvent) -> None:
+        self.messages.append(message)
+
 
 def test_parse_irc_message_parses_twitch_tags_and_payload() -> None:
     raw_line = (
@@ -198,6 +201,26 @@ async def test_twitch_irc_gateway_rejoins_pending_channels_after_connect() -> No
 
 
 @pytest.mark.asyncio
+async def test_twitch_irc_gateway_keeps_pending_channel_when_join_fails() -> None:
+    config = AppConfig()
+    gateway = AnonymousTwitchIRCGateway(config=config)
+    sent_lines: list[str] = []
+
+    async def failing_send_line(line: str) -> None:
+        sent_lines.append(line)
+        raise BrokenPipeError("pipe closed")
+
+    gateway._pending_channels.add("example")
+    gateway._send_line = failing_send_line  # type: ignore[method-assign]
+
+    with pytest.raises(BrokenPipeError):
+        await gateway._join_initial_channels()
+
+    assert sent_lines == ["JOIN #example"]
+    assert gateway._pending_channels == {"example"}
+
+
+@pytest.mark.asyncio
 async def test_twitch_irc_gateway_logs_when_no_initial_channels_are_configured(caplog: pytest.LogCaptureFixture) -> None:
     config = AppConfig()
     gateway = AnonymousTwitchIRCGateway(config=config)
@@ -223,6 +246,45 @@ async def test_twitch_irc_gateway_read_loop_stops_on_connection_reset() -> None:
     gateway._reader = ResetReader()  # type: ignore[assignment]
 
     await gateway._read_loop()
+
+
+@pytest.mark.asyncio
+async def test_twitch_irc_gateway_answers_ping_before_line_handler() -> None:
+    config = AppConfig()
+    gateway = AnonymousTwitchIRCGateway(config=config)
+    handled_lines: list[str] = []
+    sent_lines: list[str] = []
+
+    class Reader:
+        def __init__(self) -> None:
+            self.lines = [
+                b"PING :tmi.twitch.tv\r\n",
+                b":tmi.twitch.tv NOTICE * :hello\r\n",
+            ]
+            self.index = 0
+
+        def at_eof(self) -> bool:
+            return self.index >= len(self.lines)
+
+        async def readline(self) -> bytes:
+            line = self.lines[self.index]
+            self.index += 1
+            return line
+
+    async def fake_line_handler(raw_line: str) -> None:
+        handled_lines.append(raw_line.strip())
+
+    async def fake_send_line(line: str) -> None:
+        sent_lines.append(line)
+
+    gateway._reader = Reader()  # type: ignore[assignment]
+    gateway._line_handler = fake_line_handler
+    gateway._send_line = fake_send_line  # type: ignore[method-assign]
+
+    await gateway._read_loop()
+
+    assert sent_lines == ["PONG :tmi.twitch.tv"]
+    assert handled_lines == [":tmi.twitch.tv NOTICE * :hello"]
 
 
 @pytest.mark.asyncio
@@ -257,6 +319,58 @@ async def test_twitch_irc_gateway_close_connection_ignores_wait_closed_reset() -
 
     assert gateway._writer is None
     assert gateway._pending_channels == {"example"}
+
+
+@pytest.mark.asyncio
+async def test_twitch_irc_gateway_start_retries_connection_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = AppConfig(
+        twitch_irc_connection_check_interval_seconds=0.01,
+        twitch_irc_reconnect_initial_delay_seconds=0.01,
+        twitch_irc_reconnect_max_delay_seconds=0.01,
+    )
+    gateway = AnonymousTwitchIRCGateway(config=config)
+    connected = asyncio.Event()
+    attempts = 0
+
+    class FakeReader:
+        def at_eof(self) -> bool:
+            return False
+
+        async def readline(self) -> bytes:
+            await asyncio.sleep(1)
+            return b""
+
+    class FakeWriter:
+        def write(self, data: bytes) -> None:
+            return None
+
+        async def drain(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+        async def wait_closed(self) -> None:
+            return None
+
+    async def fake_open_connection(*args, **kwargs):
+        nonlocal attempts
+        _ = args, kwargs
+        attempts += 1
+        if attempts == 1:
+            raise OSError("temporary DNS failure")
+        connected.set()
+        return FakeReader(), FakeWriter()
+
+    monkeypatch.setattr("src.gateways.twitch_irc.asyncio.open_connection", fake_open_connection)
+
+    task = asyncio.create_task(gateway.start())
+    await asyncio.wait_for(connected.wait(), timeout=1)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert attempts == 2
 
 
 @pytest.mark.asyncio

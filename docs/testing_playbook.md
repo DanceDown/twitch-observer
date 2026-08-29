@@ -44,9 +44,9 @@ Run all tests:
 docker compose run --rm app pytest src/tests -q
 ```
 
-Baseline from a full local suite run:
+Baseline from a local suite run without optional load tests:
 
-- `170 passed`
+- `219 passed`
 
 ## 2.2 Targeted runs by feature area
 
@@ -69,7 +69,34 @@ docker compose run --rm app ruff check src
 docker compose run --rm app ruff format src --check
 ```
 
-## 2.4 Coverage map (feature -> tests)
+## 2.4 Developer load tests
+
+Load tests are skipped by default. Enable them explicitly when you want to compare
+worker counts or queue behavior:
+
+```powershell
+docker compose run --rm `
+  -e RUN_LOAD_TESTS=1 `
+  -e LOAD_TEST_MESSAGES=2000 `
+  -e LOAD_TEST_WORKERS=8 `
+  -e LOAD_TEST_LOOKUP_DELAY_SECONDS=0.005 `
+  app pytest src/tests/test_chat_pipeline_load.py -q -s
+```
+
+Useful knobs:
+
+- `LOAD_TEST_MESSAGES`: number of incoming Twitch messages to enqueue
+- `LOAD_TEST_WORKERS`: chat worker count to test
+- `LOAD_TEST_MATCH_EVERY`: only every Nth message creates a Discord tracking embed
+- `LOAD_TEST_SLOW_EVERY`: every Nth message simulates a slow metadata lookup
+- `LOAD_TEST_LOOKUP_DELAY_SECONDS`: artificial per-message lookup delay
+- `LOAD_TEST_SEND_DELAY_SECONDS`: artificial Discord send delay
+- `LOAD_TEST_MAX_SECONDS`: upper bound for the whole in-memory run
+
+The test asserts that parallel processing really happens and that Discord
+delivery order is still preserved inside the same Discord thread.
+
+## 2.5 Coverage map (feature -> tests)
 
 - Discord lifecycle (`/join`, `/leave`, `/on`, `/off`, `/color`, `/language`):
   - `src/tests/test_channel_command_service.py`
@@ -104,8 +131,10 @@ docker compose run --rm app ruff format src --check
   - `src/tests/test_localization.py`
 - Show pagination behavior:
   - `src/tests/test_show_ui.py`
+- Chat pipeline load and ordered delivery behavior:
+  - `src/tests/test_chat_pipeline_load.py` with `RUN_LOAD_TESTS=1`
 
-## 2.5 Known test gaps (important)
+## 2.6 Known test gaps (important)
 
 - There is no full end-to-end blackbox test that drives Discord real interactions against the live Discord API.
 - Most UI component flows are tested service-first, not widget-first (modals/select states themselves are only partially unit-tested).

@@ -274,6 +274,7 @@ def _build_chat_processing_services(
         notifier=runtime_coordinator.tracking,
         localizer=core.localizer,
         matcher=matcher,
+        metadata_lookup_timeout_seconds=core.config.twitch_chat_metadata_lookup_timeout_seconds,
     )
     auto_reply = AutoReplyService(
         thread_repository=core.thread_repository,
@@ -286,6 +287,7 @@ def _build_chat_processing_services(
         account_notifier=runtime_coordinator.accounts,
         token_refresh_skew_seconds=core.config.twitch_account_token_refresh_skew_seconds,
         matcher=matcher,
+        metadata_lookup_timeout_seconds=core.config.twitch_chat_metadata_lookup_timeout_seconds,
     )
     chat_reactions = ChatMessageReactionService(
         matcher=matcher,
@@ -296,6 +298,9 @@ def _build_chat_processing_services(
         message_ingest=message_ingest,
         user_observer=user_directory_ingest,
         reactions=chat_reactions,
+        queue_size=core.config.twitch_chat_processing_queue_size,
+        worker_count=core.config.twitch_chat_processing_workers,
+        stop_timeout_seconds=core.config.twitch_chat_processing_stop_timeout_seconds,
     )
     return _ChatProcessingServices(
         pattern_tracking=pattern_tracking,

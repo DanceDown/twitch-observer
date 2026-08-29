@@ -38,9 +38,7 @@ class DiscordUIFlowGuardService:
 
     async def _decide(self, event: RequestUIFlowCommand) -> DiscordUIFlowDecision:
         thread = (
-            None
-            if event.discord_channel_id is None
-            else await self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
+            None if event.discord_channel_id is None else await self.thread_repository.get_by_discord_channel_id(event.discord_channel_id)
         )
         if thread is None:
             return self._blocked(
@@ -74,11 +72,7 @@ class DiscordUIFlowGuardService:
             )
 
         if event.flow is UIFlowKind.REPLY and event.step in {UIFlowStep.ADD_PATTERN, UIFlowStep.ADD_EVENT}:
-            account = (
-                await self.account_repository.get_by_account_id(thread.account_id)
-                if thread.account_id is not None
-                else None
-            )
+            account = await self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
             if account is None or not account.access_token:
                 return self._blocked(
                     event,
@@ -92,11 +86,7 @@ class DiscordUIFlowGuardService:
                 )
 
         if event.flow is UIFlowKind.WRITE:
-            account = (
-                await self.account_repository.get_by_account_id(thread.account_id)
-                if thread.account_id is not None
-                else None
-            )
+            account = await self.account_repository.get_by_account_id(thread.account_id) if thread.account_id is not None else None
             if account is None or not account.access_token:
                 return self._blocked(
                     event,

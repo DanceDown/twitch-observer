@@ -62,7 +62,7 @@ class UserCommandService:
 
         twitch_user = await self.twitch_user_lookup.get_user_by_login(command.twitch_user_login)
         existing = await self.tracked_user_repository.get_by_thread_and_twitch_user(thread.thread_id, twitch_user.user_id)
-        
+
         if existing is not None:
             return build_thread_result(
                 self.localizer,
@@ -98,7 +98,7 @@ class UserCommandService:
 
         twitch_user = await self.twitch_user_lookup.get_user_by_login(command.twitch_user_login)
         existing = await self.tracked_user_repository.get_by_thread_and_twitch_user(thread.thread_id, twitch_user.user_id)
-        
+
         if existing is None:
             return build_thread_result(
                 self.localizer,
@@ -109,8 +109,9 @@ class UserCommandService:
                 sources={"view": self._user_view(twitch_user.display_name, twitch_user.login)},
             )
         if (
-            await self.tracked_user_repository.count_pattern_scope_references(thread_id=thread.thread_id, twitch_user_id=twitch_user.user_id)
-            
+            await self.tracked_user_repository.count_pattern_scope_references(
+                thread_id=thread.thread_id, twitch_user_id=twitch_user.user_id
+            )
             > 0
         ):
             return build_thread_result(

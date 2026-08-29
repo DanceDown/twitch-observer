@@ -60,7 +60,7 @@ class BatchedMessageRepository(MessageRepository):
 
     async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
         should_flush_now = await self._enqueue_message(event)
-        if should_flush_now:
+        if should_flush_now and self._task is None:
             await self.flush()
 
     async def save_bot_twitch_message(self, event: TwitchChatMessageEvent) -> None:
@@ -74,7 +74,7 @@ class BatchedMessageRepository(MessageRepository):
         event: TwitchChatMessageEvent,
     ) -> None:
         should_flush_now = await self._enqueue_match(thread_id=thread_id, event=event)
-        if should_flush_now:
+        if should_flush_now and self._task is None:
             await self.flush()
 
     async def list_recent_messages(
@@ -95,11 +95,10 @@ class BatchedMessageRepository(MessageRepository):
     ) -> list[RecentMessageRecord]:
         await self.flush()
         return await self.repository.list_recent_messages_for_channel(
-                twitch_channel_id=twitch_channel_id,
-                since=since,
-                limit=limit,
-            )
-        
+            twitch_channel_id=twitch_channel_id,
+            since=since,
+            limit=limit,
+        )
 
     async def list_recent_messages_for_thread(
         self,
@@ -110,11 +109,10 @@ class BatchedMessageRepository(MessageRepository):
     ) -> list[RecentMessageRecord]:
         await self.flush()
         return await self.repository.list_recent_messages_for_thread(
-                thread_id=thread_id,
-                since=since,
-                limit=limit,
-            )
-        
+            thread_id=thread_id,
+            since=since,
+            limit=limit,
+        )
 
     async def get_thread_message(
         self,
@@ -124,10 +122,9 @@ class BatchedMessageRepository(MessageRepository):
     ) -> RecentMessageRecord | None:
         await self.flush()
         return await self.repository.get_thread_message(
-                thread_id=thread_id,
-                message_id=message_id,
-            )
-        
+            thread_id=thread_id,
+            message_id=message_id,
+        )
 
     async def flush(self) -> None:
         async with self._flush_lock:
@@ -194,19 +191,18 @@ class BatchedMessageRepository(MessageRepository):
         batch_repository = self.repository if hasattr(self.repository, "flush_write_batch") else None
         if batch_repository is not None:
             await getattr(batch_repository, "flush_write_batch")(
-                    message_events=message_events,
-                    thread_matches=thread_matches,
-                )
-            
+                message_events=message_events,
+                thread_matches=thread_matches,
+            )
+
             return
         for event in message_events:
             await self.repository.save_twitch_message(event)
         for thread_id, event in thread_matches:
             await self.repository.mark_message_matched_in_thread(
-                    thread_id=thread_id,
-                    event=event,
-                )
-            
+                thread_id=thread_id,
+                event=event,
+            )
 
     async def _run_loop(self) -> None:
         while True:
@@ -232,9 +228,7 @@ class BatchedMessageRepository(MessageRepository):
         try:
             await self.flush()
         except DatabasePoolExhaustedError:
-            logger.warning(
-                "Final batched message write flush skipped during shutdown because the database pool is exhausted."
-            )
+            logger.warning("Final batched message write flush skipped during shutdown because the database pool is exhausted.")
         except psycopg.Error as error:
             if _is_transient_postgres_disconnect(error):
                 logger.warning(

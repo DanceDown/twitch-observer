@@ -70,9 +70,7 @@ class AdapterEventQueryService:
                     event=event,
                     action=action_record,
                     display_index=(
-                        display_index_map.get(event_record.event_id)
-                        if action_record.action_type == DISCORD_NOTIFY_ACTION
-                        else None
+                        display_index_map.get(event_record.event_id) if action_record.action_type == DISCORD_NOTIFY_ACTION else None
                     ),
                 )
             )

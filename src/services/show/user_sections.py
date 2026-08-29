@@ -51,13 +51,7 @@ class ShowPermissionsRenderer:
                 "permission_list": self.localizer.text(
                     "show.permissions.permission_list",
                     language=language,
-                    sources={
-                        "view": {
-                            "permissions": (
-                                self.localizer.text("show.permissions.permission_label.owner", language=language),
-                            )
-                        }
-                    },
+                    sources={"view": {"permissions": (self.localizer.text("show.permissions.permission_label.owner", language=language),)}},
                 ),
             }
         ]

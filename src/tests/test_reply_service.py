@@ -14,6 +14,7 @@ from src.tests.dispatch_helpers import (
     dispatch_show_command,
 )
 from src.gateways.twitch_api import (
+    TwitchAPIError,
     TwitchChannelNotFoundError,
     TwitchDeviceCodeStart,
     TwitchDevicePollResult,
@@ -985,6 +986,7 @@ class FakeTwitchAPI:
     device_start: TwitchDeviceCodeStart | None = None
     poll_result: TwitchDevicePollResult | None = None
     validated_token: TwitchValidatedToken | None = None
+    send_error: Exception | None = None
     sent_messages: list[dict[str, str | None]] = field(default_factory=list)
     live_by_user_id: dict[str, bool] = field(default_factory=dict)
     users_by_id: dict[str, TwitchUser] = field(default_factory=dict)
@@ -1027,6 +1029,8 @@ class FakeTwitchAPI:
         message: str,
         reply_parent_message_id: str | None = None,
     ) -> str:
+        if self.send_error is not None:
+            raise self.send_error
         self.sent_messages.append(
             {
                 "access_token": access_token,
@@ -1045,12 +1049,18 @@ class FakeTwitchAPI:
             raise TwitchChannelNotFoundError(f"Unknown Twitch user id: {user_id}")
         return self.users_by_id[user_id]
 
+    async def refresh_user_by_id(self, user_id: str) -> TwitchUser:
+        return await self.get_user_by_id(user_id)
+
     async def get_user_by_login(self, login: str) -> TwitchUser:
         normalized = login.strip().lower()
         for user in self.users_by_id.values():
             if user.login == normalized:
                 return user
         raise TwitchChannelNotFoundError(f"Unknown Twitch login: {normalized}")
+
+    async def refresh_user_by_login(self, login: str) -> TwitchUser:
+        return await self.get_user_by_login(login)
 
     def get_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
         return self.cached_users_by_id.get(user_id.strip())
@@ -1064,6 +1074,9 @@ class FakeTwitchAPI:
 
     async def load_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
         return self.get_cached_user_by_id(user_id)
+
+    async def load_cached_user_by_login(self, login: str) -> TwitchUser | None:
+        return self.get_cached_user_by_login(login)
 
     async def get_users_by_ids(self, user_ids: tuple[str, ...]) -> tuple[TwitchUser, ...]:
         rows: list[TwitchUser] = []
@@ -1132,7 +1145,15 @@ class FakeNotifier(AccountNotificationSender):
     ) -> None:
         self.sent.append((discord_user_id, result))
 
-    async def send_tracking_embed(self, discord_channel_id: int, embed, *, channel_login: str | None = None) -> None:
+    async def send_tracking_embed(
+        self,
+        discord_channel_id: int,
+        embed,
+        *,
+        channel_login: str | None = None,
+        thread_id: int | None = None,
+    ) -> None:
+        _ = channel_login, thread_id
         self.tracking_embeds.append((discord_channel_id, embed))
 
     async def send_channel_result(self, discord_channel_id: int, result: DiscordCommandResult) -> None:
@@ -1890,6 +1911,176 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
     assert message_repository.saved_bot_messages[0].message_id == "sent-1"
     assert message_repository.saved_bot_messages[0].reply_parent_message_id == "msg-1"
     assert message_repository.saved_bot_messages[0].author_id == "77"
+    assert len(notifier.tracking_embeds) == 1
+
+
+@pytest.mark.asyncio
+async def test_auto_reply_service_sends_tracking_embed_when_twitch_reply_fails() -> None:
+    thread_repository = InMemoryThreadRepository()
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
+    channel_repository = InMemoryChannelRepository()
+    await channel_repository.add_channel(thread.thread_id, "42")
+    pattern_repository = InMemoryPatternRepository(
+        patterns=[
+            PatternRecord(
+                thread_id=thread.thread_id,
+                pattern_id=1,
+                regex="hello",
+                channel_scope_mode="all_tracked",
+                channel_scope_ids=(),
+                user_scope_mode="all_users",
+                user_scope_ids=(),
+                sub_state="all",
+                offline_state="both",
+                is_regex=False,
+                case_sensitive=False,
+                color=None,
+                disabled=False,
+                priority=0,
+            )
+        ]
+    )
+    reply_repository = InMemoryReplyRepository()
+    await reply_repository.add_reply(
+        thread_id=thread.thread_id,
+        pattern_id=1,
+        reply_message="Hi there",
+        reply_as_reply=False,
+    )
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        reply_repository=reply_repository,
+    )
+    account_repository = InMemoryAccountRepository()
+    account = await account_repository.create_account(
+        discord_user_id=200,
+        twitch_user_id="77",
+        twitch_login="dancedown",
+        client_id="client-123",
+        access_token="oauth:test-token",
+        refresh_token=None,
+        expires_at=None,
+        scope=("user:write:chat",),
+        token_type="bearer",
+    )
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    twitch_api = FakeTwitchAPI(
+        send_error=TwitchAPIError("Twitch is temporarily unavailable."),
+        cached_users_by_id={
+            "42": TwitchUser(
+                user_id="42",
+                login="example",
+                display_name="ExampleChannel",
+            ),
+        },
+    )
+    notifier = FakeNotifier()
+    message_repository = InMemoryMessageRepository()
+    service = AutoReplyService(
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        pattern_repository=pattern_repository,
+        message_repository=message_repository,
+        account_repository=account_repository,
+        twitch_api=twitch_api,  # type: ignore[arg-type]
+        token_refresh_skew_seconds=30,
+        tracking_notifier=notifier,
+        account_notifier=notifier,
+    )
+
+    await service.handle_chat_message(
+        TwitchChatMessageEvent(
+            channel_login="example",
+            author_login="alice",
+            author_display_name="Alice",
+            author_id="7",
+            broadcaster_id="42",
+            message_id="msg-1",
+            content="hello there",
+            sent_at=datetime.now(UTC),
+            raw_tags={"badges": ""},
+        )
+    )
+
+    assert service.sent_replies == 0
+    assert twitch_api.sent_messages == []
+    assert message_repository.saved_bot_messages == []
+    assert message_repository.matched_thread_ids == [(thread.thread_id, "msg-1")]
+    assert len(notifier.tracking_embeds) == 1
+
+
+@pytest.mark.asyncio
+async def test_auto_reply_service_sends_tracking_embed_when_no_account_is_linked() -> None:
+    thread_repository = InMemoryThreadRepository()
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
+    channel_repository = InMemoryChannelRepository()
+    await channel_repository.add_channel(thread.thread_id, "42")
+    pattern_repository = InMemoryPatternRepository(
+        patterns=[
+            PatternRecord(
+                thread_id=thread.thread_id,
+                pattern_id=1,
+                regex="^<3$",
+                channel_scope_mode="only_selected",
+                channel_scope_ids=("42",),
+                user_scope_mode="only_selected",
+                user_scope_ids=("7",),
+                sub_state="all",
+                offline_state="online",
+                is_regex=True,
+                case_sensitive=True,
+                color=None,
+                disabled=False,
+                priority=7,
+            )
+        ]
+    )
+    reply_repository = InMemoryReplyRepository()
+    await reply_repository.add_reply(
+        thread_id=thread.thread_id,
+        pattern_id=1,
+        reply_message="<3",
+        reply_as_reply=False,
+    )
+    await channel_repository.set_live_state_for_twitch_channel(twitch_channel_id="42", is_live=True, changed_at="now")
+    wire_runtime_pattern_repository(
+        pattern_repository,
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        reply_repository=reply_repository,
+    )
+    notifier = FakeNotifier()
+    message_repository = InMemoryMessageRepository()
+    service = AutoReplyService(
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        pattern_repository=pattern_repository,
+        message_repository=message_repository,
+        account_repository=InMemoryAccountRepository(),
+        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        token_refresh_skew_seconds=30,
+        tracking_notifier=notifier,
+        account_notifier=notifier,
+    )
+
+    await service.handle_chat_message(
+        TwitchChatMessageEvent(
+            channel_login="example",
+            author_login="alice",
+            author_display_name="Alice",
+            author_id="7",
+            broadcaster_id="42",
+            message_id="msg-1",
+            content="<3",
+            sent_at=datetime.now(UTC),
+            raw_tags={"badges": ""},
+        )
+    )
+
+    assert service.sent_replies == 0
+    assert message_repository.matched_thread_ids == [(thread.thread_id, "msg-1")]
     assert len(notifier.tracking_embeds) == 1
 
 

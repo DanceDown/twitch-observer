@@ -38,6 +38,9 @@ class FakeTwitchAPI:
     async def get_user_by_id(self, user_id: str) -> TwitchUser:
         return self.users_by_id[user_id]
 
+    async def refresh_user_by_id(self, user_id: str) -> TwitchUser:
+        return await self.get_user_by_id(user_id)
+
 
 @pytest.mark.asyncio
 async def test_live_monitor_initial_sync_persists_state_without_emitting_transition() -> None:

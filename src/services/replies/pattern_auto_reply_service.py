@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -15,13 +16,14 @@ from src.database.connection import (
     PatternRepository,
     ReplyRecord,
     ThreadRecord,
+    TwitchAccountRecord,
     ThreadRepository,
     TwitchAccountRepository,
 )
 from src.discord_results import build_result
 from src.events.discord_results import DiscordResultStyle
 from src.events.twitch_events import TwitchChatMessageEvent
-from src.gateways.twitch_api import TwitchAPIError, TwitchAuthenticationError
+from src.gateways.twitch_api import TwitchAPIError, TwitchAuthenticationError, TwitchUser
 from src.localization import Localizer
 from src.services.account_support import AccountNotificationSender
 from src.services.chat import ChatPatternMatcher
@@ -33,7 +35,7 @@ from src.services.twitch_runtime import (
     safe_get_twitch_user_by_id,
     safe_get_twitch_user_by_login,
 )
-from src.utils.discord_embeds import build_auto_reply_embed
+from src.utils.discord_embeds import build_auto_reply_embed, build_tracking_embed
 
 if TYPE_CHECKING:
     from src.services.chat import ChatPatternMatch
@@ -54,6 +56,7 @@ class AutoReplyService:
     token_refresh_skew_seconds: int
     tracking_notifier: TrackingNotificationSender
     account_notifier: AccountNotificationSender
+    metadata_lookup_timeout_seconds: float | None = None
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     matcher: ChatPatternMatcher | None = None
     handled_messages: int = field(default=0, init=False)
@@ -98,16 +101,13 @@ class AutoReplyService:
         matching_reply = match.reply
         if matching_reply is None:
             return
-        account = (
-            await self.account_repository.get_by_account_id(match.thread.account_id)
-            if match.thread.account_id is not None
-            else None
-        )
+        account = await self.account_repository.get_by_account_id(match.thread.account_id) if match.thread.account_id is not None else None
         if account is None or not account.access_token:
             logger.debug(
                 "Skipping auto-replies for thread_id=%s because no account is linked.",
                 match.thread.thread_id,
             )
+            await self._notify_tracking_fallback(event=event, match=match, already_marked=False)
             return
         if event.author_id == account.twitch_user_id and not match.explicit_user_scope_match:
             logger.debug(
@@ -120,6 +120,7 @@ class AutoReplyService:
         channel_user = await safe_get_twitch_user_by_id(
             self.twitch_api,
             event.broadcaster_id,
+            timeout_seconds=self.metadata_lookup_timeout_seconds,
         )
         rendered_reply_message = self._render_reply_message(
             matching_reply.reply_message,
@@ -139,52 +140,13 @@ class AutoReplyService:
                 )
                 or account
             )
-            sent_message_id = await self.twitch_api.send_chat_message(
-                access_token=account.access_token,
-                client_id=account.client_id,
-                sender_id=account.twitch_user_id,
-                broadcaster_id=event.broadcaster_id,
-                message=rendered_reply_message,
-                reply_parent_message_id=(event.message_id if matching_reply.reply_as_reply else None),
-            )
-            await self.message_repository.save_bot_twitch_message(
-                self._build_sent_message_event(
-                    channel_login=(event.channel_login if channel_user is None else channel_user.login),
-                    author_login=account.twitch_login,
-                    author_id=account.twitch_user_id,
-                    broadcaster_id=event.broadcaster_id,
-                    message_id=sent_message_id,
-                    content=rendered_reply_message,
-                    reply_parent_message_id=(event.message_id if matching_reply.reply_as_reply else None),
-                )
-            )
-            self.sent_replies += 1
-            logger.debug(
-                "Sent auto-reply thread_id=%s pattern_id=%s broadcaster_id=%s sender_id=%s",
-                match.thread.thread_id,
-                match.pattern.pattern_id,
-                event.broadcaster_id,
-                account.twitch_user_id,
-            )
-            author_user = await safe_get_twitch_user_by_login(
-                self.twitch_api,
-                event.author_login,
-            )
-            await self._notify_auto_reply(
-                thread=match.thread,
+            await self._send_reply_and_notify(
                 event=event,
-                pattern=match.pattern,
-                reply=ReplyRecord(
-                    thread_id=matching_reply.thread_id,
-                    pattern_id=matching_reply.pattern_id,
-                    reply_message=rendered_reply_message,
-                    reply_as_reply=matching_reply.reply_as_reply,
-                    disabled=matching_reply.disabled,
-                ),
-                source_channel=match.source_channel,
-                author_icon_url=(None if author_user is None else author_user.profile_image_url),
-                channel_display_name=(None if channel_user is None else channel_user.display_name),
-                channel_login=None if channel_user is None else channel_user.login,
+                match=match,
+                matching_reply=matching_reply,
+                rendered_reply_message=rendered_reply_message,
+                account=account,
+                channel_user=channel_user,
             )
         except TwitchAuthenticationError as error:
             refreshed = await refresh_linked_account(
@@ -196,52 +158,13 @@ class AutoReplyService:
             )
             if refreshed is not None:
                 try:
-                    sent_message_id = await self.twitch_api.send_chat_message(
-                        access_token=refreshed.access_token,
-                        client_id=refreshed.client_id,
-                        sender_id=refreshed.twitch_user_id,
-                        broadcaster_id=event.broadcaster_id,
-                        message=rendered_reply_message,
-                        reply_parent_message_id=(event.message_id if matching_reply.reply_as_reply else None),
-                    )
-                    await self.message_repository.save_bot_twitch_message(
-                        self._build_sent_message_event(
-                            channel_login=(event.channel_login if channel_user is None else channel_user.login),
-                            author_login=refreshed.twitch_login,
-                            author_id=refreshed.twitch_user_id,
-                            broadcaster_id=event.broadcaster_id,
-                            message_id=sent_message_id,
-                            content=rendered_reply_message,
-                            reply_parent_message_id=(event.message_id if matching_reply.reply_as_reply else None),
-                        )
-                    )
-                    self.sent_replies += 1
-                    logger.debug(
-                        "Sent auto-reply after token refresh thread_id=%s pattern_id=%s broadcaster_id=%s sender_id=%s",
-                        match.thread.thread_id,
-                        match.pattern.pattern_id,
-                        event.broadcaster_id,
-                        refreshed.twitch_user_id,
-                    )
-                    author_user = await safe_get_twitch_user_by_login(
-                        self.twitch_api,
-                        event.author_login,
-                    )
-                    await self._notify_auto_reply(
-                        thread=match.thread,
+                    await self._send_reply_and_notify(
                         event=event,
-                        pattern=match.pattern,
-                        reply=ReplyRecord(
-                            thread_id=matching_reply.thread_id,
-                            pattern_id=matching_reply.pattern_id,
-                            reply_message=rendered_reply_message,
-                            reply_as_reply=matching_reply.reply_as_reply,
-                            disabled=matching_reply.disabled,
-                        ),
-                        source_channel=match.source_channel,
-                        author_icon_url=(None if author_user is None else author_user.profile_image_url),
-                        channel_display_name=(None if channel_user is None else channel_user.display_name),
-                        channel_login=(None if channel_user is None else channel_user.login),
+                        match=match,
+                        matching_reply=matching_reply,
+                        rendered_reply_message=rendered_reply_message,
+                        account=refreshed,
+                        channel_user=channel_user,
                     )
                     return
                 except TwitchAPIError as retry_error:
@@ -263,6 +186,7 @@ class AutoReplyService:
                 error,
             )
             await self._notify_account_expired(match.thread.discord_channel_id)
+            await self._notify_tracking_fallback(event=event, match=match, already_marked=True)
         except TwitchAPIError as error:
             logger.warning(
                 "Failed to send auto-reply thread_id=%s pattern_id=%s: %s",
@@ -270,6 +194,69 @@ class AutoReplyService:
                 match.pattern.pattern_id,
                 error,
             )
+            await self._notify_tracking_fallback(event=event, match=match, already_marked=True)
+
+    async def reserve_match_delivery(self, match: ChatPatternMatch) -> None:
+        await self.tracking_notifier.reserve_tracking_delivery(thread_id=match.thread.thread_id)
+
+    async def _send_reply_and_notify(
+        self,
+        *,
+        event: TwitchChatMessageEvent,
+        match: ChatPatternMatch,
+        matching_reply: ReplyRecord,
+        rendered_reply_message: str,
+        account: TwitchAccountRecord,
+        channel_user: TwitchUser | None,
+    ) -> None:
+        sent_message_id = await self.twitch_api.send_chat_message(
+            access_token=account.access_token,
+            client_id=account.client_id,
+            sender_id=account.twitch_user_id,
+            broadcaster_id=event.broadcaster_id,
+            message=rendered_reply_message,
+            reply_parent_message_id=(event.message_id if matching_reply.reply_as_reply else None),
+        )
+        await self.message_repository.save_bot_twitch_message(
+            self._build_sent_message_event(
+                channel_login=(event.channel_login if channel_user is None else channel_user.login),
+                author_login=account.twitch_login,
+                author_id=account.twitch_user_id,
+                broadcaster_id=event.broadcaster_id,
+                message_id=sent_message_id,
+                content=rendered_reply_message,
+                reply_parent_message_id=(event.message_id if matching_reply.reply_as_reply else None),
+            )
+        )
+        self.sent_replies += 1
+        logger.debug(
+            "Sent auto-reply thread_id=%s pattern_id=%s broadcaster_id=%s sender_id=%s",
+            match.thread.thread_id,
+            match.pattern.pattern_id,
+            event.broadcaster_id,
+            account.twitch_user_id,
+        )
+        author_user = await safe_get_twitch_user_by_login(
+            self.twitch_api,
+            event.author_login,
+            timeout_seconds=self.metadata_lookup_timeout_seconds,
+        )
+        await self._notify_auto_reply(
+            thread=match.thread,
+            event=event,
+            pattern=match.pattern,
+            reply=ReplyRecord(
+                thread_id=matching_reply.thread_id,
+                pattern_id=matching_reply.pattern_id,
+                reply_message=rendered_reply_message,
+                reply_as_reply=matching_reply.reply_as_reply,
+                disabled=matching_reply.disabled,
+            ),
+            source_channel=match.source_channel,
+            author_icon_url=(None if author_user is None else author_user.profile_image_url),
+            channel_display_name=(None if channel_user is None else channel_user.display_name),
+            channel_login=None if channel_user is None else channel_user.login,
+        )
 
     async def _notify_auto_reply(
         self,
@@ -296,6 +283,43 @@ class AutoReplyService:
                 channel_display_name=channel_display_name,
             ),
             channel_login=channel_login,
+            thread_id=thread.thread_id,
+        )
+
+    async def _notify_tracking_fallback(
+        self,
+        *,
+        event: TwitchChatMessageEvent,
+        match: ChatPatternMatch,
+        already_marked: bool,
+    ) -> None:
+        if not already_marked:
+            await self.message_repository.mark_message_matched_in_thread(thread_id=match.thread.thread_id, event=event)
+        author_user, channel_user = await asyncio.gather(
+            safe_get_twitch_user_by_login(
+                self.twitch_api,
+                event.author_login,
+                timeout_seconds=self.metadata_lookup_timeout_seconds,
+            ),
+            safe_get_twitch_user_by_id(
+                self.twitch_api,
+                event.broadcaster_id,
+                timeout_seconds=self.metadata_lookup_timeout_seconds,
+            ),
+        )
+        await self.tracking_notifier.send_tracking_embed(
+            match.thread.discord_channel_id,
+            build_tracking_embed(
+                event=event,
+                pattern=match.pattern,
+                thread=match.thread,
+                localizer=self.localizer,
+                channel=match.source_channel,
+                author_icon_url=(None if author_user is None else author_user.profile_image_url),
+                channel_display_name=(None if channel_user is None else channel_user.display_name),
+            ),
+            channel_login=None if channel_user is None else channel_user.login,
+            thread_id=match.thread.thread_id,
         )
 
     @staticmethod

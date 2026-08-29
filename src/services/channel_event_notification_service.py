@@ -41,11 +41,11 @@ class ChannelLiveStatePersistenceService:
 
     async def handle_change(self, event: TwitchChannelLiveStateChangedEvent) -> None:
         updated_rows = await self.channel_repository.set_live_state_for_twitch_channel(
-                twitch_channel_id=event.twitch_channel_id,
-                is_live=event.is_live,
-                changed_at=event.changed_at.isoformat(),
-            )
-        
+            twitch_channel_id=event.twitch_channel_id,
+            is_live=event.is_live,
+            changed_at=event.changed_at.isoformat(),
+        )
+
         logger.debug(
             "Persisted live-state change twitch_channel_id=%s is_live=%s rows=%s",
             event.twitch_channel_id,
@@ -74,13 +74,13 @@ class ChannelEventNotificationService:
     ) -> None:
         event_key = STREAM_ONLINE_EVENT_KEY if event.is_live else STREAM_OFFLINE_EVENT_KEY
         configured_events = await self.adapter_event_repository.list_matching_events(
-                adapter_key=TWITCH_ADAPTER_KEY,
-                subject_type=CHANNEL_SUBJECT_TYPE,
-                subject_id=event.twitch_channel_id,
-                event_key=event_key,
-                include_disabled=False,
-            )
-        
+            adapter_key=TWITCH_ADAPTER_KEY,
+            subject_type=CHANNEL_SUBJECT_TYPE,
+            subject_id=event.twitch_channel_id,
+            event_key=event_key,
+            include_disabled=False,
+        )
+
         if not configured_events:
             return
 
@@ -97,10 +97,10 @@ class ChannelEventNotificationService:
             if thread is None or not thread.enabled:
                 continue
             notify_action = await self.adapter_event_action_repository.get_action(
-                    event_id=configured_event.event_id,
-                    action_type=DISCORD_NOTIFY_ACTION,
-                )
-            
+                event_id=configured_event.event_id,
+                action_type=DISCORD_NOTIFY_ACTION,
+            )
+
             if notify_action is None or notify_action.disabled:
                 continue
             language = self.localizer.language_for_thread(thread)

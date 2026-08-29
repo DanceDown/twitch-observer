@@ -106,6 +106,9 @@ class FakeTwitchAPI:
             raise self.error
         return self.users_by_login[login.strip().lower()]
 
+    async def refresh_user_by_login(self, login: str) -> TwitchUser:
+        return await self.get_user_by_login(login)
+
     async def refresh_channel_by_login(self, login: str) -> TwitchUser:
         return await self.get_user_by_login(login)
 
@@ -117,6 +120,9 @@ class FakeTwitchAPI:
             if user.user_id == user_id:
                 return user
         raise KeyError(user_id)
+
+    async def refresh_user_by_id(self, user_id: str) -> TwitchUser:
+        return await self.get_user_by_id(user_id)
 
     async def get_channel_by_id(self, user_id: str) -> TwitchUser:
         return await self.get_user_by_id(user_id)

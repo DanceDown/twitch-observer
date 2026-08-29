@@ -46,17 +46,34 @@ class AnonymousTwitchIRCGateway:
     async def start(self) -> None:
         """Keep the IRC connection alive, rejoining channels after reconnects."""
         self._stop_requested = False
-        await self.ensure_connected()
-        self._ensure_read_task()
+        reconnect_delay = max(0.1, self._config.twitch_irc_reconnect_initial_delay_seconds)
+        max_reconnect_delay = max(reconnect_delay, self._config.twitch_irc_reconnect_max_delay_seconds)
 
         try:
             while not self._stop_requested:
-                await asyncio.sleep(self._config.twitch_irc_connection_check_interval_seconds)
-                if self._read_task is not None and self._read_task.done():
-                    await self._recover_connection("read loop stopped")
-                    continue
-                if not self._is_transport_connected():
-                    await self._recover_connection("connection health check failed")
+                try:
+                    await self.ensure_connected()
+                    self._ensure_read_task()
+                    reconnect_delay = max(0.1, self._config.twitch_irc_reconnect_initial_delay_seconds)
+                    await asyncio.sleep(self._config.twitch_irc_connection_check_interval_seconds)
+                    if self._read_task is not None and self._read_task.done():
+                        await self._recover_connection("read loop stopped")
+                        continue
+                    if not self._is_transport_connected():
+                        await self._recover_connection("connection health check failed")
+                except asyncio.CancelledError:
+                    raise
+                except Exception as error:
+                    logger.warning(
+                        "Twitch IRC connection loop recovered from error; retrying in %.1fs: %s",
+                        reconnect_delay,
+                        error,
+                        exc_info=True,
+                    )
+                    await self._stop_read_task()
+                    await self._close_connection(preserve_channels=True)
+                    await self._sleep_until_retry(reconnect_delay)
+                    reconnect_delay = min(max_reconnect_delay, reconnect_delay * 2)
         finally:
             self._stop_requested = True
             await self._stop_read_task()
@@ -77,8 +94,10 @@ class AnonymousTwitchIRCGateway:
             return
         if not self._is_connection_ready():
             logger.warning("Twitch IRC was disconnected before joining #%s; reconnecting.", normalized)
+        self._pending_channels.add(normalized)
         await self.ensure_connected()
         if normalized in self._joined_channels:
+            self._pending_channels.discard(normalized)
             return
         await self._send_line_with_reconnect(f"JOIN #{normalized}")
         self._pending_channels.discard(normalized)
@@ -139,11 +158,29 @@ class AnonymousTwitchIRCGateway:
             if not raw_bytes:
                 break
             raw_line = raw_bytes.decode("utf-8", errors="replace")
+            ping_payload = self._extract_ping_payload(raw_line)
+            if ping_payload is not None:
+                try:
+                    await self.send_pong(ping_payload)
+                except (ConnectionError, OSError) as error:
+                    logger.warning("Twitch IRC read loop stopped after PING/PONG connection error: %s", error)
+                    break
+                continue
             try:
                 if self._line_handler is not None:
                     await self._line_handler(raw_line)
+            except (ConnectionError, OSError) as error:
+                logger.warning("Twitch IRC read loop stopped after line handling connection error: %s", error)
+                break
             except Exception:
                 logger.exception("Failed to handle Twitch IRC line; continuing read loop. raw_line=%r", raw_line)
+
+    @staticmethod
+    def _extract_ping_payload(raw_line: str) -> str | None:
+        line = raw_line.strip()
+        if not line.startswith("PING "):
+            return None
+        return line.removeprefix("PING ").removeprefix(":").strip()
 
     async def _send_line(self, line: str) -> None:
         if self._writer is None:
@@ -154,33 +191,54 @@ class AnonymousTwitchIRCGateway:
 
     async def _open_connection(self) -> None:
         ssl_context = ssl.create_default_context() if self._config.twitch_irc_use_ssl else None
-        self._reader, self._writer = await asyncio.open_connection(
-            self._config.twitch_irc_host,
-            self._config.twitch_irc_port,
-            ssl=ssl_context,
-        )
-        logger.debug("Connected to Twitch IRC at %s:%s", self._config.twitch_irc_host, self._config.twitch_irc_port)
-        await self._send_line("PASS SCHMOOPIIE")
-        await self._send_line("CAP REQ :twitch.tv/tags twitch.tv/commands")
-        await self._send_line(f"NICK {self._nick}")
-        await self._send_line(f"USER {self._nick} 8 * :{self._nick}")
-        self._connected_event.set()
-        await self._join_initial_channels()
+        writer: asyncio.StreamWriter | None = None
+        try:
+            reader, writer = await asyncio.open_connection(
+                self._config.twitch_irc_host,
+                self._config.twitch_irc_port,
+                ssl=ssl_context,
+            )
+            self._reader = reader
+            self._writer = writer
+            logger.debug("Connected to Twitch IRC at %s:%s", self._config.twitch_irc_host, self._config.twitch_irc_port)
+            await self._send_line("PASS SCHMOOPIIE")
+            await self._send_line("CAP REQ :twitch.tv/tags twitch.tv/commands")
+            await self._send_line(f"NICK {self._nick}")
+            await self._send_line(f"USER {self._nick} 8 * :{self._nick}")
+            self._connected_event.set()
+            await self._join_initial_channels()
+        except Exception:
+            self._reader = None
+            self._writer = None
+            self._connected_event.clear()
+            if writer is not None:
+                with contextlib.suppress(OSError):
+                    writer.close()
+                    await writer.wait_closed()
+            raise
 
     async def _join_initial_channels(self) -> None:
-        initial_channels = set(self._config.twitch_irc_channels) | self._pending_channels
+        initial_channels = {
+            normalized
+            for channel_login in set(self._config.twitch_irc_channels) | self._pending_channels
+            if (normalized := channel_login.strip().lstrip("#").lower())
+        }
         if not initial_channels:
             logger.debug(
                 "No initial Twitch IRC channels configured in runtime state; persisted channel subscriptions can still be rejoined by startup sync."
             )
             return
-        self._pending_channels.clear()
+        self._pending_channels.update(initial_channels)
         for channel_login in sorted(initial_channels):
             normalized = channel_login.strip().lstrip("#").lower()
-            if not normalized or normalized in self._joined_channels:
+            if not normalized:
+                continue
+            if normalized in self._joined_channels:
+                self._pending_channels.discard(normalized)
                 continue
             await self._send_line(f"JOIN #{normalized}")
             self._joined_channels.add(normalized)
+            self._pending_channels.discard(normalized)
             logger.debug("Joined Twitch IRC channel #%s", normalized)
 
     async def _send_line_with_reconnect(self, line: str) -> None:
@@ -196,6 +254,9 @@ class AnonymousTwitchIRCGateway:
         await self._stop_read_task()
         await self._close_connection(preserve_channels=True)
         await self.ensure_connected()
+
+    async def _sleep_until_retry(self, delay_seconds: float) -> None:
+        await asyncio.sleep(max(0.1, delay_seconds))
 
     async def _close_connection(self, *, preserve_channels: bool) -> None:
         writer = self._writer

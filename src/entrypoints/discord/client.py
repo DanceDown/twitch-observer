@@ -90,8 +90,10 @@ class ObserverDiscordClient(discord.Client):
         embed: discord.Embed,
         *,
         channel_login: str | None = None,
+        thread_id: int | None = None,
     ) -> None:
         """Send a tracking embed to a Discord channel or DM."""
+        _ = thread_id
         channel = self.get_channel(discord_channel_id)
         if channel is None:
             channel = await self.fetch_channel(discord_channel_id)

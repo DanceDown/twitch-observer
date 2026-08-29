@@ -30,12 +30,18 @@ class TrackingRuntimeRelay(TrackingNotificationSender):
     def bind(self, sender: TrackingNotificationSender) -> None:
         self.sender = sender
 
+    async def reserve_tracking_delivery(self, *, thread_id: int) -> None:
+        if self.sender is None:
+            return
+        await self.sender.reserve_tracking_delivery(thread_id=thread_id)
+
     async def send_tracking_embed(
         self,
         discord_channel_id: int,
         embed: discord.Embed,
         *,
         channel_login: str | None = None,
+        thread_id: int | None = None,
     ) -> None:
         if self.sender is None:
             return
@@ -43,6 +49,7 @@ class TrackingRuntimeRelay(TrackingNotificationSender):
             discord_channel_id,
             embed,
             channel_login=channel_login,
+            thread_id=thread_id,
         )
 
 
@@ -124,6 +131,7 @@ class DiscordRuntimeSender(Protocol):
         embed: discord.Embed,
         *,
         channel_login: str | None = None,
+        thread_id: int | None = None,
     ) -> None: ...
 
     async def send_account_result(

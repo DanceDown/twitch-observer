@@ -16,11 +16,10 @@ async def dispatch_ui_flow_decision(
 ) -> DiscordUIFlowDecision:
     """Ask services whether a Discord UI step may be rendered."""
     return await services.ui_flow_guard.decide(
-            RequestUIFlowCommand(
-                discord_channel_id=discord_channel_id,
-                requester_id=requester_id,
-                flow=flow,
-                step=step,
-            ),
-        )
-    
+        RequestUIFlowCommand(
+            discord_channel_id=discord_channel_id,
+            requester_id=requester_id,
+            flow=flow,
+            step=step,
+        ),
+    )

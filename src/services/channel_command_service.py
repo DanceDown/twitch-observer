@@ -89,9 +89,7 @@ class ChannelCommandService:
                 ephemeral=True,
                 sources={"view": self._channel_view(twitch_user.display_name, twitch_user.login)},
             )
-        is_first_subscription = (
-            await self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id) == 0
-        )
+        is_first_subscription = await self.channel_repository.count_threads_by_twitch_channel_id(twitch_user.user_id) == 0
         if is_first_subscription:
             await self.irc_gateway.ensure_connected()
             await self.irc_gateway.join_channel(twitch_user.login)
@@ -137,11 +135,11 @@ class ChannelCommandService:
         normalized_color = normalize_optional_color(command.color)
         if normalized_color is None:
             updated = await self.channel_repository.set_color(
-                    thread_id=thread.thread_id,
-                    twitch_channel_id=twitch_user.user_id,
-                    color=None,
-                )
-            
+                thread_id=thread.thread_id,
+                twitch_channel_id=twitch_user.user_id,
+                color=None,
+            )
+
             if updated is None:
                 raise ApplicationInvariantError("Tracked channel color clear returned no row.")
             return build_thread_result(
@@ -158,11 +156,11 @@ class ChannelCommandService:
                 },
             )
         updated = await self.channel_repository.set_color(
-                thread_id=thread.thread_id,
-                twitch_channel_id=twitch_user.user_id,
-                color=normalized_color,
-            )
-        
+            thread_id=thread.thread_id,
+            twitch_channel_id=twitch_user.user_id,
+            color=normalized_color,
+        )
+
         if updated is None:
             raise ApplicationInvariantError("Tracked channel color update returned no row.")
         return build_thread_result(
@@ -199,10 +197,9 @@ class ChannelCommandService:
 
         if (
             await self.pattern_repository.count_channel_scope_references(
-                    thread_id=thread.thread_id,
-                    twitch_channel_id=twitch_user.user_id,
-                )
-            
+                thread_id=thread.thread_id,
+                twitch_channel_id=twitch_user.user_id,
+            )
             > 0
         ):
             return build_thread_result(

@@ -28,7 +28,7 @@ def _get_bool(name: str, default: str) -> bool:
 
 def get_discord_delivery_max_attempts() -> int:
     """Read the configured Discord delivery retry limit with one safe minimum."""
-    return max(1, _get_int("DISCORD_DELIVERY_MAX_ATTEMPTS", "10"))
+    return max(1, _get_int("DISCORD_DELIVERY_MAX_ATTEMPTS", "3"))
 
 
 @dataclass(slots=True)
@@ -58,10 +58,22 @@ class AppConfig:
     twitch_irc_connection_check_interval_seconds: float = field(
         default_factory=lambda: _get_float("TWITCH_IRC_CONNECTION_CHECK_INTERVAL_SECONDS", "10")
     )
-    twitch_user_cache_memory_size: int = field(default_factory=lambda: _get_int("TWITCH_USER_CACHE_MEMORY_SIZE", "2048"))
-    twitch_pattern_compile_cache_size: int = field(
-        default_factory=lambda: _get_int("TWITCH_PATTERN_COMPILE_CACHE_SIZE", "512")
+    twitch_irc_reconnect_initial_delay_seconds: float = field(
+        default_factory=lambda: _get_float("TWITCH_IRC_RECONNECT_INITIAL_DELAY_SECONDS", "1")
     )
+    twitch_irc_reconnect_max_delay_seconds: float = field(
+        default_factory=lambda: _get_float("TWITCH_IRC_RECONNECT_MAX_DELAY_SECONDS", "60")
+    )
+    twitch_chat_processing_queue_size: int = field(default_factory=lambda: _get_int("TWITCH_CHAT_PROCESSING_QUEUE_SIZE", "10000"))
+    twitch_chat_processing_workers: int = field(default_factory=lambda: _get_int("TWITCH_CHAT_PROCESSING_WORKERS", "4"))
+    twitch_chat_processing_stop_timeout_seconds: float = field(
+        default_factory=lambda: _get_float("TWITCH_CHAT_PROCESSING_STOP_TIMEOUT_SECONDS", "30")
+    )
+    twitch_chat_metadata_lookup_timeout_seconds: float = field(
+        default_factory=lambda: _get_float("TWITCH_CHAT_METADATA_LOOKUP_TIMEOUT_SECONDS", "5")
+    )
+    twitch_user_cache_memory_size: int = field(default_factory=lambda: _get_int("TWITCH_USER_CACHE_MEMORY_SIZE", "20000"))
+    twitch_pattern_compile_cache_size: int = field(default_factory=lambda: _get_int("TWITCH_PATTERN_COMPILE_CACHE_SIZE", "512"))
     twitch_metadata_refresh_interval_seconds: int = field(
         default_factory=lambda: _get_int("TWITCH_METADATA_REFRESH_INTERVAL_SECONDS", "43200")
     )
@@ -92,9 +104,7 @@ class AppConfig:
     discord_presence_watchdog_interval_seconds: float = field(
         default_factory=lambda: _get_float("DISCORD_PRESENCE_WATCHDOG_INTERVAL_SECONDS", "60")
     )
-    discord_presence_stale_after_seconds: float = field(
-        default_factory=lambda: _get_float("DISCORD_PRESENCE_STALE_AFTER_SECONDS", "180")
-    )
+    discord_presence_stale_after_seconds: float = field(default_factory=lambda: _get_float("DISCORD_PRESENCE_STALE_AFTER_SECONDS", "180"))
     discord_presence_update_timeout_seconds: float = field(
         default_factory=lambda: _get_float("DISCORD_PRESENCE_UPDATE_TIMEOUT_SECONDS", "15")
     )
@@ -102,6 +112,9 @@ class AppConfig:
     discord_presence_message_limit: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_MESSAGE_LIMIT", "50"))
     discord_presence_max_status_length: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_MAX_STATUS_LENGTH", "120"))
     discord_delivery_max_attempts: int = field(default_factory=get_discord_delivery_max_attempts)
+    discord_tracking_delivery_stop_timeout_seconds: float = field(
+        default_factory=lambda: _get_float("DISCORD_TRACKING_DELIVERY_STOP_TIMEOUT_SECONDS", "30")
+    )
     twitch_message_write_batch_size: int = field(default_factory=lambda: _get_int("TWITCH_MESSAGE_WRITE_BATCH_SIZE", "50"))
     twitch_message_write_flush_interval_seconds: float = field(
         default_factory=lambda: _get_float("TWITCH_MESSAGE_WRITE_FLUSH_INTERVAL_SECONDS", "0.25")

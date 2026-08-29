@@ -96,7 +96,9 @@ One tracked channel means:
 - the live monitor should include it in batched `Get Streams` polling
 
 This table is the per-thread subscription/config layer. It does not own the
-global live/offline state anymore.
+global live/offline state anymore. Runtime channel discovery for IRC and the
+live monitor is based on this table, not on `tracked_channel_state`, so a
+missing state row cannot hide a tracked channel.
 
 ### `tracked_channel_state`
 
@@ -110,6 +112,9 @@ Important fields:
 
 This table is the single persisted source of truth for live/offline state.
 Thread-scoped channel reads join this state back in as needed.
+
+Migrations backfill missing state rows from `channel`. Repository writes also
+create the state row on demand for a tracked channel.
 
 ### `tracked_user`
 
@@ -215,6 +220,9 @@ Important fields:
 
 This supports Discord notifications, replies, presence summaries, and future
 inspection/debug flows.
+
+`thread_message_match` links matched messages back to threads. It is indexed by
+`message_id` for reply lookup and cleanup paths.
 
 ## Relationship summary
 

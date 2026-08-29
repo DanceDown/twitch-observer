@@ -34,7 +34,10 @@ def test_pattern_compile_cache_can_be_disabled() -> None:
 
     assert cache.cache_info() is None
 
-    assert matches_pattern_content(SimpleNamespace(regex="hello", is_regex=False, case_sensitive=False), _event("hello"), compile_cache=cache) is True
+    assert (
+        matches_pattern_content(SimpleNamespace(regex="hello", is_regex=False, case_sensitive=False), _event("hello"), compile_cache=cache)
+        is True
+    )
 
 
 def test_matches_pattern_content_uses_compile_cache_for_word_patterns() -> None:

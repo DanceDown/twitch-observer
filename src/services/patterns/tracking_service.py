@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -30,12 +31,16 @@ logger = logging.getLogger(__name__)
 class TrackingNotificationSender:
     """Interface used by the tracking service to emit Discord embeds."""
 
+    async def reserve_tracking_delivery(self, *, thread_id: int) -> None:
+        return None
+
     async def send_tracking_embed(
         self,
         discord_channel_id: int,
         embed: discord.Embed,
         *,
         channel_login: str | None = None,
+        thread_id: int | None = None,
     ) -> None:  # pragma: no cover
         raise NotImplementedError
 
@@ -50,6 +55,7 @@ class PatternTrackingService:
     message_repository: MessageRepository
     twitch_api: TwitchUserLookup
     notifier: TrackingNotificationSender
+    metadata_lookup_timeout_seconds: float | None = None
     localizer: Localizer = field(default_factory=Localizer.from_directory)
     matcher: ChatPatternMatcher | None = None
 
@@ -98,15 +104,19 @@ class PatternTrackingService:
 
     async def handle_match(self, event: TwitchChatMessageEvent, match: ChatPatternMatch) -> None:
         """Send the Discord tracking notification for one prepared match."""
-        author_user = await safe_get_twitch_user_by_login(
-            self.twitch_api,
-            event.author_login,
+        author_user, channel_user = await asyncio.gather(
+            safe_get_twitch_user_by_login(
+                self.twitch_api,
+                event.author_login,
+                timeout_seconds=self.metadata_lookup_timeout_seconds,
+            ),
+            safe_get_twitch_user_by_id(
+                self.twitch_api,
+                event.broadcaster_id,
+                timeout_seconds=self.metadata_lookup_timeout_seconds,
+            ),
         )
-        channel_user = await safe_get_twitch_user_by_id(
-            self.twitch_api,
-            event.broadcaster_id,
-        )
-        logger.info(
+        logger.debug(
             "Pattern %s matched. Sending tracking embed to discord_channel_id=%s",
             match.pattern.pattern_id,
             match.thread.discord_channel_id,
@@ -124,4 +134,8 @@ class PatternTrackingService:
                 channel_display_name=(None if channel_user is None else channel_user.display_name),
             ),
             channel_login=None if channel_user is None else channel_user.login,
+            thread_id=match.thread.thread_id,
         )
+
+    async def reserve_match_delivery(self, match: ChatPatternMatch) -> None:
+        await self.notifier.reserve_tracking_delivery(thread_id=match.thread.thread_id)

@@ -82,13 +82,10 @@ class ShowChannelEventsRenderer:
             return render_empty_section(self.localizer, "show.channel_event", language=language)
 
         channel_by_id = {
-            channel.twitch_channel_id: channel
-            for channel in await self.channel_repository.list_channels_for_thread(thread.thread_id)
+            channel.twitch_channel_id: channel for channel in await self.channel_repository.list_channels_for_thread(thread.thread_id)
         }
         rows: list[str] = []
-        display_index_map = await ChannelEventDisplayIndexResolver(self.adapter_event_action_repository).build_index_map(
-            thread.thread_id
-        )
+        display_index_map = await ChannelEventDisplayIndexResolver(self.adapter_event_action_repository).build_index_map(thread.thread_id)
         actions = await self._channel_notification_actions(thread.thread_id)
         await self.resolver.preload_channel_ids(tuple(event.subject_id for event, _action in actions))
         for event, action in actions:
