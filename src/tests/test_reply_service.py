@@ -55,6 +55,7 @@ from src.services.channel_live_state_service import ChannelEventCommandService
 from src.services.patterns import ShowCommandService
 from src.services.replies import AutoReplyService, ChannelEventAutoReplyService, ReplyCommandService
 from src.tests.in_memory_channels import InMemoryChannelRepository as BaseInMemoryChannelRepository
+from src.utils.discord_embeds import build_result_embed
 
 
 @dataclass
@@ -2641,6 +2642,82 @@ async def test_channel_event_notification_service_includes_channel_author_and_th
     assert result.author_url == "https://www.twitch.tv/example"
     assert result.author_icon_url == "https://example.test/channel.png"
     assert result.thumbnail_url == "https://example.test/channel.png"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("action_color", "channel_color", "thread_color", "expected_color"),
+    [
+        ("#123456", "#abcdef", "#654321", 0x123456),
+        (None, "#abcdef", "#654321", 0xABCDEF),
+        (None, None, "#654321", 0x654321),
+    ],
+)
+async def test_channel_event_notification_service_uses_action_channel_or_thread_color(
+    action_color: str | None,
+    channel_color: str | None,
+    thread_color: str | None,
+    expected_color: int,
+) -> None:
+    thread_repository = InMemoryThreadRepository()
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
+    if thread_color is not None:
+        await thread_repository.set_color(discord_channel_id=thread.discord_channel_id, color=thread_color)
+    channel_repository = InMemoryChannelRepository()
+    await channel_repository.add_channel(thread.thread_id, "42")
+    if channel_color is not None:
+        await channel_repository.set_color(thread_id=thread.thread_id, twitch_channel_id="42", color=channel_color)
+    adapter_event_repository = InMemoryAdapterEventRepository()
+    adapter_event_action_repository = InMemoryAdapterEventActionRepository(event_repository=adapter_event_repository)
+    adapter_event = await adapter_event_repository.upsert_event(
+        thread_id=thread.thread_id,
+        adapter_key="twitch",
+        subject_type="channel",
+        subject_id="42",
+        event_key="stream.online",
+    )
+    await adapter_event_action_repository.upsert_action(
+        event_id=adapter_event.event_id,
+        action_type="discord_notify",
+        message_template=None,
+        reply_as_reply=False,
+    )
+    if action_color is not None:
+        await adapter_event_action_repository.set_action_color(
+            event_id=adapter_event.event_id,
+            action_type="discord_notify",
+            color=action_color,
+        )
+    notifier = FakeNotifier()
+    service = ChannelEventNotificationService(
+        thread_repository=thread_repository,
+        adapter_event_repository=adapter_event_repository,
+        adapter_event_action_repository=adapter_event_action_repository,
+        channel_repository=channel_repository,
+        twitch_api=FakeTwitchAPI(
+            users_by_id={
+                "42": TwitchUser(
+                    user_id="42",
+                    login="example",
+                    display_name="ExampleChannel",
+                    profile_image_url="https://example.test/channel.png",
+                )
+            }
+        ),
+        notifier=notifier,
+    )
+
+    await service.handle_change(
+        TwitchChannelLiveStateChangedEvent(
+            twitch_channel_id="42",
+            twitch_channel_login="example",
+            is_live=True,
+        )
+    )
+
+    assert len(notifier.channel_results) == 1
+    _discord_channel_id, result = notifier.channel_results[0]
+    assert build_result_embed(result).color.value == expected_color
 
 
 @pytest.mark.asyncio

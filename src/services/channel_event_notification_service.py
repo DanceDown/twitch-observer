@@ -5,7 +5,15 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from src.database.connection import AdapterEventActionRepository, AdapterEventRepository, ChannelRepository, ThreadRepository
+from src.database.connection import (
+    AdapterEventActionRecord,
+    AdapterEventActionRepository,
+    AdapterEventRepository,
+    ChannelRecord,
+    ChannelRepository,
+    ThreadRecord,
+    ThreadRepository,
+)
 from src.discord_results import build_thread_result
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.events.twitch_events import TwitchChannelLiveStateChangedEvent
@@ -104,6 +112,10 @@ class ChannelEventNotificationService:
             if notify_action is None or notify_action.disabled:
                 continue
             language = self.localizer.language_for_thread(thread)
+            source_channel = await self.channel_repository.get_by_thread_and_twitch_channel(
+                thread.thread_id,
+                event.twitch_channel_id,
+            )
             await self.notifier.send_channel_result(
                 thread.discord_channel_id,
                 build_thread_result(
@@ -111,7 +123,11 @@ class ChannelEventNotificationService:
                     "results.channel_event.went_live" if event.is_live else "results.channel_event.went_offline",
                     thread=thread,
                     thumbnail_url=channel_icon_url,
-                    color=notify_action.color,
+                    color=self._resolve_notification_color(
+                        action=notify_action,
+                        channel=source_channel,
+                        thread=thread,
+                    ),
                     style=DiscordResultStyle.INFO,
                     ephemeral=False,
                     author_name=self.localizer.text(
@@ -137,3 +153,16 @@ class ChannelEventNotificationService:
                     },
                 ),
             )
+
+    @staticmethod
+    def _resolve_notification_color(
+        *,
+        action: AdapterEventActionRecord,
+        channel: ChannelRecord | None,
+        thread: ThreadRecord,
+    ) -> str | None:
+        if action.color:
+            return action.color
+        if channel is not None and channel.color:
+            return channel.color
+        return thread.color
