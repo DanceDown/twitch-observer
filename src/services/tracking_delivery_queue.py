@@ -34,15 +34,54 @@ class _MessageSlot:
 
 
 @dataclass(slots=True)
+class _PerTargetRateLimiter:
+    rate_per_second: float
+    burst: int
+    _tokens: float = field(init=False)
+    _updated_at: float = field(default=0, init=False)
+
+    def __post_init__(self) -> None:
+        self.rate_per_second = max(0.0, self.rate_per_second)
+        self.burst = max(1, self.burst)
+        self._tokens = float(self.burst)
+
+    async def wait_for_slot(self) -> None:
+        if self.rate_per_second <= 0:
+            return
+        loop = asyncio.get_running_loop()
+        while True:
+            now = loop.time()
+            if self._updated_at <= 0:
+                self._updated_at = now
+            elapsed = now - self._updated_at
+            self._updated_at = now
+            self._tokens = min(float(self.burst), self._tokens + (elapsed * self.rate_per_second))
+            if self._tokens >= 1:
+                self._tokens -= 1
+                return
+            await asyncio.sleep((1 - self._tokens) / self.rate_per_second)
+
+
+@dataclass(slots=True)
+class _TargetDeliveryState:
+    queue: asyncio.Queue[_TrackingDelivery | None]
+    limiter: _PerTargetRateLimiter
+    task: asyncio.Task[None] | None = None
+
+
+@dataclass(slots=True)
 class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageCompletionNotifier):
-    """Deliver prepared tracking embeds in Twitch chat order per Discord thread."""
+    """Deliver prepared tracking embeds in order without one target blocking another."""
 
     sender: TrackingNotificationSender | None = None
     stop_timeout_seconds: float = 30
+    per_target_rate_per_second: float = 2
+    per_target_burst: int = 5
     _condition: asyncio.Condition = field(default_factory=asyncio.Condition, init=False)
     _message_states: dict[int, _MessageState] = field(default_factory=dict, init=False)
     _slots_by_key: dict[int, dict[int, _MessageSlot]] = field(default_factory=dict, init=False)
     _next_sequence_by_key: dict[int, int] = field(default_factory=dict, init=False)
+    _target_states: dict[int, _TargetDeliveryState] = field(default_factory=dict, init=False)
     _stop_requested: bool = field(default=False, init=False)
     _task: asyncio.Task[None] | None = field(default=None, init=False)
 
@@ -60,17 +99,22 @@ class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageComp
             self._stop_requested = True
             self._condition.notify_all()
         try:
-            await asyncio.wait_for(task, timeout=max(0.1, self.stop_timeout_seconds))
+            timeout_seconds = max(0.1, self.stop_timeout_seconds)
+            deadline = asyncio.get_running_loop().time() + timeout_seconds
+            await asyncio.wait_for(task, timeout=timeout_seconds)
+            await self._stop_target_workers(deadline)
         except TimeoutError:
             logger.warning("Tracking delivery queue did not drain in time; cancelling remaining delivery work.")
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+            await self._cancel_target_workers()
         finally:
             async with self._condition:
                 self._message_states.clear()
                 self._slots_by_key.clear()
                 self._next_sequence_by_key.clear()
+                self._target_states.clear()
                 self._stop_requested = False
             self._task = None
 
@@ -110,19 +154,21 @@ class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageComp
         thread_id: int | None = None,
     ) -> None:
         sequence = get_current_chat_message_sequence()
-        if sequence is None or self._task is None:
+        delivery = _TrackingDelivery(
+            discord_channel_id=discord_channel_id,
+            embed=embed,
+            channel_login=channel_login,
+        )
+        if self._task is None:
             await self._send_direct(discord_channel_id, embed, channel_login=channel_login)
+            return
+        if sequence is None:
+            self._queue_target_delivery(delivery)
             return
         ordering_key = self._ordering_key(thread_id=thread_id, discord_channel_id=discord_channel_id)
         async with self._condition:
             slot = self._reserve_slot_locked(ordering_key=ordering_key, sequence=sequence)
-            slot.deliveries.append(
-                _TrackingDelivery(
-                    discord_channel_id=discord_channel_id,
-                    embed=embed,
-                    channel_login=channel_login,
-                )
-            )
+            slot.deliveries.append(delivery)
             self._condition.notify_all()
 
     async def _run_loop(self) -> None:
@@ -133,20 +179,7 @@ class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageComp
                     return
                 deliveries = self._take_ready_deliveries()
             for delivery in deliveries:
-                try:
-                    await self._send_direct(
-                        delivery.discord_channel_id,
-                        delivery.embed,
-                        channel_login=delivery.channel_login,
-                    )
-                except asyncio.CancelledError:
-                    raise
-                except Exception:
-                    logger.exception(
-                        "Tracking delivery failed discord_channel_id=%s channel_login=%s.",
-                        delivery.discord_channel_id,
-                        delivery.channel_login,
-                    )
+                self._queue_target_delivery(delivery)
 
     def _reserve_slot_locked(self, *, ordering_key: int, sequence: int) -> _MessageSlot:
         self._message_states.setdefault(sequence, _MessageState())
@@ -213,3 +246,65 @@ class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageComp
         if self.sender is None:
             return
         await self.sender.send_tracking_embed(discord_channel_id, embed, channel_login=channel_login)
+
+    def _queue_target_delivery(self, delivery: _TrackingDelivery) -> None:
+        state = self._get_or_create_target_state(delivery.discord_channel_id)
+        state.queue.put_nowait(delivery)
+
+    def _get_or_create_target_state(self, target_key: int) -> _TargetDeliveryState:
+        state = self._target_states.get(target_key)
+        if state is None:
+            state = _TargetDeliveryState(
+                queue=asyncio.Queue(),
+                limiter=_PerTargetRateLimiter(
+                    rate_per_second=self.per_target_rate_per_second,
+                    burst=self.per_target_burst,
+                ),
+            )
+            self._target_states[target_key] = state
+        if state.task is None or state.task.done():
+            state.task = asyncio.create_task(self._run_target_loop(target_key, state), name=f"tracking-delivery-target-{target_key}")
+        return state
+
+    async def _run_target_loop(self, target_key: int, state: _TargetDeliveryState) -> None:
+        while True:
+            delivery = await state.queue.get()
+            try:
+                if delivery is None:
+                    return
+                await state.limiter.wait_for_slot()
+                try:
+                    await self._send_direct(
+                        delivery.discord_channel_id,
+                        delivery.embed,
+                        channel_login=delivery.channel_login,
+                    )
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    logger.exception(
+                        "Tracking delivery failed discord_channel_id=%s channel_login=%s.",
+                        delivery.discord_channel_id,
+                        delivery.channel_login,
+                    )
+            finally:
+                state.queue.task_done()
+
+    async def _stop_target_workers(self, deadline: float) -> None:
+        states = list(self._target_states.values())
+        if not states:
+            return
+        for state in states:
+            state.queue.put_nowait(None)
+        tasks = [state.task for state in states if state.task is not None]
+        if not tasks:
+            return
+        timeout_seconds = max(0.1, deadline - asyncio.get_running_loop().time())
+        await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=timeout_seconds)
+
+    async def _cancel_target_workers(self) -> None:
+        tasks = [state.task for state in self._target_states.values() if state.task is not None]
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)

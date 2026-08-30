@@ -91,10 +91,15 @@ Useful knobs:
 - `LOAD_TEST_SLOW_EVERY`: every Nth message simulates a slow metadata lookup
 - `LOAD_TEST_LOOKUP_DELAY_SECONDS`: artificial per-message lookup delay
 - `LOAD_TEST_SEND_DELAY_SECONDS`: artificial Discord send delay
+- `LOAD_TEST_TARGETS`: number of Discord targets to distribute matching messages across
+- `LOAD_TEST_SLOW_TARGET_ID`: optional target ID that should use a separate send delay
+- `LOAD_TEST_SLOW_TARGET_SEND_DELAY_SECONDS`: artificial send delay for that one target
+- `LOAD_TEST_PER_TARGET_RATE_PER_SECOND`: artificial per-target delivery rate, default `0` for unlimited load tests
+- `LOAD_TEST_PER_TARGET_BURST`: artificial per-target burst size
 - `LOAD_TEST_MAX_SECONDS`: upper bound for the whole in-memory run
 
 The test asserts that parallel processing really happens and that Discord
-delivery order is still preserved inside the same Discord thread.
+delivery order is still preserved inside the same Discord target.
 
 ## 2.5 Coverage map (feature -> tests)
 

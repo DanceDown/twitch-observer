@@ -99,15 +99,17 @@ class ObserverDiscordClient(discord.Client):
         """Send a tracking embed to a Discord channel or DM."""
         _ = thread_id
         channel = self.get_channel(discord_channel_id)
-        if channel is None:
-            channel = await self.fetch_channel(discord_channel_id)
-        if isinstance(channel, discord.TextChannel | discord.Thread | discord.DMChannel):
-            await send_embed_with_retries(
-                channel,
-                embed=embed,
-                purpose="tracking embed",
-                max_attempts=self._config.discord_delivery_max_attempts,
-            )
+        messageable = (
+            channel
+            if isinstance(channel, discord.TextChannel | discord.Thread | discord.DMChannel)
+            else self.get_partial_messageable(discord_channel_id)
+        )
+        await send_embed_with_retries(
+            messageable,
+            embed=embed,
+            purpose="tracking embed",
+            max_attempts=self._config.discord_delivery_max_attempts,
+        )
 
     async def set_status_text(self, text: str) -> None:
         """Update the bot's global Discord custom status text."""

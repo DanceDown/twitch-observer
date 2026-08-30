@@ -118,6 +118,12 @@ class AppConfig:
     discord_tracking_delivery_stop_timeout_seconds: float = field(
         default_factory=lambda: _get_float("DISCORD_TRACKING_DELIVERY_STOP_TIMEOUT_SECONDS", "30")
     )
+    discord_tracking_delivery_per_target_rate_per_second: float = field(
+        default_factory=lambda: max(0.0, _get_float("DISCORD_TRACKING_DELIVERY_PER_TARGET_RATE_PER_SECOND", "2"))
+    )
+    discord_tracking_delivery_per_target_burst: int = field(
+        default_factory=lambda: max(1, _get_int("DISCORD_TRACKING_DELIVERY_PER_TARGET_BURST", "5"))
+    )
     twitch_message_write_batch_size: int = field(default_factory=lambda: _get_int("TWITCH_MESSAGE_WRITE_BATCH_SIZE", "50"))
     twitch_message_write_flush_interval_seconds: float = field(
         default_factory=lambda: _get_float("TWITCH_MESSAGE_WRITE_FLUSH_INTERVAL_SECONDS", "0.25")

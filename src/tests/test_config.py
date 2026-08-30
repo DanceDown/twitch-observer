@@ -120,6 +120,8 @@ def test_app_config_uses_default_chat_processing_queue_settings(monkeypatch) -> 
     monkeypatch.delenv("TWITCH_CHAT_METADATA_LOOKUP_TIMEOUT_SECONDS", raising=False)
     monkeypatch.delenv("TWITCH_USER_CACHE_MEMORY_SIZE", raising=False)
     monkeypatch.delenv("DISCORD_TRACKING_DELIVERY_STOP_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("DISCORD_TRACKING_DELIVERY_PER_TARGET_RATE_PER_SECOND", raising=False)
+    monkeypatch.delenv("DISCORD_TRACKING_DELIVERY_PER_TARGET_BURST", raising=False)
     config = AppConfig()
     assert config.twitch_chat_processing_queue_size == 10000
     assert config.twitch_chat_processing_workers == 4
@@ -127,6 +129,8 @@ def test_app_config_uses_default_chat_processing_queue_settings(monkeypatch) -> 
     assert config.twitch_chat_metadata_lookup_timeout_seconds == 5
     assert config.twitch_user_cache_memory_size == 20000
     assert config.discord_tracking_delivery_stop_timeout_seconds == 30
+    assert config.discord_tracking_delivery_per_target_rate_per_second == 2
+    assert config.discord_tracking_delivery_per_target_burst == 5
 
 
 def test_app_config_reads_chat_processing_queue_settings(monkeypatch) -> None:
@@ -136,6 +140,8 @@ def test_app_config_reads_chat_processing_queue_settings(monkeypatch) -> None:
     monkeypatch.setenv("TWITCH_CHAT_METADATA_LOOKUP_TIMEOUT_SECONDS", "2.5")
     monkeypatch.setenv("TWITCH_USER_CACHE_MEMORY_SIZE", "50000")
     monkeypatch.setenv("DISCORD_TRACKING_DELIVERY_STOP_TIMEOUT_SECONDS", "12.5")
+    monkeypatch.setenv("DISCORD_TRACKING_DELIVERY_PER_TARGET_RATE_PER_SECOND", "3.5")
+    monkeypatch.setenv("DISCORD_TRACKING_DELIVERY_PER_TARGET_BURST", "9")
     config = AppConfig()
     assert config.twitch_chat_processing_queue_size == 200
     assert config.twitch_chat_processing_workers == 8
@@ -143,3 +149,5 @@ def test_app_config_reads_chat_processing_queue_settings(monkeypatch) -> None:
     assert config.twitch_chat_metadata_lookup_timeout_seconds == 2.5
     assert config.twitch_user_cache_memory_size == 50000
     assert config.discord_tracking_delivery_stop_timeout_seconds == 12.5
+    assert config.discord_tracking_delivery_per_target_rate_per_second == 3.5
+    assert config.discord_tracking_delivery_per_target_burst == 9

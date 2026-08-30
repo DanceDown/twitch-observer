@@ -15,6 +15,7 @@ from src.services.tracking_delivery_queue import OrderedTrackingDeliveryService
 class _FakeSender(TrackingNotificationSender):
     sent: list[tuple[int, str, str | None]] = field(default_factory=list)
     failing_titles: set[str] = field(default_factory=set)
+    delay_by_channel_id: dict[int, float] = field(default_factory=dict)
 
     async def send_tracking_embed(
         self,
@@ -28,14 +29,24 @@ class _FakeSender(TrackingNotificationSender):
         title = embed.title or ""
         if title in self.failing_titles:
             raise RuntimeError(f"Send failed for {title}")
+        delay_seconds = self.delay_by_channel_id.get(discord_channel_id, 0)
+        if delay_seconds > 0:
+            await asyncio.sleep(delay_seconds)
         self.sent.append((discord_channel_id, title, channel_login))
 
 
-async def _send_with_sequence(service: OrderedTrackingDeliveryService, sequence: int, title: str, *, thread_id: int = 1) -> None:
+async def _send_with_sequence(
+    service: OrderedTrackingDeliveryService,
+    sequence: int,
+    title: str,
+    *,
+    thread_id: int = 1,
+    discord_channel_id: int = 1000,
+) -> None:
     token = bind_chat_message_sequence(sequence)
     try:
         await service.send_tracking_embed(
-            1000 + sequence,
+            discord_channel_id,
             discord.Embed(title=title),
             channel_login=f"channel-{sequence}",
             thread_id=thread_id,
@@ -49,6 +60,14 @@ async def _wait_for_titles(sender: _FakeSender, expected: list[str], *, timeout:
     while [title for _, title, _ in sender.sent] != expected:
         if asyncio.get_running_loop().time() >= deadline:
             raise AssertionError([title for _, title, _ in sender.sent])
+        await asyncio.sleep(0.01)
+
+
+async def _wait_for_count(sender: _FakeSender, expected_count: int, *, timeout: float = 1) -> None:
+    deadline = asyncio.get_running_loop().time() + timeout
+    while len(sender.sent) != expected_count:
+        if asyncio.get_running_loop().time() >= deadline:
+            raise AssertionError(sender.sent)
         await asyncio.sleep(0.01)
 
 
@@ -140,8 +159,8 @@ async def test_tracking_delivery_queue_orders_independently_per_thread_after_rou
     try:
         await service.reserve_message(1)
         await service.reserve_message(2)
-        await _send_with_sequence(service, 1, "thread-one-slow", thread_id=1)
-        await _send_with_sequence(service, 2, "thread-two-ready", thread_id=2)
+        await _send_with_sequence(service, 1, "thread-one-slow", thread_id=1, discord_channel_id=1001)
+        await _send_with_sequence(service, 2, "thread-two-ready", thread_id=2, discord_channel_id=1002)
 
         await service.complete_message_routing(1)
         await service.complete_message_routing(2)
@@ -150,5 +169,99 @@ async def test_tracking_delivery_queue_orders_independently_per_thread_after_rou
         await _wait_for_titles(sender, ["thread-two-ready"])
         await service.complete_message(1)
         await _wait_for_titles(sender, ["thread-two-ready", "thread-one-slow"])
+    finally:
+        await service.stop()
+
+
+@pytest.mark.asyncio
+async def test_tracking_delivery_queue_slow_target_does_not_block_other_targets() -> None:
+    sender = _FakeSender(delay_by_channel_id={1001: 0.2})
+    service = OrderedTrackingDeliveryService(sender=sender, stop_timeout_seconds=1, per_target_rate_per_second=0)
+    await service.start()
+    try:
+        await service.reserve_message(1)
+        await service.reserve_message(2)
+        await _send_with_sequence(service, 1, "slow-target", thread_id=1, discord_channel_id=1001)
+        await _send_with_sequence(service, 2, "fast-target", thread_id=2, discord_channel_id=1002)
+
+        await service.complete_message(1)
+        await service.complete_message(2)
+
+        await _wait_for_titles(sender, ["fast-target"], timeout=0.1)
+        await _wait_for_titles(sender, ["fast-target", "slow-target"])
+    finally:
+        await service.stop()
+
+
+@pytest.mark.asyncio
+async def test_tracking_delivery_queue_keeps_fifo_inside_one_target() -> None:
+    sender = _FakeSender()
+    service = OrderedTrackingDeliveryService(sender=sender, stop_timeout_seconds=1, per_target_rate_per_second=0)
+    await service.start()
+    try:
+        for sequence in range(1, 4):
+            await service.reserve_message(sequence)
+            await _send_with_sequence(service, sequence, f"message-{sequence}", thread_id=1, discord_channel_id=1000)
+            await service.complete_message(sequence)
+
+        await _wait_for_titles(sender, ["message-1", "message-2", "message-3"])
+    finally:
+        await service.stop()
+
+
+@pytest.mark.asyncio
+async def test_tracking_delivery_queue_rate_limits_only_the_busy_target() -> None:
+    sender = _FakeSender()
+    service = OrderedTrackingDeliveryService(
+        sender=sender,
+        stop_timeout_seconds=2,
+        per_target_rate_per_second=1,
+        per_target_burst=1,
+    )
+    await service.start()
+    try:
+        await service.reserve_message(1)
+        await service.reserve_message(2)
+        await service.reserve_message(3)
+        await _send_with_sequence(service, 1, "busy-one", thread_id=1, discord_channel_id=1001)
+        await _send_with_sequence(service, 2, "busy-two", thread_id=1, discord_channel_id=1001)
+        await _send_with_sequence(service, 3, "other-one", thread_id=2, discord_channel_id=1002)
+
+        await service.complete_message(1)
+        await service.complete_message(2)
+        await service.complete_message(3)
+
+        await _wait_for_count(sender, 2, timeout=0.25)
+        early_titles = {title for _, title, _ in sender.sent}
+        assert early_titles == {"busy-one", "other-one"}
+
+        await _wait_for_count(sender, 3, timeout=1.5)
+        assert [title for channel_id, title, _ in sender.sent if channel_id == 1001] == ["busy-one", "busy-two"]
+    finally:
+        await service.stop()
+
+
+@pytest.mark.asyncio
+async def test_tracking_delivery_queue_default_burst_allows_five_immediate_sends() -> None:
+    sender = _FakeSender()
+    service = OrderedTrackingDeliveryService(sender=sender, stop_timeout_seconds=2)
+    await service.start()
+    try:
+        for sequence in range(1, 7):
+            await service.reserve_message(sequence)
+            await _send_with_sequence(service, sequence, f"message-{sequence}", thread_id=1, discord_channel_id=1000)
+            await service.complete_message(sequence)
+
+        await _wait_for_count(sender, 5, timeout=0.3)
+        assert [title for _, title, _ in sender.sent] == [
+            "message-1",
+            "message-2",
+            "message-3",
+            "message-4",
+            "message-5",
+        ]
+
+        await _wait_for_count(sender, 6, timeout=1)
+        assert [title for _, title, _ in sender.sent][-1] == "message-6"
     finally:
         await service.stop()

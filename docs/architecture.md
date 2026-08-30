@@ -53,8 +53,10 @@ This is the main runtime reference for the Twitch Observer.
 6. `ChatMessageReactionService` reserves matched Discord threads before slow
    side effects such as metadata lookups or Twitch writes.
 7. Tracking embeds are handed to `OrderedTrackingDeliveryService`, which keeps
-   Discord delivery in IRC message order per Discord thread even though worker
-   processing happens in parallel.
+   Discord delivery in IRC message order per Discord target even though worker
+   processing happens in parallel. Each Discord target has its own serial sender
+   and small send-rate limiter, so one slow or rate-limited channel does not
+   block other channels.
 
 ### Live-state flow
 
@@ -193,7 +195,10 @@ user metadata first. When visual metadata such as profile images is missing, the
 chat worker may run a bounded Helix user lookup
 (`TWITCH_CHAT_METADATA_LOOKUP_TIMEOUT_SECONDS`). A slow lookup delays only that
 message's prepared Discord notification; other workers can continue, and the
-ordered delivery queue preserves Discord message order per Discord thread.
+ordered delivery queue preserves Discord message order per Discord target.
+Delivery is rate-limited per target through
+`DISCORD_TRACKING_DELIVERY_PER_TARGET_RATE_PER_SECOND` and
+`DISCORD_TRACKING_DELIVERY_PER_TARGET_BURST`.
 Shared Helix refresh tasks are shielded from per-message lookup timeouts so a
 timed-out worker does not cancel cache warming for later messages.
 
