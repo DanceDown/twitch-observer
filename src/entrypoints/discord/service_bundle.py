@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from src.services.patterns.show_service import ShowCommandService
     from src.services.permission_service import PermissionCommandService
     from src.services.replies.reply_command_service import ReplyCommandService
+    from src.services.support_command_service import SupportCommandService
     from src.services.thread_lifecycle_service import ThreadLifecycleService
     from src.services.ui_flow_service import DiscordUIFlowGuardService
     from src.services.user_command_service import UserCommandService
@@ -34,5 +35,6 @@ class DiscordServiceBundle:
     help: HelpCommandService
     write: TwitchWriteCommandService
     show: ShowCommandService
+    support: SupportCommandService
     channel_event: ChannelEventCommandService
     ui_flow_guard: DiscordUIFlowGuardService

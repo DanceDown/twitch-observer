@@ -224,9 +224,37 @@ inspection/debug flows.
 `thread_message_match` links matched messages back to threads. It is indexed by
 `message_id` for reply lookup and cleanup paths.
 
+## Support tickets
+
+### `support_ticket`
+
+Stores support requests created from Discord with `/support`.
+
+Important fields:
+
+- `ticket_id`
+- `source_discord_channel_id`
+- `requester_discord_user_id`
+- `category`
+- `title`
+- `description`
+- `status`
+- `language`
+- `support_message_id`
+- response and close metadata
+
+Tickets move from `open` to either `answered` or `closed`. They are retained for
+audit and support history, not deleted after handling.
+
+`support_message_id` links the database row to the persistent support-channel
+message so button views can be restored on restart. The source Discord channel
+ID is stored directly because support tickets can outlive normal configuration
+changes in `thread`.
+
 ## Relationship summary
 
 - one `thread` has many tracked `channel`, `tracked_user`, `pattern`, `adapter_event`, and `user_permissions` rows
 - one `pattern` may have many channel and user scope rows, and at most one `reply`
 - one `adapter_event` may have multiple actions keyed by `action_type`
 - one `thread` may optionally link one `twitch_account`
+- one `support_ticket` stores its requester and source Discord context directly

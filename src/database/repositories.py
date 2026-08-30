@@ -15,6 +15,7 @@ from .records import (
     PatternRecord,
     RecentMessageRecord,
     ReplyRecord,
+    SupportTicketRecord,
     ThreadRecord,
     TrackedChannelStateRecord,
     TrackedUserRecord,
@@ -673,4 +674,52 @@ class UserPermissionRepository:
         raise NotImplementedError
 
     async def list_for_thread(self, *, thread_id: int) -> list[UserPermissionRecord]:  # pragma: no cover
+        raise NotImplementedError
+
+
+class SupportTicketRepository:
+    """Persistence interface for Discord support tickets."""
+
+    async def create_ticket(
+        self,
+        *,
+        source_discord_channel_id: int,
+        requester_discord_user_id: int,
+        category: str,
+        title: str,
+        description: str,
+        language: str,
+    ) -> SupportTicketRecord:  # pragma: no cover - interface
+        raise NotImplementedError
+
+    async def set_support_message_id(
+        self,
+        *,
+        ticket_id: int,
+        support_message_id: int,
+    ) -> SupportTicketRecord | None:  # pragma: no cover - interface
+        raise NotImplementedError
+
+    async def get_ticket(self, *, ticket_id: int) -> SupportTicketRecord | None:  # pragma: no cover - interface
+        raise NotImplementedError
+
+    async def list_open_tickets_with_messages(self) -> list[SupportTicketRecord]:  # pragma: no cover - interface
+        raise NotImplementedError
+
+    async def answer_ticket(
+        self,
+        *,
+        ticket_id: int,
+        responder_discord_user_id: int,
+        response_subject: str,
+        response_body: str,
+    ) -> SupportTicketRecord | None:  # pragma: no cover - interface
+        raise NotImplementedError
+
+    async def close_ticket(
+        self,
+        *,
+        ticket_id: int,
+        closer_discord_user_id: int,
+    ) -> SupportTicketRecord | None:  # pragma: no cover - interface
         raise NotImplementedError

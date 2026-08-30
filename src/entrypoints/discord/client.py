@@ -20,11 +20,13 @@ from .commands import (
     register_permission_commands,
     register_reply_commands,
     register_show_commands,
+    register_support_commands,
     register_thread_commands,
     register_user_commands,
     register_write_commands,
 )
 from .ui_data import DiscordUIDataProvider
+from .ui.support_ui import register_persistent_support_views
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,8 @@ class ObserverDiscordClient(discord.Client):
             reply_candidate_limit=self._config.discord_write_reply_candidate_limit,
         )
         register_show_commands(self.tree, self._services, self._ui_data_provider, self._localizer)
+        register_support_commands(self.tree, self._services, self._ui_data_provider, self._localizer)
+        await register_persistent_support_views(client=self, services=self._services, localizer=self._localizer)
         await self.tree.sync()
         logger.info("Synced global Discord commands: %s", ", ".join(command.name for command in self.tree.get_commands()))
 

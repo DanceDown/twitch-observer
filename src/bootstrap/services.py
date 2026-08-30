@@ -30,6 +30,7 @@ from src.services.patterns import PatternCommandService, PatternTrackingService,
 from src.services.permission_service import PermissionCommandService
 from src.services.replies import AutoReplyService, ChannelEventAutoReplyService, ReplyCommandService, ReplyEventConfiguration
 from src.services.runtime_coordinator import ApplicationRuntimeCoordinator
+from src.services.support_command_service import SupportCommandService
 from src.services.thread_lifecycle_service import ThreadLifecycleService
 from src.services.twitch_user_directory_service import TwitchUserDirectoryIngestService
 from src.services.ui_flow_service import DiscordUIFlowGuardService
@@ -223,6 +224,21 @@ def _build_discord_bundle(
         account_repository=core.account_repository,
         device_flow_repository=core.device_flow_repository,
     )
+    support_service = SupportCommandService(
+        support_ticket_repository=core.support_ticket_repository,
+        thread_repository=core.thread_repository,
+        channel_repository=core.channel_repository,
+        pattern_repository=core.pattern_repository,
+        reply_repository=core.reply_repository,
+        tracked_user_repository=core.tracked_user_repository,
+        adapter_event_action_repository=core.adapter_event_action_repository,
+        twitch_api=core.twitch_bundle,
+        localizer=core.localizer,
+        permission_repository=core.permission_repository,
+        account_repository=core.account_repository,
+        device_flow_repository=core.device_flow_repository,
+        support_discord_channel_id=core.config.support_discord_channel_id,
+    )
     channel_event_service = ChannelEventCommandService(
         thread_repository=core.thread_repository,
         channel_repository=core.channel_repository,
@@ -252,6 +268,7 @@ def _build_discord_bundle(
         help=help_service,
         write=write_service,
         show=show_service,
+        support=support_service,
         channel_event=channel_event_service,
         ui_flow_guard=ui_flow_guard,
     )

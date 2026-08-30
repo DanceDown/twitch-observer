@@ -15,6 +15,7 @@ if TYPE_CHECKING:
         MessageRepository,
         PatternRepository,
         ReplyRepository,
+        SupportTicketRepository,
         ThreadRepository,
         TrackedUserRepository,
         TwitchAccountRepository,
@@ -68,6 +69,7 @@ class ApplicationCore:
     account_repository: TwitchAccountRepository
     device_flow_repository: TwitchDeviceFlowRepository
     twitch_user_cache_repository: TwitchUserCacheRepository
+    support_ticket_repository: SupportTicketRepository
     raw_twitch_api: TwitchAPIClient
     twitch_directory: TwitchUserDirectoryService
     twitch_bundle: TwitchServiceBundle

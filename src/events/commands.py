@@ -314,6 +314,45 @@ class ShowConfigurationCommand:
 
 
 @dataclass(slots=True, frozen=True)
+class CreateSupportTicketCommand:
+    """Create one support ticket from a Discord context."""
+
+    discord_channel_id: int
+    requester_id: int
+    category: str
+    title: str
+    description: str
+    language_hint: str | None
+
+
+@dataclass(slots=True, frozen=True)
+class AnswerSupportTicketCommand:
+    """Answer one open support ticket."""
+
+    ticket_id: int
+    responder_id: int
+    subject: str
+    body: str
+
+
+@dataclass(slots=True, frozen=True)
+class CloseSupportTicketCommand:
+    """Close one open support ticket without answering it."""
+
+    ticket_id: int
+    closer_id: int
+
+
+@dataclass(slots=True, frozen=True)
+class ShowSupportTicketCommand:
+    """Render configuration for the Discord context attached to one support ticket."""
+
+    ticket_id: int
+    requester_id: int
+    sections: tuple[str, ...]
+
+
+@dataclass(slots=True, frozen=True)
 class HelpCommand:
     """Render one beginner-friendly help section."""
 

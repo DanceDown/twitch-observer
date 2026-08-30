@@ -27,6 +27,14 @@ from .replies import (
     dispatch_remove_pattern_reply,
 )
 from .show import dispatch_show_configuration
+from .support import (
+    dispatch_create_support_ticket,
+    dispatch_mark_support_answered,
+    dispatch_mark_support_closed,
+    dispatch_prepare_support_answer,
+    dispatch_prepare_support_close,
+    dispatch_show_support_ticket_configuration,
+)
 from .thread import (
     dispatch_disable_thread,
     dispatch_enable_thread,
@@ -47,6 +55,7 @@ __all__ = [
     "dispatch_add_tracked_channel",
     "dispatch_add_tracked_user",
     "dispatch_clear_permissions",
+    "dispatch_create_support_ticket",
     "dispatch_disable_channel_event_reply",
     "dispatch_disable_pattern",
     "dispatch_disable_pattern_reply",
@@ -60,6 +69,10 @@ __all__ = [
     "dispatch_grant_permissions",
     "dispatch_join_thread",
     "dispatch_leave_thread",
+    "dispatch_mark_support_answered",
+    "dispatch_mark_support_closed",
+    "dispatch_prepare_support_answer",
+    "dispatch_prepare_support_close",
     "dispatch_remove_channel_event",
     "dispatch_remove_channel_event_reply",
     "dispatch_remove_pattern",
@@ -73,6 +86,7 @@ __all__ = [
     "dispatch_set_thread_language",
     "dispatch_set_tracked_channel_color",
     "dispatch_show_configuration",
+    "dispatch_show_support_ticket_configuration",
     "dispatch_start_account_link",
     "dispatch_ui_flow_decision",
     "dispatch_unlink_account",

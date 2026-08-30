@@ -86,6 +86,19 @@ Pattern and reply entries use:
 - a stable persisted internal pattern identifier for storage and relations
 - a dense per-thread display number computed only when rendering UI or `/show`
 
+### Support flow
+
+1. `/support` calls `SupportCommandService` with the requester's Discord context.
+2. The service validates configuration and creates an `open` ticket.
+3. The Discord adapter posts the localized ticket embed and persistent button
+   view in the configured support channel, then stores the support message ID.
+4. `Reply` and `Close` first prepare the user-facing response and send it to the
+   original Discord context.
+5. Only after that delivery succeeds does the ticket move to `answered` or
+   `closed`, and the support-channel message is edited without buttons.
+6. `Show` reuses the existing `/show` section renderer for the original context
+   while bypassing the normal thread-user permission check for support staff.
+
 ## Key design decisions
 
 ### Tracked channels are infrastructure
@@ -253,6 +266,8 @@ At startup, `build_core()` opens the pool, applies ordered SQL migrations from
   - typed per-domain direct call helpers used by Discord entrypoints and UI
 - `src/entrypoints/discord/ui/patterns/`
   - split guided ping UI flow
+- `src/entrypoints/discord/ui/support_ui.py`
+  - support ticket buttons, reply modal, and support-side show modal
 - `src/services/chat_pipeline.py`
   - ordered Twitch chat processing pipeline
 - `src/services/tracking_delivery_queue.py`
@@ -265,6 +280,8 @@ At startup, `build_core()` opens the pool, applies ordered SQL migrations from
   - split pattern command, show, and tracking services
 - `src/services/show/`
   - focused `/show` section renderers plus tiny Localizer-first text helpers
+- `src/services/support_command_service.py`
+  - support ticket creation, status transitions, and support-side show access
 - `src/services/replies/`
   - split reply command, pattern auto-reply, and channel-event auto-reply services
 - `src/services/account_service.py`

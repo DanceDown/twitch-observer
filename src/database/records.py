@@ -183,6 +183,29 @@ class UserPermissionRecord:
 
 
 @dataclass(slots=True, frozen=True)
+class SupportTicketRecord:
+    """Persisted support ticket created from one Discord context."""
+
+    ticket_id: int
+    source_discord_channel_id: int
+    requester_discord_user_id: int
+    category: str
+    title: str
+    description: str
+    status: str
+    language: str
+    support_message_id: int | None
+    response_subject: str | None
+    response_body: str | None
+    responded_by_discord_user_id: int | None
+    responded_at: datetime | None
+    closed_by_discord_user_id: int | None
+    closed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(slots=True, frozen=True)
 class RecentMessageRecord:
     """Compact stored Twitch message used for status text and lightweight displays."""
 

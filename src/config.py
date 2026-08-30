@@ -112,6 +112,9 @@ class AppConfig:
     discord_presence_message_limit: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_MESSAGE_LIMIT", "50"))
     discord_presence_max_status_length: int = field(default_factory=lambda: _get_int("DISCORD_PRESENCE_MAX_STATUS_LENGTH", "120"))
     discord_delivery_max_attempts: int = field(default_factory=get_discord_delivery_max_attempts)
+    support_discord_channel_id: int | None = field(
+        default_factory=lambda: int(value) if (value := os.getenv("SUPPORT_DISCORD_CHANNEL_ID", "").strip()) else None
+    )
     discord_tracking_delivery_stop_timeout_seconds: float = field(
         default_factory=lambda: _get_float("DISCORD_TRACKING_DELIVERY_STOP_TIMEOUT_SECONDS", "30")
     )

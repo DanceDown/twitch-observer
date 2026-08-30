@@ -264,6 +264,107 @@
         "footer": ""
       }
     },
+    "support": {
+      "unavailable": {
+        "title": "Support Unavailable",
+        "body": "Support is currently unavailable.",
+        "footer": ""
+      },
+      "support_channel_delivery_failed": {
+        "title": "Support Unreachable",
+        "body": "I could not send the ticket to the support channel. Please try again later.",
+        "footer": "Ticket #{RAW:view.ticket_id}"
+      },
+      "created": {
+        "title": "Support Ticket Created",
+        "body": "Ticket #{RAW:view.ticket_id} was sent to support.\nCategory: `{CODE:view.category_label}`\nTitle: `{CODE:view.title}`",
+        "footer": ""
+      },
+      "validation_error": {
+        "title": "Support Ticket Not Created",
+        "body": "{view.detail}",
+        "footer": ""
+      },
+      "validation": {
+        "category_invalid": "Please choose a valid category.",
+        "title_required": "Please enter a title.",
+        "title_too_long": "The title can be at most {RAW:view.max_length} characters long.",
+        "description_required": "Please briefly describe what you need help with.",
+        "description_too_long": "The description can be at most {RAW:view.max_length} characters long.",
+        "subject_required": "Please enter a subject.",
+        "subject_too_long": "The subject can be at most {RAW:view.max_length} characters long.",
+        "body_required": "Please write an answer.",
+        "body_too_long": "The answer can be at most {RAW:view.max_length} characters long."
+      },
+      "ticket_not_found": {
+        "title": "Ticket Not Found",
+        "body": "This support ticket no longer exists.",
+        "footer": ""
+      },
+      "ticket_not_open": {
+        "title": "Ticket Already Handled",
+        "body": "This support ticket has already been answered or closed.",
+        "footer": ""
+      },
+      "action_ready": {
+        "title": "Ticket Ready",
+        "body": "This ticket is ready.",
+        "footer": ""
+      },
+      "answer_recorded": {
+        "title": "Answer Sent",
+        "body": "The support ticket was answered.",
+        "footer": "Ticket #{RAW:view.ticket_id}"
+      },
+      "close_recorded": {
+        "title": "Ticket Closed",
+        "body": "The support ticket was closed.",
+        "footer": "Ticket #{RAW:view.ticket_id}"
+      },
+      "delivery_failed": {
+        "title": "Origin Channel Unreachable",
+        "body": "I could not write to the origin channel. The ticket stays open.",
+        "footer": "Ticket #{RAW:view.ticket_id}"
+      },
+      "wrong_channel": {
+        "title": "Wrong Channel",
+        "body": "This support action can only be used in the configured support channel.",
+        "footer": ""
+      },
+      "show_not_joined": {
+        "title": "No Configuration",
+        "body": "There is no saved configuration for this ticket's origin channel.",
+        "footer": "Ticket #{RAW:view.ticket_id}"
+      },
+      "show_overview": {
+        "title": "Support: Configuration Overview",
+        "placeholders": {
+          "view.sections": {
+            "list": {
+              "item_format": "{RAW:item}",
+              "separator": "\n\n"
+            }
+          }
+        },
+        "body": "{RAW:view.sections}",
+        "footer": ""
+      },
+      "user_answer": {
+        "title": "Support Answer: {view.response_subject}",
+        "body": "{RAW:view.response_body}\n\n**Your Original Request**\nCategory: `{CODE:view.category_label}`\nTitle: `{CODE:view.title}`\n\n{view.description}",
+        "footer": "Ticket #{RAW:view.ticket_id}"
+      },
+      "user_closed": {
+        "title": "Support Ticket Closed",
+        "body": "Your support ticket was closed.\n\n**Your Original Request**\nCategory: `{CODE:view.category_label}`\nTitle: `{CODE:view.title}`\n\n{view.description}",
+        "footer": "Ticket #{RAW:view.ticket_id}"
+      },
+      "unexpected_error": {
+        "title": "Unexpected Error",
+        "body": "{view.detail}",
+        "footer": ""
+      }
+    },
     "help": {
       "overview": {
         "title": "Help",
@@ -1743,6 +1844,61 @@
           "title": "Paginator Locked",
           "body": "You can't turn those pages <a:Tssk:1497685026945630208>",
           "footer": ""
+        }
+      }
+    },
+    "support": {
+      "category": {
+        "bug": "Bug",
+        "question": "Question",
+        "idea": "Idea",
+        "other": "Other"
+      },
+      "status": {
+        "open": "Open",
+        "answered": "Answered",
+        "closed": "Closed"
+      },
+      "actions": {
+        "reply": "Reply",
+        "close": "Close",
+        "show": "Show"
+      },
+      "reply_modal": {
+        "title": "Answer Support Ticket",
+        "subject_label": "Subject",
+        "subject_placeholder": "Short subject for your answer",
+        "body_label": "Answer",
+        "body_placeholder": "Markdown is allowed."
+      },
+      "show_modal": {
+        "title": "View Configuration",
+        "section_label": "Section",
+        "section_option": {
+          "pings": "Pings",
+          "auto_replies": "Auto-Replies",
+          "stream_pings": "Live and Offline Pings",
+          "channels": "Twitch channels I'm watching",
+          "users": "Users I know",
+          "permissions": "Permissions",
+          "account": "Twitch Account"
+        }
+      },
+      "embed": {
+        "ticket": {
+          "title": "{view.category_label}: {view.title}",
+          "body": "**Status**\n{view.status_label}\n\n**User**\n<@{RAW:view.requester_id}> (`{CODE:view.requester_id}`)\n\n**Origin**\n<#{RAW:view.source_channel_id}> (`{CODE:view.source_channel_id}`)\n\n**Description**\n{view.description}",
+          "footer": "Ticket #{RAW:view.ticket_id} | Created: {TIMESTAMP:view.created_at}"
+        },
+        "answered": {
+          "title": "{view.category_label}: {view.title}",
+          "body": "**Status**\n{view.status_label}\n\n**User**\n<@{RAW:view.requester_id}> (`{CODE:view.requester_id}`)\n\n**Origin**\n<#{RAW:view.source_channel_id}> (`{CODE:view.source_channel_id}`)\n\n**Description**\n{view.description}\n\n## Answered\n**Subject**\n{view.response_subject}\n\n**Answer**\n{RAW:view.response_body}\n\n**Answered by**\n<@{RAW:view.responded_by}> (`{CODE:view.responded_by}`)\n\n**Time**\n{TIMESTAMP:view.responded_at}",
+          "footer": "Ticket #{RAW:view.ticket_id} | Created: {TIMESTAMP:view.created_at}"
+        },
+        "closed": {
+          "title": "{view.category_label}: {view.title}",
+          "body": "**Status**\n{view.status_label}\n\n**User**\n<@{RAW:view.requester_id}> (`{CODE:view.requester_id}`)\n\n**Origin**\n<#{RAW:view.source_channel_id}> (`{CODE:view.source_channel_id}`)\n\n**Description**\n{view.description}\n\n## Closed\n**Closed by**\n<@{RAW:view.closed_by}> (`{CODE:view.closed_by}`)\n\n**Time**\n{TIMESTAMP:view.closed_at}",
+          "footer": "Ticket #{RAW:view.ticket_id} | Created: {TIMESTAMP:view.created_at}"
         }
       }
     },

@@ -12,6 +12,7 @@ from src.database.postgres import (
     PostgresMessageRepository,
     PostgresPatternRepository,
     PostgresReplyRepository,
+    PostgresSupportTicketRepository,
     PostgresThreadRepository,
     PostgresTrackedUserRepository,
     PostgresTwitchAccountRepository,
@@ -55,6 +56,7 @@ async def build_core(config: AppConfig) -> ApplicationCore:
     account_repository = PostgresTwitchAccountRepository(database)
     device_flow_repository = PostgresTwitchDeviceFlowRepository(database)
     twitch_user_cache_repository = PostgresTwitchUserCacheRepository(database)
+    support_ticket_repository = PostgresSupportTicketRepository(database)
     raw_twitch_api = TwitchAPIClient(config)
     twitch_directory = TwitchUserDirectoryService(
         twitch_api=raw_twitch_api,
@@ -83,6 +85,7 @@ async def build_core(config: AppConfig) -> ApplicationCore:
         account_repository=account_repository,
         device_flow_repository=device_flow_repository,
         twitch_user_cache_repository=twitch_user_cache_repository,
+        support_ticket_repository=support_ticket_repository,
         raw_twitch_api=raw_twitch_api,
         twitch_directory=twitch_directory,
         twitch_bundle=twitch_bundle,

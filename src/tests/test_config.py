@@ -93,6 +93,18 @@ def test_app_config_reads_discord_delivery_max_attempts(monkeypatch) -> None:
     assert config.discord_delivery_max_attempts == 5
 
 
+def test_app_config_support_channel_id_is_optional(monkeypatch) -> None:
+    monkeypatch.delenv("SUPPORT_DISCORD_CHANNEL_ID", raising=False)
+    config = AppConfig()
+    assert config.support_discord_channel_id is None
+
+
+def test_app_config_reads_support_channel_id(monkeypatch) -> None:
+    monkeypatch.setenv("SUPPORT_DISCORD_CHANNEL_ID", "123456")
+    config = AppConfig()
+    assert config.support_discord_channel_id == 123456
+
+
 def test_app_config_uses_default_irc_reconnect_delays(monkeypatch) -> None:
     monkeypatch.delenv("TWITCH_IRC_RECONNECT_INITIAL_DELAY_SECONDS", raising=False)
     monkeypatch.delenv("TWITCH_IRC_RECONNECT_MAX_DELAY_SECONDS", raising=False)

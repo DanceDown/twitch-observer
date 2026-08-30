@@ -216,6 +216,26 @@ Modal inputs:
 - message text
 - optional reply target message ID
 
+### `/support`
+
+Create a support ticket in the configured support Discord channel.
+
+Inputs:
+
+- category: `bug`, `question`, `idea`, or `other`
+- title
+- description
+
+Behavior:
+
+- requires `SUPPORT_DISCORD_CHANNEL_ID`
+- sends a short ephemeral confirmation to the requester
+- posts a category-colored ticket embed in the support channel
+- ticket actions are `Reply`, `Close`, and `Show`
+- `Reply` sends the supporter response back to the original Discord context
+- `Close` sends a red close notice back to the original Discord context
+- `Show` lets support staff inspect all normal `/show` sections for the original context
+
 ### `/show`
 
 Open a UI flow to choose one or more configuration sections to render.

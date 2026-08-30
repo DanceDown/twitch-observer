@@ -8,6 +8,7 @@ from .migrations import PostgresMigrationRunner
 from .patterns import PostgresPatternRepository
 from .permissions import PostgresUserPermissionRepository
 from .replies import PostgresReplyRepository
+from .support_tickets import PostgresSupportTicketRepository
 from .threads import (
     PostgresChannelRepository,
     PostgresThreadRepository,
@@ -24,6 +25,7 @@ __all__ = [
     "PostgresAdapterEventRepository",
     "PostgresPatternRepository",
     "PostgresReplyRepository",
+    "PostgresSupportTicketRepository",
     "PostgresChannelRepository",
     "PostgresDatabase",
     "PostgresMessageRepository",

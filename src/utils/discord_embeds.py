@@ -5,15 +5,22 @@ from __future__ import annotations
 import discord
 
 from src.database.connection import ChannelRecord, PatternRecord, ReplyRecord, ThreadRecord
+from src.database.records import SupportTicketRecord
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.events.twitch_events import TwitchChatMessageEvent
-from src.localization import Localizer
+from src.localization import LocalizationError, Localizer
 from src.utils.discord_text import escape_discord_preserving_links
 
 EMBED_COLORS: dict[DiscordResultStyle, int] = {
     DiscordResultStyle.SUCCESS: 0x2ECC71,
     DiscordResultStyle.ERROR: 0xE74C3C,
     DiscordResultStyle.INFO: 0x3498DB,
+}
+SUPPORT_CATEGORY_COLORS: dict[str, int] = {
+    "bug": 0xE74C3C,
+    "question": 0x3498DB,
+    "idea": 0x2ECC71,
+    "other": 0x808080,
 }
 
 
@@ -161,6 +168,45 @@ def build_channel_event_auto_reply_embed(
     return embed
 
 
+def build_support_ticket_embed(
+    *,
+    ticket: SupportTicketRecord,
+    localizer: Localizer,
+) -> discord.Embed:
+    """Render an open support ticket for the configured support channel."""
+    return _build_support_ticket_state_embed(
+        ticket=ticket,
+        localizer=localizer,
+        key="discord.support.embed.ticket",
+    )
+
+
+def build_support_answered_ticket_embed(
+    *,
+    ticket: SupportTicketRecord,
+    localizer: Localizer,
+) -> discord.Embed:
+    """Render an answered support ticket for the configured support channel."""
+    return _build_support_ticket_state_embed(
+        ticket=ticket,
+        localizer=localizer,
+        key="discord.support.embed.answered",
+    )
+
+
+def build_support_closed_ticket_embed(
+    *,
+    ticket: SupportTicketRecord,
+    localizer: Localizer,
+) -> discord.Embed:
+    """Render a closed support ticket for the configured support channel."""
+    return _build_support_ticket_state_embed(
+        ticket=ticket,
+        localizer=localizer,
+        key="discord.support.embed.closed",
+    )
+
+
 def resolve_tracking_color(
     *,
     event: TwitchChatMessageEvent,
@@ -196,6 +242,11 @@ def resolve_channel_event_color(
     return 0x808080
 
 
+def resolve_support_ticket_color(*, category: str) -> int:
+    """Resolve the support-channel embed color for one ticket category."""
+    return SUPPORT_CATEGORY_COLORS.get(category, SUPPORT_CATEGORY_COLORS["other"])
+
+
 def _result_embed_color(result: DiscordCommandResult) -> int:
     if result.color:
         return _parse_hex_color(result.color)
@@ -205,3 +256,73 @@ def _result_embed_color(result: DiscordCommandResult) -> int:
 def _parse_hex_color(value: str) -> int:
     normalized = value.strip().lstrip("#")
     return int(normalized, 16)
+
+
+def _build_support_ticket_state_embed(
+    *,
+    ticket: SupportTicketRecord,
+    localizer: Localizer,
+    key: str,
+) -> discord.Embed:
+    language = localizer.resolve_language(ticket.language)
+    entry = localizer.value(key, language=language)
+    if not isinstance(entry, dict):
+        raise LocalizationError(f"Translation key {key!r} is not an object.")
+    title = entry.get("title")
+    body = entry.get("body")
+    footer = entry.get("footer")
+    placeholder_specs = entry.get("placeholders")
+    if not isinstance(title, str) or not isinstance(body, str) or not isinstance(footer, str):
+        raise LocalizationError(f"Translation result {key!r} must contain string title/body/footer.")
+    if placeholder_specs is not None and not isinstance(placeholder_specs, dict):
+        raise LocalizationError(f"Translation result {key!r} must contain object placeholders when provided.")
+
+    sources = {"view": _support_ticket_view(ticket, localizer=localizer, language=language)}
+    embed = discord.Embed(
+        title=localizer.render_with_placeholders(
+            title,
+            language=language,
+            sources=sources,
+            placeholder_specs=placeholder_specs,
+        ),
+        description=localizer.render_with_placeholders(
+            body,
+            language=language,
+            sources=sources,
+            placeholder_specs=placeholder_specs,
+        ),
+        color=resolve_support_ticket_color(category=ticket.category),
+    )
+    if footer:
+        embed.set_footer(
+            text=localizer.render_with_placeholders(
+                footer,
+                language=language,
+                sources=sources,
+                placeholder_specs=placeholder_specs,
+            )
+        )
+    return embed
+
+
+def _support_ticket_view(ticket: SupportTicketRecord, *, localizer: Localizer, language: str) -> dict[str, object]:
+    return {
+        "ticket_id": ticket.ticket_id,
+        "source_channel_id": ticket.source_discord_channel_id,
+        "requester_id": ticket.requester_discord_user_id,
+        "category": ticket.category,
+        "category_label": localizer.lookup("discord.support.category", ticket.category, language=language),
+        "title": ticket.title,
+        "description": ticket.description,
+        "status": ticket.status,
+        "status_label": localizer.lookup("discord.support.status", ticket.status, language=language),
+        "support_message_id": ticket.support_message_id or "",
+        "response_subject": ticket.response_subject or "",
+        "response_body": ticket.response_body or "",
+        "responded_by": ticket.responded_by_discord_user_id or "",
+        "responded_at": ticket.responded_at,
+        "closed_by": ticket.closed_by_discord_user_id or "",
+        "closed_at": ticket.closed_at,
+        "created_at": ticket.created_at,
+        "updated_at": ticket.updated_at,
+    }
