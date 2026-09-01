@@ -5,18 +5,24 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
+from typing import Protocol
 
 from src.events.twitch_events import TwitchChatMessageEvent
-from src.services.chat import ChatMessageReactionService
 from src.services.chat_delivery_context import (
     ChatMessageCompletionNotifier,
     bind_chat_message_sequence,
     reset_chat_message_sequence,
 )
-from src.services.message_ingest_service import MessageIngestService
-from src.services.twitch_user_directory_service import TwitchUserDirectoryIngestService
 
 logger = logging.getLogger(__name__)
+
+
+class ChatPipelineStep(Protocol):
+    """Minimal contract for services that handle one normalized Twitch chat message."""
+
+    async def handle_chat_message(self, message: TwitchChatMessageEvent) -> None:
+        """Handle one normalized Twitch chat message."""
+        ...
 
 
 @dataclass(slots=True, frozen=True)
@@ -29,9 +35,9 @@ class _QueuedChatMessage:
 class ChatMessageProcessingService:
     """Process one inbound Twitch chat message in explicit pipeline order."""
 
-    message_ingest: MessageIngestService
-    user_observer: TwitchUserDirectoryIngestService
-    reactions: ChatMessageReactionService
+    message_ingest: ChatPipelineStep
+    user_observer: ChatPipelineStep
+    reactions: ChatPipelineStep
     queue_size: int = 10000
     worker_count: int = 4
     stop_timeout_seconds: float = 30
@@ -43,6 +49,7 @@ class ChatMessageProcessingService:
     _completion_events: dict[int, asyncio.Event] = field(default_factory=dict, init=False)
 
     async def process(self, message: TwitchChatMessageEvent) -> None:
+        """Run ingest, user-cache observation, and reactions for one message."""
         await self.message_ingest.handle_chat_message(message)
         await self.user_observer.handle_chat_message(message)
         await self.reactions.handle_chat_message(message)
@@ -97,6 +104,9 @@ class ChatMessageProcessingService:
         await self._reserve_queued_message(queued_message)
         try:
             await queue.put(queued_message)
+        except asyncio.CancelledError:
+            await self._complete_queued_message(queued_message)
+            raise
         except Exception:
             await self._complete_queued_message(queued_message)
             raise

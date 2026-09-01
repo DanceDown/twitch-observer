@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from src.events.commands import HelpCommand
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
+from src.events.commands import HelpCommand
+from src.events.discord_results import DiscordCommandResult
 
 
 async def dispatch_help(
@@ -13,7 +14,8 @@ async def dispatch_help(
     requester_id: int,
     language_hint: str | None,
     section: str | None,
-) -> object:
+) -> DiscordCommandResult:
+    """Dispatch a request for localized help output."""
     return await services.help.handle_command(
         HelpCommand(
             discord_channel_id=discord_channel_id,

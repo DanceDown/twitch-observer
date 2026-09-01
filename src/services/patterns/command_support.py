@@ -4,12 +4,29 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from src.database.connection import ChannelRepository, PatternRepository, ThreadRecord, TrackedUserRepository
+from src.database.connection import ChannelRepository, PatternRecord, PatternRepository, ThreadRecord, TrackedUserRepository
 from src.events.pattern_scopes import ChannelScopeMode, OfflineScope, SubscriptionScope, UserScopeMode
+from src.gateways.twitch_api import TwitchUser
 from src.localization import Localizer
 from src.services.patterns.display_index import PatternDisplayIndexResolver
-from src.services.patterns.filters import PatternFilterResolver
+from src.services.patterns.filters import PatternEditFilterRequest, PatternFilterResolver
 from src.services.twitch_gateways import TwitchDirectoryGateway
+
+PATTERN_PRIORITY_MAX = 9
+
+
+@dataclass(slots=True, frozen=True)
+class PatternChangeRenderRequest:
+    """Resolved before/after data for the localized pattern edit summary."""
+
+    before: PatternRecord
+    after: PatternRecord
+    old_channel_logins: tuple[dict[str, str], ...]
+    new_channel_logins: tuple[dict[str, str], ...]
+    old_user_logins: tuple[dict[str, str], ...]
+    new_user_logins: tuple[dict[str, str], ...]
+    language: str
+    key_prefix: str
 
 
 @dataclass(slots=True)
@@ -25,6 +42,7 @@ class PatternCommandSupport:
     _filters: PatternFilterResolver = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Build reusable resolvers after repository dependencies are available."""
         self._display_index = PatternDisplayIndexResolver(self.pattern_repository)
         self._filters = PatternFilterResolver(
             channel_repository=self.channel_repository,
@@ -40,17 +58,20 @@ class PatternCommandSupport:
         *,
         sources: dict[str, object] | None = None,
     ) -> str:
+        """Return localized text in the thread's configured language."""
         return self.localizer.text(
             key,
             language=self.localizer.language_for_thread(thread),
             sources=sources,
         )
 
-    def pattern_mode(self, is_regex: bool, *, language: str, scope: str) -> str:
+    def pattern_mode(self, *, is_regex: bool, language: str, scope: str) -> str:
+        """Return the localized display label for regex or word matching."""
         suffix = "regex" if is_regex else "word"
         return self.localizer.lookup(f"{scope}.mode_value", suffix, language=language)
 
     async def display_index(self, thread_id: int, pattern_id: int) -> int | None:
+        """Return the current user-facing display index for a pattern."""
         return await self._display_index.resolve(thread_id=thread_id, pattern_id=pattern_id)
 
     async def resolve_filters(
@@ -61,7 +82,8 @@ class PatternCommandSupport:
         user_scope_mode: UserScopeMode,
         twitch_user_logins: tuple[str, ...],
         thread: ThreadRecord,
-    ):
+    ) -> tuple[list[TwitchUser], list[TwitchUser]]:
+        """Resolve and validate channel/user scopes for a pattern command."""
         return await self._filters.resolve_filters(
             channel_scope_mode=channel_scope_mode,
             twitch_channel_logins=twitch_channel_logins,
@@ -70,37 +92,24 @@ class PatternCommandSupport:
             thread=thread,
         )
 
-    async def resolve_pattern_edit_filters(
-        self,
-        *,
-        channel_scope_mode: ChannelScopeMode | None,
-        twitch_channel_logins: tuple[str, ...] | None,
-        user_scope_mode: UserScopeMode | None,
-        twitch_user_logins: tuple[str, ...] | None,
-        thread: ThreadRecord,
-        pattern,
-    ):
-        return await self._filters.resolve_pattern_edit_filters(
-            channel_scope_mode=channel_scope_mode,
-            twitch_channel_logins=twitch_channel_logins,
-            user_scope_mode=user_scope_mode,
-            twitch_user_logins=twitch_user_logins,
-            thread=thread,
-            pattern=pattern,
-        )
+    async def resolve_pattern_edit_filters(self, request: PatternEditFilterRequest) -> tuple[list[TwitchUser], list[TwitchUser]]:
+        """Resolve effective scopes for an edit command before persistence."""
+        return await self._filters.resolve_pattern_edit_filters(request)
 
-    async def resolve_profile_items_from_ids(self, user_ids: tuple[str, ...]):
+    async def resolve_profile_items_from_ids(self, user_ids: tuple[str, ...]) -> tuple[dict[str, str], ...]:
+        """Resolve stored Twitch user IDs into localized profile-link view data."""
         return await self._filters.resolve_profile_items_from_ids(user_ids)
 
     def format_pattern_summary(
         self,
         *,
-        pattern,
+        pattern: PatternRecord,
         channel_logins: tuple[dict[str, str], ...],
         user_logins: tuple[dict[str, str], ...],
         language: str,
         key_prefix: str,
     ) -> str:
+        """Render one localized summary of a pattern and its scopes."""
         parts = [
             self.localizer.text(
                 f"{key_prefix}.text",
@@ -110,7 +119,7 @@ class PatternCommandSupport:
             self.localizer.text(
                 f"{key_prefix}.mode",
                 language=language,
-                sources={"view": {"ping_mode": self.pattern_mode(pattern.is_regex, language=language, scope=key_prefix)}},
+                sources={"view": {"ping_mode": self.pattern_mode(is_regex=pattern.is_regex, language=language, scope=key_prefix)}},
             ),
         ]
         channel_scope = self._scope_text(
@@ -172,18 +181,12 @@ class PatternCommandSupport:
             sources={"view": {"items": tuple(parts)}},
         )
 
-    def format_pattern_changes(
-        self,
-        *,
-        before,
-        after,
-        old_channel_logins,
-        new_channel_logins: tuple[dict[str, str], ...],
-        old_user_logins,
-        new_user_logins: tuple[dict[str, str], ...],
-        language: str,
-        key_prefix: str,
-    ) -> str:
+    def format_pattern_changes(self, request: PatternChangeRenderRequest) -> str:
+        """Render a localized list of meaningful before/after pattern changes."""
+        before = request.before
+        after = request.after
+        language = request.language
+        key_prefix = request.key_prefix
         changes: list[str] = []
         if before.regex != after.regex:
             changes.append(
@@ -200,8 +203,8 @@ class PatternCommandSupport:
                     language=language,
                     sources={
                         "view": {
-                            "before": self.pattern_mode(before.is_regex, language=language, scope=key_prefix),
-                            "after": self.pattern_mode(after.is_regex, language=language, scope=key_prefix),
+                            "before": self.pattern_mode(is_regex=before.is_regex, language=language, scope=key_prefix),
+                            "after": self.pattern_mode(is_regex=after.is_regex, language=language, scope=key_prefix),
                         }
                     },
                 )
@@ -209,14 +212,14 @@ class PatternCommandSupport:
 
         old_channel_scope = self._scope_text(
             mode=before.channel_scope_mode,
-            selected=old_channel_logins,
+            selected=request.old_channel_logins,
             language=language,
             key_prefix=f"{key_prefix}.scope",
             subject="channel",
         )
         new_channel_scope = self._scope_text(
             mode=after.channel_scope_mode,
-            selected=new_channel_logins,
+            selected=request.new_channel_logins,
             language=language,
             key_prefix=f"{key_prefix}.scope",
             subject="channel",
@@ -233,14 +236,14 @@ class PatternCommandSupport:
 
         old_user_scope = self._scope_text(
             mode=before.user_scope_mode,
-            selected=old_user_logins,
+            selected=request.old_user_logins,
             language=language,
             key_prefix=f"{key_prefix}.scope",
             subject="user",
         )
         new_user_scope = self._scope_text(
             mode=after.user_scope_mode,
-            selected=new_user_logins,
+            selected=request.new_user_logins,
             language=language,
             key_prefix=f"{key_prefix}.scope",
             subject="user",
@@ -324,6 +327,7 @@ class PatternCommandSupport:
 
     @staticmethod
     def profile_item(display_name: str, login: str) -> dict[str, str]:
+        """Build the profile view shape used by localized pattern summaries."""
         return {"display_name": display_name, "login": login}
 
     def _scope_text(
@@ -385,4 +389,4 @@ class PatternCommandSupport:
             priority += 1
         if offline_state is not OfflineScope.BOTH:
             priority += 1
-        return min(priority, 9)
+        return min(priority, PATTERN_PRIORITY_MAX)

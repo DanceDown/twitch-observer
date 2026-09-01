@@ -18,7 +18,6 @@ async def _run() -> None:
         level=getattr(logging, config.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
-    logging.getLogger("discord.client")
     core = await build_core(config)
     gateways = build_gateways(core)
     services = build_services(core, gateways)

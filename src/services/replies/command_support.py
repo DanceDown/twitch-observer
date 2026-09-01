@@ -18,9 +18,11 @@ class ReplyCommandSupport:
     _display_index: PatternDisplayIndexResolver = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Build the display-index resolver after dependency injection."""
         self._display_index = PatternDisplayIndexResolver(self.pattern_repository)
 
     async def display_index(self, thread_id: int, pattern_id: int) -> int | None:
+        """Resolve the visible display index for one pattern."""
         return await self._display_index.resolve(thread_id=thread_id, pattern_id=pattern_id)
 
     def text(
@@ -30,4 +32,5 @@ class ReplyCommandSupport:
         language: str,
         sources: dict[str, object] | None = None,
     ) -> str:
+        """Render a localized reply-command string."""
         return self.localizer.text(key, language=language, sources=sources)

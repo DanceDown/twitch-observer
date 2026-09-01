@@ -1,22 +1,26 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 
 import pytest
 
-from src.tests.dispatch_helpers import dispatch_permission_command, dispatch_write_command
-from src.gateways.twitch_api import TwitchUser, TwitchUserTokenBundle, TwitchValidatedToken
 from src.database.connection import (
     ThreadRecord,
     ThreadRepository,
+    TwitchAccountCreate,
     TwitchAccountRecord,
     TwitchAccountRepository,
+    TwitchAccountTokenData,
+    TwitchAccountUpdate,
     UserPermissionRecord,
     UserPermissionRepository,
 )
-from types import SimpleNamespace
+from src.events.twitch_events import TwitchChatSendRequest
+from src.gateways.twitch_api import TwitchDeviceCodeStart, TwitchDevicePollResult, TwitchUser, TwitchUserTokenBundle, TwitchValidatedToken
 from src.services.permission_service import PermissionCommandService
-from src.services.write_service import TwitchWriteCommandService
+from src.services.write_service import TwitchWriteCommandService, TwitchWriteGateway
+from src.tests.dispatch_helpers import dispatch_permission_command, dispatch_write_command
 from src.tests.in_memory_channels import InMemoryChannelRepository as BaseInMemoryChannelRepository
 
 
@@ -111,65 +115,43 @@ class InMemoryAccountRepository(TwitchAccountRepository):
     async def get_by_account_id(self, account_id: int) -> TwitchAccountRecord | None:
         return self.accounts_by_account_id.get(account_id)
 
-    async def create_account(
-        self,
-        *,
-        discord_user_id: int,
-        twitch_user_id: str,
-        twitch_login: str,
-        client_id: str,
-        access_token: str,
-        refresh_token: str | None,
-        expires_at: str | None,
-        scope: tuple[str, ...],
-        token_type: str | None,
-    ) -> TwitchAccountRecord:
+    async def create_account(self, account: TwitchAccountCreate) -> TwitchAccountRecord:
         account_id = self.next_account_id
         self.next_account_id += 1
+        token = account.token
         record = TwitchAccountRecord(
             account_id=account_id,
-            discord_user_id=discord_user_id,
-            twitch_user_id=twitch_user_id,
-            twitch_login=twitch_login,
-            client_id=client_id,
-            access_token=access_token,
-            refresh_token=refresh_token,
-            expires_at=expires_at,
-            scope=scope,
-            token_type=token_type,
+            discord_user_id=account.discord_user_id,
+            twitch_user_id=token.twitch_user_id,
+            twitch_login=token.twitch_login,
+            client_id=token.client_id,
+            access_token=token.access_token,
+            refresh_token=token.refresh_token,
+            expires_at=token.expires_at,
+            scope=token.scope,
+            token_type=token.token_type,
         )
         self.accounts_by_account_id[account_id] = record
         return record
 
-    async def update_account(
-        self,
-        *,
-        account_id: int,
-        twitch_user_id: str,
-        twitch_login: str,
-        client_id: str,
-        access_token: str,
-        refresh_token: str | None,
-        expires_at: str | None,
-        scope: tuple[str, ...],
-        token_type: str | None,
-    ) -> TwitchAccountRecord | None:
-        existing = self.accounts_by_account_id.get(account_id)
+    async def update_account(self, account: TwitchAccountUpdate) -> TwitchAccountRecord | None:
+        existing = self.accounts_by_account_id.get(account.account_id)
         if existing is None:
             return None
+        token = account.token
         updated = TwitchAccountRecord(
-            account_id=account_id,
+            account_id=account.account_id,
             discord_user_id=existing.discord_user_id,
-            twitch_user_id=twitch_user_id,
-            twitch_login=twitch_login,
-            client_id=client_id,
-            access_token=access_token,
-            refresh_token=refresh_token,
-            expires_at=expires_at,
-            scope=scope,
-            token_type=token_type,
+            twitch_user_id=token.twitch_user_id,
+            twitch_login=token.twitch_login,
+            client_id=token.client_id,
+            access_token=token.access_token,
+            refresh_token=token.refresh_token,
+            expires_at=token.expires_at,
+            scope=token.scope,
+            token_type=token.token_type,
         )
-        self.accounts_by_account_id[account_id] = updated
+        self.accounts_by_account_id[account.account_id] = updated
         return updated
 
     async def remove_by_account_id(self, account_id: int) -> bool:
@@ -181,42 +163,15 @@ class InMemoryAccountRepository(TwitchAccountRepository):
             return None
         return sorted(matches, key=lambda account: account.account_id)[-1]
 
-    async def upsert_account(
-        self,
-        *,
-        discord_user_id: int,
-        twitch_user_id: str,
-        twitch_login: str,
-        client_id: str,
-        access_token: str,
-        refresh_token: str | None,
-        expires_at: str | None,
-        scope: tuple[str, ...],
-        token_type: str | None,
-    ) -> TwitchAccountRecord:
-        existing = await self.get_by_discord_user_id(discord_user_id)
+    async def upsert_account(self, account: TwitchAccountCreate) -> TwitchAccountRecord:
+        existing = await self.get_by_discord_user_id(account.discord_user_id)
         if existing is None:
-            return await self.create_account(
-                discord_user_id=discord_user_id,
-                twitch_user_id=twitch_user_id,
-                twitch_login=twitch_login,
-                client_id=client_id,
-                access_token=access_token,
-                refresh_token=refresh_token,
-                expires_at=expires_at,
-                scope=scope,
-                token_type=token_type,
-            )
+            return await self.create_account(account)
         updated = await self.update_account(
-            account_id=existing.account_id,
-            twitch_user_id=twitch_user_id,
-            twitch_login=twitch_login,
-            client_id=client_id,
-            access_token=access_token,
-            refresh_token=refresh_token,
-            expires_at=expires_at,
-            scope=scope,
-            token_type=token_type,
+            TwitchAccountUpdate(
+                account_id=existing.account_id,
+                token=account.token,
+            )
         )
         assert updated is not None
         return updated
@@ -226,6 +181,33 @@ class InMemoryAccountRepository(TwitchAccountRepository):
         if existing is None:
             return False
         return await self.remove_by_account_id(existing.account_id)
+
+
+def _account_create(
+    *,
+    discord_user_id: int = 200,
+    twitch_user_id: str = "77",
+    twitch_login: str = "dancedown",
+    client_id: str = "client-123",
+    access_token: str = "oauth:test-token",
+    refresh_token: str | None = None,
+    expires_at: str | None = None,
+    scope: tuple[str, ...] = ("user:write:chat",),
+    token_type: str | None = "bearer",
+) -> TwitchAccountCreate:
+    return TwitchAccountCreate(
+        discord_user_id=discord_user_id,
+        token=TwitchAccountTokenData(
+            twitch_user_id=twitch_user_id,
+            twitch_login=twitch_login,
+            client_id=client_id,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_at=expires_at,
+            scope=scope,
+            token_type=token_type,
+        ),
+    )
 
 
 @dataclass
@@ -248,7 +230,7 @@ class InMemoryPermissionRepository(UserPermissionRepository):
 
 
 @dataclass
-class FakeTwitchAPI:
+class FakeTwitchAPI(TwitchWriteGateway):
     users_by_login: dict[str, TwitchUser] = field(default_factory=dict)
     sent_messages: list[dict[str, str | None]] = field(default_factory=list)
 
@@ -258,24 +240,32 @@ class FakeTwitchAPI:
     async def refresh_channel_by_login(self, login: str) -> TwitchUser:
         return await self.get_user_by_login(login)
 
-    async def send_chat_message(
+    async def get_channel_by_id(self, user_id: str) -> TwitchUser:
+        for user in self.users_by_login.values():
+            if user.user_id == user_id:
+                return user
+        raise KeyError(user_id)
+
+    async def start_device_code_flow(self, *, scopes: tuple[str, ...]) -> TwitchDeviceCodeStart:
+        raise NotImplementedError
+
+    async def poll_device_code_flow(
         self,
         *,
-        access_token: str,
-        client_id: str,
-        sender_id: str,
-        broadcaster_id: str,
-        message: str,
-        reply_parent_message_id: str | None = None,
-    ) -> str:
+        device_code: str,
+        scopes: tuple[str, ...],
+    ) -> TwitchDevicePollResult:
+        raise NotImplementedError
+
+    async def send_chat_message(self, request: TwitchChatSendRequest) -> str:
         self.sent_messages.append(
             {
-                "access_token": access_token,
-                "client_id": client_id,
-                "sender_id": sender_id,
-                "broadcaster_id": broadcaster_id,
-                "message": message,
-                "reply_parent_message_id": reply_parent_message_id,
+                "access_token": request.access_token,
+                "client_id": request.client_id,
+                "sender_id": request.sender_id,
+                "broadcaster_id": request.broadcaster_id,
+                "message": request.message,
+                "reply_parent_message_id": request.reply_parent_message_id,
             }
         )
         return "sent-1"
@@ -290,6 +280,7 @@ class FakeTwitchAPI:
         )
 
     async def validate_user_access_token(self, access_token: str) -> TwitchValidatedToken:
+        _ = access_token
         return TwitchValidatedToken(
             client_id="client-123",
             login="dancedown",
@@ -308,24 +299,14 @@ async def test_write_send_posts_plain_twitch_message() -> None:
     channel_repository = InMemoryChannelRepository()
     await channel_repository.add_channel(thread.thread_id, "42")
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create())
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     bus.write = TwitchWriteCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         account_repository=account_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         token_refresh_skew_seconds=30,
         permission_repository=InMemoryPermissionRepository(),
     )
@@ -352,24 +333,14 @@ async def test_write_send_can_reply_to_specific_twitch_message() -> None:
     channel_repository = InMemoryChannelRepository()
     await channel_repository.add_channel(thread.thread_id, "42")
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create())
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     bus.write = TwitchWriteCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         account_repository=account_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         token_refresh_skew_seconds=30,
         permission_repository=InMemoryPermissionRepository(),
     )
@@ -396,17 +367,7 @@ async def test_write_send_respects_granted_permission_for_non_owner() -> None:
     await channel_repository.add_channel(thread.thread_id, "42")
     permission_repository = InMemoryPermissionRepository()
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:owner-token",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create(access_token="oauth:owner-token"))
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI(users_by_login={"example": TwitchUser(user_id="42", login="example", display_name="Example")})
     bus.permission = PermissionCommandService(
@@ -417,7 +378,7 @@ async def test_write_send_respects_granted_permission_for_non_owner() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         account_repository=account_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         token_refresh_skew_seconds=30,
         permission_repository=permission_repository,
     )
@@ -461,7 +422,7 @@ async def test_write_send_reports_missing_owner_account_even_for_permitted_helpe
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         account_repository=account_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         token_refresh_skew_seconds=30,
         permission_repository=permission_repository,
     )

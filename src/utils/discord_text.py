@@ -11,7 +11,7 @@ DISCORD_MENTION_PATTERN = re.compile(r"@(everyone|here|[!&]?\d{15,20})")
 
 def normalize_discord_code_value(text: str) -> str:
     """Replace backticks in runtime values so inline-code templates stay intact."""
-    return text.replace("`", "´")
+    return text.replace("`", "\N{ACUTE ACCENT}")
 
 
 def escape_discord_text(text: str) -> str:

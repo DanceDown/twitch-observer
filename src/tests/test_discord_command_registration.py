@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import discord
+import pytest
 
 from src.entrypoints.discord.commands import (
     register_account_commands,
@@ -11,6 +12,7 @@ from src.entrypoints.discord.commands import (
     register_reply_commands,
     register_user_commands,
 )
+from src.entrypoints.discord.commands.localized import CommandCatalogTranslator, command_text
 from src.localization import Localizer
 
 
@@ -83,6 +85,20 @@ def test_action_commands_remove_open_subcommands_and_make_ui_entry_fields_option
 
     account_group = _group_command(tree, "account")
     assert [command.name for command in account_group.commands] == ["connect", "disconnect"]
+
+
+@pytest.mark.asyncio
+async def test_command_catalog_translator_uses_german_command_metadata() -> None:
+    localizer = Localizer.from_directory()
+    translator = CommandCatalogTranslator(localizer)
+    text = command_text(localizer, "support.description")
+
+    assert str(text) == localizer.text("discord.commands.support.description", language="english")
+    assert await translator.translate(text, discord.Locale.american_english, object()) is None
+    assert await translator.translate(text, discord.Locale.german, object()) == localizer.text(
+        "discord.commands.support.description",
+        language="german",
+    )
 
 
 def _group_command(

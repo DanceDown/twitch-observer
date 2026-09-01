@@ -19,8 +19,8 @@ from src.discord_results import build_result, build_thread_result
 from src.events.commands import ShowConfigurationCommand
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
-from src.services.patterns.show_renderer import ShowSectionRenderer
 from src.services.authz import thread_has_permission
+from src.services.patterns.show_renderer import ShowSectionRenderer
 from src.services.twitch_gateways import TwitchDirectoryGateway
 from src.utils.permissions import ObserverPermission
 
@@ -43,6 +43,7 @@ class ShowCommandService:
     _renderer: ShowSectionRenderer = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Build the reusable show-section renderer after injection."""
         self._renderer = ShowSectionRenderer(
             channel_repository=self.channel_repository,
             pattern_repository=self.pattern_repository,
@@ -75,14 +76,13 @@ class ShowCommandService:
                 permission_repository=self.permission_repository,
                 required_permission=ObserverPermission.VIEW,
             ):
-                result = build_thread_result(
+                return build_thread_result(
                     self.localizer,
                     "results.show.permission_denied",
                     thread=thread,
                     style=DiscordResultStyle.ERROR,
                     ephemeral=True,
                 )
-                return result
             lines = []
             sections = self._normalize_sections(command.sections)
             if "channels" in sections:

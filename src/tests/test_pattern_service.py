@@ -2,19 +2,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 import pytest
 
-from src.tests.chat_match_candidates import build_chat_match_seeds, hydrate_chat_match_candidates
-from src.tests.dispatch_helpers import dispatch_pattern_command, dispatch_pattern_edit_command, dispatch_show_command
-from src.gateways.twitch_api import TwitchChannelNotFoundError, TwitchUser
 from src.database.connection import (
+    ChannelRepository,
     ChatPatternCandidateRecord,
     ChatPatternSeedRecord,
-    ChannelRepository,
     MessageRepository,
+    PatternCreate,
+    PatternDefinition,
+    PatternExactQuery,
     PatternRecord,
     PatternRepository,
+    PatternUpdate,
     RecentMessageRecord,
     ReplyRecord,
     ReplyRepository,
@@ -23,9 +25,9 @@ from src.database.connection import (
     TrackedUserRecord,
     TrackedUserRepository,
 )
-from types import SimpleNamespace
 from src.events.discord_results import DiscordResultStyle
 from src.events.twitch_events import TwitchChatMessageEvent
+from src.gateways.twitch_api import TwitchChannelNotFoundError, TwitchUser
 from src.localization import Localizer
 from src.services.patterns import (
     PatternCommandService,
@@ -33,8 +35,11 @@ from src.services.patterns import (
     ShowCommandService,
     TrackingNotificationSender,
 )
+from src.services.patterns.command_support import PatternChangeRenderRequest, PatternCommandSupport
 from src.services.patterns.display_index import PatternDisplayIndexResolver
-from src.services.patterns.command_support import PatternCommandSupport
+from src.services.twitch_gateways import TwitchDirectoryGateway
+from src.tests.chat_match_candidates import build_chat_match_seeds, hydrate_chat_match_candidates
+from src.tests.dispatch_helpers import dispatch_pattern_command, dispatch_pattern_edit_command, dispatch_show_command
 from src.tests.in_memory_channels import InMemoryChannelRepository as BaseInMemoryChannelRepository
 
 
@@ -109,70 +114,43 @@ class InMemoryPatternRepository(PatternRepository):
     tracked_user_repository: TrackedUserRepository | None = None
     reply_repository: ReplyRepository | None = None
 
-    async def find_exact_pattern(
-        self,
-        *,
-        thread_id: int,
-        regex: str,
-        channel_scope_mode: str,
-        channel_scope_ids: tuple[str, ...],
-        user_scope_mode: str,
-        user_scope_ids: tuple[str, ...],
-        sub_state: str,
-        offline_state: str,
-        is_regex: bool,
-        case_sensitive: bool,
-    ) -> PatternRecord | None:
+    async def find_exact_pattern(self, query: PatternExactQuery) -> PatternRecord | None:
+        definition = query.definition
         for pattern in self.patterns:
             if (
-                pattern.thread_id == thread_id
-                and pattern.regex == regex
-                and pattern.channel_scope_mode == channel_scope_mode
-                and pattern.channel_scope_ids == tuple(sorted(channel_scope_ids))
-                and pattern.user_scope_mode == user_scope_mode
-                and pattern.user_scope_ids == tuple(sorted(user_scope_ids))
-                and pattern.sub_state == sub_state
-                and pattern.offline_state == offline_state
-                and pattern.is_regex == is_regex
-                and pattern.case_sensitive == case_sensitive
+                pattern.thread_id == query.thread_id
+                and pattern.regex == definition.regex
+                and pattern.channel_scope_mode == definition.channel_scope_mode
+                and pattern.channel_scope_ids == tuple(sorted(definition.channel_scope_ids))
+                and pattern.user_scope_mode == definition.user_scope_mode
+                and pattern.user_scope_ids == tuple(sorted(definition.user_scope_ids))
+                and pattern.sub_state == definition.sub_state
+                and pattern.offline_state == definition.offline_state
+                and pattern.is_regex == definition.is_regex
+                and pattern.case_sensitive == definition.case_sensitive
             ):
                 return pattern
         return None
 
-    async def add_pattern(
-        self,
-        *,
-        thread_id: int,
-        regex: str,
-        channel_scope_mode: str,
-        channel_scope_ids: tuple[str, ...],
-        user_scope_mode: str,
-        user_scope_ids: tuple[str, ...],
-        sub_state: str,
-        offline_state: str,
-        is_regex: bool,
-        case_sensitive: bool,
-        color: str | None,
-        disabled: bool,
-        priority: int,
-    ) -> PatternRecord:
+    async def add_pattern(self, pattern: PatternCreate) -> PatternRecord:
+        definition = pattern.definition
         record = PatternRecord(
-            thread_id=thread_id,
+            thread_id=pattern.thread_id,
             pattern_id=self.next_pattern_id,
-            regex=regex,
-            channel_scope_mode=channel_scope_mode,
-            channel_scope_ids=tuple(sorted(channel_scope_ids)),
-            user_scope_mode=user_scope_mode,
-            user_scope_ids=tuple(sorted(user_scope_ids)),
-            sub_state=sub_state,
-            offline_state=offline_state,
-            is_regex=is_regex,
-            case_sensitive=case_sensitive,
-            color=color,
-            disabled=disabled,
+            regex=definition.regex,
+            channel_scope_mode=definition.channel_scope_mode,
+            channel_scope_ids=tuple(sorted(definition.channel_scope_ids)),
+            user_scope_mode=definition.user_scope_mode,
+            user_scope_ids=tuple(sorted(definition.user_scope_ids)),
+            sub_state=definition.sub_state,
+            offline_state=definition.offline_state,
+            is_regex=definition.is_regex,
+            case_sensitive=definition.case_sensitive,
+            color=pattern.color,
+            disabled=pattern.disabled,
             reply_message=None,
             reply_as_reply=False,
-            priority=priority,
+            priority=pattern.priority,
         )
         self.patterns.append(record)
         self.next_pattern_id += 1
@@ -227,40 +205,25 @@ class InMemoryPatternRepository(PatternRepository):
                 return updated
         return None
 
-    async def update_pattern(
-        self,
-        *,
-        thread_id: int,
-        pattern_id: int,
-        regex: str,
-        channel_scope_mode: str,
-        channel_scope_ids: tuple[str, ...],
-        user_scope_mode: str,
-        user_scope_ids: tuple[str, ...],
-        sub_state: str,
-        offline_state: str,
-        is_regex: bool,
-        case_sensitive: bool,
-        color: str | None,
-        priority: int,
-    ) -> PatternRecord | None:
+    async def update_pattern(self, update: PatternUpdate) -> PatternRecord | None:
+        definition = update.definition
         for index, pattern in enumerate(self.patterns):
-            if pattern.thread_id == thread_id and pattern.pattern_id == pattern_id:
+            if pattern.thread_id == update.thread_id and pattern.pattern_id == update.pattern_id:
                 updated = PatternRecord(
-                    thread_id=thread_id,
-                    pattern_id=pattern_id,
-                    regex=regex,
-                    channel_scope_mode=channel_scope_mode,
-                    channel_scope_ids=tuple(sorted(channel_scope_ids)),
-                    user_scope_mode=user_scope_mode,
-                    user_scope_ids=tuple(sorted(user_scope_ids)),
-                    sub_state=sub_state,
-                    offline_state=offline_state,
-                    is_regex=is_regex,
-                    case_sensitive=case_sensitive,
-                    color=color,
+                    thread_id=update.thread_id,
+                    pattern_id=update.pattern_id,
+                    regex=definition.regex,
+                    channel_scope_mode=definition.channel_scope_mode,
+                    channel_scope_ids=tuple(sorted(definition.channel_scope_ids)),
+                    user_scope_mode=definition.user_scope_mode,
+                    user_scope_ids=tuple(sorted(definition.user_scope_ids)),
+                    sub_state=definition.sub_state,
+                    offline_state=definition.offline_state,
+                    is_regex=definition.is_regex,
+                    case_sensitive=definition.case_sensitive,
+                    color=update.color,
                     disabled=pattern.disabled,
-                    priority=priority,
+                    priority=update.priority,
                 )
                 self.patterns[index] = updated
                 return updated
@@ -318,6 +281,45 @@ class InMemoryPatternRepository(PatternRepository):
         return sum(1 for pattern in self.patterns if pattern.thread_id == thread_id and twitch_channel_id in pattern.channel_scope_ids)
 
 
+def _pattern_create(
+    *,
+    thread_id: int,
+    regex: str,
+    channel_scope_mode: str = "all",
+    channel_scope_ids: tuple[str, ...] = (),
+    user_scope_mode: str = "all",
+    user_scope_ids: tuple[str, ...] = (),
+    sub_state: str = "both",
+    offline_state: str = "both",
+    is_regex: bool = False,
+    case_sensitive: bool = False,
+    color: str | None = None,
+    disabled: bool = False,
+    priority: int = 0,
+) -> PatternCreate:
+    return PatternCreate(
+        thread_id=thread_id,
+        definition=PatternDefinition(
+            regex=regex,
+            channel_scope_mode=channel_scope_mode,
+            channel_scope_ids=channel_scope_ids,
+            user_scope_mode=user_scope_mode,
+            user_scope_ids=user_scope_ids,
+            sub_state=sub_state,
+            offline_state=offline_state,
+            is_regex=is_regex,
+            case_sensitive=case_sensitive,
+        ),
+        color=color,
+        disabled=disabled,
+        priority=priority,
+    )
+
+
+async def _add_pattern(repository: PatternRepository, **kwargs) -> PatternRecord:
+    return await repository.add_pattern(_pattern_create(**kwargs))
+
+
 @dataclass
 class InMemoryReplyRepository(ReplyRepository):
     replies_by_pattern: dict[tuple[int, int], ReplyRecord] = field(default_factory=dict)
@@ -346,9 +348,11 @@ class InMemoryReplyRepository(ReplyRepository):
         return sorted(rows, key=lambda reply: reply.pattern_id)
 
     async def disable_replies_for_thread(self, thread_id: int) -> int:
+        _ = thread_id
         return 0
 
     async def enable_replies_for_thread(self, thread_id: int) -> int:
+        _ = thread_id
         return 0
 
 
@@ -374,6 +378,7 @@ class InMemoryTrackedUserRepository(TrackedUserRepository):
         )
 
     async def count_pattern_scope_references(self, *, thread_id: int, twitch_user_id: str) -> int:
+        _ = thread_id, twitch_user_id
         return 0
 
 
@@ -396,12 +401,15 @@ class InMemoryMessageRepository(MessageRepository):
     matched_thread_ids: list[tuple[int, str | None]] = field(default_factory=list)
 
     async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
-        return None
+        _ = event
+        return
 
     async def save_bot_twitch_message(self, event: TwitchChatMessageEvent) -> None:
-        return None
+        _ = event
+        return
 
     async def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
+        _ = since, limit
         return []
 
     async def list_recent_messages_for_channel(
@@ -411,6 +419,7 @@ class InMemoryMessageRepository(MessageRepository):
         since: datetime,
         limit: int,
     ) -> list[RecentMessageRecord]:
+        _ = twitch_channel_id, since, limit
         return []
 
     async def mark_message_matched_in_thread(self, *, thread_id: int, event: TwitchChatMessageEvent) -> None:
@@ -423,11 +432,12 @@ class InMemoryMessageRepository(MessageRepository):
         since: datetime,
         limit: int,
     ) -> list[RecentMessageRecord]:
+        _ = thread_id, since, limit
         return []
 
 
 @dataclass
-class FakeTwitchAPI:
+class FakeTwitchAPI(TwitchDirectoryGateway):
     users_by_login: dict[str, TwitchUser] = field(default_factory=dict)
     cached_users_by_login: dict[str, TwitchUser] = field(default_factory=dict)
     live_by_user_id: dict[str, bool] = field(default_factory=dict)
@@ -616,7 +626,7 @@ def test_pattern_presenter_keeps_scope_links_clickable_in_added_summary() -> Non
     support = PatternCommandSupport(
         channel_repository=InMemoryChannelRepository(),
         pattern_repository=InMemoryPatternRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         localizer=_scope_summary_localizer(),
     )
     pattern = PatternRecord(
@@ -652,7 +662,7 @@ def test_pattern_presenter_formats_updated_scope_change_without_wrapping_links_i
     support = PatternCommandSupport(
         channel_repository=InMemoryChannelRepository(),
         pattern_repository=InMemoryPatternRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         localizer=_scope_summary_localizer(),
     )
     before = PatternRecord(
@@ -689,14 +699,16 @@ def test_pattern_presenter_formats_updated_scope_change_without_wrapping_links_i
     )
 
     rendered = support.format_pattern_changes(
-        before=before,
-        after=after,
-        old_channel_logins=(),
-        new_channel_logins=({"display_name": "DanceDown", "login": "dancedown"},),
-        old_user_logins=(),
-        new_user_logins=({"display_name": "Alice", "login": "alice"},),
-        language="english",
-        key_prefix="results.pattern.updated_result.summary",
+        PatternChangeRenderRequest(
+            before=before,
+            after=after,
+            old_channel_logins=(),
+            new_channel_logins=({"display_name": "DanceDown", "login": "dancedown"},),
+            old_user_logins=(),
+            new_user_logins=({"display_name": "Alice", "login": "alice"},),
+            language="english",
+            key_prefix="results.pattern.updated_result.summary",
+        )
     )
 
     assert "[`DanceDown`](https://www.twitch.tv/dancedown)" in rendered
@@ -716,7 +728,7 @@ async def test_ping_command_adds_pattern_with_selected_channel_scope() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
 
     result = await dispatch_pattern_command(
@@ -754,7 +766,7 @@ async def test_ping_command_add_saves_explicit_priority() -> None:
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
         pattern_repository=pattern_repository,
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
     )
 
     result = await dispatch_pattern_command(
@@ -793,7 +805,7 @@ async def test_pattern_command_removes_existing_regex_by_id() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
 
     await dispatch_pattern_command(
@@ -849,7 +861,7 @@ async def test_ping_command_disables_existing_pattern_by_id() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
 
     await dispatch_pattern_command(
@@ -905,7 +917,7 @@ async def test_ping_command_enables_disabled_pattern_by_id() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
 
     await dispatch_pattern_command(
@@ -960,7 +972,7 @@ async def test_ping_command_requires_join_before_adding_patterns() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
 
     result = await dispatch_pattern_command(
@@ -999,7 +1011,7 @@ async def test_pattern_priority_command_updates_existing_pattern_priority() -> N
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
 
     await dispatch_pattern_command(
@@ -1064,7 +1076,7 @@ async def test_pattern_edit_updates_existing_pattern_fields() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
 
     await dispatch_pattern_command(
@@ -1132,7 +1144,7 @@ async def test_ping_command_rejects_selected_scope_channels_that_are_not_tracked
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
 
     result = await dispatch_pattern_command(
@@ -1178,7 +1190,7 @@ async def test_ping_command_supports_all_except_selected_scope() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
 
     result = await dispatch_pattern_command(
@@ -1221,7 +1233,7 @@ async def test_ping_command_supports_selected_user_scope() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
 
     result = await dispatch_pattern_command(
@@ -1264,7 +1276,7 @@ async def test_ping_command_supports_all_except_selected_users() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
 
     result = await dispatch_pattern_command(
@@ -1299,7 +1311,8 @@ async def test_show_command_lists_channels_and_all_pattern_types_together() -> N
     channel_repository = InMemoryChannelRepository()
     await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    await pattern_repository.add_pattern(
+    await _add_pattern(
+        pattern_repository,
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="only_selected",
@@ -1314,7 +1327,8 @@ async def test_show_command_lists_channels_and_all_pattern_types_together() -> N
         disabled=False,
         priority=2,
     )
-    await pattern_repository.add_pattern(
+    await _add_pattern(
+        pattern_repository,
         thread_id=thread.thread_id,
         regex="^hello$",
         channel_scope_mode="all_tracked",
@@ -1339,7 +1353,7 @@ async def test_show_command_lists_channels_and_all_pattern_types_together() -> N
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         reply_repository=InMemoryReplyRepository(),
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
 
     result = await dispatch_show_command(
@@ -1370,7 +1384,7 @@ async def test_show_command_lists_tracked_users_with_links() -> None:
             users_by_login={
                 "alice": TwitchUser(user_id="7", login="alice", display_name="Alice"),
             }
-        ),  # type: ignore[arg-type]
+        ),
         tracked_user_repository=tracked_user_repository,
     )
 
@@ -1425,7 +1439,7 @@ async def test_show_command_renders_where_and_who_as_bullets() -> None:
                 "example": TwitchUser(user_id="42", login="example", display_name="Example"),
                 "alice": TwitchUser(user_id="7", login="alice", display_name="Alice"),
             }
-        ),  # type: ignore[arg-type]
+        ),
         tracked_user_repository=tracked_user_repository,
     )
 
@@ -1447,7 +1461,8 @@ async def test_tracking_service_sends_embed_for_matching_ping_with_pattern_color
     channel_repository = InMemoryChannelRepository()
     await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    await pattern_repository.add_pattern(
+    await _add_pattern(
+        pattern_repository,
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="all_tracked",
@@ -1473,7 +1488,7 @@ async def test_tracking_service_sends_embed_for_matching_ping_with_pattern_color
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         message_repository=InMemoryMessageRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         notifier=notifier,
     )
 
@@ -1503,7 +1518,8 @@ async def test_tracking_service_refreshes_missing_author_profile_image_for_track
     channel_repository = InMemoryChannelRepository()
     await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    await pattern_repository.add_pattern(
+    await _add_pattern(
+        pattern_repository,
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="all_tracked",
@@ -1540,7 +1556,7 @@ async def test_tracking_service_refreshes_missing_author_profile_image_for_track
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         message_repository=InMemoryMessageRepository(),
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         notifier=notifier,
     )
 
@@ -1569,7 +1585,8 @@ async def test_tracking_service_sends_embed_for_case_sensitive_ping_match() -> N
     channel_repository = InMemoryChannelRepository()
     await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    await pattern_repository.add_pattern(
+    await _add_pattern(
+        pattern_repository,
         thread_id=thread.thread_id,
         regex="test",
         channel_scope_mode="all_tracked",
@@ -1595,7 +1612,7 @@ async def test_tracking_service_sends_embed_for_case_sensitive_ping_match() -> N
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         message_repository=InMemoryMessageRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         notifier=notifier,
     )
 
@@ -1622,7 +1639,8 @@ async def test_tracking_service_uses_highest_priority_match_and_stops_after_firs
     channel_repository = InMemoryChannelRepository()
     await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    await pattern_repository.add_pattern(
+    await _add_pattern(
+        pattern_repository,
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="all_tracked",
@@ -1637,7 +1655,8 @@ async def test_tracking_service_uses_highest_priority_match_and_stops_after_firs
         disabled=False,
         priority=1,
     )
-    await pattern_repository.add_pattern(
+    await _add_pattern(
+        pattern_repository,
         thread_id=thread.thread_id,
         regex="hello there",
         channel_scope_mode="all_tracked",
@@ -1663,7 +1682,7 @@ async def test_tracking_service_uses_highest_priority_match_and_stops_after_firs
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         message_repository=InMemoryMessageRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         notifier=notifier,
     )
 
@@ -1692,7 +1711,8 @@ async def test_tracking_service_skips_normal_embed_when_pattern_has_enabled_repl
     channel_repository = InMemoryChannelRepository()
     await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    await pattern_repository.add_pattern(
+    await _add_pattern(
+        pattern_repository,
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="all_tracked",
@@ -1721,7 +1741,7 @@ async def test_tracking_service_skips_normal_embed_when_pattern_has_enabled_repl
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         message_repository=InMemoryMessageRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         notifier=notifier,
     )
 
@@ -1748,7 +1768,8 @@ async def test_show_command_lists_patterns_in_creation_order() -> None:
     thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
     channel_repository = InMemoryChannelRepository()
     pattern_repository = InMemoryPatternRepository()
-    await pattern_repository.add_pattern(
+    await _add_pattern(
+        pattern_repository,
         thread_id=thread.thread_id,
         regex="general",
         channel_scope_mode="all_tracked",
@@ -1763,7 +1784,8 @@ async def test_show_command_lists_patterns_in_creation_order() -> None:
         disabled=False,
         priority=1,
     )
-    await pattern_repository.add_pattern(
+    await _add_pattern(
+        pattern_repository,
         thread_id=thread.thread_id,
         regex="specific",
         channel_scope_mode="only_selected",
@@ -1788,7 +1810,7 @@ async def test_show_command_lists_patterns_in_creation_order() -> None:
                 "example": TwitchUser(user_id="42", login="example", display_name="Example"),
                 "alice": TwitchUser(user_id="7", login="alice", display_name="Alice"),
             }
-        ),  # type: ignore[arg-type]
+        ),
     )
 
     result = await dispatch_show_command(
@@ -1807,7 +1829,8 @@ async def test_show_command_lists_patterns_in_creation_order() -> None:
 @pytest.mark.asyncio
 async def test_display_index_stays_stable_when_pattern_priority_changes() -> None:
     pattern_repository = InMemoryPatternRepository()
-    first = await pattern_repository.add_pattern(
+    first = await _add_pattern(
+        pattern_repository,
         thread_id=1,
         regex="first",
         channel_scope_mode="all_tracked",
@@ -1822,7 +1845,8 @@ async def test_display_index_stays_stable_when_pattern_priority_changes() -> Non
         disabled=False,
         priority=1,
     )
-    second = await pattern_repository.add_pattern(
+    second = await _add_pattern(
+        pattern_repository,
         thread_id=1,
         regex="second",
         channel_scope_mode="all_tracked",
@@ -1854,7 +1878,8 @@ async def test_tracking_service_respects_all_except_selected_user_scope() -> Non
     channel_repository = InMemoryChannelRepository()
     await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    await pattern_repository.add_pattern(
+    await _add_pattern(
+        pattern_repository,
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="all_tracked",
@@ -1880,7 +1905,7 @@ async def test_tracking_service_respects_all_except_selected_user_scope() -> Non
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         message_repository=InMemoryMessageRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         notifier=notifier,
     )
 
@@ -1911,7 +1936,8 @@ async def test_tracking_service_respects_all_tracked_except_selected_user_scope(
     await tracked_user_repository.add_user(thread_id=thread.thread_id, twitch_user_id="7")
     await tracked_user_repository.add_user(thread_id=thread.thread_id, twitch_user_id="8")
     pattern_repository = InMemoryPatternRepository()
-    await pattern_repository.add_pattern(
+    await _add_pattern(
+        pattern_repository,
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="all_tracked",
@@ -1938,7 +1964,7 @@ async def test_tracking_service_respects_all_tracked_except_selected_user_scope(
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         message_repository=InMemoryMessageRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         notifier=notifier,
     )
 
@@ -1967,7 +1993,8 @@ async def test_tracking_service_skips_disabled_thread() -> None:
     channel_repository = InMemoryChannelRepository()
     await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    await pattern_repository.add_pattern(
+    await _add_pattern(
+        pattern_repository,
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="all_tracked",
@@ -1993,7 +2020,7 @@ async def test_tracking_service_skips_disabled_thread() -> None:
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         message_repository=InMemoryMessageRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         notifier=notifier,
     )
 
@@ -2021,7 +2048,8 @@ async def test_tracking_service_uses_persisted_channel_live_state_without_twitch
     await channel_repository.add_channel(thread.thread_id, "42")
     await channel_repository.set_live_state_for_twitch_channel(twitch_channel_id="42", is_live=True, changed_at="now")
     pattern_repository = InMemoryPatternRepository()
-    await pattern_repository.add_pattern(
+    await _add_pattern(
+        pattern_repository,
         thread_id=thread.thread_id,
         regex="hello",
         channel_scope_mode="all_tracked",
@@ -2048,7 +2076,7 @@ async def test_tracking_service_uses_persisted_channel_live_state_without_twitch
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         message_repository=InMemoryMessageRepository(),
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         notifier=notifier,
     )
 
@@ -2076,7 +2104,8 @@ async def test_tracking_service_matches_usernotice_system_message_content() -> N
     channel_repository = InMemoryChannelRepository()
     await channel_repository.add_channel(thread.thread_id, "42")
     pattern_repository = InMemoryPatternRepository()
-    await pattern_repository.add_pattern(
+    await _add_pattern(
+        pattern_repository,
         thread_id=thread.thread_id,
         regex="gifted a Tier 1 sub",
         channel_scope_mode="all_tracked",
@@ -2102,7 +2131,7 @@ async def test_tracking_service_matches_usernotice_system_message_content() -> N
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         message_repository=InMemoryMessageRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         notifier=notifier,
     )
 

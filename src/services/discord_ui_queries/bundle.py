@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class DiscordUIQueryBundle:
+    """Container for every read-side service used by Discord UI flows."""
+
     channels: TrackedChannelQueryService
     patterns: PatternQueryService
     users: TrackedUserQueryService

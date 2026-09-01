@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from src.events.ui_flow import DiscordUIFlowDecision, RequestUIFlowCommand, UIFlowKind, UIFlowStep
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
+from src.events.ui_flow import DiscordUIFlowDecision, RequestUIFlowCommand, UIFlowKind, UIFlowStep
 
 
 async def dispatch_ui_flow_decision(

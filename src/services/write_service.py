@@ -6,24 +6,31 @@ import logging
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from src.gateways.twitch_api import TwitchAuthenticationError
-from src.database.connection import ChannelRepository, ThreadRepository, TwitchAccountRepository, UserPermissionRepository
+from src.database.connection import (
+    ChannelRepository,
+    ThreadRepository,
+    TwitchAccountRecord,
+    TwitchAccountRepository,
+    UserPermissionRepository,
+)
 from src.discord_results import build_thread_result
 from src.events.commands import SendTwitchMessageCommand
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
+from src.events.twitch_events import TwitchChatSendRequest
+from src.gateways.twitch_api import TwitchAuthenticationError
 from src.localization import Localizer
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
 from src.services.twitch_gateways import TwitchAuthGateway, TwitchChannelLookup, TwitchChatGateway
-from src.services.twitch_runtime import ensure_fresh_linked_account, refresh_linked_account
+from src.services.twitch_runtime import LinkedTwitchAccountRefreshContext, ensure_fresh_linked_account, refresh_linked_account
 from src.utils.permissions import ObserverPermission
 
 logger = logging.getLogger(__name__)
 
+TWITCH_CHAT_MESSAGE_MAX_LENGTH = 500
+
 
 class TwitchWriteGateway(TwitchChannelLookup, TwitchChatGateway, TwitchAuthGateway, Protocol):
     """Combined protocol for manual Twitch writes."""
-
-    pass
 
 
 @dataclass(slots=True)
@@ -41,6 +48,7 @@ class TwitchWriteCommandService:
     _runner: CommandExecutionRunner = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Build shared command guards and error handling after injection."""
         self._guards = ThreadCommandGuards(
             thread_repository=self.thread_repository,
             permission_repository=self.permission_repository,
@@ -57,6 +65,7 @@ class TwitchWriteCommandService:
         )
 
     async def handle_request(self, command: SendTwitchMessageCommand) -> DiscordCommandResult:
+        """Validate and send one manual Twitch chat message request."""
         return await self._runner.run(command, lambda: self._send_message(command), logger_=logger)
 
     async def _send_message(self, command: SendTwitchMessageCommand) -> DiscordCommandResult:
@@ -71,7 +80,7 @@ class TwitchWriteCommandService:
         message = command.message.strip()
         if not message:
             raise ValueError(self.localizer.text("results.write.empty_message", language=thread.language))
-        if len(message) > 500:
+        if len(message) > TWITCH_CHAT_MESSAGE_MAX_LENGTH:
             raise ValueError(self.localizer.text("results.write.message_too_long", language=thread.language))
         twitch_channel = await self.twitch_api.refresh_channel_by_login(command.twitch_channel_login)
         tracked_channel = await self.channel_repository.get_by_thread_and_twitch_channel(thread.thread_id, twitch_channel.user_id)
@@ -90,33 +99,33 @@ class TwitchWriteCommandService:
         if isinstance(account, DiscordCommandResult):
             return account
 
+        refresh_context = LinkedTwitchAccountRefreshContext(
+            account_repository=self.account_repository,
+            twitch_auth=self.twitch_api,
+            thread_repository=self.thread_repository,
+            thread=thread,
+        )
         account = (
             await ensure_fresh_linked_account(
                 account=account,
-                account_repository=self.account_repository,
-                twitch_auth=self.twitch_api,
+                context=refresh_context,
                 token_refresh_skew_seconds=self.token_refresh_skew_seconds,
-                thread_repository=self.thread_repository,
-                thread=thread,
             )
             or account
         )
         try:
             await self.twitch_api.send_chat_message(
-                access_token=account.access_token,
-                client_id=account.client_id,
-                sender_id=account.twitch_user_id,
-                broadcaster_id=twitch_channel.user_id,
-                message=message,
-                reply_parent_message_id=command.reply_parent_message_id,
+                self._build_send_request(
+                    account=account,
+                    broadcaster_id=twitch_channel.user_id,
+                    message=message,
+                    reply_parent_message_id=command.reply_parent_message_id,
+                )
             )
         except TwitchAuthenticationError:
             refreshed = await refresh_linked_account(
                 account=account,
-                account_repository=self.account_repository,
-                twitch_auth=self.twitch_api,
-                thread_repository=self.thread_repository,
-                thread=thread,
+                context=refresh_context,
             )
             if refreshed is None:
                 if thread.account_id is not None:
@@ -131,12 +140,12 @@ class TwitchWriteCommandService:
                     ephemeral=True,
                 )
             await self.twitch_api.send_chat_message(
-                access_token=refreshed.access_token,
-                client_id=refreshed.client_id,
-                sender_id=refreshed.twitch_user_id,
-                broadcaster_id=twitch_channel.user_id,
-                message=message,
-                reply_parent_message_id=command.reply_parent_message_id,
+                self._build_send_request(
+                    account=refreshed,
+                    broadcaster_id=twitch_channel.user_id,
+                    message=message,
+                    reply_parent_message_id=command.reply_parent_message_id,
+                )
             )
 
         if command.reply_parent_message_id:
@@ -173,3 +182,20 @@ class TwitchWriteCommandService:
     @staticmethod
     def _channel_view(display_name: str, login: str) -> dict[str, object]:
         return {"channel": {"display_name": display_name, "login": login}}
+
+    @staticmethod
+    def _build_send_request(
+        *,
+        account: TwitchAccountRecord,
+        broadcaster_id: str,
+        message: str,
+        reply_parent_message_id: str | None,
+    ) -> TwitchChatSendRequest:
+        return TwitchChatSendRequest(
+            access_token=account.access_token,
+            client_id=account.client_id,
+            sender_id=account.twitch_user_id,
+            broadcaster_id=broadcaster_id,
+            message=message,
+            reply_parent_message_id=reply_parent_message_id,
+        )

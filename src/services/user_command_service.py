@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from src.database.connection import ThreadRepository, TrackedUserRepository, UserPermissionRepository
+from src.database.connection import ThreadRecord, ThreadRepository, TrackedUserRepository, UserPermissionRepository
 from src.discord_results import build_thread_result
 from src.events.commands import AddTrackedUserCommand, RemoveTrackedUserCommand
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
@@ -30,6 +30,7 @@ class UserCommandService:
     _guards: ThreadCommandGuards = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Build shared command guards and error handling after injection."""
         self._runner = CommandExecutionRunner(
             localizer=self.localizer,
             resolve_thread=self._resolve_thread,
@@ -46,9 +47,11 @@ class UserCommandService:
         )
 
     async def handle_add(self, command: AddTrackedUserCommand) -> DiscordCommandResult:
+        """Add a tracked Twitch user to the current Discord context."""
         return await self._runner.run(command, lambda: self._add_user(command), logger_=logger)
 
     async def handle_remove(self, command: RemoveTrackedUserCommand) -> DiscordCommandResult:
+        """Remove a tracked Twitch user from the current Discord context."""
         return await self._runner.run(command, lambda: self._remove_user(command), logger_=logger)
 
     async def _add_user(self, command: AddTrackedUserCommand) -> DiscordCommandResult:
@@ -137,7 +140,7 @@ class UserCommandService:
             },
         )
 
-    async def _resolve_thread(self, command: AddTrackedUserCommand | RemoveTrackedUserCommand):
+    async def _resolve_thread(self, command: AddTrackedUserCommand | RemoveTrackedUserCommand) -> ThreadRecord | None:
         return await self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
 
     @staticmethod

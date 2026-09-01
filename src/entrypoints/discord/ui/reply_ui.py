@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import discord
 
-from src.entrypoints.discord.service_bundle import DiscordServiceBundle
+from src.events.commands import AddChannelEventReplyCommand, AddPatternReplyCommand
 from src.localization import Localizer
 
 from ..dispatch import (
@@ -25,6 +25,7 @@ from ..ui_data import (
     ReplyPresentation,
 )
 from .selects import window_with_included_items
+from .shared import DiscordModalContext
 
 
 def _pattern_label(pattern: PatternPresentation, *, localizer: Localizer, language: str, scope: str) -> str:
@@ -73,64 +74,67 @@ class PatternReplyAddModal(discord.ui.Modal):
     def __init__(
         self,
         *,
-        services: DiscordServiceBundle,
-        discord_channel_id: int,
-        requester_id: int,
+        context: DiscordModalContext,
         patterns: list[PatternPresentation],
-        localizer: Localizer,
-        language: str,
         default_pattern_id: int | None = None,
         default_message: str | None = None,
         default_reply_as_reply: bool = False,
-        bound_message: discord.InteractionMessage | None = None,
     ) -> None:
-        super().__init__(title=localizer.text("discord.reply_ui.pattern_add.title", language=language), timeout=300)
-        self._services = services
-        self._discord_channel_id = discord_channel_id
-        self._requester_id = requester_id
-        self._bound_message = bound_message
+        """Create the modal used to add or edit a pattern auto-reply."""
+        super().__init__(
+            title=context.localizer.text("discord.reply_ui.pattern_add.title", language=context.language),
+            timeout=300,
+        )
+        self._context = context
         visible_patterns = window_with_included_items(
             patterns,
             key=lambda pattern: pattern.pattern.pattern_id,
             included_keys=[default_pattern_id] if default_pattern_id is not None else [],
         )
         self.message = discord.ui.TextInput(
-            label=localizer.text("discord.reply_ui.pattern_add.message_label", language=language),
+            label=context.localizer.text("discord.reply_ui.pattern_add.message_label", language=context.language),
             style=discord.TextStyle.paragraph,
             default=default_message,
-            placeholder=localizer.text(
+            placeholder=context.localizer.text(
                 "discord.reply_ui.pattern_add.message_placeholder",
-                language=language,
-                sources={"view": {"example_name": localizer.text("discord.reply_ui.pattern_add.example_name", language=language)}},
+                language=context.language,
+                sources={
+                    "view": {
+                        "example_name": context.localizer.text(
+                            "discord.reply_ui.pattern_add.example_name",
+                            language=context.language,
+                        )
+                    }
+                },
             ),
             required=True,
             max_length=500,
         )
         self.pattern = discord.ui.Label(
-            text=localizer.text("discord.reply_ui.pattern_add.pattern_label", language=language),
-            description=localizer.text("discord.reply_ui.pattern_add.pattern_description", language=language),
+            text=context.localizer.text("discord.reply_ui.pattern_add.pattern_label", language=context.language),
+            description=context.localizer.text("discord.reply_ui.pattern_add.pattern_description", language=context.language),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
                         label=_pattern_label(
                             pattern,
-                            localizer=localizer,
-                            language=language,
+                            localizer=context.localizer,
+                            language=context.language,
                             scope="discord.reply_ui.pattern_add",
                         ),
                         value=_encode_pattern_target(pattern.pattern.pattern_id),
                         default=pattern.pattern.pattern_id == default_pattern_id,
-                        description=localizer.text(
+                        description=context.localizer.text(
                             "discord.reply_ui.pattern_add.pattern_option_description",
-                            language=language,
+                            language=context.language,
                             sources={
                                 "view": {
                                     "display_id": pattern.display_index,
-                                    "ping_mode": localizer.text(
+                                    "ping_mode": context.localizer.text(
                                         "discord.pattern_ui.summary.mode_regex"
                                         if pattern.pattern.is_regex
                                         else "discord.pattern_ui.summary.mode_word",
-                                        language=language,
+                                        language=context.language,
                                     ),
                                 }
                             },
@@ -143,16 +147,16 @@ class PatternReplyAddModal(discord.ui.Modal):
             ),
         )
         self.mode = discord.ui.Label(
-            text=localizer.text("discord.reply_ui.pattern_add.mode_label", language=language),
+            text=context.localizer.text("discord.reply_ui.pattern_add.mode_label", language=context.language),
             component=discord.ui.RadioGroup(
                 options=[
                     discord.RadioGroupOption(
-                        label=localizer.text("discord.reply_ui.pattern_add.mode_message", language=language),
+                        label=context.localizer.text("discord.reply_ui.pattern_add.mode_message", language=context.language),
                         value="message",
                         default=not default_reply_as_reply,
                     ),
                     discord.RadioGroupOption(
-                        label=localizer.text("discord.reply_ui.pattern_add.mode_reply", language=language),
+                        label=context.localizer.text("discord.reply_ui.pattern_add.mode_reply", language=context.language),
                         value="reply",
                         default=default_reply_as_reply,
                     ),
@@ -164,17 +168,20 @@ class PatternReplyAddModal(discord.ui.Modal):
         self.add_item(self.mode)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        """Dispatch creation of a pattern-bound auto-reply."""
         await defer_interaction_response(interaction, ephemeral=True)
         _, pattern_id = _decode_target(self.pattern.component.values[0])
         result = await dispatch_add_pattern_reply(
-            self._services,
-            discord_channel_id=self._discord_channel_id,
-            requester_id=self._requester_id,
-            pattern_id=pattern_id,
-            message=normalize_optional_text(self.message.value),
-            reply_as_reply=self.mode.component.value == "reply",
+            self._context.services,
+            AddPatternReplyCommand(
+                discord_channel_id=self._context.discord_channel_id,
+                requester_id=self._context.requester_id,
+                pattern_id=pattern_id,
+                message=normalize_optional_text(self.message.value),
+                reply_as_reply=self.mode.component.value == "reply",
+            ),
         )
-        await complete_bound_result(interaction, bound_message=self._bound_message, result=result)
+        await complete_bound_result(interaction, bound_message=self._context.bound_message, result=result)
 
 
 class EventReplyAddModal(discord.ui.Modal):
@@ -183,37 +190,39 @@ class EventReplyAddModal(discord.ui.Modal):
     def __init__(
         self,
         *,
-        services: DiscordServiceBundle,
-        discord_channel_id: int,
-        requester_id: int,
+        context: DiscordModalContext,
         adapter_events: list[AdapterEventPresentation],
-        localizer: Localizer,
-        language: str,
         default_event_id: int | None = None,
         default_message: str | None = None,
-        bound_message: discord.InteractionMessage | None = None,
     ) -> None:
-        super().__init__(title=localizer.text("discord.reply_ui.event_add.title", language=language), timeout=300)
-        self._services = services
-        self._discord_channel_id = discord_channel_id
-        self._requester_id = requester_id
-        self._bound_message = bound_message
+        """Create the modal used to add a live/offline auto-reply."""
+        super().__init__(
+            title=context.localizer.text("discord.reply_ui.event_add.title", language=context.language),
+            timeout=300,
+        )
+        self._context = context
         visible_events = window_with_included_items(
             adapter_events,
             key=lambda event: event.event.event_id,
             included_keys=[default_event_id] if default_event_id is not None else [],
         )
         self.message = discord.ui.TextInput(
-            label=localizer.text("discord.reply_ui.event_add.message_label", language=language),
+            label=context.localizer.text("discord.reply_ui.event_add.message_label", language=context.language),
             style=discord.TextStyle.paragraph,
             default=default_message,
-            placeholder=localizer.text(
+            placeholder=context.localizer.text(
                 "discord.reply_ui.event_add.message_placeholder",
-                language=language,
+                language=context.language,
                 sources={
                     "view": {
-                        "example_channel": localizer.text("discord.reply_ui.event_add.example_channel", language=language),
-                        "example_state": localizer.text("discord.reply_ui.event_add.example_state", language=language),
+                        "example_channel": context.localizer.text(
+                            "discord.reply_ui.event_add.example_channel",
+                            language=context.language,
+                        ),
+                        "example_state": context.localizer.text(
+                            "discord.reply_ui.event_add.example_state",
+                            language=context.language,
+                        ),
                     }
                 },
             ),
@@ -221,29 +230,29 @@ class EventReplyAddModal(discord.ui.Modal):
             max_length=500,
         )
         self.adapter_event = discord.ui.Label(
-            text=localizer.text("discord.reply_ui.event_add.trigger_label", language=language),
-            description=localizer.text("discord.reply_ui.event_add.trigger_description", language=language),
+            text=context.localizer.text("discord.reply_ui.event_add.trigger_label", language=context.language),
+            description=context.localizer.text("discord.reply_ui.event_add.trigger_description", language=context.language),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
                         label=_adapter_event_label(
                             event,
-                            localizer=localizer,
-                            language=language,
+                            localizer=context.localizer,
+                            language=context.language,
                             scope="discord.reply_ui.event_add",
                         ),
                         value=_encode_adapter_event_target(event.event.event_id),
                         default=event.event.event_id == default_event_id,
-                        description=localizer.text(
+                        description=context.localizer.text(
                             "discord.reply_ui.event_add.trigger_option_description",
-                            language=language,
+                            language=context.language,
                             sources={
                                 "view": {
                                     "login": event.channel.login[:80],
                                     "state": _event_state_label(
                                         event.event.event_key,
-                                        localizer=localizer,
-                                        language=language,
+                                        localizer=context.localizer,
+                                        language=context.language,
                                         scope="discord.reply_ui.event_add",
                                     ).lower(),
                                 }
@@ -260,17 +269,20 @@ class EventReplyAddModal(discord.ui.Modal):
         self.add_item(self.adapter_event)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        """Dispatch creation of a live/offline auto-reply action."""
         await defer_interaction_response(interaction, ephemeral=True)
         _, adapter_event_id = _decode_target(self.adapter_event.component.values[0])
         result = await dispatch_add_channel_event_reply(
-            self._services,
-            discord_channel_id=self._discord_channel_id,
-            requester_id=self._requester_id,
-            adapter_event_id=adapter_event_id,
-            message=normalize_optional_text(self.message.value),
-            reply_as_reply=False,
+            self._context.services,
+            AddChannelEventReplyCommand(
+                discord_channel_id=self._context.discord_channel_id,
+                requester_id=self._context.requester_id,
+                adapter_event_id=adapter_event_id,
+                message=normalize_optional_text(self.message.value),
+                reply_as_reply=False,
+            ),
         )
-        await complete_bound_result(interaction, bound_message=self._bound_message, result=result)
+        await complete_bound_result(interaction, bound_message=self._context.bound_message, result=result)
 
 
 class ReplyActionModal(discord.ui.Modal):
@@ -280,38 +292,31 @@ class ReplyActionModal(discord.ui.Modal):
         self,
         *,
         title: str,
-        services: DiscordServiceBundle,
-        discord_channel_id: int,
-        requester_id: int,
+        context: DiscordModalContext,
         action: str,
         replies: list[ReplyPresentation | AdapterEventActionPresentation],
-        localizer: Localizer,
-        language: str,
-        bound_message: discord.InteractionMessage | None = None,
     ) -> None:
+        """Create the modal used to select an existing reply action."""
         super().__init__(title=title, timeout=300)
-        self._services = services
-        self._discord_channel_id = discord_channel_id
-        self._requester_id = requester_id
+        self._context = context
         self._action = action
-        self._bound_message = bound_message
         self.reply = discord.ui.Label(
-            text=localizer.text("discord.reply_ui.action.reply_label", language=language),
-            description=localizer.text("discord.reply_ui.action.reply_description", language=language),
+            text=context.localizer.text("discord.reply_ui.action.reply_label", language=context.language),
+            description=context.localizer.text("discord.reply_ui.action.reply_description", language=context.language),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
                         label=_reply_label(reply),
                         value=_encode_pattern_target(reply.reply.pattern_id),
-                        description=localizer.text(
+                        description=context.localizer.text(
                             "discord.reply_ui.action.linked_pattern_description",
-                            language=language,
+                            language=context.language,
                             sources={
                                 "view": {
                                     "pattern": _pattern_label(
                                         reply.pattern,
-                                        localizer=localizer,
-                                        language=language,
+                                        localizer=context.localizer,
+                                        language=context.language,
                                         scope="discord.reply_ui.action",
                                     )
                                 }
@@ -322,18 +327,21 @@ class ReplyActionModal(discord.ui.Modal):
                     else discord.SelectOption(
                         label=(
                             reply.action.message_template
-                            or localizer.text("discord.reply_ui.action.untitled_event_action", language=language)
+                            or context.localizer.text(
+                                "discord.reply_ui.action.untitled_event_action",
+                                language=context.language,
+                            )
                         )[:100],
                         value=_encode_adapter_event_target(reply.event.event.event_id),
-                        description=localizer.text(
+                        description=context.localizer.text(
                             "discord.reply_ui.action.linked_event_description",
-                            language=language,
+                            language=context.language,
                             sources={
                                 "view": {
                                     "event": _adapter_event_label(
                                         reply.event,
-                                        localizer=localizer,
-                                        language=language,
+                                        localizer=context.localizer,
+                                        language=context.language,
                                         scope="discord.reply_ui.action",
                                     )
                                 }
@@ -349,49 +357,50 @@ class ReplyActionModal(discord.ui.Modal):
         self.add_item(self.reply)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        """Dispatch enable, disable, or remove for the selected reply target."""
         await defer_interaction_response(interaction, ephemeral=True)
         target_type, identifier = _decode_target(self.reply.component.values[0])
         if target_type == "pattern":
             if self._action == "remove":
                 result = await dispatch_remove_pattern_reply(
-                    self._services,
-                    discord_channel_id=self._discord_channel_id,
-                    requester_id=self._requester_id,
+                    self._context.services,
+                    discord_channel_id=self._context.discord_channel_id,
+                    requester_id=self._context.requester_id,
                     pattern_id=identifier,
                 )
             elif self._action == "disable":
                 result = await dispatch_disable_pattern_reply(
-                    self._services,
-                    discord_channel_id=self._discord_channel_id,
-                    requester_id=self._requester_id,
+                    self._context.services,
+                    discord_channel_id=self._context.discord_channel_id,
+                    requester_id=self._context.requester_id,
                     pattern_id=identifier,
                 )
             else:
                 result = await dispatch_enable_pattern_reply(
-                    self._services,
-                    discord_channel_id=self._discord_channel_id,
-                    requester_id=self._requester_id,
+                    self._context.services,
+                    discord_channel_id=self._context.discord_channel_id,
+                    requester_id=self._context.requester_id,
                     pattern_id=identifier,
                 )
         elif self._action == "remove":
             result = await dispatch_remove_channel_event_reply(
-                self._services,
-                discord_channel_id=self._discord_channel_id,
-                requester_id=self._requester_id,
+                self._context.services,
+                discord_channel_id=self._context.discord_channel_id,
+                requester_id=self._context.requester_id,
                 adapter_event_id=identifier,
             )
         elif self._action == "disable":
             result = await dispatch_disable_channel_event_reply(
-                self._services,
-                discord_channel_id=self._discord_channel_id,
-                requester_id=self._requester_id,
+                self._context.services,
+                discord_channel_id=self._context.discord_channel_id,
+                requester_id=self._context.requester_id,
                 adapter_event_id=identifier,
             )
         else:
             result = await dispatch_enable_channel_event_reply(
-                self._services,
-                discord_channel_id=self._discord_channel_id,
-                requester_id=self._requester_id,
+                self._context.services,
+                discord_channel_id=self._context.discord_channel_id,
+                requester_id=self._context.requester_id,
                 adapter_event_id=identifier,
             )
-        await complete_bound_result(interaction, bound_message=self._bound_message, result=result)
+        await complete_bound_result(interaction, bound_message=self._context.bound_message, result=result)

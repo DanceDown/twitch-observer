@@ -15,4 +15,6 @@ class AccountNotificationSender(Protocol):
         discord_user_id: int,
         discord_channel_id: int | None,
         result: DiscordCommandResult,
-    ) -> None: ...
+    ) -> None:
+        """Send one account-linking result to Discord."""
+        ...

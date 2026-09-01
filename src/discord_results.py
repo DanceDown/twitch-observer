@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Mapping
+from collections.abc import Mapping
 
 from src.database.records import ThreadRecord
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import LocalizationError, Localizer
 
 
-def build_result(
+# Result builders intentionally expose all Discord embed/result presentation knobs at one call site.
+def build_result(  # noqa: PLR0913
     localizer: Localizer,
     key: str,
     *,
@@ -26,15 +27,15 @@ def build_result(
     """Build one Discord command result from a localized `title`/`body`/`footer` object."""
     value = localizer.value(key, language=language)
     if not isinstance(value, dict):
-        raise LocalizationError(f"Translation key {key!r} is not an object.")
+        raise LocalizationError.translation_key_not_object(key)
     title = value.get("title")
     body = value.get("body")
     footer = value.get("footer")
     placeholder_specs = value.get("placeholders")
     if not isinstance(title, str) or not isinstance(body, str) or not isinstance(footer, str):
-        raise LocalizationError(f"Translation result {key!r} must contain string title/body/footer.")
+        raise LocalizationError.translation_result_missing_strings(key)
     if placeholder_specs is not None and not isinstance(placeholder_specs, dict):
-        raise LocalizationError(f"Translation result {key!r} must contain object placeholders when provided.")
+        raise LocalizationError.translation_result_invalid_placeholders(key)
     return DiscordCommandResult(
         title=localizer.render_with_placeholders(
             title,
@@ -65,7 +66,8 @@ def build_result(
     )
 
 
-def build_thread_result(
+# Thread results mirror `build_result` and add only language/thread source resolution.
+def build_thread_result(  # noqa: PLR0913
     localizer: Localizer,
     key: str,
     *,

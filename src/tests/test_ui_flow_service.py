@@ -54,12 +54,14 @@ class EmptyReplyRepository(ReplyRepository):
 
 class EmptyAccountRepository(TwitchAccountRepository):
     async def get_by_account_id(self, account_id: int):
-        return None
+        _ = account_id
+        return
 
 
 class EmptyPermissionRepository(UserPermissionRepository):
     async def get_by_user_and_thread(self, *, discord_user_id: int, thread_id: int):
-        return None
+        _ = discord_user_id, thread_id
+        return
 
 
 @pytest.mark.asyncio

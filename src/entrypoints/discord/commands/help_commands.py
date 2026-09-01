@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import discord
 
+from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.events.discord_results import DiscordResultStyle
 from src.localization import Localizer
 from src.services.help_service import HELP_SECTIONS
-from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
 from ..dispatch import dispatch_help
 from ..helpers import resolve_interaction_language, send_initial_result
 from ..ui.show_ui import ShowPaginationView, build_show_pages
 from ..ui_data import DiscordUIDataProvider
+from .localized import command_descriptions, command_text
 
 
 def register_help_commands(
@@ -22,10 +23,14 @@ def register_help_commands(
     localizer: Localizer,
 ) -> None:
     """Register the single-word `/help` command."""
-    section_choices = [discord.app_commands.Choice(name=section, value=section) for section in HELP_SECTIONS]
+    _ = ui_data_provider
 
-    @tree.command(name="help", description="Explain how to use the bot.")
-    @discord.app_commands.describe(section="Optional topic; leave empty for the general introduction.")
+    section_choices = [
+        discord.app_commands.Choice(name=command_text(localizer, f"help.choices.{section}"), value=section) for section in HELP_SECTIONS
+    ]
+
+    @tree.command(name="help", description=command_text(localizer, "help.description"))
+    @discord.app_commands.describe(**command_descriptions(localizer, section="help.options.section"))
     @discord.app_commands.choices(section=section_choices)
     async def help_command(
         interaction: discord.Interaction,

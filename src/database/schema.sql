@@ -37,7 +37,10 @@ CREATE TABLE twitch_user_cache (
     twitch_login         TEXT        NOT NULL,
     display_name         TEXT        NOT NULL,
     profile_image_url    TEXT,
-    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    chat_color           TEXT,
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_twitch_user_cache_chat_color_format
+        CHECK (chat_color IS NULL OR chat_color = '' OR chat_color ~ '^#[0-9A-Fa-f]{6}$')
 );
 
 CREATE UNIQUE INDEX idx_twitch_user_cache_login

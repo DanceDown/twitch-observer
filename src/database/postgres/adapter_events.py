@@ -9,6 +9,8 @@ from ..repositories import AdapterEventRepository
 from ._utils import require_row
 from .database import PostgresDatabase
 
+AdapterEventRow = tuple[int, int, str, str, str, str, bool]
+
 
 @dataclass(slots=True)
 class PostgresAdapterEventRepository(AdapterEventRepository):
@@ -25,6 +27,7 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
         subject_id: str,
         event_key: str,
     ) -> AdapterEventRecord:
+        """Create or re-enable an external adapter event trigger."""
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -49,6 +52,7 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
         subject_id: str,
         event_key: str,
     ) -> AdapterEventRecord | None:
+        """Return one external adapter event trigger by its natural key."""
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
@@ -68,6 +72,7 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
         return self._build_record(row)
 
     async def list_events_for_thread(self, thread_id: int, *, include_disabled: bool = True) -> list[AdapterEventRecord]:
+        """Return external adapter events configured for one thread."""
         async with self.database.read_cursor() as cursor:
             if include_disabled:
                 await cursor.execute(
@@ -101,6 +106,7 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
         event_key: str,
         include_disabled: bool = False,
     ) -> list[AdapterEventRecord]:
+        """Return adapter events matching an incoming adapter payload."""
         async with self.database.read_cursor() as cursor:
             if include_disabled:
                 await cursor.execute(
@@ -133,7 +139,7 @@ class PostgresAdapterEventRepository(AdapterEventRepository):
         return [self._build_record(row) for row in rows]
 
     @staticmethod
-    def _build_record(row: tuple) -> AdapterEventRecord:
+    def _build_record(row: AdapterEventRow) -> AdapterEventRecord:
         return AdapterEventRecord(
             event_id=int(row[0]),
             thread_id=int(row[1]),

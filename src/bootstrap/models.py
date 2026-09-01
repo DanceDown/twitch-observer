@@ -45,15 +45,17 @@ if TYPE_CHECKING:
     from src.services.patterns import PatternTrackingService
     from src.services.replies import AutoReplyService, ChannelEventAutoReplyService
     from src.services.runtime_coordinator import ApplicationRuntimeCoordinator
-    from src.services.twitch_service_bundle import TwitchServiceBundle
-    from src.services.twitch_metadata_refresh_service import TwitchMetadataRefreshService
-    from src.services.twitch_live_monitor_service import TwitchLiveMonitorService
     from src.services.tracking_delivery_queue import OrderedTrackingDeliveryService
+    from src.services.twitch_live_monitor_service import TwitchLiveMonitorService
+    from src.services.twitch_metadata_refresh_service import TwitchMetadataRefreshService
+    from src.services.twitch_service_bundle import TwitchServiceBundle
     from src.services.twitch_user_directory_service import TwitchUserDirectoryIngestService, TwitchUserDirectoryService
 
 
 @dataclass(slots=True)
 class ApplicationCore:
+    """Long-lived infrastructure and repositories shared by every runtime component."""
+
     config: AppConfig
     localizer: Localizer
     database: PostgresDatabase
@@ -77,6 +79,8 @@ class ApplicationCore:
 
 @dataclass(slots=True)
 class ApplicationServices:
+    """Application services after business dependencies have been wired together."""
+
     discord: DiscordServiceBundle
     message_ingest: MessageIngestService
     user_directory_ingest: TwitchUserDirectoryIngestService
@@ -94,17 +98,23 @@ class ApplicationServices:
 
 @dataclass(slots=True)
 class ApplicationGateways:
+    """External connection gateways created outside business-service assembly."""
+
     twitch_irc: AnonymousTwitchIRCGateway
 
 
 @dataclass(slots=True)
 class ApplicationEntrypoints:
+    """Runnable Twitch and Discord entrypoints that receive external events."""
+
     twitch_irc: TwitchIRCEntrypoint
     discord: DiscordEntrypoint
 
 
 @dataclass(slots=True)
 class ApplicationRuntime:
+    """Background workers and top-level tasks that must be started and stopped together."""
+
     live_monitor_service: TwitchLiveMonitorService
     metadata_refresh_service: TwitchMetadataRefreshService
     irc_bootstrap_service: IRCBootstrapService

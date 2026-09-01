@@ -11,6 +11,9 @@ from src.events.discord_results import DiscordResultStyle
 
 from .state import PatternEditorMode
 
+PATTERN_PRIORITY_MIN = 0
+PATTERN_PRIORITY_MAX = 9
+
 if TYPE_CHECKING:
     from .home import PatternHomeView
 
@@ -19,6 +22,7 @@ class PatternOptionsModal(discord.ui.Modal):
     """Collect the remaining non-text match options for one ping."""
 
     def __init__(self, *, parent: PatternHomeView) -> None:
+        """Create the modal seeded from the current option state."""
         super().__init__(title=parent.text("discord.pattern_ui.options.title"), timeout=300)
         self._parent_view = parent
         self.sub_state = discord.ui.Label(
@@ -77,6 +81,7 @@ class PatternOptionsModal(discord.ui.Modal):
         self.add_item(self.priority)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        """Validate submitted options and rerender or finish with an error."""
         await defer_interaction_response(interaction)
         self._parent_view.state.sub_state = self.sub_state.component.value
         self._parent_view.state.offline_state = self.offline_state.component.value
@@ -94,7 +99,7 @@ class PatternOptionsModal(discord.ui.Modal):
                     ),
                 )
                 return
-            if parsed < 0 or parsed > 9:
+            if parsed < PATTERN_PRIORITY_MIN or parsed > PATTERN_PRIORITY_MAX:
                 await self._parent_view.finish_with_interaction(
                     interaction,
                     self._parent_view.result(

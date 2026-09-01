@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from src.events.commands import StartAccountLinkCommand, UnlinkAccountCommand
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
+from src.events.commands import StartAccountLinkCommand, UnlinkAccountCommand
+from src.events.discord_results import DiscordCommandResult
 
 
 async def dispatch_start_account_link(
@@ -11,7 +12,8 @@ async def dispatch_start_account_link(
     *,
     requester_id: int,
     discord_channel_id: int | None,
-) -> object:
+) -> DiscordCommandResult:
+    """Dispatch a request to start Twitch account linking."""
     return await services.account.handle_link_command(
         StartAccountLinkCommand(
             requester_id=requester_id,
@@ -25,7 +27,8 @@ async def dispatch_unlink_account(
     *,
     requester_id: int,
     discord_channel_id: int | None,
-) -> object:
+) -> DiscordCommandResult:
+    """Dispatch a request to unlink the current Twitch account."""
     return await services.account.handle_unlink_command(
         UnlinkAccountCommand(
             requester_id=requester_id,

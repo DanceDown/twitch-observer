@@ -14,6 +14,7 @@ from src.database.connection import (
     UserPermissionRepository,
 )
 from src.discord_results import build_thread_result
+from src.errors import ApplicationInvariantError
 from src.events.commands import AddChannelEventCommand, RemoveChannelEventCommand, SetChannelEventColorCommand
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
@@ -35,10 +36,28 @@ logger = logging.getLogger(__name__)
 ChannelEventCommand = AddChannelEventCommand | RemoveChannelEventCommand | SetChannelEventColorCommand
 
 
+def _channel_event_color_clear_missing() -> ApplicationInvariantError:
+    return ApplicationInvariantError.operation_returned_no_row("Adapter event action color clear")
+
+
+def _channel_event_color_update_missing() -> ApplicationInvariantError:
+    return ApplicationInvariantError.operation_returned_no_row("Adapter event action color update")
+
+
 @dataclass(slots=True, frozen=True)
 class _ChannelEventPermissionCommand:
     discord_channel_id: int
     requester_id: int
+
+
+@dataclass(slots=True, frozen=True)
+class _ChannelEventView:
+    state: str
+    channel_display_name: str
+    channel_login: str
+    requester_id: int | None = None
+    display_id: int | None = None
+    color: str | None = None
 
 
 @dataclass(slots=True)
@@ -56,6 +75,7 @@ class ChannelEventCommandService:
     _guards: ThreadCommandGuards = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Build shared command guards and error handling after injection."""
         self._runner = CommandExecutionRunner(
             localizer=self.localizer,
             resolve_thread=self._resolve_thread,
@@ -72,12 +92,15 @@ class ChannelEventCommandService:
         )
 
     async def handle_add_command(self, command: AddChannelEventCommand) -> DiscordCommandResult:
+        """Create or re-enable a live/offline notification action."""
         return await self._runner.run(command, lambda: self._handle_action(command, action="add"), logger_=logger)
 
     async def handle_remove_command(self, command: RemoveChannelEventCommand) -> DiscordCommandResult:
+        """Remove a live/offline notification action."""
         return await self._runner.run(command, lambda: self._handle_action(command, action="remove"), logger_=logger)
 
     async def handle_set_color_command(self, command: SetChannelEventColorCommand) -> DiscordCommandResult:
+        """Set or clear the live/offline notification color override."""
         return await self._runner.run(command, lambda: self._set_color(command), logger_=logger)
 
     async def _handle_action(self, command: ChannelEventCommand, *, action: str) -> DiscordCommandResult:
@@ -105,7 +128,6 @@ class ChannelEventCommandService:
         if action == "remove":
             return await self._update_notification(
                 command,
-                action=action,
                 thread=thread,
                 channel_display_name=channel_display_name,
                 channel_login=channel_login,
@@ -167,11 +189,13 @@ class ChannelEventCommandService:
             ephemeral=ephemeral,
             sources={
                 "view": self._event_view(
-                    requester_id=command.requester_id,
-                    display_id=display_id,
-                    state=self._state_label(command.event_kind.value, thread),
-                    channel_display_name=channel_display_name,
-                    channel_login=channel_login,
+                    _ChannelEventView(
+                        requester_id=command.requester_id,
+                        display_id=display_id,
+                        state=self._state_label(command.event_kind.value, thread),
+                        channel_display_name=channel_display_name,
+                        channel_login=channel_login,
+                    )
                 )
             },
         )
@@ -180,7 +204,6 @@ class ChannelEventCommandService:
         self,
         command: ChannelEventCommand,
         *,
-        action: str,
         thread: ThreadRecord,
         channel_display_name: str,
         channel_login: str,
@@ -210,9 +233,11 @@ class ChannelEventCommandService:
                 ephemeral=True,
                 sources={
                     "view": self._event_view(
-                        state=self._state_label(command.event_kind.value, thread),
-                        channel_display_name=channel_display_name,
-                        channel_login=channel_login,
+                        _ChannelEventView(
+                            state=self._state_label(command.event_kind.value, thread),
+                            channel_display_name=channel_display_name,
+                            channel_login=channel_login,
+                        )
                     )
                 },
             )
@@ -233,11 +258,13 @@ class ChannelEventCommandService:
             ephemeral=False,
             sources={
                 "view": self._event_view(
-                    requester_id=command.requester_id,
-                    display_id=display_id,
-                    state=self._state_label(command.event_kind.value, thread),
-                    channel_display_name=channel_display_name,
-                    channel_login=channel_login,
+                    _ChannelEventView(
+                        requester_id=command.requester_id,
+                        display_id=display_id,
+                        state=self._state_label(command.event_kind.value, thread),
+                        channel_display_name=channel_display_name,
+                        channel_login=channel_login,
+                    )
                 )
             },
         )
@@ -293,9 +320,11 @@ class ChannelEventCommandService:
                 ephemeral=True,
                 sources={
                     "view": self._event_view(
-                        state=self._state_label(command.event_kind.value, thread),
-                        channel_display_name=channel_display_name,
-                        channel_login=channel_login,
+                        _ChannelEventView(
+                            state=self._state_label(command.event_kind.value, thread),
+                            channel_display_name=channel_display_name,
+                            channel_login=channel_login,
+                        )
                     )
                 },
             )
@@ -314,7 +343,7 @@ class ChannelEventCommandService:
             )
 
             if updated is None:
-                raise RuntimeError("Adapter event action repository returned no row for clear color.")
+                raise _channel_event_color_clear_missing()
             return build_thread_result(
                 self.localizer,
                 "results.channel_event.color_cleared",
@@ -323,11 +352,13 @@ class ChannelEventCommandService:
                 ephemeral=False,
                 sources={
                     "view": self._event_view(
-                        requester_id=command.requester_id,
-                        display_id=display_id,
-                        state=self._state_label(command.event_kind.value, thread),
-                        channel_display_name=channel_display_name,
-                        channel_login=channel_login,
+                        _ChannelEventView(
+                            requester_id=command.requester_id,
+                            display_id=display_id,
+                            state=self._state_label(command.event_kind.value, thread),
+                            channel_display_name=channel_display_name,
+                            channel_login=channel_login,
+                        )
                     )
                 },
             )
@@ -341,11 +372,13 @@ class ChannelEventCommandService:
                 ephemeral=True,
                 sources={
                     "view": self._event_view(
-                        display_id=display_id,
-                        state=self._state_label(command.event_kind.value, thread),
-                        channel_display_name=channel_display_name,
-                        channel_login=channel_login,
-                        color=normalized_color,
+                        _ChannelEventView(
+                            display_id=display_id,
+                            state=self._state_label(command.event_kind.value, thread),
+                            channel_display_name=channel_display_name,
+                            channel_login=channel_login,
+                            color=normalized_color,
+                        )
                     )
                 },
             )
@@ -357,7 +390,7 @@ class ChannelEventCommandService:
         )
 
         if updated is None:
-            raise RuntimeError("Adapter event action repository returned no row for set color.")
+            raise _channel_event_color_update_missing()
         return build_thread_result(
             self.localizer,
             "results.channel_event.color_updated",
@@ -366,12 +399,14 @@ class ChannelEventCommandService:
             ephemeral=False,
             sources={
                 "view": self._event_view(
-                    requester_id=command.requester_id,
-                    display_id=display_id,
-                    state=self._state_label(command.event_kind.value, thread),
-                    channel_display_name=channel_display_name,
-                    channel_login=channel_login,
-                    color=updated.color or "",
+                    _ChannelEventView(
+                        requester_id=command.requester_id,
+                        display_id=display_id,
+                        state=self._state_label(command.event_kind.value, thread),
+                        channel_display_name=channel_display_name,
+                        channel_login=channel_login,
+                        color=updated.color or "",
+                    )
                 )
             },
         )
@@ -399,26 +434,18 @@ class ChannelEventCommandService:
         )
 
     @staticmethod
-    def _event_view(
-        *,
-        state: str,
-        channel_display_name: str,
-        channel_login: str,
-        requester_id: int | None = None,
-        display_id: int | None = None,
-        color: str | None = None,
-    ) -> dict[str, object]:
+    def _event_view(event_view: _ChannelEventView) -> dict[str, object]:
         view: dict[str, object] = {
-            "state": state,
+            "state": event_view.state,
             "channel": {
-                "display_name": channel_display_name,
-                "login": channel_login,
+                "display_name": event_view.channel_display_name,
+                "login": event_view.channel_login,
             },
         }
-        if requester_id is not None:
-            view["requester_id"] = requester_id
-        if display_id is not None:
-            view["display_id"] = display_id
-        if color is not None:
-            view["color"] = color
+        if event_view.requester_id is not None:
+            view["requester_id"] = event_view.requester_id
+        if event_view.display_id is not None:
+            view["display_id"] = event_view.display_id
+        if event_view.color is not None:
+            view["color"] = event_view.color
         return view

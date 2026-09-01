@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import aiohttp
@@ -13,18 +13,29 @@ from src.entrypoints.discord.helpers import build_public_result_embed, complete_
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.events.twitch_events import TwitchChatMessageEvent
 from src.localization import Localizer
-from src.utils.discord_embeds import build_channel_event_auto_reply_embed, build_result_embed, build_tracking_embed
+from src.utils.discord_embeds import (
+    ChannelEventAutoReplyEmbedRequest,
+    TrackingEmbedRequest,
+    build_channel_event_auto_reply_embed,
+    build_result_embed,
+    build_tracking_embed,
+)
 
 _MISSING = object()
+PUBLIC_RESULT_MESSAGE = "Added a ping."
+
+
+def _assert_embed_description(embed: discord.Embed | None, expected: str) -> None:
+    assert embed is not None
+    actual = embed.description
+    assert actual == expected
 
 
 def test_public_actor_embed_keeps_direct_user_placeholder_without_duplicate_prefix() -> None:
     localizer = Localizer.from_directory()
-    message = localizer._interpolate(  # type: ignore[attr-defined]
+    message = localizer.render(
         "<@{RAW:view.requester_id}> added a ping: `{CODE:view.ping}`",
-        {"view": {"requester_id": "123", "ping": "alpha"}},
-        language=None,
-        placeholder_specs=None,
+        sources={"view": {"requester_id": "123", "ping": "alpha"}},
     )
     result = DiscordCommandResult(
         title="Ping Added",
@@ -43,15 +54,14 @@ def test_public_actor_embed_keeps_direct_user_placeholder_without_duplicate_pref
 def test_public_actor_embed_keeps_plain_body_when_no_user_placeholder_exists() -> None:
     result = DiscordCommandResult(
         title="Ping Added",
-        message="Added a ping.",
+        message=PUBLIC_RESULT_MESSAGE,
         style=DiscordResultStyle.SUCCESS,
         ephemeral=False,
     )
 
     embed = build_public_result_embed(result)
 
-    assert embed.description is not None
-    assert embed.description == "Added a ping."
+    _assert_embed_description(embed, PUBLIC_RESULT_MESSAGE)
 
 
 class FakeUnknownInteractionError(discord.NotFound):
@@ -133,7 +143,7 @@ async def test_send_initial_result_posts_public_result_even_when_defer_hits_unkn
     )
     result = DiscordCommandResult(
         title="Ping Added",
-        message="Added a ping.",
+        message=PUBLIC_RESULT_MESSAGE,
         style=DiscordResultStyle.SUCCESS,
         ephemeral=False,
     )
@@ -142,7 +152,7 @@ async def test_send_initial_result_posts_public_result_even_when_defer_hits_unkn
 
     assert interaction.channel is not None
     assert len(interaction.channel.sent_embeds) == 1
-    assert interaction.channel.sent_embeds[0].description == "Added a ping."
+    _assert_embed_description(interaction.channel.sent_embeds[0], PUBLIC_RESULT_MESSAGE)
     assert interaction.deleted_original_response is False
 
 
@@ -173,7 +183,7 @@ async def test_complete_bound_result_posts_public_result_even_when_defer_hits_un
     bound_message = FakeBoundMessage()
     result = DiscordCommandResult(
         title="Ping Added",
-        message="Added a ping.",
+        message=PUBLIC_RESULT_MESSAGE,
         style=DiscordResultStyle.SUCCESS,
         ephemeral=False,
     )
@@ -198,7 +208,7 @@ async def test_send_initial_result_retries_transient_public_send_failure(monkeyp
     )
     result = DiscordCommandResult(
         title="Ping Added",
-        message="Added a ping.",
+        message=PUBLIC_RESULT_MESSAGE,
         style=DiscordResultStyle.SUCCESS,
         ephemeral=False,
     )
@@ -226,7 +236,7 @@ async def test_send_initial_result_keeps_result_visible_when_public_send_never_s
     )
     result = DiscordCommandResult(
         title="Ping Added",
-        message="Added a ping.",
+        message=PUBLIC_RESULT_MESSAGE,
         style=DiscordResultStyle.SUCCESS,
         ephemeral=False,
     )
@@ -237,7 +247,7 @@ async def test_send_initial_result_keeps_result_visible_when_public_send_never_s
     assert interaction.channel.sent_embeds == []
     assert interaction.deleted_original_response is False
     assert interaction.edited_original_embed is not None
-    assert interaction.edited_original_embed.description == "Added a ping."
+    _assert_embed_description(interaction.edited_original_embed, PUBLIC_RESULT_MESSAGE)
 
 
 @pytest.mark.asyncio
@@ -256,7 +266,7 @@ async def test_complete_bound_result_keeps_bound_message_when_public_send_never_
     bound_message = FakeBoundMessage()
     result = DiscordCommandResult(
         title="Ping Added",
-        message="Added a ping.",
+        message=PUBLIC_RESULT_MESSAGE,
         style=DiscordResultStyle.SUCCESS,
         ephemeral=False,
     )
@@ -268,16 +278,18 @@ async def test_complete_bound_result_keeps_bound_message_when_public_send_never_
     assert interaction.deleted_original_response is False
     assert bound_message.deleted is False
     assert bound_message.edited_embed is not None
-    assert bound_message.edited_embed.description == "Added a ping."
+    _assert_embed_description(bound_message.edited_embed, PUBLIC_RESULT_MESSAGE)
 
 
 def test_tracking_embed_author_name_is_not_escaped() -> None:
     embed = build_tracking_embed(
-        event=_event(author_display_name="User_*Name*"),
-        pattern=_pattern(),
-        thread=_thread(),
-        localizer=Localizer.from_directory(),
-        channel=ChannelRecord(thread_id=1, twitch_channel_id="42", color=None),
+        TrackingEmbedRequest(
+            event=_event(author_display_name="User_*Name*"),
+            pattern=_pattern(),
+            thread=_thread(),
+            localizer=Localizer.from_directory(),
+            channel=ChannelRecord(thread_id=1, twitch_channel_id="42", color=None),
+        )
     )
 
     assert embed.author.name == "User_*Name*"
@@ -285,14 +297,16 @@ def test_tracking_embed_author_name_is_not_escaped() -> None:
 
 def test_channel_event_embed_author_name_is_not_escaped() -> None:
     embed = build_channel_event_auto_reply_embed(
-        thread=_thread(),
-        localizer=Localizer.from_directory(),
-        channel_display_name="Channel_*Name*",
-        channel_login="channel",
-        state="online",
-        reply_message="Hello",
-        channel=ChannelRecord(thread_id=1, twitch_channel_id="42", color=None),
-        event_color=None,
+        ChannelEventAutoReplyEmbedRequest(
+            thread=_thread(),
+            localizer=Localizer.from_directory(),
+            channel_display_name="Channel_*Name*",
+            channel_login="channel",
+            state="online",
+            reply_message="Hello",
+            channel=ChannelRecord(thread_id=1, twitch_channel_id="42", color=None),
+            event_color=None,
+        )
     )
 
     assert embed.author.name == "Channel_*Name*"

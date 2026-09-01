@@ -81,6 +81,14 @@ Tracking embed color inheritance:
 4. Twitch author color
 5. fallback gray
 
+Live/offline ping color inheritance:
+
+1. live/offline ping color
+2. tracked channel color
+3. Discord context color
+4. Twitch channel chat color
+5. fallback gray
+
 ## Twitch validation dependencies
 
 User-provided Twitch channel and user logins are validated through Helix.

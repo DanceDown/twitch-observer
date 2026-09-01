@@ -4,18 +4,27 @@ from __future__ import annotations
 
 import discord
 
-from src.entrypoints.discord.service_bundle import DiscordServiceBundle
+from src.events.commands import SetChannelEventColorCommand
 from src.events.twitch_events import StreamEventKind
 from src.localization import Localizer
-from ..helpers import defer_interaction_response, normalize_optional_text
+
 from ..dispatch import (
     dispatch_add_channel_event,
     dispatch_remove_channel_event,
     dispatch_set_channel_event_color,
 )
-from ..helpers import complete_bound_result
+from ..helpers import complete_bound_result, defer_interaction_response, normalize_optional_text
 from ..ui_data import AdapterEventActionPresentation, TrackedChannelPresentation
 from .selects import window_with_included_items
+from .shared import DiscordModalContext
+
+
+class UnsupportedLivePingActionError(ValueError):
+    """Raised when a live/offline UI modal receives an unknown action key."""
+
+    def __init__(self, action: str) -> None:
+        """Create an error for an unsupported live-ping action key."""
+        super().__init__(f"Unsupported live ping action `{action}`.")
 
 
 class ChannelEventModal(discord.ui.Modal):
@@ -25,21 +34,14 @@ class ChannelEventModal(discord.ui.Modal):
         self,
         *,
         title: str,
-        services: DiscordServiceBundle,
-        discord_channel_id: int,
-        requester_id: int,
+        context: DiscordModalContext,
         tracked_channels: list[TrackedChannelPresentation],
-        localizer: Localizer,
-        language: str,
         default_channel_id: str | None = None,
         default_event_key: str | None = None,
-        bound_message: discord.InteractionMessage | None = None,
     ) -> None:
+        """Create the modal used to add live/offline notifications."""
         super().__init__(title=title, timeout=300)
-        self._services = services
-        self._discord_channel_id = discord_channel_id
-        self._requester_id = requester_id
-        self._bound_message = bound_message
+        self._context = context
         included_channel_logins = [
             channel.login for channel in tracked_channels if channel.user_id == default_channel_id or channel.login == default_channel_id
         ]
@@ -49,17 +51,17 @@ class ChannelEventModal(discord.ui.Modal):
             included_keys=included_channel_logins,
         )
         self.state = discord.ui.Label(
-            text=localizer.text("discord.live_state_ui.modal.state_label", language=language),
-            description=localizer.text("discord.live_state_ui.modal.state_description", language=language),
+            text=context.localizer.text("discord.live_state_ui.modal.state_label", language=context.language),
+            description=context.localizer.text("discord.live_state_ui.modal.state_description", language=context.language),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
-                        label=localizer.text("discord.live_state_ui.modal.state_option.online", language=language),
+                        label=context.localizer.text("discord.live_state_ui.modal.state_option.online", language=context.language),
                         value=StreamEventKind.ONLINE.value,
                         default=default_event_key == StreamEventKind.ONLINE.value,
                     ),
                     discord.SelectOption(
-                        label=localizer.text("discord.live_state_ui.modal.state_option.offline", language=language),
+                        label=context.localizer.text("discord.live_state_ui.modal.state_option.offline", language=context.language),
                         value=StreamEventKind.OFFLINE.value,
                         default=default_event_key == StreamEventKind.OFFLINE.value,
                     ),
@@ -70,8 +72,8 @@ class ChannelEventModal(discord.ui.Modal):
         )
         self.add_item(self.state)
         self.channel = discord.ui.Label(
-            text=localizer.text("discord.live_state_ui.modal.channel_label", language=language),
-            description=localizer.text("discord.live_state_ui.modal.channel_description", language=language),
+            text=context.localizer.text("discord.live_state_ui.modal.channel_label", language=context.language),
+            description=context.localizer.text("discord.live_state_ui.modal.channel_description", language=context.language),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
@@ -89,15 +91,16 @@ class ChannelEventModal(discord.ui.Modal):
         self.add_item(self.channel)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        """Dispatch the selected channel-event notification creation."""
         await defer_interaction_response(interaction, ephemeral=True)
         result = await dispatch_add_channel_event(
-            self._services,
-            discord_channel_id=self._discord_channel_id,
-            requester_id=self._requester_id,
+            self._context.services,
+            discord_channel_id=self._context.discord_channel_id,
+            requester_id=self._context.requester_id,
             twitch_channel_id=self.channel.component.values[0],
             event_kind=StreamEventKind(self.state.component.values[0]),
         )
-        await complete_bound_result(interaction, bound_message=self._bound_message, result=result)
+        await complete_bound_result(interaction, bound_message=self._context.bound_message, result=result)
 
 
 class ChannelEventActionModal(discord.ui.Modal):
@@ -107,34 +110,27 @@ class ChannelEventActionModal(discord.ui.Modal):
         self,
         *,
         title: str,
-        services: DiscordServiceBundle,
-        discord_channel_id: int,
-        requester_id: int,
+        context: DiscordModalContext,
         action: str,
         actions: list[AdapterEventActionPresentation],
-        localizer: Localizer,
-        language: str,
         default_notification_value: str | None = None,
-        bound_message: discord.InteractionMessage | None = None,
     ) -> None:
+        """Create the modal used to remove live/offline notifications."""
         super().__init__(title=title, timeout=300)
-        self._services = services
-        self._discord_channel_id = discord_channel_id
-        self._requester_id = requester_id
+        self._context = context
         self._action = action
-        self._bound_message = bound_message
         visible_actions = window_with_included_items(
             actions,
             key=lambda item: f"{item.event.event.subject_id}:{item.event.event.event_key}",
             included_keys=[default_notification_value] if default_notification_value else [],
         )
         self.notification = discord.ui.Label(
-            text=localizer.text("discord.live_state_ui.action.notification_label", language=language),
-            description=localizer.text("discord.live_state_ui.action.notification_description", language=language),
+            text=context.localizer.text("discord.live_state_ui.action.notification_label", language=context.language),
+            description=context.localizer.text("discord.live_state_ui.action.notification_description", language=context.language),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
-                        label=_notification_label(item, localizer=localizer, language=language),
+                        label=_notification_label(item, localizer=context.localizer, language=context.language),
                         value=f"{item.event.event.subject_id}:{item.event.event.event_key}",
                         description=item.event.channel.login[:100],
                         default=f"{item.event.event.subject_id}:{item.event.event.event_key}" == default_notification_value,
@@ -148,18 +144,19 @@ class ChannelEventActionModal(discord.ui.Modal):
         self.add_item(self.notification)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        """Dispatch removal of the selected live/offline notification."""
         await defer_interaction_response(interaction, ephemeral=True)
         twitch_channel_id, event_key = self.notification.component.values[0].split(":", 1)
         if self._action != "remove":
-            raise ValueError(f"Unsupported live ping action `{self._action}`.")
+            raise UnsupportedLivePingActionError(self._action)
         result = await dispatch_remove_channel_event(
-            self._services,
-            discord_channel_id=self._discord_channel_id,
-            requester_id=self._requester_id,
+            self._context.services,
+            discord_channel_id=self._context.discord_channel_id,
+            requester_id=self._context.requester_id,
             twitch_channel_id=twitch_channel_id,
             event_kind=StreamEventKind(event_key),
         )
-        await complete_bound_result(interaction, bound_message=self._bound_message, result=result)
+        await complete_bound_result(interaction, bound_message=self._context.bound_message, result=result)
 
 
 class ChannelEventColorModal(discord.ui.Modal):
@@ -169,33 +166,26 @@ class ChannelEventColorModal(discord.ui.Modal):
         self,
         *,
         title: str,
-        services: DiscordServiceBundle,
-        discord_channel_id: int,
-        requester_id: int,
+        context: DiscordModalContext,
         actions: list[AdapterEventActionPresentation],
-        localizer: Localizer,
-        language: str,
         default_notification_value: str | None = None,
         default_color: str | None = None,
-        bound_message: discord.InteractionMessage | None = None,
     ) -> None:
+        """Create the modal used to set or clear notification colors."""
         super().__init__(title=title, timeout=300)
-        self._services = services
-        self._discord_channel_id = discord_channel_id
-        self._requester_id = requester_id
-        self._bound_message = bound_message
+        self._context = context
         visible_actions = window_with_included_items(
             actions,
             key=lambda item: f"{item.event.event.subject_id}:{item.event.event.event_key}",
             included_keys=[default_notification_value] if default_notification_value else [],
         )
         self.notification = discord.ui.Label(
-            text=localizer.text("discord.live_state_ui.action.notification_label", language=language),
-            description=localizer.text("discord.live_state_ui.action.notification_description", language=language),
+            text=context.localizer.text("discord.live_state_ui.action.notification_label", language=context.language),
+            description=context.localizer.text("discord.live_state_ui.action.notification_description", language=context.language),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
-                        label=_notification_label(item, localizer=localizer, language=language),
+                        label=_notification_label(item, localizer=context.localizer, language=context.language),
                         value=f"{item.event.event.subject_id}:{item.event.event.event_key}",
                         description=item.event.channel.login[:100],
                         default=f"{item.event.event.subject_id}:{item.event.event.event_key}" == default_notification_value,
@@ -208,8 +198,8 @@ class ChannelEventColorModal(discord.ui.Modal):
         )
         self.add_item(self.notification)
         self.color = discord.ui.TextInput(
-            label=localizer.text("discord.live_state_ui.action.color_label", language=language),
-            placeholder=localizer.text("discord.live_state_ui.action.color_placeholder", language=language),
+            label=context.localizer.text("discord.live_state_ui.action.color_label", language=context.language),
+            placeholder=context.localizer.text("discord.live_state_ui.action.color_placeholder", language=context.language),
             default=default_color,
             required=False,
             max_length=7,
@@ -217,17 +207,20 @@ class ChannelEventColorModal(discord.ui.Modal):
         self.add_item(self.color)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        """Dispatch the selected live/offline notification color update."""
         await defer_interaction_response(interaction, ephemeral=True)
         twitch_channel_id, event_key = self.notification.component.values[0].split(":", 1)
         result = await dispatch_set_channel_event_color(
-            self._services,
-            discord_channel_id=self._discord_channel_id,
-            requester_id=self._requester_id,
-            twitch_channel_id=twitch_channel_id,
-            event_kind=StreamEventKind(event_key),
-            color=normalize_optional_text(self.color.value),
+            self._context.services,
+            SetChannelEventColorCommand(
+                discord_channel_id=self._context.discord_channel_id,
+                requester_id=self._context.requester_id,
+                twitch_channel_id=twitch_channel_id,
+                event_kind=StreamEventKind(event_key),
+                color=normalize_optional_text(self.color.value),
+            ),
         )
-        await complete_bound_result(interaction, bound_message=self._bound_message, result=result)
+        await complete_bound_result(interaction, bound_message=self._context.bound_message, result=result)
 
 
 def _notification_label(

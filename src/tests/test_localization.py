@@ -20,11 +20,9 @@ def test_localizer_resolves_sources_with_dot_paths_and_backslash_escaping() -> N
     )
 
     rendered = localizer.text("example.body", language="english", sources={"view": {"language_name": "German"}})
-    escaped = localizer._interpolate(  # type: ignore[attr-defined]
+    escaped = localizer.render(
         r"Literal \{name\} and \\ and {view.value}",
-        {"view": {"value": "ok"}},
-        language=None,
-        placeholder_specs=None,
+        sources={"view": {"value": "ok"}},
     )
 
     assert "German" in rendered
@@ -36,11 +34,9 @@ def test_localizer_resolves_sources_with_dot_paths_and_backslash_escaping() -> N
 def test_localizer_supports_explicit_placeholder_modes_with_dot_paths() -> None:
     localizer = Localizer.from_directory()
 
-    rendered = localizer._interpolate(  # type: ignore[attr-defined]
+    rendered = localizer.render(
         "Escaped={view.value} Raw={RAW:view.value} Code=`{CODE:view.value}` Mention=<@{RAW:view.user_id}>",
-        {"view": {"value": "Hello` @everyone [x]", "user_id": 123}},
-        language=None,
-        placeholder_specs=None,
+        sources={"view": {"value": "Hello` @everyone [x]", "user_id": 123}},
     )
 
     assert r"Escaped=Hello\` @" in rendered
@@ -148,16 +144,17 @@ def test_build_result_uses_sources_with_list_metadata() -> None:
 
 
 def test_localizer_loads_utf8_german_text_from_files(tmp_path) -> None:
+    german_text = "verfügbar außer äöüß"
     (tmp_path / "english.json").write_text("{}", encoding="utf-8")
     (tmp_path / "german.json").write_text(
-        json.dumps({"example": {"text": "verfügbar außer äöüß"}}, ensure_ascii=False),
+        json.dumps({"example": {"text": german_text}}, ensure_ascii=False),
         encoding="utf-8",
     )
 
     localizer = Localizer.from_directory(tmp_path)
     rendered = localizer.text("example.text", language="german")
 
-    assert rendered == "verfügbar außer äöüß"
+    assert rendered == german_text
 
 
 def test_localizer_raises_for_missing_source_values() -> None:

@@ -21,6 +21,7 @@ class ChannelEventDisplayIndexResolver:
     adapter_event_action_repository: AdapterEventActionRepository
 
     async def build_index_map(self, thread_id: int) -> dict[int, int]:
+        """Build dense display indexes for notification actions in one thread."""
         rows = [
             (event, action)
             for event, action in await self.adapter_event_action_repository.list_actions_for_thread(
@@ -36,4 +37,5 @@ class ChannelEventDisplayIndexResolver:
         return {event.event_id: display_index for display_index, (event, _) in enumerate(rows, start=1)}
 
     async def resolve(self, *, thread_id: int, event_id: int) -> int | None:
+        """Resolve one event ID to its dense display index."""
         return (await self.build_index_map(thread_id)).get(event_id)

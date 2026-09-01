@@ -1,2 +1,9 @@
 target-version = "py313"
 line-length = 140
+
+[lint]
+extend-select = ["D"]
+ignore = ["D203", "D213"]
+
+[lint.per-file-ignores]
+"src/tests/**" = ["D"]

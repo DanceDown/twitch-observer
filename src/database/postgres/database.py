@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import AsyncIterator
 
 import psycopg
 from psycopg_pool import AsyncConnectionPool, PoolTimeout
 
 from src.config import AppConfig
-from src.errors import DatabasePoolExhaustedError
+from src.errors import DatabaseNotOpenError, DatabasePoolExhaustedError
 
 
 @dataclass(slots=True)
@@ -23,6 +23,7 @@ class PostgresDatabase:
     _pool: AsyncConnectionPool[psycopg.AsyncConnection] | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Apply pool defaults from configuration after construction."""
         if self.max_pool_size is None:
             self.max_pool_size = max(1, self.config.postgres_pool_size)
         if self.acquire_timeout_seconds is None:
@@ -72,9 +73,8 @@ class PostgresDatabase:
     @asynccontextmanager
     async def read_cursor(self) -> AsyncIterator[psycopg.AsyncCursor]:
         """Lease one async cursor for one read-only repository operation."""
-        async with self.read_connection() as connection:
-            async with connection.cursor() as cursor:
-                yield cursor
+        async with self.read_connection() as connection, connection.cursor() as cursor:
+            yield cursor
 
     @asynccontextmanager
     async def async_connection(self) -> AsyncIterator[psycopg.AsyncConnection]:
@@ -98,19 +98,19 @@ class PostgresDatabase:
     @asynccontextmanager
     async def async_cursor(self) -> AsyncIterator[psycopg.AsyncCursor]:
         """Lease one async cursor for one repository operation."""
-        async with self.async_connection() as connection:
-            async with connection.cursor() as cursor:
-                yield cursor
+        async with self.async_connection() as connection, connection.cursor() as cursor:
+            yield cursor
 
     @asynccontextmanager
     async def _pool_connection(self) -> AsyncIterator[psycopg.AsyncConnection]:
         pool = self._pool
         if pool is None:
-            raise RuntimeError("PostgresDatabase.open() must be awaited before using the pool.")
+            raise DatabaseNotOpenError
         try:
             async with pool.connection() as connection:
                 yield connection
         except PoolTimeout as error:
-            raise DatabasePoolExhaustedError(
-                f"PostgreSQL pool exhausted after waiting {self.acquire_timeout_seconds:.2f}s (pool_size={self.max_pool_size})."
+            raise DatabasePoolExhaustedError.from_pool_settings(
+                acquire_timeout_seconds=self.acquire_timeout_seconds,
+                max_pool_size=self.max_pool_size,
             ) from error

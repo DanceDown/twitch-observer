@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-from typing import cast
-
 import discord
 
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
+from src.events.commands import CreateSupportTicketCommand
 from src.localization import Localizer
-from src.services.support_command_service import SupportTicketCreateResult
 
 from ..dispatch import dispatch_create_support_ticket
 from ..helpers import command_unavailable_result, defer_interaction_response, resolve_interaction_language, send_initial_result
 from ..ui.support_ui import send_new_support_ticket
 from ..ui_data import DiscordUIDataProvider
+from .localized import command_descriptions, command_text
 
 
 def register_support_commands(
@@ -25,17 +24,20 @@ def register_support_commands(
     """Register `/support` for creating support tickets."""
     _ = ui_data_provider
     category_choices = [
-        discord.app_commands.Choice(name="Bug", value="bug"),
-        discord.app_commands.Choice(name="Question", value="question"),
-        discord.app_commands.Choice(name="Idea", value="idea"),
-        discord.app_commands.Choice(name="Other", value="other"),
+        discord.app_commands.Choice(name=command_text(localizer, "support.choices.bug"), value="bug"),
+        discord.app_commands.Choice(name=command_text(localizer, "support.choices.question"), value="question"),
+        discord.app_commands.Choice(name=command_text(localizer, "support.choices.idea"), value="idea"),
+        discord.app_commands.Choice(name=command_text(localizer, "support.choices.other"), value="other"),
     ]
 
-    @tree.command(name="support", description="Create a support ticket.")
+    @tree.command(name="support", description=command_text(localizer, "support.description"))
     @discord.app_commands.describe(
-        category="Support category.",
-        title="Short title for the support request.",
-        description="What happened or what do you need help with?",
+        **command_descriptions(
+            localizer,
+            category="support.options.category",
+            title="support.options.title",
+            description="support.options.description",
+        )
     )
     @discord.app_commands.choices(category=category_choices)
     async def support(
@@ -50,10 +52,9 @@ def register_support_commands(
 
         await defer_interaction_response(interaction, ephemeral=True)
         language_hint = resolve_interaction_language(localizer, interaction)
-        creation = cast(
-            SupportTicketCreateResult,
-            await dispatch_create_support_ticket(
-                services,
+        creation = await dispatch_create_support_ticket(
+            services,
+            CreateSupportTicketCommand(
                 discord_channel_id=interaction.channel_id,
                 requester_id=interaction.user.id,
                 category=category.value,

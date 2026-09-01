@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import Protocol
 
 import discord
 
+from src.discord_results import build_result
 from src.entrypoints.discord.helpers import (
     complete_bound_result,
     defer_interaction_response,
     send_message_response,
     send_modal_response,
 )
-from src.discord_results import build_result
+from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.events.ui_flow import UIFlowKind, UIFlowStep
 from src.localization import DEFAULT_LANGUAGE, Localizer
@@ -20,10 +22,27 @@ from src.utils.discord_embeds import build_result_embed
 
 from ..dispatch import dispatch_ui_flow_decision
 
-if TYPE_CHECKING:
-    from ..ui_data import DiscordUIDataProvider
-
 COLOR_PICKER_URL = "https://htmlcolorcodes.com/color-picker/"
+
+
+@dataclass(slots=True, frozen=True)
+class DiscordModalContext:
+    """Shared runtime context passed into command modals."""
+
+    services: DiscordServiceBundle
+    discord_channel_id: int
+    requester_id: int
+    localizer: Localizer
+    language: str
+    bound_message: discord.InteractionMessage | None = None
+
+
+class ContextLanguageDataProvider(Protocol):
+    """UI data provider slice needed to resolve one thread language."""
+
+    async def get_thread_language(self, discord_channel_id: int) -> str | None:
+        """Return the configured language for one Discord context."""
+        ...
 
 
 def build_form_embed(result: DiscordCommandResult) -> discord.Embed:
@@ -44,7 +63,7 @@ async def start_form(
 async def resolve_context_language(
     *,
     localizer: Localizer,
-    data_provider: DiscordUIDataProvider | None = None,
+    data_provider: ContextLanguageDataProvider | None = None,
     discord_channel_id: int | None = None,
 ) -> str:
     """Resolve the active UI language for one Discord context."""
@@ -64,6 +83,7 @@ class BaseFormView(discord.ui.View):
         language: str = DEFAULT_LANGUAGE,
         timeout: float = 900,
     ) -> None:
+        """Initialize owner binding, localization, and response tracking."""
         super().__init__(timeout=timeout)
         self.owner_id = owner_id
         self._localizer = localizer

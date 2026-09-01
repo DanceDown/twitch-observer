@@ -5,15 +5,17 @@ from __future__ import annotations
 import discord
 
 from src.discord_results import build_result
+from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.events.discord_results import DiscordResultStyle
 from src.events.ui_flow import UIFlowKind, UIFlowStep
 from src.localization import Localizer
-from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
 from ..dispatch import dispatch_add_tracked_user, dispatch_remove_tracked_user
 from ..helpers import command_unavailable_result, ensure_ui_flow_allowed, send_initial_result
+from ..ui.shared import DiscordModalContext
 from ..ui.user_ui import UserNameModal, UserSelectionModal
 from ..ui_data import DiscordUIDataProvider
+from .localized import command_descriptions, command_text
 
 
 def register_user_commands(
@@ -23,11 +25,10 @@ def register_user_commands(
     localizer: Localizer,
 ) -> None:
     """Register `/user` action subcommands."""
+    group = discord.app_commands.Group(name="user", description=command_text(localizer, "user.description"))
 
-    group = discord.app_commands.Group(name="user", description="Add or remove tracked Twitch users.")
-
-    @group.command(name="add", description="Add one tracked Twitch user.")
-    @discord.app_commands.describe(twitch_user_login="Twitch user login.")
+    @group.command(name="add", description=command_text(localizer, "user.add.description"))
+    @discord.app_commands.describe(**command_descriptions(localizer, twitch_user_login="user.add.options.twitch_user_login"))
     async def user_add(interaction: discord.Interaction, twitch_user_login: str | None = None) -> None:
         if interaction.channel_id is None:
             await send_initial_result(interaction, command_unavailable_result())
@@ -39,12 +40,13 @@ def register_user_commands(
             language = await ui_data_provider.get_thread_language(interaction.channel_id) or localizer.default_language
             await interaction.response.send_modal(
                 UserNameModal(
-                    services=services,
-                    discord_channel_id=interaction.channel_id,
-                    requester_id=interaction.user.id,
-                    action="add",
-                    localizer=localizer,
-                    language=localizer.resolve_language(language),
+                    context=DiscordModalContext(
+                        services=services,
+                        discord_channel_id=interaction.channel_id,
+                        requester_id=interaction.user.id,
+                        localizer=localizer,
+                        language=localizer.resolve_language(language),
+                    ),
                 )
             )
             return
@@ -56,8 +58,8 @@ def register_user_commands(
         )
         await send_initial_result(interaction, result)
 
-    @group.command(name="remove", description="Remove one tracked Twitch user.")
-    @discord.app_commands.describe(twitch_user_login="Tracked Twitch user login.")
+    @group.command(name="remove", description=command_text(localizer, "user.remove.description"))
+    @discord.app_commands.describe(**command_descriptions(localizer, twitch_user_login="user.remove.options.twitch_user_login"))
     async def user_remove(interaction: discord.Interaction, twitch_user_login: str | None = None) -> None:
         if interaction.channel_id is None:
             await send_initial_result(interaction, command_unavailable_result())
@@ -82,12 +84,14 @@ def register_user_commands(
                 return
             await interaction.response.send_modal(
                 UserSelectionModal(
-                    services=services,
-                    discord_channel_id=interaction.channel_id,
-                    requester_id=interaction.user.id,
+                    context=DiscordModalContext(
+                        services=services,
+                        discord_channel_id=interaction.channel_id,
+                        requester_id=interaction.user.id,
+                        localizer=localizer,
+                        language=localizer.resolve_language(language),
+                    ),
                     tracked_users=tracked_users,
-                    localizer=localizer,
-                    language=localizer.resolve_language(language),
                 )
             )
             return

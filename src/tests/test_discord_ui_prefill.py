@@ -3,20 +3,24 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import cast
 
 import discord
 import pytest
 
 from src.database.connection import AdapterEventActionRecord, AdapterEventRecord, PatternRecord
 from src.entrypoints.discord.commands.live_state_commands import register_live_state_commands
-from src.entrypoints.discord.commands.write_commands import register_write_commands
+from src.entrypoints.discord.commands.write_commands import WriteCommandOptions, register_write_commands
+from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.entrypoints.discord.ui.live_state_ui import ChannelEventActionModal, ChannelEventModal
 from src.entrypoints.discord.ui.patterns.channels_modal import PatternChannelsModal
+from src.entrypoints.discord.ui.patterns.context import PatternViewContext
 from src.entrypoints.discord.ui.patterns.selection import PatternPickerView
 from src.entrypoints.discord.ui.patterns.state import PatternFormState
 from src.entrypoints.discord.ui.patterns.users_modal import PatternUsersModal
 from src.entrypoints.discord.ui.reply_ui import PatternReplyAddModal
-from src.entrypoints.discord.ui.write_ui import WriteModal
+from src.entrypoints.discord.ui.shared import DiscordModalContext
+from src.entrypoints.discord.ui.write_ui import WriteModal, WriteModalDefaults
 from src.localization import Localizer
 from src.services.discord_ui_queries import (
     AdapterEventActionPresentation,
@@ -26,6 +30,25 @@ from src.services.discord_ui_queries import (
     TrackedUserPresentation,
     WriteReplyCandidatePresentation,
 )
+
+
+def _fake_services() -> DiscordServiceBundle:
+    placeholder = SimpleNamespace()
+    return DiscordServiceBundle(
+        thread=placeholder,
+        channel=placeholder,
+        user=placeholder,
+        pattern=placeholder,
+        permission=placeholder,
+        account=placeholder,
+        reply=placeholder,
+        help=placeholder,
+        write=placeholder,
+        show=placeholder,
+        support=placeholder,
+        channel_event=placeholder,
+        ui_flow_guard=placeholder,
+    )
 
 
 def _tracked_channels(count: int) -> list[TrackedChannelPresentation]:
@@ -171,6 +194,12 @@ class _FakePatternProvider:
     async def get_pattern(self, _discord_channel_id: int, pattern_id: int) -> PatternPresentation | None:
         return next((pattern for pattern in self.patterns if pattern.pattern.pattern_id == pattern_id), None)
 
+    async def list_tracked_channels(self, _discord_channel_id: int) -> list[TrackedChannelPresentation]:
+        return []
+
+    async def list_tracked_users(self, _discord_channel_id: int) -> list[TrackedUserPresentation]:
+        return []
+
 
 @dataclass
 class _FakeResponse:
@@ -252,16 +281,20 @@ def _pattern_presentation(pattern_id: int) -> PatternPresentation:
 def test_write_modal_includes_selected_items_beyond_first_25() -> None:
     localizer = Localizer.from_directory()
     modal = WriteModal(
-        services=object(),  # type: ignore[arg-type]
-        discord_channel_id=100,
-        requester_id=200,
+        context=DiscordModalContext(
+            services=_fake_services(),
+            discord_channel_id=100,
+            requester_id=200,
+            localizer=localizer,
+            language="german",
+        ),
         tracked_channels=_tracked_channels(30),
         reply_candidates=_reply_candidates(30),
-        localizer=localizer,
-        language="german",
-        default_channel_login="channel29",
-        default_message="hello",
-        default_reply_parent_message_id="msg-29",
+        defaults=WriteModalDefaults(
+            channel_login="channel29",
+            message="hello",
+            reply_parent_message_id="msg-29",
+        ),
     )
 
     channel_values = [option.value for option in modal.channel.component.options]
@@ -308,12 +341,14 @@ def test_pattern_reply_modal_includes_selected_pattern_beyond_first_25() -> None
     ]
 
     modal = PatternReplyAddModal(
-        services=object(),  # type: ignore[arg-type]
-        discord_channel_id=100,
-        requester_id=200,
+        context=DiscordModalContext(
+            services=_fake_services(),
+            discord_channel_id=100,
+            requester_id=200,
+            localizer=localizer,
+            language="german",
+        ),
         patterns=patterns,
-        localizer=localizer,
-        language="german",
         default_pattern_id=30,
     )
 
@@ -324,27 +359,26 @@ def test_live_state_modals_include_selected_items_beyond_first_25() -> None:
     localizer = Localizer.from_directory()
     tracked_channels = _tracked_channels(30)
     actions = [_adapter_action(index) for index in range(1, 31)]
+    context = DiscordModalContext(
+        services=_fake_services(),
+        discord_channel_id=100,
+        requester_id=200,
+        localizer=localizer,
+        language="german",
+    )
 
     add_modal = ChannelEventModal(
         title="add",
-        services=object(),  # type: ignore[arg-type]
-        discord_channel_id=100,
-        requester_id=200,
+        context=context,
         tracked_channels=tracked_channels,
-        localizer=localizer,
-        language="german",
         default_channel_id="channel29",
         default_event_key="stream.online",
     )
     action_modal = ChannelEventActionModal(
         title="remove",
-        services=object(),  # type: ignore[arg-type]
-        discord_channel_id=100,
-        requester_id=200,
+        context=context,
         action="remove",
         actions=actions,
-        localizer=localizer,
-        language="german",
         default_notification_value="29:stream.online",
     )
 
@@ -357,16 +391,18 @@ async def test_pattern_edit_selection_opens_editor_with_ephemeral_modal_submit_r
     localizer = Localizer.from_directory()
     provider = _FakePatternProvider(patterns=[_pattern_presentation(14)])
     picker = PatternPickerView(
-        owner_id=200,
-        language="german",
-        services=object(),  # type: ignore[arg-type]
-        data_provider=provider,  # type: ignore[arg-type]
-        discord_channel_id=100,
-        localizer=localizer,
+        context=PatternViewContext(
+            owner_id=200,
+            language="german",
+            services=_fake_services(),
+            data_provider=provider,
+            discord_channel_id=100,
+            localizer=localizer,
+        ),
     )
     interaction = _FakeModalSubmitInteraction()
 
-    await picker.submit_selection(interaction, 14)  # type: ignore[arg-type]
+    await picker.submit_selection(cast(discord.Interaction, interaction), 14)
 
     assert interaction.response.ephemeral is True
     editor_view = interaction.response.sent_view
@@ -407,11 +443,10 @@ async def test_write_command_prefills_modal_and_includes_selected_reply_candidat
 
     register_write_commands(
         tree,
-        services=object(),  # type: ignore[arg-type]
-        ui_data_provider=provider,  # type: ignore[arg-type]
+        services=_fake_services(),
+        ui_data_provider=provider,
         localizer=localizer,
-        reply_candidate_max_age_minutes=60,
-        reply_candidate_limit=25,
+        options=WriteCommandOptions(reply_candidate_max_age_minutes=60, reply_candidate_limit=25),
     )
     command = next(command for command in tree.get_commands() if command.name == "write")
     interaction = _FakeInteraction()
@@ -424,8 +459,10 @@ async def test_write_command_prefills_modal_and_includes_selected_reply_candidat
     )
 
     assert interaction.response.modal is not None
-    assert captured["default_channel_login"] == "channel29"
-    assert captured["default_reply_parent_message_id"] == "msg-29"
+    defaults = captured["defaults"]
+    assert isinstance(defaults, WriteModalDefaults)
+    assert defaults.channel_login == "channel29"
+    assert defaults.reply_parent_message_id == "msg-29"
     assert any(candidate.message_id == "msg-29" for candidate in captured["reply_candidates"])
 
 
@@ -451,8 +488,8 @@ async def test_liveping_add_opens_prefilled_modal_when_partial(
 
     register_live_state_commands(
         tree,
-        services=object(),  # type: ignore[arg-type]
-        ui_data_provider=provider,  # type: ignore[arg-type]
+        services=_fake_services(),
+        ui_data_provider=provider,
         localizer=localizer,
     )
     liveping_group = next(command for command in tree.get_commands() if command.name == "liveping")
@@ -495,8 +532,8 @@ async def test_liveping_add_dispatches_directly_with_stream_event_choice(
 
     register_live_state_commands(
         tree,
-        services=object(),  # type: ignore[arg-type]
-        ui_data_provider=provider,  # type: ignore[arg-type]
+        services=_fake_services(),
+        ui_data_provider=provider,
         localizer=localizer,
     )
     liveping_group = next(command for command in tree.get_commands() if command.name == "liveping")

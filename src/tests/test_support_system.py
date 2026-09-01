@@ -7,9 +7,10 @@ from types import SimpleNamespace
 import discord
 import pytest
 
-from src.database.records import SupportTicketRecord, ThreadRecord
+from src.database.records import SupportTicketCreate, SupportTicketRecord, ThreadRecord
 from src.entrypoints.discord.commands.support_commands import register_support_commands
 from src.entrypoints.discord.ui.support_ui import SupportTicketView
+from src.discord_results import build_result
 from src.events.commands import AnswerSupportTicketCommand, CloseSupportTicketCommand, CreateSupportTicketCommand, ShowSupportTicketCommand
 from src.events.discord_results import DiscordResultStyle
 from src.localization import Localizer
@@ -22,28 +23,19 @@ class InMemorySupportTicketRepository:
     tickets: dict[int, SupportTicketRecord] = field(default_factory=dict)
     next_ticket_id: int = 1
 
-    async def create_ticket(
-        self,
-        *,
-        source_discord_channel_id: int,
-        requester_discord_user_id: int,
-        category: str,
-        title: str,
-        description: str,
-        language: str,
-    ) -> SupportTicketRecord:
+    async def create_ticket(self, create: SupportTicketCreate) -> SupportTicketRecord:
         ticket_id = self.next_ticket_id
         self.next_ticket_id += 1
         now = _now(ticket_id)
         ticket = SupportTicketRecord(
             ticket_id=ticket_id,
-            source_discord_channel_id=source_discord_channel_id,
-            requester_discord_user_id=requester_discord_user_id,
-            category=category,
-            title=title,
-            description=description,
+            source_discord_channel_id=create.source_discord_channel_id,
+            requester_discord_user_id=create.requester_discord_user_id,
+            category=create.category,
+            title=create.title,
+            description=create.description,
             status="open",
-            language=language,
+            language=create.language,
             support_message_id=None,
             response_subject=None,
             response_body=None,
@@ -69,11 +61,7 @@ class InMemorySupportTicketRepository:
         return self.tickets.get(ticket_id)
 
     async def list_open_tickets_with_messages(self) -> list[SupportTicketRecord]:
-        return [
-            ticket
-            for ticket in self.tickets.values()
-            if ticket.status == "open" and ticket.support_message_id is not None
-        ]
+        return [ticket for ticket in self.tickets.values() if ticket.status == "open" and ticket.support_message_id is not None]
 
     async def answer_ticket(
         self,
@@ -216,9 +204,20 @@ class FakeSupportMessage:
         self.edited_view = view
 
 
+def _assert_text_matches(actual: str, expected: str) -> None:
+    assert actual == expected
+
+
 @pytest.mark.asyncio
 async def test_support_without_config_returns_ephemeral_unavailable() -> None:
     service = _service(support_channel_id=None, thread_language="german")
+    expected = build_result(
+        service.localizer,
+        "results.support.unavailable",
+        language="german",
+        style=DiscordResultStyle.ERROR,
+        ephemeral=True,
+    )
 
     result = await service.handle_create(
         CreateSupportTicketCommand(
@@ -234,7 +233,7 @@ async def test_support_without_config_returns_ephemeral_unavailable() -> None:
     assert result.ticket is None
     assert result.result.ephemeral is True
     assert result.result.style is DiscordResultStyle.ERROR
-    assert result.result.message == "Support ist derzeit nicht verfügbar."
+    _assert_text_matches(result.result.message, expected.message)
 
 
 @pytest.mark.asyncio
@@ -264,7 +263,10 @@ async def test_support_command_creates_ticket_and_sends_colored_support_embed() 
     assert isinstance(sent_embed, discord.Embed)
     assert isinstance(sent_view, SupportTicketView)
     assert sent_embed.color.value == resolve_support_ticket_color(category="bug")
-    assert sent_embed.title == "Bug: Ping 14"
+    assert sent_embed.title is not None
+    assert localizer.lookup("discord.support.category", "bug", language="german") in sent_embed.title
+    assert "Ping 14" in sent_embed.title
+    assert "Ticket" not in sent_embed.title
     assert sent_embed.footer.text is not None
     assert sent_embed.footer.text.startswith("Ticket #1")
     assert interaction.edited_original_embed is not None
@@ -409,7 +411,7 @@ async def test_support_close_button_sends_user_notice_and_removes_buttons() -> N
     assert len(origin_channel.sent) == 1
     assert support_message.edited_view is None
     assert support_message.edited_embed is not None
-    assert "Closed" in (support_message.edited_embed.description or "")
+    assert localizer.lookup("discord.support.status", "closed", language="english") in (support_message.edited_embed.description or "")
     assert service.support_ticket_repository.tickets[1].status == "closed"
 
 

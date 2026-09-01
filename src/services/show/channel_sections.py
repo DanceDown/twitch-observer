@@ -26,11 +26,14 @@ from .text import render_details, render_empty_section, render_line, render_row,
 
 @dataclass(slots=True)
 class ShowChannelsRenderer:
+    """Render tracked Twitch channels for `/show channels`."""
+
     channel_repository: ChannelRepository
     resolver: ShowTwitchSubjectResolver
     localizer: Localizer
 
     async def render(self, thread: ThreadRecord) -> str:
+        """Return the localized tracked-channel section for one thread."""
         language = self.localizer.language_for_thread(thread)
         channels = await self.channel_repository.list_channels_for_thread(thread.thread_id)
         if not channels:
@@ -71,12 +74,15 @@ class ShowChannelsRenderer:
 
 @dataclass(slots=True)
 class ShowChannelEventsRenderer:
+    """Render live/offline notification actions for `/show live-pings`."""
+
     channel_repository: ChannelRepository
     adapter_event_action_repository: AdapterEventActionRepository | None
     resolver: ShowTwitchSubjectResolver
     localizer: Localizer
 
     async def render(self, thread: ThreadRecord) -> str:
+        """Return the localized live/offline notification section."""
         language = self.localizer.language_for_thread(thread)
         if self.adapter_event_action_repository is None:
             return render_empty_section(self.localizer, "show.channel_event", language=language)

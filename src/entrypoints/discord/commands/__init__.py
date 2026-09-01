@@ -1,3 +1,5 @@
+"""Discord slash-command registration modules."""
+
 from .account_commands import register_account_commands
 from .channel_commands import register_channel_commands
 from .help_commands import register_help_commands
@@ -9,9 +11,10 @@ from .show_commands import register_show_commands
 from .support_commands import register_support_commands
 from .thread_commands import register_thread_commands
 from .user_commands import register_user_commands
-from .write_commands import register_write_commands
+from .write_commands import WriteCommandOptions, register_write_commands
 
 __all__ = [
+    "WriteCommandOptions",
     "register_account_commands",
     "register_channel_commands",
     "register_help_commands",
@@ -25,3 +28,4 @@ __all__ = [
     "register_user_commands",
     "register_write_commands",
 ]
+"""Discord slash-command registration modules."""

@@ -26,11 +26,12 @@ class LiveStateChangeOrchestrator:
     auto_replies: ChannelEventAutoReplyService
 
     async def handle_change(self, event: TwitchChannelLiveStateChangedEvent) -> None:
+        """Persist one transition, send auto-replies, then notify Discord."""
         await self.persistence.handle_change(event)
         try:
             suppressed_events = await self.auto_replies.handle_channel_live_state_changed(event)
         except DatabasePoolExhaustedError:
-            logger.error(
+            logger.exception(
                 "Channel-event auto-reply handling skipped because the database pool is exhausted twitch_channel_id=%s is_live=%s",
                 event.twitch_channel_id,
                 event.is_live,

@@ -22,6 +22,7 @@ class FakeBatchMessageRepository(MessageRepository):
     matched_by_thread_id: dict[int, list[str]] = field(default_factory=dict)
     flush_batches: list[tuple[tuple[str, ...], tuple[tuple[int, str], ...]]] = field(default_factory=list)
     saved_bot_message_ids: list[str] = field(default_factory=list)
+    flush_called: asyncio.Event = field(default_factory=asyncio.Event)
 
     async def flush_write_batch(
         self,
@@ -48,6 +49,7 @@ class FakeBatchMessageRepository(MessageRepository):
             if message_id not in thread_matches_for_id:
                 thread_matches_for_id.append(message_id)
         self.flush_batches.append((tuple(message_ids), tuple(match_ids)))
+        self.flush_called.set()
 
     async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
         message_id = _require_message_id(event)
@@ -129,6 +131,7 @@ class FailingBatchMessageRepository(FakeBatchMessageRepository):
     ) -> None:
         _ = message_events, thread_matches
         self.flush_attempts += 1
+        self.flush_called.set()
         raise self.error
 
 
@@ -187,7 +190,7 @@ async def test_batched_message_repository_background_worker_flushes_without_read
     await repository.start()
     await repository.save_twitch_message(event)
     await repository.mark_message_matched_in_thread(thread_id=9, event=event)
-    await asyncio.sleep(0.05)
+    await asyncio.wait_for(inner.flush_called.wait(), timeout=1)
     await repository.stop()
 
     assert inner.flush_batches == [(("msg-2",), ((9, "msg-2"),))]
@@ -297,6 +300,40 @@ async def test_batched_message_repository_replays_spooled_shutdown_writes_on_sta
 
 
 @pytest.mark.asyncio
+async def test_batched_message_repository_keeps_malformed_spool_without_crashing(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    inner = FakeBatchMessageRepository()
+    spool_path = tmp_path / "message-spool.json"
+    spool_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "messages": [
+                    {
+                        "channel_login": "example",
+                        "author_login": "alice",
+                        "content": "hello",
+                    }
+                ],
+                "thread_matches": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    repository = BatchedMessageRepository(repository=inner, batch_size=50, flush_interval_seconds=60, spool_path=str(spool_path))
+
+    with caplog.at_level(logging.ERROR):
+        await repository.start()
+        await repository.stop()
+
+    assert "Could not read batched message write spool" in caplog.text
+    assert spool_path.exists()
+    assert inner.flush_batches == []
+
+
+@pytest.mark.asyncio
 async def test_batched_message_repository_spools_pending_writes_when_pool_is_exhausted_on_stop(tmp_path: Path) -> None:
     inner = PoolExhaustedBatchMessageRepository()
     spool_path = tmp_path / "message-spool.json"
@@ -319,7 +356,7 @@ async def test_batched_message_repository_background_requeues_transient_postgres
     await repository.start()
     with caplog.at_level(logging.WARNING):
         await repository.save_twitch_message(_event("msg-retry"))
-        await asyncio.sleep(0.03)
+        await asyncio.wait_for(inner.flush_called.wait(), timeout=1)
         await repository.stop()
 
     assert inner.flush_attempts >= 1

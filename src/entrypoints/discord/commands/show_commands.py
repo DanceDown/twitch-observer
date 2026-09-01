@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import discord
 
+from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.events.discord_results import DiscordResultStyle
 from src.events.ui_flow import UIFlowKind, UIFlowStep
 from src.localization import Localizer
-from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
 from ..dispatch import dispatch_show_configuration
 from ..helpers import command_unavailable_result, ensure_ui_flow_allowed, send_initial_result
 from ..ui.show_ui import ShowPaginationView, ShowSectionModal, _show_section_item_prefix
 from ..ui_data import DiscordUIDataProvider
+from .localized import command_descriptions, command_text
 
 
 def register_show_commands(
@@ -22,19 +23,18 @@ def register_show_commands(
     localizer: Localizer,
 ) -> None:
     """Register the single-word `/show` command."""
-
     section_choices = [
-        discord.app_commands.Choice(name="pings", value="pings"),
-        discord.app_commands.Choice(name="auto_replies", value="auto_replies"),
-        discord.app_commands.Choice(name="stream_pings", value="stream_pings"),
-        discord.app_commands.Choice(name="channels", value="channels"),
-        discord.app_commands.Choice(name="users", value="users"),
-        discord.app_commands.Choice(name="permissions", value="permissions"),
-        discord.app_commands.Choice(name="account", value="account"),
+        discord.app_commands.Choice(name=command_text(localizer, "show.choices.pings"), value="pings"),
+        discord.app_commands.Choice(name=command_text(localizer, "show.choices.auto_replies"), value="auto_replies"),
+        discord.app_commands.Choice(name=command_text(localizer, "show.choices.stream_pings"), value="stream_pings"),
+        discord.app_commands.Choice(name=command_text(localizer, "show.choices.channels"), value="channels"),
+        discord.app_commands.Choice(name=command_text(localizer, "show.choices.users"), value="users"),
+        discord.app_commands.Choice(name=command_text(localizer, "show.choices.permissions"), value="permissions"),
+        discord.app_commands.Choice(name=command_text(localizer, "show.choices.account"), value="account"),
     ]
 
-    @tree.command(name="show", description="Show the settings of the current channel.")
-    @discord.app_commands.describe(section="Optional section; leave empty to pick from the modal.")
+    @tree.command(name="show", description=command_text(localizer, "show.description"))
+    @discord.app_commands.describe(**command_descriptions(localizer, section="show.options.section"))
     @discord.app_commands.choices(section=section_choices)
     async def show(
         interaction: discord.Interaction,

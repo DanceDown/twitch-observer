@@ -3,13 +3,27 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from psycopg.types.json import Jsonb
 
-from ..records import TwitchAccountRecord, TwitchDeviceFlowRecord, TwitchUserCacheRecord
+from ..records import (
+    TwitchAccountCreate,
+    TwitchAccountRecord,
+    TwitchAccountUpdate,
+    TwitchDeviceFlowRecord,
+    TwitchDeviceFlowUpsert,
+    TwitchUserCacheRecord,
+    TwitchUserCacheUpsert,
+)
 from ..repositories import TwitchAccountRepository, TwitchDeviceFlowRepository, TwitchUserCacheRepository
 from ._utils import require_row, require_value
 from .database import PostgresDatabase
+
+JsonStringList = list[str] | tuple[str, ...] | None
+TwitchAccountRow = tuple[int, int, str, str, str, str | None, str | None, datetime | None, JsonStringList, str | None]
+TwitchDeviceFlowRow = tuple[int | None, int, str, str, str, int, datetime, JsonStringList, str, str | None, datetime | None]
+TwitchUserCacheRow = tuple[str, str, str, str | None, str | None, datetime]
 
 
 @dataclass(slots=True)
@@ -19,6 +33,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
     database: PostgresDatabase
 
     async def get_by_account_id(self, account_id: int) -> TwitchAccountRecord | None:
+        """Return one linked Twitch account by internal ID."""
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
@@ -34,19 +49,9 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
             return None
         return self._build_account_record(row)
 
-    async def create_account(
-        self,
-        *,
-        discord_user_id: int,
-        twitch_user_id: str,
-        twitch_login: str,
-        client_id: str,
-        access_token: str,
-        refresh_token: str | None,
-        expires_at: str | None,
-        scope: tuple[str, ...],
-        token_type: str | None,
-    ) -> TwitchAccountRecord:
+    async def create_account(self, account: TwitchAccountCreate) -> TwitchAccountRecord:
+        """Insert a linked Twitch account with validated token data."""
+        token = account.token
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -59,34 +64,24 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
                           access_token, refresh_token, expires_at, scope, token_type
                 """,
                 (
-                    discord_user_id,
-                    twitch_user_id,
-                    twitch_login,
-                    client_id,
-                    access_token,
-                    refresh_token,
-                    expires_at,
-                    Jsonb(list(scope)),
-                    token_type,
+                    account.discord_user_id,
+                    token.twitch_user_id,
+                    token.twitch_login,
+                    token.client_id,
+                    token.access_token,
+                    token.refresh_token,
+                    token.expires_at,
+                    Jsonb(list(token.scope)),
+                    token.token_type,
                 ),
             )
             row = await cursor.fetchone()
         row = require_row(row, operation="twitch_account.create_account")
         return self._build_account_record(row)
 
-    async def update_account(
-        self,
-        *,
-        account_id: int,
-        twitch_user_id: str,
-        twitch_login: str,
-        client_id: str,
-        access_token: str,
-        refresh_token: str | None,
-        expires_at: str | None,
-        scope: tuple[str, ...],
-        token_type: str | None,
-    ) -> TwitchAccountRecord | None:
+    async def update_account(self, account: TwitchAccountUpdate) -> TwitchAccountRecord | None:
+        """Replace token data for an existing linked Twitch account."""
+        token = account.token
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -105,15 +100,15 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
                           access_token, refresh_token, expires_at, scope, token_type
                 """,
                 (
-                    twitch_user_id,
-                    twitch_login,
-                    client_id,
-                    access_token,
-                    refresh_token,
-                    expires_at,
-                    Jsonb(list(scope)),
-                    token_type,
-                    account_id,
+                    token.twitch_user_id,
+                    token.twitch_login,
+                    token.client_id,
+                    token.access_token,
+                    token.refresh_token,
+                    token.expires_at,
+                    Jsonb(list(token.scope)),
+                    token.token_type,
+                    account.account_id,
                 ),
             )
             row = await cursor.fetchone()
@@ -122,6 +117,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
         return self._build_account_record(row)
 
     async def remove_by_account_id(self, account_id: int) -> bool:
+        """Delete one linked Twitch account by internal ID."""
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -135,6 +131,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
         return row is not None
 
     async def get_by_discord_user_id(self, discord_user_id: int) -> TwitchAccountRecord | None:
+        """Return the newest linked Twitch account for one Discord user."""
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
@@ -152,52 +149,28 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
             return None
         return self._build_account_record(row)
 
-    async def upsert_account(
-        self,
-        *,
-        discord_user_id: int,
-        twitch_user_id: str,
-        twitch_login: str,
-        client_id: str,
-        access_token: str,
-        refresh_token: str | None,
-        expires_at: str | None,
-        scope: tuple[str, ...],
-        token_type: str | None,
-    ) -> TwitchAccountRecord:
-        existing = await self.get_by_discord_user_id(discord_user_id)
+    async def upsert_account(self, account: TwitchAccountCreate) -> TwitchAccountRecord:
+        """Create or update the linked Twitch account for a Discord user."""
+        existing = await self.get_by_discord_user_id(account.discord_user_id)
         if existing is None:
-            return await self.create_account(
-                discord_user_id=discord_user_id,
-                twitch_user_id=twitch_user_id,
-                twitch_login=twitch_login,
-                client_id=client_id,
-                access_token=access_token,
-                refresh_token=refresh_token,
-                expires_at=expires_at,
-                scope=scope,
-                token_type=token_type,
-            )
+            return await self.create_account(account)
         updated = await self.update_account(
-            account_id=existing.account_id,
-            twitch_user_id=twitch_user_id,
-            twitch_login=twitch_login,
-            client_id=client_id,
-            access_token=access_token,
-            refresh_token=refresh_token,
-            expires_at=expires_at,
-            scope=scope,
-            token_type=token_type,
+            TwitchAccountUpdate(
+                account_id=existing.account_id,
+                token=account.token,
+            )
         )
         return require_value(updated, operation="twitch_account.upsert_account")
 
     async def remove_by_discord_user_id(self, discord_user_id: int) -> bool:
+        """Delete the newest linked Twitch account for one Discord user."""
         existing = await self.get_by_discord_user_id(discord_user_id)
         if existing is None:
             return False
         return await self.remove_by_account_id(existing.account_id)
 
     async def list_accounts(self) -> list[TwitchAccountRecord]:
+        """Return all linked Twitch accounts, newest first."""
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
@@ -211,7 +184,7 @@ class PostgresTwitchAccountRepository(TwitchAccountRepository):
         return [self._build_account_record(row) for row in rows]
 
     @staticmethod
-    def _build_account_record(row: tuple) -> TwitchAccountRecord:
+    def _build_account_record(row: TwitchAccountRow) -> TwitchAccountRecord:
         scopes = tuple(row[8] or [])
         return TwitchAccountRecord(
             account_id=int(row[0]),
@@ -234,6 +207,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
     database: PostgresDatabase
 
     async def get_by_discord_channel_id(self, discord_channel_id: int) -> TwitchDeviceFlowRecord | None:
+        """Return a pending or failed device flow for one Discord channel."""
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
@@ -249,18 +223,8 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
             return None
         return self._build_record(row)
 
-    async def upsert_pending_flow(
-        self,
-        *,
-        discord_user_id: int,
-        discord_channel_id: int,
-        device_code: str,
-        user_code: str,
-        verification_uri: str,
-        interval_seconds: int,
-        expires_at: str,
-        scope: tuple[str, ...],
-    ) -> TwitchDeviceFlowRecord:
+    async def upsert_pending_flow(self, flow: TwitchDeviceFlowUpsert) -> TwitchDeviceFlowRecord:
+        """Create or reset a pending Twitch device-code flow."""
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -286,14 +250,14 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
                           expires_at, scope, status, last_error, last_polled_at
                 """,
                 (
-                    discord_channel_id,
-                    discord_user_id,
-                    device_code,
-                    user_code,
-                    verification_uri,
-                    interval_seconds,
-                    expires_at,
-                    Jsonb(list(scope)),
+                    flow.discord_channel_id,
+                    flow.discord_user_id,
+                    flow.device_code,
+                    flow.user_code,
+                    flow.verification_uri,
+                    flow.interval_seconds,
+                    flow.expires_at,
+                    Jsonb(list(flow.scope)),
                 ),
             )
             row = await cursor.fetchone()
@@ -301,6 +265,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
         return self._build_record(row)
 
     async def list_pending_flows(self) -> list[TwitchDeviceFlowRecord]:
+        """Return every device-code flow still waiting for authorization."""
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
@@ -315,6 +280,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
         return [self._build_record(row) for row in rows]
 
     async def mark_failed(self, *, discord_channel_id: int, last_error: str) -> TwitchDeviceFlowRecord | None:
+        """Mark one device-code flow as failed with its final error."""
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -334,6 +300,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
         return self._build_record(row)
 
     async def touch_polled(self, *, discord_channel_id: int) -> None:
+        """Update the last-polled timestamp for one device-code flow."""
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -346,6 +313,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
             )
 
     async def update_interval(self, *, discord_channel_id: int, interval_seconds: int) -> None:
+        """Store Twitch's latest requested polling interval."""
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -358,6 +326,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
             )
 
     async def remove_by_discord_channel_id(self, discord_channel_id: int) -> bool:
+        """Delete a device-code flow by Discord channel ID."""
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -371,6 +340,7 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
         return row is not None
 
     async def get_by_discord_user_id(self, discord_user_id: int) -> TwitchDeviceFlowRecord | None:
+        """Return the newest device-code flow for one Discord user."""
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
@@ -389,13 +359,14 @@ class PostgresTwitchDeviceFlowRepository(TwitchDeviceFlowRepository):
         return self._build_record(row)
 
     async def remove_by_discord_user_id(self, discord_user_id: int) -> bool:
+        """Delete the newest device-code flow for one Discord user."""
         existing = await self.get_by_discord_user_id(discord_user_id)
         if existing is None:
             return False
         return await self.remove_by_discord_channel_id(existing.discord_channel_id or 0)
 
     @staticmethod
-    def _build_record(row: tuple) -> TwitchDeviceFlowRecord:
+    def _build_record(row: TwitchDeviceFlowRow) -> TwitchDeviceFlowRecord:
         return TwitchDeviceFlowRecord(
             discord_user_id=int(row[1]),
             discord_channel_id=int(row[0]) if row[0] is not None else None,
@@ -418,10 +389,11 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
     database: PostgresDatabase
 
     async def get_by_user_id(self, twitch_user_id: str) -> TwitchUserCacheRecord | None:
+        """Return cached Twitch metadata by Twitch user ID."""
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
-                SELECT twitch_user_id, twitch_login, display_name, profile_image_url, updated_at
+                SELECT twitch_user_id, twitch_login, display_name, profile_image_url, chat_color, updated_at
                 FROM twitch_user_cache
                 WHERE twitch_user_id = %s
                 """,
@@ -433,13 +405,14 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
         return self._build_record(row)
 
     async def get_by_login(self, twitch_login: str) -> TwitchUserCacheRecord | None:
+        """Return cached Twitch metadata by normalized login."""
         normalized_login = twitch_login.strip().lower()
         if not normalized_login:
             return None
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
-                SELECT twitch_user_id, twitch_login, display_name, profile_image_url, updated_at
+                SELECT twitch_user_id, twitch_login, display_name, profile_image_url, chat_color, updated_at
                 FROM twitch_user_cache
                 WHERE twitch_login = %s
                 """,
@@ -457,8 +430,11 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
         twitch_login: str,
         display_name: str,
         profile_image_url: str | None,
+        chat_color: str | None,
     ) -> TwitchUserCacheRecord:
+        """Persist authoritative metadata fetched from Twitch APIs."""
         normalized_login = twitch_login.strip().lower()
+        normalized_chat_color = self._normalize_chat_color(chat_color)
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -474,28 +450,35 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
                     twitch_login,
                     display_name,
                     profile_image_url,
+                    chat_color,
                     updated_at
                 )
-                VALUES (%s, %s, %s, %s, NOW())
+                VALUES (%s, %s, %s, %s, %s, NOW())
                 ON CONFLICT (twitch_user_id)
                 DO UPDATE SET
                     twitch_login = EXCLUDED.twitch_login,
                     display_name = EXCLUDED.display_name,
                     profile_image_url = EXCLUDED.profile_image_url,
+                    chat_color = COALESCE(EXCLUDED.chat_color, twitch_user_cache.chat_color),
                     updated_at = CASE
                         WHEN twitch_user_cache.twitch_login IS DISTINCT FROM EXCLUDED.twitch_login
                           OR twitch_user_cache.display_name IS DISTINCT FROM EXCLUDED.display_name
                           OR twitch_user_cache.profile_image_url IS DISTINCT FROM EXCLUDED.profile_image_url
+                          OR (
+                              EXCLUDED.chat_color IS NOT NULL
+                              AND twitch_user_cache.chat_color IS DISTINCT FROM EXCLUDED.chat_color
+                          )
                         THEN NOW()
                         ELSE twitch_user_cache.updated_at
                     END
-                RETURNING twitch_user_id, twitch_login, display_name, profile_image_url, updated_at
+                RETURNING twitch_user_id, twitch_login, display_name, profile_image_url, chat_color, updated_at
                 """,
                 (
                     twitch_user_id,
                     normalized_login,
                     display_name,
                     profile_image_url,
+                    normalized_chat_color,
                 ),
             )
             row = await cursor.fetchone()
@@ -508,9 +491,12 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
         twitch_user_id: str,
         twitch_login: str,
         display_name: str | None,
+        chat_color: str | None = None,
     ) -> TwitchUserCacheRecord:
+        """Persist metadata observed cheaply from IRC chat tags."""
         normalized_login = twitch_login.strip().lower()
         normalized_display_name = (display_name or "").strip() or None
+        normalized_chat_color = self._normalize_chat_color(chat_color)
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -526,28 +512,35 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
                     twitch_login,
                     display_name,
                     profile_image_url,
+                    chat_color,
                     updated_at
                 )
-                VALUES (%s, %s, %s, NULL, NOW())
+                VALUES (%s, %s, %s, NULL, %s, NOW())
                 ON CONFLICT (twitch_user_id)
                 DO UPDATE SET
                     twitch_login = EXCLUDED.twitch_login,
                     display_name = COALESCE(%s, twitch_user_cache.display_name, EXCLUDED.display_name),
+                    chat_color = COALESCE(%s, twitch_user_cache.chat_color),
                     updated_at = CASE
                         WHEN twitch_user_cache.twitch_login IS DISTINCT FROM EXCLUDED.twitch_login
                           OR (%s::text IS NOT NULL AND twitch_user_cache.display_name IS DISTINCT FROM %s::text)
+                          OR (%s::text IS NOT NULL AND twitch_user_cache.chat_color IS DISTINCT FROM %s::text)
                         THEN NOW()
                         ELSE twitch_user_cache.updated_at
                     END
-                RETURNING twitch_user_id, twitch_login, display_name, profile_image_url, updated_at
+                RETURNING twitch_user_id, twitch_login, display_name, profile_image_url, chat_color, updated_at
                 """,
                 (
                     twitch_user_id,
                     normalized_login,
                     normalized_display_name or normalized_login,
+                    normalized_chat_color,
+                    normalized_display_name,
+                    normalized_chat_color,
                     normalized_display_name,
                     normalized_display_name,
-                    normalized_display_name,
+                    normalized_chat_color,
+                    normalized_chat_color,
                 ),
             )
             row = await cursor.fetchone()
@@ -555,10 +548,11 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
         return self._build_record(row)
 
     async def list_all(self) -> list[TwitchUserCacheRecord]:
+        """Return every persisted Twitch user cache record."""
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
-                SELECT twitch_user_id, twitch_login, display_name, profile_image_url, updated_at
+                SELECT twitch_user_id, twitch_login, display_name, profile_image_url, chat_color, updated_at
                 FROM twitch_user_cache
                 ORDER BY twitch_user_id
                 """
@@ -566,59 +560,71 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
             rows = await cursor.fetchall()
         return [self._build_record(row) for row in rows]
 
-    async def upsert_many_from_api(self, records: tuple[tuple[str, str, str, str | None], ...]) -> None:
+    async def upsert_many_from_api(self, records: tuple[TwitchUserCacheUpsert, ...]) -> None:
+        """Persist a deduplicated batch of Twitch API metadata."""
         if not records:
             return
-        async with self.database.async_transaction() as connection:
-            async with connection.cursor() as cursor:
-                deduplicated = {}
-                for twitch_user_id, twitch_login, display_name, profile_image_url in records:
-                    deduplicated[twitch_user_id] = (
-                        twitch_user_id,
-                        twitch_login.strip().lower(),
-                        display_name,
-                        profile_image_url,
-                    )
-                normalized_records = tuple(deduplicated.values())
-                await cursor.executemany(
-                    """
-                    DELETE FROM twitch_user_cache
-                    WHERE twitch_login = %s AND twitch_user_id <> %s
-                    """,
-                    [(twitch_login, twitch_user_id) for twitch_user_id, twitch_login, _, _ in normalized_records],
+        async with self.database.async_transaction() as connection, connection.cursor() as cursor:
+            deduplicated = {}
+            for twitch_user_id, twitch_login, display_name, profile_image_url, chat_color in records:
+                deduplicated[twitch_user_id] = (
+                    twitch_user_id,
+                    twitch_login.strip().lower(),
+                    display_name,
+                    profile_image_url,
+                    self._normalize_chat_color(chat_color),
                 )
-                await cursor.executemany(
-                    """
-                    INSERT INTO twitch_user_cache (
-                        twitch_user_id,
-                        twitch_login,
-                        display_name,
-                        profile_image_url,
-                        updated_at
-                    )
-                    VALUES (%s, %s, %s, %s, NOW())
-                    ON CONFLICT (twitch_user_id)
-                    DO UPDATE SET
-                        twitch_login = EXCLUDED.twitch_login,
-                        display_name = EXCLUDED.display_name,
-                        profile_image_url = EXCLUDED.profile_image_url,
-                        updated_at = CASE
-                            WHEN twitch_user_cache.twitch_login IS DISTINCT FROM EXCLUDED.twitch_login
-                              OR twitch_user_cache.display_name IS DISTINCT FROM EXCLUDED.display_name
-                              OR twitch_user_cache.profile_image_url IS DISTINCT FROM EXCLUDED.profile_image_url
-                            THEN NOW()
-                            ELSE twitch_user_cache.updated_at
-                        END
-                    """,
-                    normalized_records,
+            normalized_records = tuple(deduplicated.values())
+            await cursor.executemany(
+                """
+                DELETE FROM twitch_user_cache
+                WHERE twitch_login = %s AND twitch_user_id <> %s
+                """,
+                [(twitch_login, twitch_user_id) for twitch_user_id, twitch_login, _, _, _ in normalized_records],
+            )
+            await cursor.executemany(
+                """
+                INSERT INTO twitch_user_cache (
+                    twitch_user_id,
+                    twitch_login,
+                    display_name,
+                    profile_image_url,
+                    chat_color,
+                    updated_at
                 )
+                VALUES (%s, %s, %s, %s, %s, NOW())
+                ON CONFLICT (twitch_user_id)
+                DO UPDATE SET
+                    twitch_login = EXCLUDED.twitch_login,
+                    display_name = EXCLUDED.display_name,
+                    profile_image_url = EXCLUDED.profile_image_url,
+                    chat_color = COALESCE(EXCLUDED.chat_color, twitch_user_cache.chat_color),
+                    updated_at = CASE
+                        WHEN twitch_user_cache.twitch_login IS DISTINCT FROM EXCLUDED.twitch_login
+                          OR twitch_user_cache.display_name IS DISTINCT FROM EXCLUDED.display_name
+                          OR twitch_user_cache.profile_image_url IS DISTINCT FROM EXCLUDED.profile_image_url
+                          OR (
+                              EXCLUDED.chat_color IS NOT NULL
+                              AND twitch_user_cache.chat_color IS DISTINCT FROM EXCLUDED.chat_color
+                          )
+                        THEN NOW()
+                        ELSE twitch_user_cache.updated_at
+                    END
+                """,
+                normalized_records,
+            )
 
     @staticmethod
-    def _build_record(row: tuple) -> TwitchUserCacheRecord:
+    def _build_record(row: TwitchUserCacheRow) -> TwitchUserCacheRecord:
         return TwitchUserCacheRecord(
             twitch_user_id=str(row[0]),
             twitch_login=row[1],
             display_name=row[2],
             profile_image_url=row[3],
-            updated_at=row[4].isoformat(),
+            chat_color=row[4],
+            updated_at=row[5].isoformat(),
         )
+
+    @staticmethod
+    def _normalize_chat_color(value: str | None) -> str | None:
+        return None if value is None else value.strip()

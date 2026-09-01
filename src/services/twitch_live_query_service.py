@@ -14,4 +14,5 @@ class TwitchLiveQueryService:
     twitch_api: TwitchAPIClient
 
     async def get_live_user_ids(self, user_ids: list[str]) -> set[str]:
+        """Return the requested Twitch user IDs that currently have live streams."""
         return await self.twitch_api.get_live_user_ids(user_ids)

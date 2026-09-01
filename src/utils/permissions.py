@@ -21,6 +21,14 @@ class ObserverPermission(IntFlag):
     ADMIN = 1 << 10
 
 
+class UnsupportedPermissionError(ValueError):
+    """Raised when a persisted or slash-command permission value is unknown."""
+
+    def __init__(self, value: str) -> None:
+        """Create the unsupported-permission error for one raw value."""
+        super().__init__(f"Unsupported permission `{value}`.")
+
+
 PERMISSION_CHOICES: tuple[tuple[str, ObserverPermission], ...] = (
     ("view", ObserverPermission.VIEW),
     ("manage_channels", ObserverPermission.MANAGE_CHANNELS),
@@ -35,6 +43,19 @@ PERMISSION_CHOICES: tuple[tuple[str, ObserverPermission], ...] = (
     ("admin", ObserverPermission.ADMIN),
 )
 
+_ALL_PERMISSIONS = ObserverPermission(sum(int(permission) for _, permission in PERMISSION_CHOICES))
+_IMPLIED_PERMISSIONS: tuple[tuple[ObserverPermission, ObserverPermission], ...] = (
+    (ObserverPermission.MANAGE_CHANNELS, ObserverPermission.VIEW),
+    (ObserverPermission.MANAGE_PATTERNS, ObserverPermission.TOGGLE_PATTERNS | ObserverPermission.VIEW),
+    (ObserverPermission.TOGGLE_PATTERNS, ObserverPermission.VIEW),
+    (ObserverPermission.MANAGE_REPLIES, ObserverPermission.TOGGLE_REPLIES | ObserverPermission.VIEW),
+    (ObserverPermission.TOGGLE_REPLIES, ObserverPermission.VIEW),
+    (ObserverPermission.SEND_TWITCH_MESSAGES, ObserverPermission.VIEW),
+    (ObserverPermission.CONTROL_OBSERVER, ObserverPermission.VIEW),
+    (ObserverPermission.LEAVE_CONTEXT, ObserverPermission.VIEW),
+    (ObserverPermission.MANAGE_PERMISSIONS, ObserverPermission.VIEW),
+)
+
 
 def permission_from_value(value: str) -> ObserverPermission:
     """Map a stable slash-command choice value to one permission bit."""
@@ -42,7 +63,7 @@ def permission_from_value(value: str) -> ObserverPermission:
     for raw_value, permission in PERMISSION_CHOICES:
         if raw_value == normalized:
             return permission
-    raise ValueError(f"Unsupported permission `{value}`.")
+    raise UnsupportedPermissionError(value)
 
 
 def permissions_mask_from_values(values: tuple[str, ...]) -> int:
@@ -67,26 +88,11 @@ def effective_permissions(mask: int) -> ObserverPermission:
     permissions = ObserverPermission(mask)
 
     if permissions & ObserverPermission.ADMIN:
-        return ObserverPermission(sum(int(permission) for _, permission in PERMISSION_CHOICES))
+        return _ALL_PERMISSIONS
 
-    if permissions & ObserverPermission.MANAGE_CHANNELS:
-        permissions |= ObserverPermission.VIEW
-    if permissions & ObserverPermission.MANAGE_PATTERNS:
-        permissions |= ObserverPermission.TOGGLE_PATTERNS | ObserverPermission.VIEW
-    if permissions & ObserverPermission.TOGGLE_PATTERNS:
-        permissions |= ObserverPermission.VIEW
-    if permissions & ObserverPermission.MANAGE_REPLIES:
-        permissions |= ObserverPermission.TOGGLE_REPLIES | ObserverPermission.VIEW
-    if permissions & ObserverPermission.TOGGLE_REPLIES:
-        permissions |= ObserverPermission.VIEW
-    if permissions & ObserverPermission.SEND_TWITCH_MESSAGES:
-        permissions |= ObserverPermission.VIEW
-    if permissions & ObserverPermission.CONTROL_OBSERVER:
-        permissions |= ObserverPermission.VIEW
-    if permissions & ObserverPermission.LEAVE_CONTEXT:
-        permissions |= ObserverPermission.VIEW
-    if permissions & ObserverPermission.MANAGE_PERMISSIONS:
-        permissions |= ObserverPermission.VIEW
+    for granted, implied in _IMPLIED_PERMISSIONS:
+        if permissions & granted:
+            permissions |= implied
     return permissions
 
 

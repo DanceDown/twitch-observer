@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import discord
+
 from src.entrypoints.discord.helpers import defer_interaction_response
 
 from ...ui_data import TrackedChannelPresentation
@@ -18,6 +19,7 @@ class PatternChannelsModal(discord.ui.Modal):
     """Collect the Twitch-channel scope for one ping."""
 
     def __init__(self, *, parent: PatternHomeView, tracked_channels: list[TrackedChannelPresentation]) -> None:
+        """Create the modal seeded with tracked channel choices."""
         super().__init__(title=parent.text("discord.pattern_ui.channels.title"), timeout=300)
         self._parent_view = parent
         self._tracked_channels = tracked_channels
@@ -70,6 +72,7 @@ class PatternChannelsModal(discord.ui.Modal):
         self.add_item(self.channels)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        """Store submitted channel scope in the parent form and rerender it."""
         await defer_interaction_response(interaction)
         self._parent_view.state.channel_scope_mode = self.scope.component.value
         if self.scope.component.value == "all_tracked":

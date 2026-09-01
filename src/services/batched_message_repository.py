@@ -9,25 +9,62 @@ import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Protocol, runtime_checkable
 
 import psycopg
 
 from src.database.connection import MessageRepository, RecentMessageRecord
-from src.errors import DatabasePoolExhaustedError
+from src.errors import DatabasePoolExhaustedError, MissingTwitchMessageIdError
 from src.events.twitch_events import TwitchChatMessageEvent
 
 logger = logging.getLogger(__name__)
 _SPOOL_VERSION = 1
 
 
+class BatchedMessageSpoolError(ValueError):
+    """Raised when a persisted write-spool file has an invalid shape."""
+
+    @classmethod
+    def payload_not_object(cls) -> BatchedMessageSpoolError:
+        """Build an error for spool files whose root value is not an object."""
+        return cls("Batched message write spool payload must be an object.")
+
+    @classmethod
+    def unsupported_version(cls, version: object) -> BatchedMessageSpoolError:
+        """Build an error for spool files from unsupported future/old formats."""
+        return cls(f"Unsupported batched message write spool version: {version!r}.")
+
+    @classmethod
+    def malformed_lists(cls) -> BatchedMessageSpoolError:
+        """Build an error for spool files with malformed message lists."""
+        return cls("Batched message write spool lists are malformed.")
+
+    @classmethod
+    def thread_match_not_object(cls) -> BatchedMessageSpoolError:
+        """Build an error for malformed thread-match entries."""
+        return cls("Batched message write spool thread match must be an object.")
+
+    @classmethod
+    def event_not_object(cls) -> BatchedMessageSpoolError:
+        """Build an error for malformed message event entries."""
+        return cls("Batched message write spool event must be an object.")
+
+    @classmethod
+    def missing_field(cls, key: str) -> BatchedMessageSpoolError:
+        """Build an error for required spool event fields missing from the payload."""
+        return cls(f"Batched message write spool field {key!r} is missing.")
+
+
+@runtime_checkable
 class _BatchMessageWriteRepository(Protocol):
     async def flush_write_batch(
         self,
         *,
         message_events: tuple[TwitchChatMessageEvent, ...],
         thread_matches: tuple[tuple[int, TwitchChatMessageEvent], ...],
-    ) -> None: ...
+    ) -> None:
+        """Persist a prepared batch of raw messages and thread matches."""
+        ...
 
 
 @dataclass(slots=True)
@@ -48,12 +85,14 @@ class BatchedMessageRepository(MessageRepository):
     _spool_restore_pending: bool = field(default=False, init=False)
 
     async def start(self) -> None:
+        """Restore spooled writes and start the background flush loop."""
         await self._restore_spooled_writes()
         if self._task is None:
             self._stop_event.clear()
             self._task = asyncio.create_task(self._run_loop(), name="message-write-batcher")
 
     async def stop(self) -> None:
+        """Stop the background loop and flush remaining writes for shutdown."""
         self._stop_event.set()
         self._wake_event.set()
         had_task = self._task is not None
@@ -65,11 +104,13 @@ class BatchedMessageRepository(MessageRepository):
             await self._flush_for_shutdown()
 
     async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
+        """Queue one incoming Twitch message for batched persistence."""
         should_flush_now = await self._enqueue_message(event)
         if should_flush_now and self._task is None:
             await self.flush()
 
     async def save_bot_twitch_message(self, event: TwitchChatMessageEvent) -> None:
+        """Flush pending inbound messages before storing a bot-sent message."""
         await self.flush()
         await self.repository.save_bot_twitch_message(event)
 
@@ -79,6 +120,7 @@ class BatchedMessageRepository(MessageRepository):
         thread_id: int,
         event: TwitchChatMessageEvent,
     ) -> None:
+        """Queue that one Twitch message matched inside one thread."""
         should_flush_now = await self._enqueue_match(thread_id=thread_id, event=event)
         if should_flush_now and self._task is None:
             await self.flush()
@@ -89,6 +131,7 @@ class BatchedMessageRepository(MessageRepository):
         since: datetime,
         limit: int,
     ) -> list[RecentMessageRecord]:
+        """Flush pending writes before returning recent cross-channel messages."""
         await self.flush()
         return await self.repository.list_recent_messages(since=since, limit=limit)
 
@@ -99,6 +142,7 @@ class BatchedMessageRepository(MessageRepository):
         since: datetime,
         limit: int,
     ) -> list[RecentMessageRecord]:
+        """Flush pending writes before returning recent messages for one channel."""
         await self.flush()
         return await self.repository.list_recent_messages_for_channel(
             twitch_channel_id=twitch_channel_id,
@@ -113,6 +157,7 @@ class BatchedMessageRepository(MessageRepository):
         since: datetime,
         limit: int,
     ) -> list[RecentMessageRecord]:
+        """Flush pending writes before returning recent messages for one thread."""
         await self.flush()
         return await self.repository.list_recent_messages_for_thread(
             thread_id=thread_id,
@@ -126,6 +171,7 @@ class BatchedMessageRepository(MessageRepository):
         thread_id: int,
         message_id: str,
     ) -> RecentMessageRecord | None:
+        """Flush pending writes before reading one thread-linked message."""
         await self.flush()
         return await self.repository.get_thread_message(
             thread_id=thread_id,
@@ -133,6 +179,7 @@ class BatchedMessageRepository(MessageRepository):
         )
 
     async def flush(self) -> None:
+        """Persist all queued message writes, requeuing snapshots on DB failure."""
         async with self._flush_lock:
             while True:
                 snapshot = await self._take_snapshot()
@@ -201,9 +248,8 @@ class BatchedMessageRepository(MessageRepository):
         message_events: tuple[TwitchChatMessageEvent, ...],
         thread_matches: tuple[tuple[int, TwitchChatMessageEvent], ...],
     ) -> None:
-        batch_repository = self.repository if hasattr(self.repository, "flush_write_batch") else None
-        if batch_repository is not None:
-            await getattr(batch_repository, "flush_write_batch")(
+        if isinstance(self.repository, _BatchMessageWriteRepository):
+            await self.repository.flush_write_batch(
                 message_events=message_events,
                 thread_matches=thread_matches,
             )
@@ -223,16 +269,14 @@ class BatchedMessageRepository(MessageRepository):
             if self._stop_event.is_set():
                 break
             if self.flush_interval_seconds > 0:
-                try:
+                with contextlib.suppress(TimeoutError):
                     await asyncio.wait_for(self._stop_event.wait(), timeout=self.flush_interval_seconds)
-                except TimeoutError:
-                    pass
             if self._stop_event.is_set():
                 break
             try:
                 await self.flush()
             except DatabasePoolExhaustedError:
-                logger.error("Batched message write flush failed because the database pool is exhausted.")
+                logger.exception("Batched message write flush failed because the database pool is exhausted.")
             except psycopg.Error as error:
                 self._log_postgres_flush_error(error)
         await self._flush_for_shutdown()
@@ -324,12 +368,12 @@ class BatchedMessageRepository(MessageRepository):
         logger.exception("Batched message write flush failed because PostgreSQL returned an error.")
 
     @staticmethod
-    def _build_fallback_message_id(event: TwitchChatMessageEvent) -> str:
-        raise ValueError("Twitch IRC message is missing message_id.")
+    def _build_fallback_message_id() -> str:
+        raise MissingTwitchMessageIdError
 
     @classmethod
     def _resolve_message_id(cls, event: TwitchChatMessageEvent) -> str:
-        return event.message_id or cls._build_fallback_message_id(event)
+        return event.message_id or cls._build_fallback_message_id()
 
 
 def _is_transient_postgres_disconnect(error: psycopg.Error) -> bool:
@@ -377,15 +421,15 @@ def _write_spool_file(
 
 
 def _read_spool_file(path: Path) -> tuple[tuple[TwitchChatMessageEvent, ...], tuple[tuple[int, TwitchChatMessageEvent], ...]]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload: object = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError("Batched message write spool payload must be an object.")
+        raise BatchedMessageSpoolError.payload_not_object()
     if payload.get("version") != _SPOOL_VERSION:
-        raise ValueError(f"Unsupported batched message write spool version: {payload.get('version')!r}.")
+        raise BatchedMessageSpoolError.unsupported_version(payload.get("version"))
     messages = payload.get("messages", [])
     thread_matches = payload.get("thread_matches", [])
     if not isinstance(messages, list) or not isinstance(thread_matches, list):
-        raise ValueError("Batched message write spool lists are malformed.")
+        raise BatchedMessageSpoolError.malformed_lists()
     return (
         tuple(_event_from_payload(message) for message in messages),
         tuple(_thread_match_from_payload(match) for match in thread_matches),
@@ -403,13 +447,13 @@ def _remove_spool_file(path: Path) -> bool:
     return True
 
 
-def _thread_match_from_payload(payload: Any) -> tuple[int, TwitchChatMessageEvent]:
+def _thread_match_from_payload(payload: object) -> tuple[int, TwitchChatMessageEvent]:
     if not isinstance(payload, dict):
-        raise ValueError("Batched message write spool thread match must be an object.")
-    return int(payload["thread_id"]), _event_from_payload(payload["event"])
+        raise BatchedMessageSpoolError.thread_match_not_object()
+    return int(_required_value(payload, "thread_id")), _event_from_payload(_required_value(payload, "event"))
 
 
-def _event_to_payload(event: TwitchChatMessageEvent) -> dict[str, Any]:
+def _event_to_payload(event: TwitchChatMessageEvent) -> dict[str, object]:
     return {
         "channel_login": event.channel_login,
         "author_login": event.author_login,
@@ -429,9 +473,9 @@ def _event_to_payload(event: TwitchChatMessageEvent) -> dict[str, Any]:
     }
 
 
-def _event_from_payload(payload: Any) -> TwitchChatMessageEvent:
+def _event_from_payload(payload: object) -> TwitchChatMessageEvent:
     if not isinstance(payload, dict):
-        raise ValueError("Batched message write spool event must be an object.")
+        raise BatchedMessageSpoolError.event_not_object()
     return TwitchChatMessageEvent(
         channel_login=_required_str(payload, "channel_login"),
         author_login=_required_str(payload, "author_login"),
@@ -445,32 +489,35 @@ def _event_from_payload(payload: Any) -> TwitchChatMessageEvent:
         message_kind=_required_str(payload, "message_kind"),
         notice_type=_optional_str(payload, "notice_type"),
         system_message=_optional_str(payload, "system_message"),
-        sent_at=_datetime_from_payload(payload["sent_at"]),
+        sent_at=_datetime_from_payload(_required_value(payload, "sent_at")),
         raw_line=_optional_str(payload, "raw_line"),
         raw_tags=_raw_tags_from_payload(payload.get("raw_tags", {})),
     )
 
 
-def _required_str(payload: dict[str, Any], key: str) -> str:
-    value = payload[key]
-    if value is None:
-        raise ValueError(f"Batched message write spool field {key!r} is missing.")
-    return str(value)
+def _required_value(payload: dict[str, object], key: str) -> object:
+    if key not in payload or payload[key] is None:
+        raise BatchedMessageSpoolError.missing_field(key)
+    return payload[key]
 
 
-def _optional_str(payload: dict[str, Any], key: str) -> str | None:
+def _required_str(payload: dict[str, object], key: str) -> str:
+    return str(_required_value(payload, key))
+
+
+def _optional_str(payload: dict[str, object], key: str) -> str | None:
     value = payload.get(key)
     return None if value is None else str(value)
 
 
-def _datetime_from_payload(value: Any) -> datetime:
+def _datetime_from_payload(value: object) -> datetime:
     parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=UTC)
     return parsed
 
 
-def _raw_tags_from_payload(value: Any) -> dict[str, str]:
+def _raw_tags_from_payload(value: object) -> dict[str, str]:
     if not isinstance(value, dict):
         return {}
     return {str(key): str(item) for key, item in value.items()}

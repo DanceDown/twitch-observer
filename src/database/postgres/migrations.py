@@ -8,7 +8,6 @@ from pathlib import Path
 
 from .database import PostgresDatabase
 
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -20,10 +19,12 @@ class PostgresMigrationRunner:
     migrations_directory: Path | None = None
 
     def __post_init__(self) -> None:
+        """Use the packaged migrations directory when none was injected."""
         if self.migrations_directory is None:
             self.migrations_directory = Path(__file__).resolve().parents[1] / "migrations"
 
     async def apply_pending(self) -> None:
+        """Apply every migration file that is not recorded yet."""
         migration_files = sorted(self._migration_files())
         if not migration_files:
             return
@@ -70,15 +71,14 @@ class PostgresMigrationRunner:
     async def _apply_one(self, migration_file: Path) -> None:
         migration_sql = migration_file.read_text(encoding="utf-8").strip()
         LOGGER.info("Applying PostgreSQL migration %s", migration_file.name)
-        async with self.database.async_connection() as connection:
-            async with connection.cursor() as cursor:
-                if migration_sql:
-                    await cursor.execute(migration_sql)
-                await cursor.execute(
-                    """
-                    INSERT INTO schema_migrations (version)
-                    VALUES (%s)
-                    """,
-                    (migration_file.name,),
-                )
+        async with self.database.async_connection() as connection, connection.cursor() as cursor:
+            if migration_sql:
+                await cursor.execute(migration_sql)
+            await cursor.execute(
+                """
+                INSERT INTO schema_migrations (version)
+                VALUES (%s)
+                """,
+                (migration_file.name,),
+            )
         LOGGER.info("Applied PostgreSQL migration %s", migration_file.name)

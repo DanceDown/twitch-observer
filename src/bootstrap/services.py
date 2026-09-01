@@ -6,13 +6,13 @@ from dataclasses import dataclass
 
 from src.entrypoints.discord import DiscordServiceBundle
 from src.services.account_service import AccountCommandService
-from src.services.chat import ChatMessageReactionService, ChatPatternMatcher
 from src.services.channel_command_service import ChannelCommandService
 from src.services.channel_event_notification_service import (
     ChannelEventNotificationService,
     ChannelLiveStatePersistenceService,
 )
 from src.services.channel_live_state_service import ChannelEventCommandService
+from src.services.chat import ChatMessageReactionService, ChatPatternMatcher
 from src.services.chat_pipeline import ChatMessageProcessingService
 from src.services.discord_ui_queries import (
     AdapterEventQueryService,
@@ -57,6 +57,7 @@ class _LiveStateServices:
 
 
 def build_services(core: ApplicationCore, gateways: ApplicationGateways) -> ApplicationServices:
+    """Wire business services around shared repositories, gateways, and coordinators."""
     message_ingest = MessageIngestService(message_repository=core.message_repository)
     user_directory_ingest = TwitchUserDirectoryIngestService(directory=core.twitch_directory)
     ui_queries = _build_ui_queries(core)

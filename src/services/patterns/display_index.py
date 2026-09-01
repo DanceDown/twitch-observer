@@ -14,6 +14,7 @@ class PatternDisplayIndexResolver:
     pattern_repository: PatternRepository
 
     async def build_index_map(self, thread_id: int) -> dict[int, int]:
+        """Build dense display indexes for patterns in one thread."""
         return {
             pattern.pattern_id: display_index
             for display_index, pattern in enumerate(
@@ -23,4 +24,5 @@ class PatternDisplayIndexResolver:
         }
 
     async def resolve(self, *, thread_id: int, pattern_id: int) -> int | None:
+        """Resolve one pattern ID to its dense display index."""
         return (await self.build_index_map(thread_id)).get(pattern_id)

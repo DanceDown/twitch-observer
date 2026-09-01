@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import suppress
 
 import aiohttp
@@ -17,6 +18,8 @@ from .client import ObserverDiscordClient
 from .service_bundle import DiscordServiceBundle
 from .ui_data import DiscordUIDataProvider
 
+logger = logging.getLogger(__name__)
+
 
 class DiscordEntrypoint(TrackingNotificationSender, DiscordPresenceStatusSender):
     """Entrypoint managing the Discord client lifecycle."""
@@ -29,6 +32,7 @@ class DiscordEntrypoint(TrackingNotificationSender, DiscordPresenceStatusSender)
         ui_data_provider: DiscordUIDataProvider,
         localizer: Localizer,
     ) -> None:
+        """Create the entrypoint wrapper around the concrete Discord client."""
         self._config = config
         self._client = ObserverDiscordClient(
             config=config,
@@ -40,7 +44,7 @@ class DiscordEntrypoint(TrackingNotificationSender, DiscordPresenceStatusSender)
     async def start(self) -> None:
         """Connect the Discord bot if a token is configured."""
         if not self._config.discord_bot_token:
-            print("No Discord bot token configured; the Discord entrypoint is disabled.")
+            logger.info("No Discord bot token configured; the Discord entrypoint is disabled.")
             return
         await self._client.start(self._config.discord_bot_token)
 

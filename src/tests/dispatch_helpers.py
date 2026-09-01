@@ -39,6 +39,14 @@ from src.entrypoints.discord.dispatch import (
     dispatch_ui_flow_decision,
     dispatch_unlink_account,
 )
+from src.events.commands import (
+    AddChannelEventReplyCommand,
+    AddPatternCommand,
+    AddPatternReplyCommand,
+    EditPatternCommand,
+    SendTwitchMessageCommand,
+    SetChannelEventColorCommand,
+)
 from src.events.pattern_scopes import ChannelScopeMode, OfflineScope, SubscriptionScope, UserScopeMode
 from src.events.twitch_events import StreamEventKind
 from src.events.ui_flow import UIFlowKind, UIFlowStep
@@ -141,20 +149,22 @@ async def dispatch_pattern_command(
     if action == "add":
         return await dispatch_add_pattern(
             services,
-            discord_channel_id=discord_channel_id,
-            requester_id=requester_id,
-            pattern_text=pattern_text or "",
-            is_regex=bool(is_regex),
-            channel_scope_mode=ChannelScopeMode(channel_scope_mode),
-            twitch_channel_logins=twitch_channel_logins,
-            user_scope_mode=UserScopeMode(user_scope_mode),
-            twitch_user_logins=twitch_user_logins,
-            sub_state=SubscriptionScope(sub_state),
-            offline_state=OfflineScope(offline_state),
-            case_sensitive=case_sensitive,
-            color=color,
-            disabled=disabled,
-            priority=priority,
+            AddPatternCommand(
+                discord_channel_id=discord_channel_id,
+                requester_id=requester_id,
+                pattern_text=pattern_text or "",
+                is_regex=bool(is_regex),
+                channel_scope_mode=ChannelScopeMode(channel_scope_mode),
+                twitch_channel_logins=twitch_channel_logins,
+                user_scope_mode=UserScopeMode(user_scope_mode),
+                twitch_user_logins=twitch_user_logins,
+                sub_state=SubscriptionScope(sub_state),
+                offline_state=OfflineScope(offline_state),
+                case_sensitive=case_sensitive,
+                color=color,
+                disabled=disabled,
+                priority=priority,
+            ),
         )
     if action == "remove" and pattern_id is not None:
         return await dispatch_remove_pattern(
@@ -201,21 +211,23 @@ async def dispatch_pattern_edit_command(
 ):
     return await dispatch_edit_pattern(
         services,
-        discord_channel_id=discord_channel_id,
-        requester_id=requester_id,
-        pattern_id=pattern_id,
-        pattern_text=pattern_text,
-        is_regex=is_regex,
-        channel_scope_mode=None if channel_scope_mode is None else ChannelScopeMode(channel_scope_mode),
-        twitch_channel_logins=twitch_channel_logins,
-        user_scope_mode=None if user_scope_mode is None else UserScopeMode(user_scope_mode),
-        twitch_user_logins=twitch_user_logins,
-        sub_state=None if sub_state is None else SubscriptionScope(sub_state),
-        offline_state=None if offline_state is None else OfflineScope(offline_state),
-        case_sensitive=case_sensitive,
-        color=color,
-        clear_color=clear_color,
-        priority=priority,
+        EditPatternCommand(
+            discord_channel_id=discord_channel_id,
+            requester_id=requester_id,
+            pattern_id=pattern_id,
+            pattern_text=pattern_text,
+            is_regex=is_regex,
+            channel_scope_mode=None if channel_scope_mode is None else ChannelScopeMode(channel_scope_mode),
+            twitch_channel_logins=twitch_channel_logins,
+            user_scope_mode=None if user_scope_mode is None else UserScopeMode(user_scope_mode),
+            twitch_user_logins=twitch_user_logins,
+            sub_state=None if sub_state is None else SubscriptionScope(sub_state),
+            offline_state=None if offline_state is None else OfflineScope(offline_state),
+            case_sensitive=case_sensitive,
+            color=color,
+            clear_color=clear_color,
+            priority=priority,
+        ),
     )
 
 
@@ -308,11 +320,13 @@ async def dispatch_reply_command(
         if action == "add":
             return await dispatch_add_pattern_reply(
                 services,
-                discord_channel_id=discord_channel_id,
-                requester_id=requester_id,
-                pattern_id=pattern_id,
-                message=message or "",
-                reply_as_reply=reply_as_reply,
+                AddPatternReplyCommand(
+                    discord_channel_id=discord_channel_id,
+                    requester_id=requester_id,
+                    pattern_id=pattern_id,
+                    message=message or "",
+                    reply_as_reply=reply_as_reply,
+                ),
             )
         if action == "remove":
             return await dispatch_remove_pattern_reply(
@@ -340,11 +354,13 @@ async def dispatch_reply_command(
     if action == "add":
         return await dispatch_add_channel_event_reply(
             services,
-            discord_channel_id=discord_channel_id,
-            requester_id=requester_id,
-            adapter_event_id=adapter_event_id,
-            message=message or "",
-            reply_as_reply=reply_as_reply,
+            AddChannelEventReplyCommand(
+                discord_channel_id=discord_channel_id,
+                requester_id=requester_id,
+                adapter_event_id=adapter_event_id,
+                message=message or "",
+                reply_as_reply=reply_as_reply,
+            ),
         )
     if action == "remove":
         return await dispatch_remove_channel_event_reply(
@@ -400,11 +416,13 @@ async def dispatch_channel_event_command(
     if action == "color":
         return await dispatch_set_channel_event_color(
             services,
-            discord_channel_id=discord_channel_id,
-            requester_id=requester_id,
-            twitch_channel_id=twitch_channel_id,
-            event_kind=event_kind,
-            color=color,
+            SetChannelEventColorCommand(
+                discord_channel_id=discord_channel_id,
+                requester_id=requester_id,
+                twitch_channel_id=twitch_channel_id,
+                event_kind=event_kind,
+                color=color,
+            ),
         )
     raise ValueError(f"Unsupported channel-event action `{action}`.")
 
@@ -420,11 +438,13 @@ async def dispatch_write_command(
 ):
     return await dispatch_send_twitch_message(
         services,
-        discord_channel_id=discord_channel_id,
-        requester_id=requester_id,
-        twitch_channel_login=twitch_channel_login,
-        message=message,
-        reply_parent_message_id=reply_parent_message_id,
+        SendTwitchMessageCommand(
+            discord_channel_id=discord_channel_id,
+            requester_id=requester_id,
+            twitch_channel_login=twitch_channel_login,
+            message=message,
+            reply_parent_message_id=reply_parent_message_id,
+        ),
     )
 
 

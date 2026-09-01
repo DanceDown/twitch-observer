@@ -3,14 +3,34 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
-from ..records import SupportTicketRecord
+from psycopg import sql
+
+from ..records import SupportTicketCreate, SupportTicketRecord
 from ..repositories import SupportTicketRepository
 from ._utils import require_row
 from .database import PostgresDatabase
 
-
-SupportTicketRow = tuple
+SupportTicketRow = tuple[
+    int,
+    int,
+    int,
+    str,
+    str,
+    str,
+    str,
+    str,
+    int | None,
+    str | None,
+    str | None,
+    int | None,
+    datetime | None,
+    int | None,
+    datetime | None,
+    datetime,
+    datetime,
+]
 
 
 @dataclass(slots=True)
@@ -19,19 +39,11 @@ class PostgresSupportTicketRepository(SupportTicketRepository):
 
     database: PostgresDatabase
 
-    async def create_ticket(
-        self,
-        *,
-        source_discord_channel_id: int,
-        requester_discord_user_id: int,
-        category: str,
-        title: str,
-        description: str,
-        language: str,
-    ) -> SupportTicketRecord:
+    async def create_ticket(self, ticket: SupportTicketCreate) -> SupportTicketRecord:
+        """Insert a new open support ticket."""
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
-                f"""
+                sql.SQL("""
                 INSERT INTO support_ticket (
                     source_discord_channel_id,
                     requester_discord_user_id,
@@ -41,15 +53,15 @@ class PostgresSupportTicketRepository(SupportTicketRepository):
                     language
                 )
                 VALUES (%s, %s, %s, %s, %s, %s)
-                RETURNING {self._columns()}
-                """,
+                RETURNING {}
+                """).format(self._columns()),
                 (
-                    source_discord_channel_id,
-                    requester_discord_user_id,
-                    category,
-                    title,
-                    description,
-                    language,
+                    ticket.source_discord_channel_id,
+                    ticket.requester_discord_user_id,
+                    ticket.category,
+                    ticket.title,
+                    ticket.description,
+                    ticket.language,
                 ),
             )
             row = require_row(await cursor.fetchone(), operation="support_ticket.create_ticket")
@@ -61,43 +73,46 @@ class PostgresSupportTicketRepository(SupportTicketRepository):
         ticket_id: int,
         support_message_id: int,
     ) -> SupportTicketRecord | None:
+        """Attach the Discord support-channel message ID to a ticket."""
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
-                f"""
+                sql.SQL("""
                 UPDATE support_ticket
                 SET support_message_id = %s,
                     updated_at = NOW()
                 WHERE ticket_id = %s
-                RETURNING {self._columns()}
-                """,
+                RETURNING {}
+                """).format(self._columns()),
                 (support_message_id, ticket_id),
             )
             row = await cursor.fetchone()
         return self._build_record(row) if row is not None else None
 
     async def get_ticket(self, *, ticket_id: int) -> SupportTicketRecord | None:
+        """Return one support ticket by internal ticket ID."""
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
-                f"""
-                SELECT {self._columns()}
+                sql.SQL("""
+                SELECT {}
                 FROM support_ticket
                 WHERE ticket_id = %s
-                """,
+                """).format(self._columns()),
                 (ticket_id,),
             )
             row = await cursor.fetchone()
         return self._build_record(row) if row is not None else None
 
     async def list_open_tickets_with_messages(self) -> list[SupportTicketRecord]:
+        """Return open tickets that can still be acted on in Discord."""
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
-                f"""
-                SELECT {self._columns()}
+                sql.SQL("""
+                SELECT {}
                 FROM support_ticket
                 WHERE status = 'open'
                   AND support_message_id IS NOT NULL
                 ORDER BY ticket_id
-                """,
+                """).format(self._columns()),
                 (),
             )
             rows = await cursor.fetchall()
@@ -111,9 +126,10 @@ class PostgresSupportTicketRepository(SupportTicketRepository):
         response_subject: str,
         response_body: str,
     ) -> SupportTicketRecord | None:
+        """Mark an open ticket as answered and store the supporter's response."""
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
-                f"""
+                sql.SQL("""
                 UPDATE support_ticket
                 SET status = 'answered',
                     response_subject = %s,
@@ -123,8 +139,8 @@ class PostgresSupportTicketRepository(SupportTicketRepository):
                     updated_at = NOW()
                 WHERE ticket_id = %s
                   AND status = 'open'
-                RETURNING {self._columns()}
-                """,
+                RETURNING {}
+                """).format(self._columns()),
                 (response_subject, response_body, responder_discord_user_id, ticket_id),
             )
             row = await cursor.fetchone()
@@ -136,9 +152,10 @@ class PostgresSupportTicketRepository(SupportTicketRepository):
         ticket_id: int,
         closer_discord_user_id: int,
     ) -> SupportTicketRecord | None:
+        """Mark an open ticket as closed without a supporter answer."""
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
-                f"""
+                sql.SQL("""
                 UPDATE support_ticket
                 SET status = 'closed',
                     closed_by_discord_user_id = %s,
@@ -146,16 +163,16 @@ class PostgresSupportTicketRepository(SupportTicketRepository):
                     updated_at = NOW()
                 WHERE ticket_id = %s
                   AND status = 'open'
-                RETURNING {self._columns()}
-                """,
+                RETURNING {}
+                """).format(self._columns()),
                 (closer_discord_user_id, ticket_id),
             )
             row = await cursor.fetchone()
         return self._build_record(row) if row is not None else None
 
     @staticmethod
-    def _columns() -> str:
-        return """
+    def _columns() -> sql.SQL:
+        return sql.SQL("""
             ticket_id,
             source_discord_channel_id,
             requester_discord_user_id,
@@ -173,7 +190,7 @@ class PostgresSupportTicketRepository(SupportTicketRepository):
             closed_at,
             created_at,
             updated_at
-        """
+        """)
 
     @staticmethod
     def _build_record(row: SupportTicketRow) -> SupportTicketRecord:

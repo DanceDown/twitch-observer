@@ -22,10 +22,12 @@ class ShowTwitchSubjectResolver:
     _user_resolution_cache: dict[str, TwitchUser] = field(default_factory=dict, init=False, repr=False)
 
     def reset(self) -> None:
+        """Clear per-render Twitch resolution caches."""
         self._channel_resolution_cache.clear()
         self._user_resolution_cache.clear()
 
     async def preload_channel_ids(self, twitch_ids: tuple[str, ...]) -> None:
+        """Resolve broadcaster IDs in bulk before rendering channel-heavy sections."""
         await self._resolve_ids_with_cache(
             twitch_ids,
             resolution_cache=self._channel_resolution_cache,
@@ -33,6 +35,7 @@ class ShowTwitchSubjectResolver:
         )
 
     async def preload_user_ids(self, twitch_ids: tuple[str, ...]) -> None:
+        """Resolve user IDs in bulk before rendering user-heavy sections."""
         await self._resolve_ids_with_cache(
             twitch_ids,
             resolution_cache=self._user_resolution_cache,
@@ -40,18 +43,21 @@ class ShowTwitchSubjectResolver:
         )
 
     async def resolve_channel_by_id(self, user_id: str) -> TwitchUser:
+        """Return broadcaster metadata for one Twitch ID, using the render cache."""
         normalized_user_id = user_id.strip()
         if normalized_user_id not in self._channel_resolution_cache:
             await self.preload_channel_ids((user_id,))
         return self._channel_resolution_cache[normalized_user_id]
 
     async def resolve_user_by_id(self, user_id: str) -> TwitchUser:
+        """Return user metadata for one Twitch ID, using the render cache."""
         normalized_user_id = user_id.strip()
         if normalized_user_id not in self._user_resolution_cache:
             await self.preload_user_ids((user_id,))
         return self._user_resolution_cache[normalized_user_id]
 
     async def resolve_twitch_links(self, twitch_ids: tuple[str, ...]) -> tuple[dict[str, str], ...]:
+        """Return localized link view data for broadcaster IDs."""
         resolved: list[dict[str, str]] = []
         for twitch_id in twitch_ids:
             user = await self.resolve_channel_by_id(twitch_id)
@@ -59,6 +65,7 @@ class ShowTwitchSubjectResolver:
         return tuple(resolved)
 
     async def resolve_twitch_names(self, twitch_ids: tuple[str, ...]) -> tuple[dict[str, str], ...]:
+        """Return localized name view data for user IDs."""
         resolved: list[dict[str, str]] = []
         for twitch_id in twitch_ids:
             user = await self.resolve_user_by_id(twitch_id)

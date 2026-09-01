@@ -21,6 +21,8 @@ from .text import render_details, render_line, render_row, render_rows, render_s
 
 @dataclass(slots=True)
 class ShowAutoRepliesRenderer:
+    """Render pattern replies and live/offline reply actions for `/show`."""
+
     pattern_repository: PatternRepository
     reply_repository: ReplyRepository | None
     adapter_event_action_repository: AdapterEventActionRepository | None
@@ -28,6 +30,7 @@ class ShowAutoRepliesRenderer:
     localizer: Localizer
 
     async def render(self, thread: ThreadRecord) -> str:
+        """Return the localized auto-replies section for one thread."""
         language = self.localizer.language_for_thread(thread)
         replies = (
             []

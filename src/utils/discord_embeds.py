@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import discord
 
 from src.database.connection import ChannelRecord, PatternRecord, ReplyRecord, ThreadRecord
@@ -24,6 +26,36 @@ SUPPORT_CATEGORY_COLORS: dict[str, int] = {
 }
 
 
+@dataclass(slots=True, frozen=True)
+class TrackingEmbedRequest:
+    """Inputs for one Twitch-chat tracking embed."""
+
+    event: TwitchChatMessageEvent
+    pattern: PatternRecord
+    thread: ThreadRecord
+    localizer: Localizer
+    channel: ChannelRecord | None
+    reply: ReplyRecord | None = None
+    author_icon_url: str | None = None
+    channel_display_name: str | None = None
+
+
+@dataclass(slots=True, frozen=True)
+class ChannelEventAutoReplyEmbedRequest:
+    """Inputs for one live/offline auto-reply tracking embed."""
+
+    thread: ThreadRecord
+    localizer: Localizer
+    channel_display_name: str
+    channel_login: str | None
+    state: str
+    reply_message: str
+    channel: ChannelRecord | None
+    event_color: str | None
+    twitch_chat_color: str | None = None
+    channel_icon_url: str | None = None
+
+
 def build_result_embed(result: DiscordCommandResult) -> discord.Embed:
     """Render a command result into a consistently styled Discord embed."""
     embed = discord.Embed(
@@ -44,125 +76,91 @@ def build_result_embed(result: DiscordCommandResult) -> discord.Embed:
     return embed
 
 
-def build_tracking_embed(
-    *,
-    event: TwitchChatMessageEvent,
-    pattern: PatternRecord,
-    thread: ThreadRecord,
-    localizer: Localizer,
-    channel: ChannelRecord | None,
-    reply: ReplyRecord | None = None,
-    author_icon_url: str | None = None,
-    channel_display_name: str | None = None,
-) -> discord.Embed:
+def build_tracking_embed(request: TrackingEmbedRequest) -> discord.Embed:
     """Render one matched Twitch message as a Discord embed."""
-    language = localizer.language_for_thread(thread)
+    language = request.localizer.language_for_thread(request.thread)
     embed = discord.Embed(
         title="",
-        description=escape_discord_preserving_links(event.content),
-        color=resolve_tracking_color(event=event, pattern=pattern, channel=channel, thread=thread),
-    )
-    embed.set_author(
-        name=event.author_display_name or event.author_login,
-        url=f"https://www.twitch.tv/{event.author_login}",
-        icon_url=author_icon_url,
-    )
-    embed.set_footer(
-        text=localizer.text(
-            "discord.tracking_embed.footer_channel",
-            language=language,
-            sources={"view": {"channel_name": channel_display_name or event.channel_login}},
+        description=escape_discord_preserving_links(request.event.content),
+        color=resolve_tracking_color(
+            event=request.event,
+            pattern=request.pattern,
+            channel=request.channel,
+            thread=request.thread,
         ),
     )
-    if reply is not None:
+    embed.set_author(
+        name=request.event.author_display_name or request.event.author_login,
+        url=f"https://www.twitch.tv/{request.event.author_login}",
+        icon_url=request.author_icon_url,
+    )
+    embed.set_footer(
+        text=request.localizer.text(
+            "discord.tracking_embed.footer_channel",
+            language=language,
+            sources={"view": {"channel_name": request.channel_display_name or request.event.channel_login}},
+        ),
+    )
+    if request.reply is not None:
         embed.add_field(
-            name=localizer.text("discord.tracking_embed.reply_field", language=language),
-            value=escape_discord_preserving_links(reply.reply_message),
+            name=request.localizer.text("discord.tracking_embed.reply_field", language=language),
+            value=escape_discord_preserving_links(request.reply.reply_message),
             inline=False,
         )
     return embed
 
 
-def build_auto_reply_embed(
-    *,
-    event: TwitchChatMessageEvent,
-    pattern: PatternRecord,
-    thread: ThreadRecord,
-    localizer: Localizer,
-    reply: ReplyRecord,
-    channel: ChannelRecord | None = None,
-    author_icon_url: str | None = None,
-    channel_display_name: str | None = None,
-) -> discord.Embed:
+def build_auto_reply_embed(request: TrackingEmbedRequest) -> discord.Embed:
     """Render one matched Twitch message that also triggered an auto-reply."""
-    return build_tracking_embed(
-        event=event,
-        pattern=pattern,
-        thread=thread,
-        localizer=localizer,
-        channel=channel,
-        reply=reply,
-        author_icon_url=author_icon_url,
-        channel_display_name=channel_display_name,
-    )
+    return build_tracking_embed(request)
 
 
-def build_channel_event_auto_reply_embed(
-    *,
-    thread: ThreadRecord,
-    localizer: Localizer,
-    channel_display_name: str,
-    channel_login: str | None,
-    state: str,
-    reply_message: str,
-    channel: ChannelRecord | None,
-    event_color: str | None,
-    channel_icon_url: str | None = None,
-) -> discord.Embed:
+def build_channel_event_auto_reply_embed(request: ChannelEventAutoReplyEmbedRequest) -> discord.Embed:
     """Render one live/offline ping auto-reply notification for Discord tracking."""
-    language = localizer.language_for_thread(thread)
+    language = request.localizer.language_for_thread(request.thread)
     description_key = (
         "discord.channel_event_reply_embed.description_online"
-        if state == "online"
+        if request.state == "online"
         else "discord.channel_event_reply_embed.description_offline"
     )
     embed = discord.Embed(
-        title=localizer.text(
+        title=request.localizer.text(
             "discord.channel_event_reply_embed.title",
             language=language,
         ),
-        description=localizer.text(
+        description=request.localizer.text(
             description_key,
             language=language,
             sources={
                 "view": {
                     "channel": {
-                        "display_name": channel_display_name,
-                        "login": channel_login,
+                        "display_name": request.channel_display_name,
+                        "login": request.channel_login,
                     }
                 }
             },
         ),
         color=resolve_channel_event_color(
-            event_color=event_color,
-            channel=channel,
-            thread=thread,
+            event_color=request.event_color,
+            channel=request.channel,
+            thread=request.thread,
+            twitch_chat_color=request.twitch_chat_color,
         ),
     )
     embed.set_author(
-        name=localizer.text(
+        name=request.localizer.text(
             "discord.channel_event_reply_embed.author_name",
             language=language,
-            sources={"view": {"channel": {"display_name": channel_display_name}}},
+            sources={"view": {"channel": {"display_name": request.channel_display_name}}},
         ),
-        url=None if not channel_login else f"https://www.twitch.tv/{channel_login}",
-        icon_url=channel_icon_url,
+        url=None if not request.channel_login else f"https://www.twitch.tv/{request.channel_login}",
+        icon_url=request.channel_icon_url,
     )
-    if channel_icon_url:
-        embed.set_thumbnail(url=channel_icon_url)
+    if request.channel_icon_url:
+        embed.set_thumbnail(url=request.channel_icon_url)
     embed.add_field(
-        name=localizer.text("discord.channel_event_reply_embed.reply_field", language=language),
-        value=escape_discord_preserving_links(reply_message),
+        name=request.localizer.text("discord.channel_event_reply_embed.reply_field", language=language),
+        value=escape_discord_preserving_links(request.reply_message),
         inline=False,
     )
     return embed
@@ -231,6 +229,7 @@ def resolve_channel_event_color(
     event_color: str | None,
     channel: ChannelRecord | None,
     thread: ThreadRecord,
+    twitch_chat_color: str | None,
 ) -> int:
     """Resolve the embed color for tracked live/offline ping notifications."""
     if event_color:
@@ -239,6 +238,8 @@ def resolve_channel_event_color(
         return _parse_hex_color(channel.color)
     if thread.color:
         return _parse_hex_color(thread.color)
+    if twitch_chat_color:
+        return _parse_hex_color(twitch_chat_color)
     return 0x808080
 
 
@@ -267,15 +268,15 @@ def _build_support_ticket_state_embed(
     language = localizer.resolve_language(ticket.language)
     entry = localizer.value(key, language=language)
     if not isinstance(entry, dict):
-        raise LocalizationError(f"Translation key {key!r} is not an object.")
+        raise LocalizationError.translation_key_not_object(key)
     title = entry.get("title")
     body = entry.get("body")
     footer = entry.get("footer")
     placeholder_specs = entry.get("placeholders")
     if not isinstance(title, str) or not isinstance(body, str) or not isinstance(footer, str):
-        raise LocalizationError(f"Translation result {key!r} must contain string title/body/footer.")
+        raise LocalizationError.translation_result_missing_strings(key)
     if placeholder_specs is not None and not isinstance(placeholder_specs, dict):
-        raise LocalizationError(f"Translation result {key!r} must contain object placeholders when provided.")
+        raise LocalizationError.translation_result_invalid_placeholders(key)
 
     sources = {"view": _support_ticket_view(ticket, localizer=localizer, language=language)}
     embed = discord.Embed(

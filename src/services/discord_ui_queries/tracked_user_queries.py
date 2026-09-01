@@ -13,14 +13,18 @@ from .shared import get_thread_for_channel, resolve_users_by_ids
 
 @dataclass(slots=True)
 class TrackedUserQueryService:
+    """Load tracked Twitch user data for Discord UI selections."""
+
     thread_repository: ThreadRepository
     tracked_user_repository: TrackedUserRepository
     twitch_api: TwitchDirectoryGateway
 
     async def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
+        """Return the thread configured for one Discord channel."""
         return await get_thread_for_channel(self.thread_repository, discord_channel_id)
 
     async def list_tracked_users(self, discord_channel_id: int) -> list[TrackedUserPresentation]:
+        """List tracked Twitch users with resolved names."""
         thread = await self.get_thread(discord_channel_id)
         if thread is None:
             return []

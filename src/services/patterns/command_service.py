@@ -6,7 +6,6 @@ import logging
 import re
 from dataclasses import dataclass, field
 
-from src.gateways.twitch_api import TwitchAPIConfigurationError, TwitchChannelNotFoundError
 from src.database.connection import (
     ChannelRepository,
     PatternRepository,
@@ -17,6 +16,7 @@ from src.database.connection import (
 )
 from src.events.commands import AddPatternCommand, EditPatternCommand, RemovePatternCommand, SetPatternEnabledCommand
 from src.events.discord_results import DiscordCommandResult
+from src.gateways.twitch_api import TwitchAPIConfigurationError, TwitchChannelNotFoundError
 from src.localization import Localizer
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
 from src.services.twitch_gateways import TwitchDirectoryGateway
@@ -52,6 +52,7 @@ class PatternCommandService:
     _support: PatternCommandSupport = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Build shared guards and pattern support after dependency injection."""
         self._runner = CommandExecutionRunner(
             localizer=self.localizer,
             resolve_thread=self._resolve_thread,
@@ -75,6 +76,7 @@ class PatternCommandService:
         )
 
     async def handle_add_command(self, command: AddPatternCommand) -> DiscordCommandResult:
+        """Create a Twitch chat ping pattern for the Discord context."""
         return await self._runner.run(
             command,
             lambda: self._add_pattern_command(command),
@@ -88,6 +90,7 @@ class PatternCommandService:
         )
 
     async def handle_remove_command(self, command: RemovePatternCommand) -> DiscordCommandResult:
+        """Remove a Twitch chat ping pattern from the Discord context."""
         return await self._runner.run(
             command,
             lambda: self._remove_pattern_command(command),
@@ -101,6 +104,7 @@ class PatternCommandService:
         )
 
     async def handle_set_enabled_command(self, command: SetPatternEnabledCommand) -> DiscordCommandResult:
+        """Enable or disable a Twitch chat ping pattern."""
         operation = self._enable_pattern(command) if command.enabled else self._disable_pattern(command)
         return await self._runner.run(
             command,
@@ -115,6 +119,7 @@ class PatternCommandService:
         )
 
     async def handle_edit_command(self, command: EditPatternCommand) -> DiscordCommandResult:
+        """Edit an existing Twitch chat ping pattern."""
         return await self._runner.run(
             command,
             lambda: self._edit_pattern(command),

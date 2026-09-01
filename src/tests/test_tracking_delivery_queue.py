@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 import discord
 import pytest
 
-from src.services.patterns import TrackingNotificationSender
 from src.services.chat_delivery_context import bind_chat_message_sequence, reset_chat_message_sequence
+from src.services.patterns import TrackingNotificationSender
 from src.services.tracking_delivery_queue import OrderedTrackingDeliveryService
 
 
@@ -55,16 +55,16 @@ async def _send_with_sequence(
         reset_chat_message_sequence(token)
 
 
-async def _wait_for_titles(sender: _FakeSender, expected: list[str], *, timeout: float = 1) -> None:
-    deadline = asyncio.get_running_loop().time() + timeout
+async def _wait_for_titles(sender: _FakeSender, expected: list[str], *, timeout_seconds: float = 1) -> None:
+    deadline = asyncio.get_running_loop().time() + timeout_seconds
     while [title for _, title, _ in sender.sent] != expected:
         if asyncio.get_running_loop().time() >= deadline:
             raise AssertionError([title for _, title, _ in sender.sent])
         await asyncio.sleep(0.01)
 
 
-async def _wait_for_count(sender: _FakeSender, expected_count: int, *, timeout: float = 1) -> None:
-    deadline = asyncio.get_running_loop().time() + timeout
+async def _wait_for_count(sender: _FakeSender, expected_count: int, *, timeout_seconds: float = 1) -> None:
+    deadline = asyncio.get_running_loop().time() + timeout_seconds
     while len(sender.sent) != expected_count:
         if asyncio.get_running_loop().time() >= deadline:
             raise AssertionError(sender.sent)
@@ -187,7 +187,7 @@ async def test_tracking_delivery_queue_slow_target_does_not_block_other_targets(
         await service.complete_message(1)
         await service.complete_message(2)
 
-        await _wait_for_titles(sender, ["fast-target"], timeout=0.1)
+        await _wait_for_titles(sender, ["fast-target"], timeout_seconds=0.1)
         await _wait_for_titles(sender, ["fast-target", "slow-target"])
     finally:
         await service.stop()
@@ -231,11 +231,11 @@ async def test_tracking_delivery_queue_rate_limits_only_the_busy_target() -> Non
         await service.complete_message(2)
         await service.complete_message(3)
 
-        await _wait_for_count(sender, 2, timeout=0.25)
+        await _wait_for_count(sender, 2, timeout_seconds=0.25)
         early_titles = {title for _, title, _ in sender.sent}
         assert early_titles == {"busy-one", "other-one"}
 
-        await _wait_for_count(sender, 3, timeout=1.5)
+        await _wait_for_count(sender, 3, timeout_seconds=1.5)
         assert [title for channel_id, title, _ in sender.sent if channel_id == 1001] == ["busy-one", "busy-two"]
     finally:
         await service.stop()
@@ -252,7 +252,7 @@ async def test_tracking_delivery_queue_default_burst_allows_five_immediate_sends
             await _send_with_sequence(service, sequence, f"message-{sequence}", thread_id=1, discord_channel_id=1000)
             await service.complete_message(sequence)
 
-        await _wait_for_count(sender, 5, timeout=0.3)
+        await _wait_for_count(sender, 5, timeout_seconds=0.3)
         assert [title for _, title, _ in sender.sent] == [
             "message-1",
             "message-2",
@@ -261,7 +261,7 @@ async def test_tracking_delivery_queue_default_burst_allows_five_immediate_sends
             "message-5",
         ]
 
-        await _wait_for_count(sender, 6, timeout=1)
+        await _wait_for_count(sender, 6, timeout_seconds=1)
         assert [title for _, title, _ in sender.sent][-1] == "message-6"
     finally:
         await service.stop()

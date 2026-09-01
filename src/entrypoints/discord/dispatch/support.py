@@ -9,28 +9,16 @@ from src.events.commands import (
     CreateSupportTicketCommand,
     ShowSupportTicketCommand,
 )
+from src.events.discord_results import DiscordCommandResult
+from src.services.support_command_service import SupportTicketCreateResult, SupportTicketMessageResult, SupportTicketUpdateResult
 
 
 async def dispatch_create_support_ticket(
     services: DiscordServiceBundle,
-    *,
-    discord_channel_id: int,
-    requester_id: int,
-    category: str,
-    title: str,
-    description: str,
-    language_hint: str | None,
-) -> object:
-    return await services.support.handle_create(
-        CreateSupportTicketCommand(
-            discord_channel_id=discord_channel_id,
-            requester_id=requester_id,
-            category=category,
-            title=title,
-            description=description,
-            language_hint=language_hint,
-        )
-    )
+    command: CreateSupportTicketCommand,
+) -> SupportTicketCreateResult:
+    """Dispatch creation of a user-submitted support ticket."""
+    return await services.support.handle_create(command)
 
 
 async def dispatch_prepare_support_answer(
@@ -40,7 +28,8 @@ async def dispatch_prepare_support_answer(
     responder_id: int,
     subject: str,
     body: str,
-) -> object:
+) -> SupportTicketMessageResult:
+    """Prepare the user-facing answer message for one support ticket."""
     return await services.support.prepare_answer(
         AnswerSupportTicketCommand(
             ticket_id=ticket_id,
@@ -58,7 +47,8 @@ async def dispatch_mark_support_answered(
     responder_id: int,
     subject: str,
     body: str,
-) -> object:
+) -> SupportTicketUpdateResult:
+    """Persist a support ticket as answered after the Discord send succeeds."""
     return await services.support.mark_answered(
         AnswerSupportTicketCommand(
             ticket_id=ticket_id,
@@ -74,7 +64,8 @@ async def dispatch_prepare_support_close(
     *,
     ticket_id: int,
     closer_id: int,
-) -> object:
+) -> SupportTicketMessageResult:
+    """Prepare the user-facing close message for one support ticket."""
     return await services.support.prepare_close(
         CloseSupportTicketCommand(
             ticket_id=ticket_id,
@@ -88,7 +79,8 @@ async def dispatch_mark_support_closed(
     *,
     ticket_id: int,
     closer_id: int,
-) -> object:
+) -> SupportTicketUpdateResult:
+    """Persist a support ticket as closed after the Discord send succeeds."""
     return await services.support.mark_closed(
         CloseSupportTicketCommand(
             ticket_id=ticket_id,
@@ -103,7 +95,8 @@ async def dispatch_show_support_ticket_configuration(
     ticket_id: int,
     requester_id: int,
     sections: tuple[str, ...],
-) -> object:
+) -> DiscordCommandResult:
+    """Dispatch a privileged show request for the ticket's source context."""
     return await services.support.handle_show(
         ShowSupportTicketCommand(
             ticket_id=ticket_id,

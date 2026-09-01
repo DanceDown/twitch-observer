@@ -10,8 +10,8 @@ from src.services.chat_pipeline import ChatMessageProcessingService
 from src.services.live_state_orchestrator import LiveStateChangeOrchestrator
 
 
-async def _wait_until(predicate, *, timeout: float = 1) -> None:
-    deadline = asyncio.get_running_loop().time() + timeout
+async def _wait_until(predicate, *, timeout_seconds: float = 1) -> None:
+    deadline = asyncio.get_running_loop().time() + timeout_seconds
     while not predicate():
         if asyncio.get_running_loop().time() >= deadline:
             raise TimeoutError
@@ -91,6 +91,7 @@ class _LiveNotification:
         *,
         suppressed_events: set[tuple[int, int]] | None = None,
     ) -> None:
+        _ = suppressed_events
         self.recorder.calls.append(f"notify:{event.twitch_channel_id}")
 
 
@@ -109,7 +110,7 @@ async def test_chat_pipeline_runs_in_explicit_order() -> None:
     pipeline = ChatMessageProcessingService(
         message_ingest=_MessageIngest(recorder),
         user_observer=_UserObserver(recorder),
-        reactions=_ChatReactions(recorder),  # type: ignore[arg-type]
+        reactions=_ChatReactions(recorder),
     )
 
     await pipeline.process(
@@ -135,7 +136,7 @@ async def test_chat_pipeline_workers_drain_queued_messages() -> None:
     pipeline = ChatMessageProcessingService(
         message_ingest=_MessageIngest(recorder),
         user_observer=_UserObserver(recorder),
-        reactions=_ChatReactions(recorder),  # type: ignore[arg-type]
+        reactions=_ChatReactions(recorder),
         queue_size=10,
         worker_count=1,
         completion_notifier=completion_recorder,
@@ -173,13 +174,50 @@ async def test_chat_pipeline_workers_drain_queued_messages() -> None:
 
 
 @pytest.mark.asyncio
+async def test_chat_pipeline_completes_reserved_message_when_enqueue_is_cancelled() -> None:
+    recorder = _Recorder()
+    completion_recorder = _CompletionRecorder()
+    pipeline = ChatMessageProcessingService(
+        message_ingest=_MessageIngest(recorder),
+        user_observer=_UserObserver(recorder),
+        reactions=_ChatReactions(recorder),
+        queue_size=1,
+        worker_count=1,
+        completion_notifier=completion_recorder,
+    )
+    pipeline._queue = asyncio.Queue(maxsize=1)
+    pipeline._workers = []
+    await pipeline._queue.put(None)
+
+    task = asyncio.create_task(
+        pipeline.enqueue(
+            TwitchChatMessageEvent(
+                channel_login="example",
+                author_login="alice",
+                content="cancelled",
+                message_id="m-1",
+            )
+        )
+    )
+    await _wait_until(lambda: completion_recorder.reserved == [1])
+
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert completion_recorder.completed == [1]
+    assert pipeline._message_sequences == {}
+    assert pipeline._completion_events == {}
+
+
+@pytest.mark.asyncio
 async def test_chat_pipeline_waits_for_in_flight_reply_parent_only() -> None:
     recorder = _Recorder()
     reactions = _BlockingChatReactions(recorder)
     pipeline = ChatMessageProcessingService(
         message_ingest=_MessageIngest(recorder),
         user_observer=_UserObserver(recorder),
-        reactions=reactions,  # type: ignore[arg-type]
+        reactions=reactions,
         queue_size=10,
         worker_count=3,
     )
@@ -234,7 +272,7 @@ async def test_chat_pipeline_stop_cancels_workers_after_timeout() -> None:
     pipeline = ChatMessageProcessingService(
         message_ingest=_MessageIngest(recorder),
         user_observer=_UserObserver(recorder),
-        reactions=reactions,  # type: ignore[arg-type]
+        reactions=reactions,
         queue_size=10,
         worker_count=1,
         stop_timeout_seconds=0.01,

@@ -1,23 +1,27 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 
 import pytest
 
-from src.tests.dispatch_helpers import dispatch_pattern_command, dispatch_permission_command, dispatch_show_command
-from src.gateways.twitch_api import TwitchUser
 from src.database.connection import (
+    PatternCreate,
+    PatternExactQuery,
     PatternRecord,
     PatternRepository,
+    PatternUpdate,
     ReplyRepository,
     ThreadRecord,
     ThreadRepository,
     UserPermissionRecord,
     UserPermissionRepository,
 )
-from types import SimpleNamespace
+from src.gateways.twitch_api import TwitchUser
 from src.services.patterns import PatternCommandService, ShowCommandService
 from src.services.permission_service import PermissionCommandService
+from src.services.twitch_gateways import TwitchDirectoryGateway
+from src.tests.dispatch_helpers import dispatch_pattern_command, dispatch_permission_command, dispatch_show_command
 from src.tests.in_memory_channels import InMemoryChannelRepository as BaseInMemoryChannelRepository
 
 
@@ -88,26 +92,27 @@ class InMemoryPatternRepository(PatternRepository):
     patterns: list[PatternRecord] = field(default_factory=list)
     next_pattern_id: int = 1
 
-    async def find_exact_pattern(self, **kwargs) -> PatternRecord | None:
+    async def find_exact_pattern(self, query: PatternExactQuery) -> PatternRecord | None:
+        _ = query
         return None
 
-    async def add_pattern(self, **kwargs) -> PatternRecord:
-        thread_id = kwargs["thread_id"]
+    async def add_pattern(self, pattern: PatternCreate) -> PatternRecord:
+        definition = pattern.definition
         record = PatternRecord(
-            thread_id=thread_id,
+            thread_id=pattern.thread_id,
             pattern_id=self.next_pattern_id,
-            regex=kwargs["regex"],
-            channel_scope_mode=kwargs["channel_scope_mode"],
-            channel_scope_ids=tuple(sorted(kwargs["channel_scope_ids"])),
-            user_scope_mode=kwargs["user_scope_mode"],
-            user_scope_ids=tuple(sorted(kwargs["user_scope_ids"])),
-            sub_state=kwargs["sub_state"],
-            offline_state=kwargs["offline_state"],
-            is_regex=kwargs["is_regex"],
-            case_sensitive=kwargs["case_sensitive"],
-            color=kwargs["color"],
-            disabled=kwargs["disabled"],
-            priority=kwargs["priority"],
+            regex=definition.regex,
+            channel_scope_mode=definition.channel_scope_mode,
+            channel_scope_ids=tuple(sorted(definition.channel_scope_ids)),
+            user_scope_mode=definition.user_scope_mode,
+            user_scope_ids=tuple(sorted(definition.user_scope_ids)),
+            sub_state=definition.sub_state,
+            offline_state=definition.offline_state,
+            is_regex=definition.is_regex,
+            case_sensitive=definition.case_sensitive,
+            color=pattern.color,
+            disabled=pattern.disabled,
+            priority=pattern.priority,
         )
         self.patterns.append(record)
         self.next_pattern_id += 1
@@ -117,15 +122,19 @@ class InMemoryPatternRepository(PatternRepository):
         self.patterns = [pattern for pattern in self.patterns if not (pattern.thread_id == thread_id and pattern.pattern_id == pattern_id)]
 
     async def set_pattern_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool) -> PatternRecord | None:
+        _ = thread_id, pattern_id, disabled
         return None
 
     async def set_pattern_priority(self, *, thread_id: int, pattern_id: int, priority: int) -> PatternRecord | None:
+        _ = thread_id, pattern_id, priority
         return None
 
-    async def update_pattern(self, **kwargs) -> PatternRecord | None:
+    async def update_pattern(self, pattern: PatternUpdate) -> PatternRecord | None:
+        _ = pattern
         return None
 
     async def list_active_patterns_for_thread(self, thread_id: int) -> list[PatternRecord]:
+        _ = thread_id
         return []
 
     async def get_pattern_by_id(self, *, thread_id: int, pattern_id: int) -> PatternRecord | None:
@@ -141,30 +150,38 @@ class InMemoryPatternRepository(PatternRepository):
         return rows
 
     async def count_channel_scope_references(self, *, thread_id: int, twitch_channel_id: str) -> int:
+        _ = thread_id, twitch_channel_id
         return 0
 
 
 @dataclass
 class InMemoryReplyRepository(ReplyRepository):
     async def get_by_pattern(self, *, thread_id: int, pattern_id: int):
-        return None
+        _ = thread_id, pattern_id
+        return
 
     async def add_reply(self, *, thread_id: int, pattern_id: int, reply_message: str, reply_as_reply: bool):
-        return None
+        _ = thread_id, pattern_id, reply_message, reply_as_reply
+        return
 
     async def remove_reply(self, *, thread_id: int, pattern_id: int):
-        return None
+        _ = thread_id, pattern_id
+        return
 
     async def set_reply_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool):
-        return None
+        _ = thread_id, pattern_id, disabled
+        return
 
     async def list_replies_for_thread(self, thread_id: int, *, include_disabled: bool = True):
+        _ = thread_id, include_disabled
         return []
 
     async def disable_replies_for_thread(self, thread_id: int) -> int:
+        _ = thread_id
         return 0
 
     async def enable_replies_for_thread(self, thread_id: int) -> int:
+        _ = thread_id
         return 0
 
 
@@ -188,7 +205,7 @@ class InMemoryPermissionRepository(UserPermissionRepository):
 
 
 @dataclass
-class FakeTwitchAPI:
+class FakeTwitchAPI(TwitchDirectoryGateway):
     users_by_login: dict[str, TwitchUser] = field(default_factory=dict)
 
     async def get_user_by_login(self, login: str) -> TwitchUser:
@@ -206,13 +223,37 @@ class FakeTwitchAPI:
     async def refresh_channel_by_login(self, login: str) -> TwitchUser:
         return await self.get_user_by_login(login)
 
+    async def refresh_user_by_login(self, login: str) -> TwitchUser:
+        return await self.get_user_by_login(login)
+
+    async def refresh_user_by_id(self, user_id: str) -> TwitchUser:
+        return await self.get_user_by_id(user_id)
+
     def get_cached_user_by_login(self, login: str) -> TwitchUser | None:
+        _ = login
         return None
 
     def get_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
+        _ = user_id
         return None
 
+    async def load_cached_user_by_login(self, login: str) -> TwitchUser | None:
+        return self.get_cached_user_by_login(login)
+
+    async def load_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
+        return self.get_cached_user_by_id(user_id)
+
+    async def get_users_by_ids(self, user_ids: tuple[str, ...]) -> tuple[TwitchUser, ...]:
+        users: list[TwitchUser] = []
+        for user_id in user_ids:
+            try:
+                users.append(await self.get_user_by_id(user_id))
+            except KeyError:
+                continue
+        return tuple(users)
+
     async def is_user_live(self, user_id: str) -> bool:
+        _ = user_id
         return False
 
 
@@ -233,7 +274,7 @@ async def test_permission_grant_allows_non_owner_to_add_patterns() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         permission_repository=permission_repository,
     )
 
@@ -305,7 +346,7 @@ async def test_permission_view_allows_non_owner_to_use_show() -> None:
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         reply_repository=InMemoryReplyRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         permission_repository=permission_repository,
     )
 

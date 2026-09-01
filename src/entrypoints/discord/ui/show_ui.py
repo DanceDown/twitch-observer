@@ -6,8 +6,8 @@ from contextlib import suppress
 
 import discord
 
-from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.discord_results import build_result
+from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.utils.discord_embeds import build_result_embed
@@ -60,8 +60,7 @@ def build_show_pages(
             continue
 
         # Only split inside an item when one single item is too large by itself.
-        for oversized_part in _split_plain_text(item, available_item_length):
-            pages.append(_render_show_page(page_prefix, (oversized_part,)))
+        pages.extend(_render_show_page(page_prefix, (oversized_part,)) for oversized_part in _split_plain_text(item, available_item_length))
 
     if current_items:
         pages.append(_render_show_page(page_prefix, current_items))
@@ -137,6 +136,7 @@ class ShowPaginationView(discord.ui.View):
         language: str,
         item_prefix: str,
     ) -> None:
+        """Create a paginator for one rendered `/show` result."""
         super().__init__(timeout=840)
         self._owner_id = owner_id
         self._result = result
@@ -222,6 +222,7 @@ class ShowSectionModal(discord.ui.Modal):
         requester_id: int,
         localizer: Localizer,
     ) -> None:
+        """Create the modal for selecting a show section."""
         super().__init__(title=localizer.text("discord.show_ui.modal.title", language=language), timeout=300)
         self._services = services
         self._discord_channel_id = discord_channel_id

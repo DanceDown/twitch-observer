@@ -15,6 +15,7 @@ class StreamEventKind(StrEnum):
 
     @property
     def state_name(self) -> str:
+        """Return the placeholder-friendly stream state name."""
         return "online" if self is StreamEventKind.ONLINE else "offline"
 
 
@@ -37,6 +38,18 @@ class TwitchChatMessageEvent:
     sent_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     raw_line: str | None = None
     raw_tags: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(slots=True, frozen=True)
+class TwitchChatSendRequest:
+    """All data needed for one outgoing Twitch chat send API call."""
+
+    access_token: str
+    client_id: str
+    sender_id: str
+    broadcaster_id: str
+    message: str
+    reply_parent_message_id: str | None = None
 
 
 @dataclass(slots=True, frozen=True)

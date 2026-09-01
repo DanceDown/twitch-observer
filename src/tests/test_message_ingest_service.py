@@ -1,19 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from random import seed
-from contextlib import asynccontextmanager
-import logging
+from typing import cast
 
 import pytest
 
 from src.database.connection import MessageRepository, RecentMessageRecord, ThreadRecord
 from src.database.postgres import PostgresMessageRepository
+from src.database.postgres.database import PostgresDatabase
 from src.events.twitch_events import TwitchChatMessageEvent
-from src.services.discord_ui_queries import WriteQueryService
 from src.services.discord_presence_service import DiscordPresenceService, DiscordPresenceStatusSender
+from src.services.discord_ui_queries import WriteQueryService
 from src.services.message_ingest_service import MessageIngestService
 
 
@@ -131,6 +133,10 @@ class RecordingDatabase:
     @asynccontextmanager
     async def async_cursor(self) -> RecordingCursor:
         yield self.cursor_instance
+
+
+def _postgres_database(database: RecordingDatabase) -> PostgresDatabase:
+    return cast(PostgresDatabase, database)
 
 
 @pytest.mark.asyncio
@@ -380,7 +386,7 @@ async def test_presence_watchdog_restarts_stale_worker(caplog: pytest.LogCapture
 @pytest.mark.asyncio
 async def test_postgres_message_repository_uses_null_reply_reference_when_parent_is_missing() -> None:
     database = RecordingDatabase()
-    repository = PostgresMessageRepository(database=database)  # type: ignore[arg-type]
+    repository = PostgresMessageRepository(database=_postgres_database(database))
     event = TwitchChatMessageEvent(
         channel_login="channel",
         author_login="bob",
@@ -414,7 +420,7 @@ async def test_postgres_message_repository_uses_null_reply_reference_when_parent
 @pytest.mark.asyncio
 async def test_postgres_message_repository_marks_bot_messages_with_true_flag() -> None:
     database = RecordingDatabase()
-    repository = PostgresMessageRepository(database=database)  # type: ignore[arg-type]
+    repository = PostgresMessageRepository(database=_postgres_database(database))
     event = TwitchChatMessageEvent(
         channel_login="channel",
         author_login="bot-account",
@@ -435,7 +441,7 @@ async def test_postgres_message_repository_marks_bot_messages_with_true_flag() -
 @pytest.mark.asyncio
 async def test_postgres_message_repository_requires_message_id() -> None:
     database = RecordingDatabase()
-    repository = PostgresMessageRepository(database=database)  # type: ignore[arg-type]
+    repository = PostgresMessageRepository(database=_postgres_database(database))
 
     with pytest.raises(ValueError, match="missing message_id"):
         await repository.save_twitch_message(

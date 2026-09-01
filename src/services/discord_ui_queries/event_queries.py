@@ -20,15 +20,19 @@ from .tracked_channel_queries import TrackedChannelQueryService
 
 @dataclass(slots=True)
 class AdapterEventQueryService:
+    """Load live/offline event data for Discord UI selections."""
+
     thread_repository: ThreadRepository
     channel_queries: TrackedChannelQueryService
     adapter_event_repository: AdapterEventRepository | None = None
     adapter_event_action_repository: AdapterEventActionRepository | None = None
 
     async def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
+        """Return the thread configured for one Discord channel."""
         return await get_thread_for_channel(self.thread_repository, discord_channel_id)
 
     async def list_adapter_events(self, discord_channel_id: int) -> list[AdapterEventPresentation]:
+        """List configured live/offline events with their tracked channel data."""
         thread = await self.get_thread(discord_channel_id)
         if thread is None or self.adapter_event_repository is None:
             return []
@@ -51,6 +55,7 @@ class AdapterEventQueryService:
         return presentations
 
     async def list_adapter_event_actions(self, discord_channel_id: int) -> list[AdapterEventActionPresentation]:
+        """List event actions suitable for reply and notification UI flows."""
         thread = await self.get_thread(discord_channel_id)
         if thread is None or self.adapter_event_repository is None or self.adapter_event_action_repository is None:
             return []

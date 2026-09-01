@@ -10,6 +10,7 @@ async def resolve_pattern_identifier(
     discord_channel_id: int,
     pattern_id: int,
 ) -> int:
+    """Resolve either a real pattern ID or a visible display index."""
     patterns = await ui_data_provider.list_patterns(discord_channel_id)
     for item in patterns:
         if item.pattern.pattern_id == pattern_id:

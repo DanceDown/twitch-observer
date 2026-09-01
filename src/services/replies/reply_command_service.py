@@ -29,7 +29,7 @@ from src.services.command_execution import CommandExecutionRunner, ThreadCommand
 from src.services.twitch_gateways import TwitchChannelStateLookup
 from src.utils.permissions import ObserverPermission
 
-from .command_operations import handle_event_action, handle_pattern_action
+from .command_operations import EventActionDependencies, PatternActionDependencies, ReplyAction, handle_event_action, handle_pattern_action
 from .command_support import ReplyCommandSupport
 
 PatternReplyCommand = AddPatternReplyCommand | RemovePatternReplyCommand | SetPatternReplyEnabledCommand
@@ -67,8 +67,11 @@ class ReplyCommandService:
     _runner: CommandExecutionRunner = field(init=False, repr=False)
     _guards: ThreadCommandGuards = field(init=False, repr=False)
     _support: ReplyCommandSupport = field(init=False, repr=False)
+    _pattern_action_dependencies: PatternActionDependencies = field(init=False, repr=False)
+    _event_action_dependencies: EventActionDependencies = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Build shared guards and operation dependencies after injection."""
         self._runner = CommandExecutionRunner(
             localizer=self.localizer,
             resolve_thread=self._resolve_thread,
@@ -87,8 +90,22 @@ class ReplyCommandService:
             pattern_repository=self.pattern_repository,
             localizer=self.localizer,
         )
+        self._pattern_action_dependencies = PatternActionDependencies(
+            pattern_repository=self.pattern_repository,
+            reply_repository=self.reply_repository,
+            account_repository=self.account_repository,
+            localizer=self.localizer,
+            support=self._support,
+        )
+        self._event_action_dependencies = EventActionDependencies(
+            event_configuration=self.event_configuration,
+            account_repository=self.account_repository,
+            localizer=self.localizer,
+            support=self._support,
+        )
 
     async def handle_add_pattern_command(self, command: AddPatternReplyCommand) -> DiscordCommandResult:
+        """Create or replace the Twitch auto-reply attached to a pattern."""
         return await self._runner.run(
             command,
             lambda: self._handle_pattern_action(command, action="add"),
@@ -96,6 +113,7 @@ class ReplyCommandService:
         )
 
     async def handle_remove_pattern_command(self, command: RemovePatternReplyCommand) -> DiscordCommandResult:
+        """Remove the Twitch auto-reply attached to a pattern."""
         return await self._runner.run(
             command,
             lambda: self._handle_pattern_action(command, action="remove"),
@@ -103,6 +121,7 @@ class ReplyCommandService:
         )
 
     async def handle_set_pattern_enabled_command(self, command: SetPatternReplyEnabledCommand) -> DiscordCommandResult:
+        """Enable or disable the Twitch auto-reply attached to a pattern."""
         return await self._runner.run(
             command,
             lambda: self._handle_pattern_action(command, action="enable" if command.enabled else "disable"),
@@ -110,6 +129,7 @@ class ReplyCommandService:
         )
 
     async def handle_add_event_command(self, command: AddChannelEventReplyCommand) -> DiscordCommandResult:
+        """Create or replace the Twitch auto-reply attached to a channel event."""
         return await self._runner.run(
             command,
             lambda: self._handle_adapter_event_action(command, action="add"),
@@ -117,6 +137,7 @@ class ReplyCommandService:
         )
 
     async def handle_remove_event_command(self, command: RemoveChannelEventReplyCommand) -> DiscordCommandResult:
+        """Remove the Twitch auto-reply attached to a channel event."""
         return await self._runner.run(
             command,
             lambda: self._handle_adapter_event_action(command, action="remove"),
@@ -124,6 +145,7 @@ class ReplyCommandService:
         )
 
     async def handle_set_event_enabled_command(self, command: SetChannelEventReplyEnabledCommand) -> DiscordCommandResult:
+        """Enable or disable the Twitch auto-reply attached to a channel event."""
         return await self._runner.run(
             command,
             lambda: self._handle_adapter_event_action(command, action="enable" if command.enabled else "disable"),
@@ -134,7 +156,7 @@ class ReplyCommandService:
         self,
         command: PatternReplyCommand,
         *,
-        action: str,
+        action: ReplyAction,
     ) -> DiscordCommandResult:
         if action in {"add", "remove"}:
             required_permission = ObserverPermission.MANAGE_REPLIES
@@ -155,18 +177,14 @@ class ReplyCommandService:
             command=command,
             action=action,
             thread=thread,
-            pattern_repository=self.pattern_repository,
-            reply_repository=self.reply_repository,
-            account_repository=self.account_repository,
-            localizer=self.localizer,
-            support=self._support,
+            dependencies=self._pattern_action_dependencies,
         )
 
     async def _handle_adapter_event_action(
         self,
         command: EventReplyCommand,
         *,
-        action: str,
+        action: ReplyAction,
     ) -> DiscordCommandResult:
         if action in {"add", "remove"}:
             required_permission = ObserverPermission.MANAGE_REPLIES
@@ -187,10 +205,7 @@ class ReplyCommandService:
             command=command,
             action=action,
             thread=thread,
-            event_configuration=self.event_configuration,
-            account_repository=self.account_repository,
-            localizer=self.localizer,
-            support=self._support,
+            dependencies=self._event_action_dependencies,
         )
 
     async def _ensure_thread_permission(

@@ -86,12 +86,14 @@ class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageComp
     _task: asyncio.Task[None] | None = field(default=None, init=False)
 
     async def start(self) -> None:
+        """Start the coordinator that releases completed chat-message slots."""
         if self._task is not None:
             return
         self._stop_requested = False
         self._task = asyncio.create_task(self._run_loop(), name="tracking-delivery-queue")
 
     async def stop(self) -> None:
+        """Drain queued deliveries and stop all per-target sender tasks."""
         task = self._task
         if task is None:
             return
@@ -119,17 +121,20 @@ class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageComp
             self._task = None
 
     async def reserve_message(self, sequence: int) -> None:
+        """Register an incoming chat message before its routing decisions are known."""
         async with self._condition:
             self._message_states.setdefault(sequence, _MessageState())
             self._condition.notify_all()
 
     async def complete_message_routing(self, sequence: int) -> None:
+        """Mark that no more delivery slots will be reserved for one chat message."""
         async with self._condition:
             state = self._message_states.setdefault(sequence, _MessageState())
             state.routing_complete = True
             self._condition.notify_all()
 
     async def complete_message(self, sequence: int) -> None:
+        """Mark one chat message fully processed so its ready deliveries may advance."""
         async with self._condition:
             state = self._message_states.setdefault(sequence, _MessageState())
             state.routing_complete = True
@@ -138,6 +143,7 @@ class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageComp
             self._condition.notify_all()
 
     async def reserve_tracking_delivery(self, *, thread_id: int) -> None:
+        """Reserve an ordered delivery slot for the current chat-message context."""
         sequence = get_current_chat_message_sequence()
         if sequence is None or self._task is None:
             return
@@ -153,6 +159,7 @@ class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageComp
         channel_login: str | None = None,
         thread_id: int | None = None,
     ) -> None:
+        """Queue or directly send one prepared tracking embed."""
         sequence = get_current_chat_message_sequence()
         delivery = _TrackingDelivery(
             discord_channel_id=discord_channel_id,
@@ -195,7 +202,7 @@ class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageComp
 
     def _take_ready_deliveries(self) -> list[_TrackingDelivery]:
         deliveries: list[_TrackingDelivery] = []
-        for ordering_key in sorted(tuple(self._next_sequence_by_key)):
+        for ordering_key in sorted(self._next_sequence_by_key):
             while self._is_group_ready(ordering_key):
                 next_sequence = self._next_sequence_by_key[ordering_key]
                 slots = self._slots_by_key[ordering_key]
@@ -263,10 +270,13 @@ class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageComp
             )
             self._target_states[target_key] = state
         if state.task is None or state.task.done():
-            state.task = asyncio.create_task(self._run_target_loop(target_key, state), name=f"tracking-delivery-target-{target_key}")
+            state.task = asyncio.create_task(
+                self._run_target_loop(state),
+                name=f"tracking-delivery-target-{target_key}",
+            )
         return state
 
-    async def _run_target_loop(self, target_key: int, state: _TargetDeliveryState) -> None:
+    async def _run_target_loop(self, state: _TargetDeliveryState) -> None:
         while True:
             delivery = await state.queue.get()
             try:

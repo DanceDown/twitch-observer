@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from contextlib import suppress
 import logging
+from contextlib import suppress
 from typing import cast
 
 import discord
 
-from src.entrypoints.discord.delivery import send_embed_with_retries, send_embed_message_with_retries
+from src.entrypoints.discord.delivery import DiscordEmbedSendRequest, send_embed_message_with_retries, send_embed_with_retries
 from src.entrypoints.discord.helpers import defer_interaction_response, send_initial_result, send_modal_response
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.events.discord_results import DiscordResultStyle
@@ -17,8 +17,6 @@ from src.services.support_command_service import (
     SUPPORT_RESPONSE_BODY_MAX_LENGTH,
     SUPPORT_RESPONSE_SUBJECT_MAX_LENGTH,
     SupportTicketCreateResult,
-    SupportTicketMessageResult,
-    SupportTicketUpdateResult,
 )
 from src.utils.discord_embeds import (
     build_result_embed,
@@ -50,6 +48,7 @@ class SupportTicketView(discord.ui.View):
         localizer: Localizer,
         language: str,
     ) -> None:
+        """Create persistent ticket buttons for one ticket ID."""
         super().__init__(timeout=None)
         self._ticket_id = ticket_id
         self._services = services
@@ -91,13 +90,10 @@ class SupportTicketView(discord.ui.View):
         if not await self._ensure_support_channel(interaction):
             return
         await defer_interaction_response(interaction, ephemeral=True)
-        prepared = cast(
-            SupportTicketMessageResult,
-            await dispatch_prepare_support_close(
-                self._services,
-                ticket_id=self._ticket_id,
-                closer_id=interaction.user.id,
-            ),
+        prepared = await dispatch_prepare_support_close(
+            self._services,
+            ticket_id=self._ticket_id,
+            closer_id=interaction.user.id,
         )
         if prepared.ticket is None:
             await send_initial_result(interaction, prepared.result)
@@ -111,13 +107,10 @@ class SupportTicketView(discord.ui.View):
             await send_initial_result(interaction, self._services.support.delivery_failed_result(prepared.ticket))
             return
 
-        updated = cast(
-            SupportTicketUpdateResult,
-            await dispatch_mark_support_closed(
-                self._services,
-                ticket_id=self._ticket_id,
-                closer_id=interaction.user.id,
-            ),
+        updated = await dispatch_mark_support_closed(
+            self._services,
+            ticket_id=self._ticket_id,
+            closer_id=interaction.user.id,
         )
         if updated.ticket is None:
             await send_initial_result(interaction, updated.result)
@@ -166,6 +159,7 @@ class SupportReplyModal(discord.ui.Modal):
         language: str,
         support_message: discord.Message | discord.InteractionMessage | None,
     ) -> None:
+        """Create the modal for answering one support ticket."""
         resolved_language = localizer.resolve_language(language)
         super().__init__(title=localizer.text("discord.support.reply_modal.title", language=resolved_language), timeout=300)
         self._ticket_id = ticket_id
@@ -192,15 +186,12 @@ class SupportReplyModal(discord.ui.Modal):
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Send an answer to the requester and mark the ticket answered."""
         await defer_interaction_response(interaction, ephemeral=True)
-        prepared = cast(
-            SupportTicketMessageResult,
-            await dispatch_prepare_support_answer(
-                self._services,
-                ticket_id=self._ticket_id,
-                responder_id=interaction.user.id,
-                subject=str(self.subject.value),
-                body=str(self.body.value),
-            ),
+        prepared = await dispatch_prepare_support_answer(
+            self._services,
+            ticket_id=self._ticket_id,
+            responder_id=interaction.user.id,
+            subject=str(self.subject.value),
+            body=str(self.body.value),
         )
         if prepared.ticket is None:
             await send_initial_result(interaction, prepared.result)
@@ -214,15 +205,12 @@ class SupportReplyModal(discord.ui.Modal):
             await send_initial_result(interaction, self._services.support.delivery_failed_result(prepared.ticket))
             return
 
-        updated = cast(
-            SupportTicketUpdateResult,
-            await dispatch_mark_support_answered(
-                self._services,
-                ticket_id=self._ticket_id,
-                responder_id=interaction.user.id,
-                subject=str(self.subject.value),
-                body=str(self.body.value),
-            ),
+        updated = await dispatch_mark_support_answered(
+            self._services,
+            ticket_id=self._ticket_id,
+            responder_id=interaction.user.id,
+            subject=str(self.subject.value),
+            body=str(self.body.value),
         )
         if updated.ticket is None:
             await send_initial_result(interaction, updated.result)
@@ -246,6 +234,7 @@ class SupportShowSectionModal(discord.ui.Modal):
         localizer: Localizer,
         language: str,
     ) -> None:
+        """Create the modal for selecting a ticket-origin show section."""
         resolved_language = localizer.resolve_language(language)
         super().__init__(title=localizer.text("discord.support.show_modal.title", language=resolved_language), timeout=300)
         self._ticket_id = ticket_id
@@ -349,17 +338,18 @@ async def send_new_support_ticket(
     )
     message = await send_embed_message_with_retries(
         support_channel,
-        embed=build_support_ticket_embed(ticket=creation.ticket, localizer=localizer),
-        view=view,
-        allowed_mentions=_support_allowed_mentions(),
-        purpose="support ticket",
+        request=DiscordEmbedSendRequest(
+            embed=build_support_ticket_embed(ticket=creation.ticket, localizer=localizer),
+            view=view,
+            allowed_mentions=_support_allowed_mentions(),
+            purpose="support ticket",
+        ),
     )
     if message is None:
         return False
-    try:
-        await services.support.record_support_message(ticket_id=creation.ticket.ticket_id, support_message_id=message.id)
-    except Exception:
-        logger.warning("Could not record support message ID for ticket_id=%s.", creation.ticket.ticket_id, exc_info=True)
+    recorded = await services.support.record_support_message(ticket_id=creation.ticket.ticket_id, support_message_id=message.id)
+    if recorded is None:
+        logger.warning("Could not record support message ID for ticket_id=%s.", creation.ticket.ticket_id)
     return True
 
 
@@ -370,11 +360,7 @@ async def register_persistent_support_views(
     localizer: Localizer,
 ) -> None:
     """Restore persistent support-ticket buttons for open tickets after startup."""
-    try:
-        tickets = await services.support.list_open_tickets_with_messages()
-    except Exception:
-        logger.warning("Could not restore persistent support ticket views.", exc_info=True)
-        return
+    tickets = await services.support.list_open_tickets_with_messages()
 
     for ticket in tickets:
         if ticket.support_message_id is None:
@@ -405,9 +391,11 @@ async def _send_to_origin_channel(
     try:
         return await send_embed_with_retries(
             channel,
-            embed=embed,
-            allowed_mentions=_support_allowed_mentions(),
-            purpose=purpose,
+            request=DiscordEmbedSendRequest(
+                embed=embed,
+                allowed_mentions=_support_allowed_mentions(),
+                purpose=purpose,
+            ),
         )
     except (discord.Forbidden, discord.NotFound):
         return False

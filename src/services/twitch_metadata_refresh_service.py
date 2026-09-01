@@ -6,12 +6,13 @@ import asyncio
 import contextlib
 import logging
 from dataclasses import dataclass, field
+from typing import Protocol, runtime_checkable
 
 import psycopg
 
+from src.database.connection import TwitchUserCacheRecord
 from src.errors import DatabasePoolExhaustedError
-from src.gateways.twitch_api import TwitchAPIError
-from src.services.twitch_user_directory_service import TwitchUserDirectoryService
+from src.gateways.twitch_api import TwitchAPIError, TwitchUser
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +22,36 @@ def _batched(values: tuple[str, ...], batch_size: int) -> tuple[tuple[str, ...],
     return tuple(values[index : index + effective_batch_size] for index in range(0, len(values), effective_batch_size))
 
 
+class TwitchMetadataDirectory(Protocol):
+    """Minimal directory operations needed by the background metadata refresh."""
+
+    async def list_cached_users(self) -> tuple[TwitchUserCacheRecord, ...]:
+        """Return all persisted Twitch user cache records eligible for refresh."""
+        ...
+
+    async def get_users_by_ids(self, user_ids: tuple[str, ...]) -> tuple[TwitchUser, ...]:
+        """Fetch normal Twitch user metadata for many IDs."""
+        ...
+
+    async def upsert_users_from_api(self, users: tuple[TwitchUser, ...]) -> None:
+        """Persist freshly fetched Twitch user metadata."""
+        ...
+
+
+@runtime_checkable
+class TwitchMetadataChatColorDirectory(Protocol):
+    """Optional metadata refresh extension that includes Twitch chat-name colors."""
+
+    async def get_users_by_ids_with_chat_colors(self, user_ids: tuple[str, ...]) -> tuple[TwitchUser, ...]:
+        """Fetch Twitch user metadata plus chat-name colors for many IDs."""
+        ...
+
+
 @dataclass(slots=True)
 class TwitchMetadataRefreshService:
     """Refresh the full persisted Twitch metadata cache in evenly spaced batches."""
 
-    directory: TwitchUserDirectoryService
+    directory: TwitchMetadataDirectory
     refresh_interval_seconds: float
     request_spacing_seconds: float
     batch_size: int = 100
@@ -33,11 +59,13 @@ class TwitchMetadataRefreshService:
     _task: asyncio.Task[None] | None = field(default=None, init=False)
 
     async def start(self) -> None:
+        """Start the background refresh loop once."""
         if self._task is None:
             self._stop_event.clear()
             self._task = asyncio.create_task(self._run_loop(), name="twitch-metadata-refresh")
 
     async def stop(self) -> None:
+        """Stop the background refresh loop and wait for cancellation."""
         self._stop_event.set()
         if self._task is not None:
             self._task.cancel()
@@ -46,6 +74,7 @@ class TwitchMetadataRefreshService:
             self._task = None
 
     async def run_once(self) -> None:
+        """Refresh every cached Twitch user once, spreading API calls across batches."""
         cached_records = await self.directory.list_cached_users()
         cached_user_ids = tuple(dict.fromkeys(record.twitch_user_id for record in cached_records if record.twitch_user_id))
         if not cached_user_ids:
@@ -56,7 +85,7 @@ class TwitchMetadataRefreshService:
         spacing_seconds = self._spacing_seconds_for_batch_count(len(batches))
         for index, batch in enumerate(batches):
             try:
-                users = await self.directory.get_users_by_ids(batch)
+                users = await self._get_users_with_visual_metadata(batch)
             except TwitchAPIError as error:
                 logger.warning("Failed to refresh Twitch metadata batch (%s ids): %s", len(batch), error)
                 continue
@@ -64,13 +93,18 @@ class TwitchMetadataRefreshService:
             if index < len(batches) - 1:
                 await self._wait_or_stop(spacing_seconds)
 
+    async def _get_users_with_visual_metadata(self, user_ids: tuple[str, ...]) -> tuple[TwitchUser, ...]:
+        if isinstance(self.directory, TwitchMetadataChatColorDirectory):
+            return await self.directory.get_users_by_ids_with_chat_colors(user_ids)
+        return await self.directory.get_users_by_ids(user_ids)
+
     async def _run_loop(self) -> None:
         while not self._stop_event.is_set():
             started_at = asyncio.get_running_loop().time()
             try:
                 await self.run_once()
             except DatabasePoolExhaustedError:
-                logger.error("Twitch metadata refresh pass skipped because the database pool is exhausted.")
+                logger.exception("Twitch metadata refresh pass skipped because the database pool is exhausted.")
             except psycopg.Error:
                 logger.exception("Twitch metadata refresh pass failed because PostgreSQL returned an error.")
             except TwitchAPIError:

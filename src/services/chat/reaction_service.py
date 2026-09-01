@@ -10,29 +10,46 @@ from typing import Protocol
 from src.events.twitch_events import TwitchChatMessageEvent
 from src.services.chat_delivery_context import ChatMessageCompletionNotifier, get_current_chat_message_sequence
 
-from .matcher import ChatPatternMatch, ChatPatternMatcher
+from .matcher import ChatPatternMatch
 
 logger = logging.getLogger(__name__)
 
 
+class ChatMatcher(Protocol):
+    """Matcher that turns one Twitch message into zero or more reactions."""
+
+    async def find_matches(self, event: TwitchChatMessageEvent) -> tuple[ChatPatternMatch, ...]:
+        """Return all configured reactions matching one chat message."""
+        ...
+
+
 class TrackingMatchHandler(Protocol):
-    async def handle_match(self, event: TwitchChatMessageEvent, match: ChatPatternMatch) -> None: ...
+    """Handler for matches that should only be mirrored into Discord."""
+
+    async def handle_match(self, event: TwitchChatMessageEvent, match: ChatPatternMatch) -> None:
+        """Process one tracking-only chat match."""
+        ...
 
 
 class ReplyMatchHandler(Protocol):
-    async def handle_match(self, event: TwitchChatMessageEvent, match: ChatPatternMatch) -> None: ...
+    """Handler for matches that should send an auto-reply before tracking."""
+
+    async def handle_match(self, event: TwitchChatMessageEvent, match: ChatPatternMatch) -> None:
+        """Process one chat match with an attached auto-reply."""
+        ...
 
 
 @dataclass(slots=True)
 class ChatMessageReactionService:
     """Evaluate one chat message once, then dispatch tracking or auto-reply work."""
 
-    matcher: ChatPatternMatcher
+    matcher: ChatMatcher
     tracking: TrackingMatchHandler
     replies: ReplyMatchHandler
     completion_notifier: ChatMessageCompletionNotifier | None = None
 
     async def handle_chat_message(self, event: TwitchChatMessageEvent) -> None:
+        """Match one Twitch message and dispatch all resulting reaction work."""
         sequence = get_current_chat_message_sequence()
         matches: tuple[ChatPatternMatch, ...] = ()
         try:

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import discord
+
 from src.entrypoints.discord.helpers import defer_interaction_response
 
 from ...ui_data import TrackedUserPresentation
@@ -18,6 +19,7 @@ class PatternUsersModal(discord.ui.Modal):
     """Collect one user-scope update for one ping."""
 
     def __init__(self, *, parent: PatternHomeView, tracked_users: list[TrackedUserPresentation]) -> None:
+        """Create the modal seeded with tracked user choices."""
         super().__init__(title=parent.text("discord.pattern_ui.users.title"), timeout=300)
         self._parent_view = parent
         self._tracked_users = tracked_users
@@ -80,6 +82,7 @@ class PatternUsersModal(discord.ui.Modal):
         self.add_item(self.users)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        """Store submitted user scope in the parent form and rerender it."""
         await defer_interaction_response(interaction)
         state = self._parent_view.state
         state.user_scope_mode = self.scope.component.value

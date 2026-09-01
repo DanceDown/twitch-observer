@@ -173,7 +173,8 @@ IRC metadata updates login and display-name information without a Helix call.
 Repeated identical IRC metadata is skipped in memory to avoid writing the same
 cache row for every chat message.
 Parallel cache misses for the same user are deduplicated in-process so only one
-Helix lookup runs per key at a time. Profile images still require Helix.
+Helix lookup runs per key at a time. Profile images and users without recent IRC
+chat color still require Helix metadata refreshes.
 
 The persistent cache is also refreshed by `TwitchMetadataRefreshService` in
 full batched passes on one shared interval

@@ -3,16 +3,41 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 
-from src.tests.chat_match_candidates import build_chat_match_seeds, hydrate_chat_match_candidates
-from src.tests.dispatch_helpers import (
-    dispatch_account_command,
-    dispatch_channel_event_command,
-    dispatch_reply_command,
-    dispatch_show_command,
+from src.database.connection import (
+    AdapterEventActionRecord,
+    AdapterEventActionRepository,
+    AdapterEventRecord,
+    AdapterEventRepository,
+    ChannelRepository,
+    ChatPatternCandidateRecord,
+    ChatPatternSeedRecord,
+    MessageRepository,
+    PatternCreate,
+    PatternExactQuery,
+    PatternRecord,
+    PatternRepository,
+    PatternUpdate,
+    RecentMessageRecord,
+    ReplyRecord,
+    ReplyRepository,
+    ThreadRecord,
+    ThreadRepository,
+    TrackedUserRepository,
+    TwitchAccountCreate,
+    TwitchAccountRecord,
+    TwitchAccountRepository,
+    TwitchAccountTokenData,
+    TwitchAccountUpdate,
+    TwitchDeviceFlowRecord,
+    TwitchDeviceFlowRepository,
+    TwitchDeviceFlowUpsert,
 )
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
+from src.events.twitch_events import TwitchChannelLiveStateChangedEvent, TwitchChatMessageEvent, TwitchChatSendRequest
 from src.gateways.twitch_api import (
     TwitchAPIError,
     TwitchChannelNotFoundError,
@@ -22,31 +47,6 @@ from src.gateways.twitch_api import (
     TwitchUserTokenBundle,
     TwitchValidatedToken,
 )
-from src.database.connection import (
-    AdapterEventActionRecord,
-    AdapterEventActionRepository,
-    AdapterEventRecord,
-    AdapterEventRepository,
-    ChatPatternCandidateRecord,
-    ChatPatternSeedRecord,
-    ChannelRepository,
-    MessageRepository,
-    PatternRecord,
-    PatternRepository,
-    RecentMessageRecord,
-    ReplyRecord,
-    ReplyRepository,
-    ThreadRecord,
-    ThreadRepository,
-    TrackedUserRepository,
-    TwitchAccountRecord,
-    TwitchAccountRepository,
-    TwitchDeviceFlowRecord,
-    TwitchDeviceFlowRepository,
-)
-from types import SimpleNamespace
-from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
-from src.events.twitch_events import TwitchChannelLiveStateChangedEvent, TwitchChatMessageEvent
 from src.services.account_polling_service import DeviceFlowPollingService
 from src.services.account_service import AccountCommandService
 from src.services.account_support import AccountNotificationSender
@@ -54,6 +54,14 @@ from src.services.channel_event_notification_service import ChannelEventNotifica
 from src.services.channel_live_state_service import ChannelEventCommandService
 from src.services.patterns import ShowCommandService
 from src.services.replies import AutoReplyService, ChannelEventAutoReplyService, ReplyCommandService
+from src.services.twitch_gateways import TwitchReplyGateway
+from src.tests.chat_match_candidates import build_chat_match_seeds, hydrate_chat_match_candidates
+from src.tests.dispatch_helpers import (
+    dispatch_account_command,
+    dispatch_channel_event_command,
+    dispatch_reply_command,
+    dispatch_show_command,
+)
 from src.tests.in_memory_channels import InMemoryChannelRepository as BaseInMemoryChannelRepository
 from src.utils.discord_embeds import build_result_embed
 
@@ -147,12 +155,14 @@ class InMemoryMessageRepository(MessageRepository):
     saved_bot_messages: list[TwitchChatMessageEvent] = field(default_factory=list)
 
     async def save_twitch_message(self, event: TwitchChatMessageEvent) -> None:
-        return None
+        _ = event
+        return
 
     async def save_bot_twitch_message(self, event: TwitchChatMessageEvent) -> None:
         self.saved_bot_messages.append(event)
 
     async def list_recent_messages(self, *, since: datetime, limit: int) -> list[RecentMessageRecord]:
+        _ = since, limit
         return []
 
     async def list_recent_messages_for_channel(
@@ -162,6 +172,7 @@ class InMemoryMessageRepository(MessageRepository):
         since: datetime,
         limit: int,
     ) -> list[RecentMessageRecord]:
+        _ = twitch_channel_id, since, limit
         return []
 
     async def mark_message_matched_in_thread(self, *, thread_id: int, event: TwitchChatMessageEvent) -> None:
@@ -174,6 +185,7 @@ class InMemoryMessageRepository(MessageRepository):
         since: datetime,
         limit: int,
     ) -> list[RecentMessageRecord]:
+        _ = thread_id, since, limit
         return []
 
 
@@ -185,10 +197,12 @@ class InMemoryPatternRepository(PatternRepository):
     tracked_user_repository: TrackedUserRepository | None = None
     reply_repository: ReplyRepository | None = None
 
-    async def find_exact_pattern(self, **kwargs) -> PatternRecord | None:  # pragma: no cover - unused here
+    async def find_exact_pattern(self, query: PatternExactQuery) -> PatternRecord | None:  # pragma: no cover - unused here
+        _ = query
         raise NotImplementedError
 
-    async def add_pattern(self, **kwargs) -> PatternRecord:  # pragma: no cover - unused here
+    async def add_pattern(self, pattern: PatternCreate) -> PatternRecord:  # pragma: no cover - unused here
+        _ = pattern
         raise NotImplementedError
 
     async def remove_pattern(self, *, thread_id: int, pattern_id: int) -> None:
@@ -240,40 +254,25 @@ class InMemoryPatternRepository(PatternRepository):
                 return updated
         return None
 
-    async def update_pattern(
-        self,
-        *,
-        thread_id: int,
-        pattern_id: int,
-        regex: str,
-        channel_scope_mode: str,
-        channel_scope_ids: tuple[str, ...],
-        user_scope_mode: str,
-        user_scope_ids: tuple[str, ...],
-        sub_state: str,
-        offline_state: str,
-        is_regex: bool,
-        case_sensitive: bool,
-        color: str | None,
-        priority: int,
-    ) -> PatternRecord | None:
+    async def update_pattern(self, update: PatternUpdate) -> PatternRecord | None:
+        definition = update.definition
         for index, pattern in enumerate(self.patterns):
-            if pattern.thread_id == thread_id and pattern.pattern_id == pattern_id:
+            if pattern.thread_id == update.thread_id and pattern.pattern_id == update.pattern_id:
                 updated = PatternRecord(
-                    thread_id=thread_id,
-                    pattern_id=pattern_id,
-                    regex=regex,
-                    channel_scope_mode=channel_scope_mode,
-                    channel_scope_ids=tuple(sorted(channel_scope_ids)),
-                    user_scope_mode=user_scope_mode,
-                    user_scope_ids=tuple(sorted(user_scope_ids)),
-                    sub_state=sub_state,
-                    offline_state=offline_state,
-                    is_regex=is_regex,
-                    case_sensitive=case_sensitive,
-                    color=color,
+                    thread_id=update.thread_id,
+                    pattern_id=update.pattern_id,
+                    regex=definition.regex,
+                    channel_scope_mode=definition.channel_scope_mode,
+                    channel_scope_ids=tuple(sorted(definition.channel_scope_ids)),
+                    user_scope_mode=definition.user_scope_mode,
+                    user_scope_ids=tuple(sorted(definition.user_scope_ids)),
+                    sub_state=definition.sub_state,
+                    offline_state=definition.offline_state,
+                    is_regex=definition.is_regex,
+                    case_sensitive=definition.case_sensitive,
+                    color=update.color,
                     disabled=pattern.disabled,
-                    priority=priority,
+                    priority=update.priority,
                 )
                 self.patterns[index] = updated
                 return updated
@@ -611,8 +610,9 @@ class InMemoryAdapterEventActionRepository(AdapterEventActionRepository):
             return []
         results: list[tuple[AdapterEventRecord, AdapterEventActionRecord]] = []
         for event in await self.event_repository.list_events_for_thread(thread_id, include_disabled=include_disabled):
-            for action in await self.list_actions_for_event(event.event_id, include_disabled=include_disabled):
-                results.append((event, action))
+            results.extend(
+                (event, action) for action in await self.list_actions_for_event(event.event_id, include_disabled=include_disabled)
+            )
         return results
 
 
@@ -639,14 +639,14 @@ async def test_channel_event_command_manages_live_and_offline_notifications() ->
         channel_repository=channel_repository,
         adapter_event_repository=adapter_event_repository,
         adapter_event_action_repository=adapter_event_action_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
     bus.show = ShowCommandService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=InMemoryPatternRepository(),
         reply_repository=InMemoryReplyRepository(),
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         adapter_event_action_repository=adapter_event_action_repository,
     )
 
@@ -752,65 +752,43 @@ class InMemoryAccountRepository(TwitchAccountRepository):
     async def get_by_account_id(self, account_id: int) -> TwitchAccountRecord | None:
         return self.accounts_by_account_id.get(account_id)
 
-    async def create_account(
-        self,
-        *,
-        discord_user_id: int,
-        twitch_user_id: str,
-        twitch_login: str,
-        client_id: str,
-        access_token: str,
-        refresh_token: str | None,
-        expires_at: str | None,
-        scope: tuple[str, ...],
-        token_type: str | None,
-    ) -> TwitchAccountRecord:
+    async def create_account(self, account: TwitchAccountCreate) -> TwitchAccountRecord:
         account_id = self.next_account_id
         self.next_account_id += 1
+        token = account.token
         record = TwitchAccountRecord(
             account_id=account_id,
-            discord_user_id=discord_user_id,
-            twitch_user_id=twitch_user_id,
-            twitch_login=twitch_login,
-            client_id=client_id,
-            access_token=access_token,
-            refresh_token=refresh_token,
-            expires_at=expires_at,
-            scope=scope,
-            token_type=token_type,
+            discord_user_id=account.discord_user_id,
+            twitch_user_id=token.twitch_user_id,
+            twitch_login=token.twitch_login,
+            client_id=token.client_id,
+            access_token=token.access_token,
+            refresh_token=token.refresh_token,
+            expires_at=token.expires_at,
+            scope=token.scope,
+            token_type=token.token_type,
         )
         self.accounts_by_account_id[account_id] = record
         return record
 
-    async def update_account(
-        self,
-        *,
-        account_id: int,
-        twitch_user_id: str,
-        twitch_login: str,
-        client_id: str,
-        access_token: str,
-        refresh_token: str | None,
-        expires_at: str | None,
-        scope: tuple[str, ...],
-        token_type: str | None,
-    ) -> TwitchAccountRecord | None:
-        existing = self.accounts_by_account_id.get(account_id)
+    async def update_account(self, account: TwitchAccountUpdate) -> TwitchAccountRecord | None:
+        existing = self.accounts_by_account_id.get(account.account_id)
         if existing is None:
             return None
+        token = account.token
         updated = TwitchAccountRecord(
-            account_id=account_id,
+            account_id=account.account_id,
             discord_user_id=existing.discord_user_id,
-            twitch_user_id=twitch_user_id,
-            twitch_login=twitch_login,
-            client_id=client_id,
-            access_token=access_token,
-            refresh_token=refresh_token,
-            expires_at=expires_at,
-            scope=scope,
-            token_type=token_type,
+            twitch_user_id=token.twitch_user_id,
+            twitch_login=token.twitch_login,
+            client_id=token.client_id,
+            access_token=token.access_token,
+            refresh_token=token.refresh_token,
+            expires_at=token.expires_at,
+            scope=token.scope,
+            token_type=token.token_type,
         )
-        self.accounts_by_account_id[account_id] = updated
+        self.accounts_by_account_id[account.account_id] = updated
         return updated
 
     async def remove_by_account_id(self, account_id: int) -> bool:
@@ -822,42 +800,15 @@ class InMemoryAccountRepository(TwitchAccountRepository):
             return None
         return sorted(matches, key=lambda account: account.account_id)[-1]
 
-    async def upsert_account(
-        self,
-        *,
-        discord_user_id: int,
-        twitch_user_id: str,
-        twitch_login: str,
-        client_id: str,
-        access_token: str,
-        refresh_token: str | None,
-        expires_at: str | None,
-        scope: tuple[str, ...],
-        token_type: str | None,
-    ) -> TwitchAccountRecord:
-        existing = await self.get_by_discord_user_id(discord_user_id)
+    async def upsert_account(self, account: TwitchAccountCreate) -> TwitchAccountRecord:
+        existing = await self.get_by_discord_user_id(account.discord_user_id)
         if existing is None:
-            return await self.create_account(
-                discord_user_id=discord_user_id,
-                twitch_user_id=twitch_user_id,
-                twitch_login=twitch_login,
-                client_id=client_id,
-                access_token=access_token,
-                refresh_token=refresh_token,
-                expires_at=expires_at,
-                scope=scope,
-                token_type=token_type,
-            )
+            return await self.create_account(account)
         updated = await self.update_account(
-            account_id=existing.account_id,
-            twitch_user_id=twitch_user_id,
-            twitch_login=twitch_login,
-            client_id=client_id,
-            access_token=access_token,
-            refresh_token=refresh_token,
-            expires_at=expires_at,
-            scope=scope,
-            token_type=token_type,
+            TwitchAccountUpdate(
+                account_id=existing.account_id,
+                token=account.token,
+            )
         )
         assert updated is not None
         return updated
@@ -879,32 +830,21 @@ class InMemoryDeviceFlowRepository(TwitchDeviceFlowRepository):
     async def get_by_discord_channel_id(self, discord_channel_id: int) -> TwitchDeviceFlowRecord | None:
         return self.flows_by_discord_channel_id.get(discord_channel_id)
 
-    async def upsert_pending_flow(
-        self,
-        *,
-        discord_user_id: int,
-        discord_channel_id: int,
-        device_code: str,
-        user_code: str,
-        verification_uri: str,
-        interval_seconds: int,
-        expires_at: str,
-        scope: tuple[str, ...],
-    ) -> TwitchDeviceFlowRecord:
+    async def upsert_pending_flow(self, flow: TwitchDeviceFlowUpsert) -> TwitchDeviceFlowRecord:
         record = TwitchDeviceFlowRecord(
-            discord_user_id=discord_user_id,
-            discord_channel_id=discord_channel_id,
-            device_code=device_code,
-            user_code=user_code,
-            verification_uri=verification_uri,
-            interval_seconds=interval_seconds,
-            expires_at=expires_at,
-            scope=scope,
+            discord_user_id=flow.discord_user_id,
+            discord_channel_id=flow.discord_channel_id,
+            device_code=flow.device_code,
+            user_code=flow.user_code,
+            verification_uri=flow.verification_uri,
+            interval_seconds=flow.interval_seconds,
+            expires_at=flow.expires_at,
+            scope=flow.scope,
             status="pending",
             last_error=None,
             last_polled_at=None,
         )
-        self.flows_by_discord_channel_id[discord_channel_id] = record
+        self.flows_by_discord_channel_id[flow.discord_channel_id] = record
         return record
 
     async def list_pending_flows(self) -> list[TwitchDeviceFlowRecord]:
@@ -982,8 +922,58 @@ class InMemoryDeviceFlowRepository(TwitchDeviceFlowRepository):
         return await self.remove_by_discord_channel_id(existing.discord_channel_id)
 
 
+def _account_create(
+    *,
+    discord_user_id: int = 200,
+    twitch_user_id: str = "77",
+    twitch_login: str = "dancedown",
+    client_id: str = "client-123",
+    access_token: str = "oauth:test-token",
+    refresh_token: str | None = None,
+    expires_at: str | None = None,
+    scope: tuple[str, ...] = ("user:write:chat",),
+    token_type: str | None = "bearer",
+) -> TwitchAccountCreate:
+    return TwitchAccountCreate(
+        discord_user_id=discord_user_id,
+        token=TwitchAccountTokenData(
+            twitch_user_id=twitch_user_id,
+            twitch_login=twitch_login,
+            client_id=client_id,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_at=expires_at,
+            scope=scope,
+            token_type=token_type,
+        ),
+    )
+
+
+def _pending_flow(
+    *,
+    discord_user_id: int = 200,
+    discord_channel_id: int = 100,
+    device_code: str = "device-123",
+    user_code: str = "ABCD-EFGH",
+    verification_uri: str = "https://twitch.example/activate",
+    interval_seconds: int = 5,
+    expires_at: str = "2099-01-01T00:00:00+00:00",
+    scope: tuple[str, ...] = ("user:write:chat",),
+) -> TwitchDeviceFlowUpsert:
+    return TwitchDeviceFlowUpsert(
+        discord_user_id=discord_user_id,
+        discord_channel_id=discord_channel_id,
+        device_code=device_code,
+        user_code=user_code,
+        verification_uri=verification_uri,
+        interval_seconds=interval_seconds,
+        expires_at=expires_at,
+        scope=scope,
+    )
+
+
 @dataclass
-class FakeTwitchAPI:
+class FakeTwitchAPI(TwitchReplyGateway):
     device_start: TwitchDeviceCodeStart | None = None
     poll_result: TwitchDevicePollResult | None = None
     validated_token: TwitchValidatedToken | None = None
@@ -997,6 +987,7 @@ class FakeTwitchAPI:
     refreshed_tokens: list[str] = field(default_factory=list)
 
     async def start_device_code_flow(self, *, scopes: tuple[str, ...]) -> TwitchDeviceCodeStart:
+        _ = scopes
         assert self.device_start is not None
         return self.device_start
 
@@ -1011,6 +1002,7 @@ class FakeTwitchAPI:
         return self.poll_result
 
     async def validate_user_access_token(self, access_token: str) -> TwitchValidatedToken:
+        _ = access_token
         assert self.validated_token is not None
         return self.validated_token
 
@@ -1020,26 +1012,17 @@ class FakeTwitchAPI:
         assert self.poll_result.token_bundle is not None
         return self.poll_result.token_bundle
 
-    async def send_chat_message(
-        self,
-        *,
-        access_token: str,
-        client_id: str,
-        sender_id: str,
-        broadcaster_id: str,
-        message: str,
-        reply_parent_message_id: str | None = None,
-    ) -> str:
+    async def send_chat_message(self, request: TwitchChatSendRequest) -> str:
         if self.send_error is not None:
             raise self.send_error
         self.sent_messages.append(
             {
-                "access_token": access_token,
-                "client_id": client_id,
-                "sender_id": sender_id,
-                "broadcaster_id": broadcaster_id,
-                "message": message,
-                "reply_parent_message_id": reply_parent_message_id,
+                "access_token": request.access_token,
+                "client_id": request.client_id,
+                "sender_id": request.sender_id,
+                "broadcaster_id": request.broadcaster_id,
+                "message": request.message,
+                "reply_parent_message_id": request.reply_parent_message_id,
             }
         )
         return "sent-1"
@@ -1105,31 +1088,22 @@ class BlockingLiveEventTwitchAPI(FakeTwitchAPI):
     all_sends_started: asyncio.Event = field(default_factory=asyncio.Event)
     started_sender_ids: list[str] = field(default_factory=list)
 
-    async def send_chat_message(
-        self,
-        *,
-        access_token: str,
-        client_id: str,
-        sender_id: str,
-        broadcaster_id: str,
-        message: str,
-        reply_parent_message_id: str | None = None,
-    ) -> str:
-        self.started_sender_ids.append(sender_id)
+    async def send_chat_message(self, request: TwitchChatSendRequest) -> str:
+        self.started_sender_ids.append(request.sender_id)
         if len(self.started_sender_ids) >= self.expected_calls:
             self.all_sends_started.set()
         await self.release_send.wait()
         self.sent_messages.append(
             {
-                "access_token": access_token,
-                "client_id": client_id,
-                "sender_id": sender_id,
-                "broadcaster_id": broadcaster_id,
-                "message": message,
-                "reply_parent_message_id": reply_parent_message_id,
+                "access_token": request.access_token,
+                "client_id": request.client_id,
+                "sender_id": request.sender_id,
+                "broadcaster_id": request.broadcaster_id,
+                "message": request.message,
+                "reply_parent_message_id": request.reply_parent_message_id,
             }
         )
-        return f"sent-{sender_id}"
+        return f"sent-{request.sender_id}"
 
 
 @dataclass
@@ -1144,6 +1118,7 @@ class FakeNotifier(AccountNotificationSender):
         discord_channel_id: int | None,
         result: DiscordCommandResult,
     ) -> None:
+        _ = discord_channel_id
         self.sent.append((discord_user_id, result))
 
     async def send_tracking_embed(
@@ -1181,7 +1156,7 @@ async def test_account_link_command_starts_device_flow() -> None:
         account_repository=account_repository,
         device_flow_repository=device_flow_repository,
         thread_repository=thread_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
 
     result = await dispatch_account_command(
@@ -1201,22 +1176,40 @@ async def test_account_link_command_starts_device_flow() -> None:
 
 
 @pytest.mark.asyncio
+async def test_account_unlink_cancels_pending_device_flow_without_linked_account() -> None:
+    bus = SimpleNamespace()
+    account_repository = InMemoryAccountRepository()
+    device_flow_repository = InMemoryDeviceFlowRepository()
+    thread_repository = InMemoryThreadRepository()
+    await thread_repository.create(owner_id=200, discord_channel_id=100)
+    await device_flow_repository.upsert_pending_flow(_pending_flow(discord_channel_id=100))
+    bus.account = AccountCommandService(
+        account_repository=account_repository,
+        device_flow_repository=device_flow_repository,
+        thread_repository=thread_repository,
+        twitch_api=FakeTwitchAPI(),
+    )
+
+    result = await dispatch_account_command(
+        bus,
+        requester_id=200,
+        discord_channel_id=100,
+        action="unlink",
+    )
+
+    assert result.style == DiscordResultStyle.SUCCESS
+    assert result.ephemeral is False
+    assert await device_flow_repository.get_by_discord_channel_id(100) is None
+    assert await account_repository.list_accounts() == []
+
+
+@pytest.mark.asyncio
 async def test_show_account_lists_linked_account_with_display_name_and_thumbnail() -> None:
     bus = SimpleNamespace()
     thread_repository = InMemoryThreadRepository()
     await thread_repository.create(owner_id=200, discord_channel_id=100)
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="test__user",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token="refresh-123",
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create(twitch_login="test__user", refresh_token="refresh-123"))
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     bus.show = ShowCommandService(
         thread_repository=thread_repository,
@@ -1232,7 +1225,7 @@ async def test_show_account_lists_linked_account_with_display_name_and_thumbnail
                     profile_image_url="https://example.test/avatar.png",
                 )
             }
-        ),  # type: ignore[arg-type]
+        ),
         account_repository=account_repository,
         device_flow_repository=InMemoryDeviceFlowRepository(),
     )
@@ -1253,14 +1246,11 @@ async def test_device_flow_poller_links_account_after_successful_authorization()
     thread_repository = InMemoryThreadRepository()
     await thread_repository.create(owner_id=200, discord_channel_id=100)
     await device_flow_repository.upsert_pending_flow(
-        discord_user_id=200,
-        discord_channel_id=100,
-        device_code="device-123",
-        user_code="ABCDEFGH",
-        verification_uri="https://example.test/activate",
-        interval_seconds=5,
-        expires_at=(datetime.now(UTC) + timedelta(minutes=30)).isoformat(),
-        scope=("user:write:chat",),
+        _pending_flow(
+            user_code="ABCDEFGH",
+            verification_uri="https://example.test/activate",
+            expires_at=(datetime.now(UTC) + timedelta(minutes=30)).isoformat(),
+        )
     )
     twitch_api = FakeTwitchAPI(
         poll_result=TwitchDevicePollResult(
@@ -1287,7 +1277,7 @@ async def test_device_flow_poller_links_account_after_successful_authorization()
         device_flow_repository=device_flow_repository,
         account_repository=account_repository,
         thread_repository=thread_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         poll_interval_seconds=2,
         notifier=notifier,
     )
@@ -1311,14 +1301,11 @@ async def test_device_flow_poller_marks_failed_authorizations() -> None:
     thread_repository = InMemoryThreadRepository()
     await thread_repository.create(owner_id=200, discord_channel_id=100)
     await device_flow_repository.upsert_pending_flow(
-        discord_user_id=200,
-        discord_channel_id=100,
-        device_code="device-123",
-        user_code="ABCDEFGH",
-        verification_uri="https://example.test/activate",
-        interval_seconds=5,
-        expires_at=(datetime.now(UTC) + timedelta(minutes=30)).isoformat(),
-        scope=("user:write:chat",),
+        _pending_flow(
+            user_code="ABCDEFGH",
+            verification_uri="https://example.test/activate",
+            expires_at=(datetime.now(UTC) + timedelta(minutes=30)).isoformat(),
+        )
     )
     twitch_api = FakeTwitchAPI(
         poll_result=TwitchDevicePollResult(status="failed", error_message="access_denied"),
@@ -1328,7 +1315,7 @@ async def test_device_flow_poller_marks_failed_authorizations() -> None:
         device_flow_repository=device_flow_repository,
         account_repository=account_repository,
         thread_repository=thread_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         poll_interval_seconds=2,
         notifier=notifier,
     )
@@ -1370,23 +1357,13 @@ async def test_account_unlink_keeps_attached_auto_replies() -> None:
     reply_repository = InMemoryReplyRepository()
     await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token="refresh-123",
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create(refresh_token="refresh-123"))
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     bus.account = AccountCommandService(
         account_repository=account_repository,
         device_flow_repository=InMemoryDeviceFlowRepository(),
         thread_repository=thread_repository,
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
     )
 
     result = await dispatch_account_command(bus, requester_id=200, discord_channel_id=100, action="unlink")
@@ -1476,17 +1453,7 @@ async def test_reply_add_updates_pattern_reply_fields() -> None:
     )
     reply_repository = InMemoryReplyRepository()
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create())
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     bus.reply = ReplyCommandService(
         thread_repository=thread_repository,
@@ -1541,17 +1508,7 @@ async def test_reply_add_does_not_escape_parentheses_in_message_preview() -> Non
     )
     reply_repository = InMemoryReplyRepository()
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create())
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     bus.reply = ReplyCommandService(
         thread_repository=thread_repository,
@@ -1602,17 +1559,7 @@ async def test_reply_add_rejects_overwriting_existing_auto_reply() -> None:
     reply_repository = InMemoryReplyRepository()
     await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Existing", reply_as_reply=False)
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create())
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     bus.reply = ReplyCommandService(
         thread_repository=thread_repository,
@@ -1666,17 +1613,7 @@ async def test_reply_disable_marks_reply_as_disabled() -> None:
     reply_repository = InMemoryReplyRepository()
     await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create())
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     bus.reply = ReplyCommandService(
         thread_repository=thread_repository,
@@ -1731,17 +1668,7 @@ async def test_reply_enable_marks_reply_as_enabled() -> None:
     await reply_repository.add_reply(thread_id=thread.thread_id, pattern_id=1, reply_message="Hi there", reply_as_reply=True)
     await reply_repository.set_reply_disabled(thread_id=thread.thread_id, pattern_id=1, disabled=True)
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create())
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     bus.reply = ReplyCommandService(
         thread_repository=thread_repository,
@@ -1800,7 +1727,7 @@ async def test_show_auto_replies_lists_attached_replies() -> None:
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
         reply_repository=reply_repository,
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
     )
 
     result = await dispatch_show_command(
@@ -1855,17 +1782,7 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
         reply_repository=reply_repository,
     )
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create())
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI(
         cached_users_by_id={
@@ -1884,7 +1801,7 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
         pattern_repository=pattern_repository,
         message_repository=message_repository,
         account_repository=account_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         token_refresh_skew_seconds=30,
         tracking_notifier=notifier,
         account_notifier=notifier,
@@ -1955,17 +1872,7 @@ async def test_auto_reply_service_sends_tracking_embed_when_twitch_reply_fails()
         reply_repository=reply_repository,
     )
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create())
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI(
         send_error=TwitchAPIError("Twitch is temporarily unavailable."),
@@ -1985,7 +1892,7 @@ async def test_auto_reply_service_sends_tracking_embed_when_twitch_reply_fails()
         pattern_repository=pattern_repository,
         message_repository=message_repository,
         account_repository=account_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         token_refresh_skew_seconds=30,
         tracking_notifier=notifier,
         account_notifier=notifier,
@@ -2060,7 +1967,7 @@ async def test_auto_reply_service_sends_tracking_embed_when_no_account_is_linked
         pattern_repository=pattern_repository,
         message_repository=message_repository,
         account_repository=InMemoryAccountRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         token_refresh_skew_seconds=30,
         tracking_notifier=notifier,
         account_notifier=notifier,
@@ -2120,17 +2027,7 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
         reply_repository=reply_repository,
     )
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="7",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create(twitch_user_id="7"))
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
     notifier = FakeNotifier()
@@ -2140,7 +2037,7 @@ async def test_auto_reply_service_skips_self_reply_loops() -> None:
         pattern_repository=pattern_repository,
         message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         token_refresh_skew_seconds=30,
         tracking_notifier=notifier,
         account_notifier=notifier,
@@ -2199,17 +2096,7 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
         reply_repository=reply_repository,
     )
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="7",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create(twitch_user_id="7"))
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
     notifier = FakeNotifier()
@@ -2219,7 +2106,7 @@ async def test_auto_reply_service_allows_self_reply_when_user_scope_is_only_sele
         pattern_repository=pattern_repository,
         message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         token_refresh_skew_seconds=30,
         tracking_notifier=notifier,
         account_notifier=notifier,
@@ -2279,17 +2166,7 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
         reply_repository=reply_repository,
     )
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create())
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
     notifier = FakeNotifier()
@@ -2299,7 +2176,7 @@ async def test_auto_reply_service_skips_disabled_thread() -> None:
         pattern_repository=pattern_repository,
         message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         token_refresh_skew_seconds=30,
         tracking_notifier=notifier,
         account_notifier=notifier,
@@ -2374,17 +2251,7 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
         reply_repository=reply_repository,
     )
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create())
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
     notifier = FakeNotifier()
@@ -2394,7 +2261,7 @@ async def test_auto_reply_service_stops_after_first_matching_pattern_without_rep
         pattern_repository=pattern_repository,
         message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         token_refresh_skew_seconds=30,
         tracking_notifier=notifier,
         account_notifier=notifier,
@@ -2454,17 +2321,7 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
         reply_repository=reply_repository,
     )
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create())
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI()
     notifier = FakeNotifier()
@@ -2474,7 +2331,7 @@ async def test_auto_reply_service_uses_persisted_channel_live_state_without_live
         pattern_repository=pattern_repository,
         message_repository=InMemoryMessageRepository(),
         account_repository=account_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         token_refresh_skew_seconds=30,
         tracking_notifier=notifier,
         account_notifier=notifier,
@@ -2531,17 +2388,7 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
         reply_as_reply=False,
     )
     account_repository = InMemoryAccountRepository()
-    account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    account = await account_repository.create_account(_account_create())
     await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
     twitch_api = FakeTwitchAPI(
         users_by_id={
@@ -2557,7 +2404,7 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
         adapter_event_action_repository=adapter_event_action_repository,
         message_repository=message_repository,
         account_repository=account_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         tracking_notifier=notifier,
         token_refresh_skew_seconds=30,
     )
@@ -2646,17 +2493,30 @@ async def test_channel_event_notification_service_includes_channel_author_and_th
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("action_color", "channel_color", "thread_color", "expected_color"),
+    ("event_key", "is_live"),
     [
-        ("#123456", "#abcdef", "#654321", 0x123456),
-        (None, "#abcdef", "#654321", 0xABCDEF),
-        (None, None, "#654321", 0x654321),
+        ("stream.online", True),
+        ("stream.offline", False),
+    ],
+)
+@pytest.mark.parametrize(
+    ("action_color", "channel_color", "thread_color", "twitch_chat_color", "expected_color"),
+    [
+        ("#123456", "#abcdef", "#654321", "#AA00BB", 0x123456),
+        (None, "#abcdef", "#654321", "#AA00BB", 0xABCDEF),
+        (None, None, "#654321", "#AA00BB", 0x654321),
+        (None, None, None, "#AA00BB", 0xAA00BB),
+        (None, None, None, "", 0x808080),
+        (None, None, None, None, 0x808080),
     ],
 )
 async def test_channel_event_notification_service_uses_action_channel_or_thread_color(
+    event_key: str,
+    is_live: bool,
     action_color: str | None,
     channel_color: str | None,
     thread_color: str | None,
+    twitch_chat_color: str | None,
     expected_color: int,
 ) -> None:
     thread_repository = InMemoryThreadRepository()
@@ -2674,7 +2534,7 @@ async def test_channel_event_notification_service_uses_action_channel_or_thread_
         adapter_key="twitch",
         subject_type="channel",
         subject_id="42",
-        event_key="stream.online",
+        event_key=event_key,
     )
     await adapter_event_action_repository.upsert_action(
         event_id=adapter_event.event_id,
@@ -2701,6 +2561,7 @@ async def test_channel_event_notification_service_uses_action_channel_or_thread_
                     login="example",
                     display_name="ExampleChannel",
                     profile_image_url="https://example.test/channel.png",
+                    chat_color=twitch_chat_color,
                 )
             }
         ),
@@ -2711,13 +2572,110 @@ async def test_channel_event_notification_service_uses_action_channel_or_thread_
         TwitchChannelLiveStateChangedEvent(
             twitch_channel_id="42",
             twitch_channel_login="example",
-            is_live=True,
+            is_live=is_live,
         )
     )
 
     assert len(notifier.channel_results) == 1
     _discord_channel_id, result = notifier.channel_results[0]
     assert build_result_embed(result).color.value == expected_color
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("event_key", "is_live"),
+    [
+        ("stream.online", True),
+        ("stream.offline", False),
+    ],
+)
+@pytest.mark.parametrize(
+    ("action_color", "channel_color", "thread_color", "twitch_chat_color", "expected_color"),
+    [
+        ("#123456", "#abcdef", "#654321", "#AA00BB", 0x123456),
+        (None, "#abcdef", "#654321", "#AA00BB", 0xABCDEF),
+        (None, None, "#654321", "#AA00BB", 0x654321),
+        (None, None, None, "#AA00BB", 0xAA00BB),
+        (None, None, None, "", 0x808080),
+        (None, None, None, None, 0x808080),
+    ],
+)
+async def test_channel_event_auto_reply_service_uses_action_channel_or_thread_color(
+    event_key: str,
+    is_live: bool,
+    action_color: str | None,
+    channel_color: str | None,
+    thread_color: str | None,
+    twitch_chat_color: str | None,
+    expected_color: int,
+) -> None:
+    thread_repository = InMemoryThreadRepository()
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
+    if thread_color is not None:
+        await thread_repository.set_color(discord_channel_id=thread.discord_channel_id, color=thread_color)
+    channel_repository = InMemoryChannelRepository()
+    await channel_repository.add_channel(thread.thread_id, "42")
+    if channel_color is not None:
+        await channel_repository.set_color(thread_id=thread.thread_id, twitch_channel_id="42", color=channel_color)
+    adapter_event_repository = InMemoryAdapterEventRepository()
+    adapter_event_action_repository = InMemoryAdapterEventActionRepository(event_repository=adapter_event_repository)
+    adapter_event = await adapter_event_repository.upsert_event(
+        thread_id=thread.thread_id,
+        adapter_key="twitch",
+        subject_type="channel",
+        subject_id="42",
+        event_key=event_key,
+    )
+    await adapter_event_action_repository.upsert_action(
+        event_id=adapter_event.event_id,
+        action_type="discord_notify",
+        message_template=None,
+        reply_as_reply=False,
+    )
+    if action_color is not None:
+        await adapter_event_action_repository.set_action_color(
+            event_id=adapter_event.event_id,
+            action_type="discord_notify",
+            color=action_color,
+        )
+    await adapter_event_action_repository.upsert_action(
+        event_id=adapter_event.event_id,
+        action_type="twitch_send_message",
+        message_template="YIPPIE {CHANNEL} is {STATE}",
+        reply_as_reply=False,
+    )
+    account_repository = InMemoryAccountRepository()
+    account = await account_repository.create_account(_account_create())
+    await thread_repository.set_account_id(discord_channel_id=100, account_id=account.account_id)
+    twitch_api = FakeTwitchAPI(
+        users_by_id={
+            "42": TwitchUser(user_id="42", login="example", display_name="ExampleChannel", chat_color=twitch_chat_color),
+        }
+    )
+    notifier = FakeNotifier()
+    service = ChannelEventAutoReplyService(
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        adapter_event_repository=adapter_event_repository,
+        adapter_event_action_repository=adapter_event_action_repository,
+        message_repository=InMemoryMessageRepository(),
+        account_repository=account_repository,
+        twitch_api=twitch_api,
+        tracking_notifier=notifier,
+        token_refresh_skew_seconds=30,
+    )
+
+    await service.handle_channel_live_state_changed(
+        TwitchChannelLiveStateChangedEvent(
+            twitch_channel_id="42",
+            twitch_channel_login="example",
+            is_live=is_live,
+        )
+    )
+
+    assert len(notifier.tracking_embeds) == 1
+    _discord_channel_id, tracking_embed = notifier.tracking_embeds[0]
+    assert tracking_embed.color.value == expected_color
 
 
 @pytest.mark.asyncio
@@ -2760,27 +2718,15 @@ async def test_channel_event_auto_reply_service_sends_multiple_thread_replies_in
         )
 
     account_repository = InMemoryAccountRepository()
-    first_account = await account_repository.create_account(
-        discord_user_id=200,
-        twitch_user_id="77",
-        twitch_login="dancedown",
-        client_id="client-123",
-        access_token="oauth:test-token-1",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
-    )
+    first_account = await account_repository.create_account(_account_create(access_token="oauth:test-token-1"))
     second_account = await account_repository.create_account(
-        discord_user_id=201,
-        twitch_user_id="88",
-        twitch_login="dancedown2",
-        client_id="client-456",
-        access_token="oauth:test-token-2",
-        refresh_token=None,
-        expires_at=None,
-        scope=("user:write:chat",),
-        token_type="bearer",
+        _account_create(
+            discord_user_id=201,
+            twitch_user_id="88",
+            twitch_login="dancedown2",
+            client_id="client-456",
+            access_token="oauth:test-token-2",
+        )
     )
     await thread_repository.set_account_id(discord_channel_id=100, account_id=first_account.account_id)
     await thread_repository.set_account_id(discord_channel_id=101, account_id=second_account.account_id)
@@ -2800,7 +2746,7 @@ async def test_channel_event_auto_reply_service_sends_multiple_thread_replies_in
         adapter_event_action_repository=adapter_event_action_repository,
         message_repository=message_repository,
         account_repository=account_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         tracking_notifier=notifier,
         token_refresh_skew_seconds=30,
     )

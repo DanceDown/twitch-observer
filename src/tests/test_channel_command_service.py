@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 
 import pytest
 
-from src.tests.dispatch_helpers import dispatch_channel_command, dispatch_thread_command
-from src.gateways.twitch_api import TwitchAPIConfigurationError, TwitchUser
-from src.database.connection import PatternRepository, ThreadRecord, ThreadRepository
-from types import SimpleNamespace
+from src.database.connection import PatternCreate, PatternExactQuery, PatternRepository, PatternUpdate, ThreadRecord, ThreadRepository
 from src.events.discord_results import DiscordResultStyle
+from src.gateways.twitch_api import TwitchAPIConfigurationError, TwitchUser
 from src.services.channel_command_service import ChannelCommandService
-from src.services.thread_lifecycle_service import ThreadLifecycleService
 from src.services.runtime_coordinator import TrackedChannelsChangedNotifier
-from src.services.twitch_gateways import TwitchIRCChannelGateway
+from src.services.thread_lifecycle_service import ThreadLifecycleService
+from src.services.twitch_gateways import TwitchDirectoryGateway, TwitchIRCChannelGateway
+from src.tests.dispatch_helpers import dispatch_channel_command, dispatch_thread_command
 from src.tests.in_memory_channels import InMemoryChannelRepository as BaseInMemoryChannelRepository
 
 
@@ -95,7 +95,7 @@ class InMemoryChannelRepository(BaseInMemoryChannelRepository):
 
 
 @dataclass
-class FakeTwitchAPI:
+class FakeTwitchAPI(TwitchDirectoryGateway):
     users_by_login: dict[str, TwitchUser] = field(default_factory=dict)
     cached_users_by_id: dict[str, TwitchUser] = field(default_factory=dict)
     id_requests: list[str] = field(default_factory=list)
@@ -129,6 +129,22 @@ class FakeTwitchAPI:
 
     def get_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
         return self.cached_users_by_id.get(user_id.strip())
+
+    def get_cached_user_by_login(self, login: str) -> TwitchUser | None:
+        normalized = login.strip().lower()
+        for user in self.cached_users_by_id.values():
+            if user.login == normalized:
+                return user
+        return None
+
+    async def load_cached_user_by_login(self, login: str) -> TwitchUser | None:
+        return self.get_cached_user_by_login(login)
+
+    async def load_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
+        return self.get_cached_user_by_id(user_id)
+
+    async def get_users_by_ids(self, user_ids: tuple[str, ...]) -> tuple[TwitchUser, ...]:
+        return tuple(user for user_id in user_ids if (user := self.get_cached_user_by_id(user_id)) is not None)
 
 
 @dataclass
@@ -175,10 +191,12 @@ class FakeTrackedChannelsNotifier(TrackedChannelsChangedNotifier):
 class FakePatternRepository(PatternRepository):
     references_by_channel: dict[tuple[int, str], int] = field(default_factory=dict)
 
-    async def find_exact_pattern(self, **kwargs):  # pragma: no cover - unused here
+    async def find_exact_pattern(self, query: PatternExactQuery):  # pragma: no cover - unused here
+        _ = query
         raise NotImplementedError
 
-    async def add_pattern(self, **kwargs):  # pragma: no cover - unused here
+    async def add_pattern(self, pattern: PatternCreate):  # pragma: no cover - unused here
+        _ = pattern
         raise NotImplementedError
 
     async def remove_pattern(self, *, thread_id: int, pattern_id: int) -> None:  # pragma: no cover - unused here
@@ -190,7 +208,8 @@ class FakePatternRepository(PatternRepository):
     async def set_pattern_priority(self, *, thread_id: int, pattern_id: int, priority: int):  # pragma: no cover - unused here
         raise NotImplementedError
 
-    async def update_pattern(self, **kwargs):  # pragma: no cover - unused here
+    async def update_pattern(self, pattern: PatternUpdate):  # pragma: no cover - unused here
+        _ = pattern
         raise NotImplementedError
 
     async def get_pattern_by_id(self, *, thread_id: int, pattern_id: int):  # pragma: no cover - unused here
@@ -215,14 +234,14 @@ async def test_channel_command_adds_new_channel_and_joins_irc() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         irc_gateway=irc_gateway,
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
     event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         irc_gateway=irc_gateway,
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -264,7 +283,7 @@ async def test_channel_command_removes_existing_channel_and_parts_last_irc_subsc
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         irc_gateway=irc_gateway,
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -296,7 +315,7 @@ async def test_channel_command_rejects_non_owner_changes() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         irc_gateway=irc_gateway,
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -325,7 +344,7 @@ async def test_channel_command_requires_join_before_adding_channels() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         irc_gateway=irc_gateway,
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -358,7 +377,7 @@ async def test_channel_command_reports_already_added_instead_of_toggling() -> No
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         irc_gateway=irc_gateway,
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -390,7 +409,7 @@ async def test_channel_command_reports_missing_channel_on_remove() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         irc_gateway=irc_gateway,
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -422,7 +441,7 @@ async def test_channel_command_rejects_remove_when_scope_still_references_channe
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=pattern_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         irc_gateway=irc_gateway,
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -453,7 +472,7 @@ async def test_channel_command_does_not_persist_add_when_irc_join_fails() -> Non
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=FakePatternRepository(),
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         irc_gateway=irc_gateway,
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -483,7 +502,7 @@ async def test_channel_command_does_not_remove_last_channel_when_irc_part_fails(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=FakePatternRepository(),
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         irc_gateway=irc_gateway,
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -510,7 +529,7 @@ async def test_channel_command_returns_ephemeral_error_for_missing_twitch_creden
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
         pattern_repository=FakePatternRepository(),
-        twitch_api=FakeTwitchAPI(error=TwitchAPIConfigurationError("Missing Twitch credentials.")),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(error=TwitchAPIConfigurationError("Missing Twitch credentials.")),
         irc_gateway=irc_gateway,
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -539,7 +558,7 @@ async def test_leave_command_deletes_thread_and_parts_last_irc_channels() -> Non
     event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         irc_gateway=irc_gateway,
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -571,7 +590,7 @@ async def test_leave_command_prefers_cached_channel_metadata() -> None:
     event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=channel_repository,
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         irc_gateway=irc_gateway,
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -596,7 +615,7 @@ async def test_off_command_disables_existing_thread_context() -> None:
     event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         irc_gateway=FakeIRCGateway(),
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -623,7 +642,7 @@ async def test_on_command_reenables_existing_thread_context() -> None:
     event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         irc_gateway=FakeIRCGateway(),
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -653,7 +672,7 @@ async def test_channel_color_command_sets_color_for_tracked_channel() -> None:
         thread_repository=thread_repository,
         channel_repository=channel_repository,
         pattern_repository=FakePatternRepository(),
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
         irc_gateway=FakeIRCGateway(),
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -682,7 +701,7 @@ async def test_context_color_command_sets_thread_color() -> None:
     event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         irc_gateway=FakeIRCGateway(),
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -711,7 +730,7 @@ async def test_context_color_command_reports_same_color_as_info() -> None:
     event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         irc_gateway=FakeIRCGateway(),
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -738,7 +757,7 @@ async def test_language_command_updates_thread_language_and_returns_localized_re
     event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         irc_gateway=FakeIRCGateway(),
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )
@@ -767,7 +786,7 @@ async def test_language_command_reports_same_language_as_info() -> None:
     event_bus.thread = ThreadLifecycleService(
         thread_repository=thread_repository,
         channel_repository=InMemoryChannelRepository(),
-        twitch_api=FakeTwitchAPI(),  # type: ignore[arg-type]
+        twitch_api=FakeTwitchAPI(),
         irc_gateway=FakeIRCGateway(),
         tracked_channels_notifier=FakeTrackedChannelsNotifier(),
     )

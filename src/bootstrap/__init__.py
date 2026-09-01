@@ -20,8 +20,8 @@ __all__ = [
     "build_core",
     "build_entrypoints",
     "build_gateways",
-    "build_services",
     "build_runtime",
+    "build_services",
     "start_runtime",
     "stop_runtime",
 ]

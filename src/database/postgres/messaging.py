@@ -5,11 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from src.errors import MissingTwitchMessageIdError
 from src.events.twitch_events import TwitchChatMessageEvent
 
 from ..records import RecentMessageRecord
 from ..repositories import MessageRepository
 from .database import PostgresDatabase
+
+RecentMessageRow = tuple[str, str, str, str, datetime]
+MessageInsertParams = tuple[str, str, datetime, str, str, str, str | None, bool]
 
 
 @dataclass(slots=True)
@@ -69,46 +73,45 @@ class PostgresMessageRepository(MessageRepository):
         """Persist one batched write snapshot for messages and thread matches."""
         if not message_events and not thread_matches:
             return
-        async with self.database.async_transaction() as connection:
-            async with connection.cursor() as cursor:
-                if message_events:
-                    await cursor.executemany(
-                        """
-                        INSERT INTO message (
-                            message_id,
-                            twitch_channel_id,
-                            timestamp,
-                            twitch_user_id,
-                            username,
-                            content,
-                            is_reply_to,
-                            is_bot
-                        )
-                        VALUES (
-                            %s,
-                            %s,
-                            %s,
-                            %s,
-                            %s,
-                            %s,
-                            (SELECT message_id FROM message WHERE message_id = %s),
-                            %s
-                        )
-                        ON CONFLICT (message_id) DO NOTHING
-                        """,
-                        tuple(self._build_message_params(event, is_bot=False) for event in message_events),
+        async with self.database.async_transaction() as connection, connection.cursor() as cursor:
+            if message_events:
+                await cursor.executemany(
+                    """
+                    INSERT INTO message (
+                        message_id,
+                        twitch_channel_id,
+                        timestamp,
+                        twitch_user_id,
+                        username,
+                        content,
+                        is_reply_to,
+                        is_bot
                     )
-                if thread_matches:
-                    await cursor.executemany(
-                        """
-                        INSERT INTO thread_message_match (thread_id, message_id)
-                        SELECT %s, message_id
-                        FROM message
-                        WHERE message_id = %s
-                        ON CONFLICT (thread_id, message_id) DO NOTHING
-                        """,
-                        tuple((thread_id, self._resolve_message_id(event)) for thread_id, event in thread_matches),
+                    VALUES (
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        (SELECT message_id FROM message WHERE message_id = %s),
+                        %s
                     )
+                    ON CONFLICT (message_id) DO NOTHING
+                    """,
+                    tuple(self._build_message_params(event, is_bot=False) for event in message_events),
+                )
+            if thread_matches:
+                await cursor.executemany(
+                    """
+                    INSERT INTO thread_message_match (thread_id, message_id)
+                    SELECT %s, message_id
+                    FROM message
+                    WHERE message_id = %s
+                    ON CONFLICT (thread_id, message_id) DO NOTHING
+                    """,
+                    tuple((thread_id, self._resolve_message_id(event)) for thread_id, event in thread_matches),
+                )
 
     async def mark_message_matched_in_thread(
         self,
@@ -143,16 +146,7 @@ class PostgresMessageRepository(MessageRepository):
                 (since, limit),
             )
             rows = await cursor.fetchall()
-        return [
-            RecentMessageRecord(
-                message_id=str(row[0]),
-                twitch_channel_id=str(row[1]),
-                username=str(row[2]),
-                content=str(row[3]),
-                timestamp=row[4],
-            )
-            for row in rows
-        ]
+        return [self._build_recent_message_record(row) for row in rows]
 
     async def list_recent_messages_for_channel(
         self,
@@ -175,16 +169,7 @@ class PostgresMessageRepository(MessageRepository):
                 (twitch_channel_id, since, limit),
             )
             rows = await cursor.fetchall()
-        return [
-            RecentMessageRecord(
-                message_id=str(row[0]),
-                twitch_channel_id=str(row[1]),
-                username=str(row[2]),
-                content=str(row[3]),
-                timestamp=row[4],
-            )
-            for row in rows
-        ]
+        return [self._build_recent_message_record(row) for row in rows]
 
     async def list_recent_messages_for_thread(
         self,
@@ -208,16 +193,7 @@ class PostgresMessageRepository(MessageRepository):
                 (thread_id, since, limit),
             )
             rows = await cursor.fetchall()
-        return [
-            RecentMessageRecord(
-                message_id=str(row[0]),
-                twitch_channel_id=str(row[1]),
-                username=str(row[2]),
-                content=str(row[3]),
-                timestamp=row[4],
-            )
-            for row in rows
-        ]
+        return [self._build_recent_message_record(row) for row in rows]
 
     async def get_thread_message(
         self,
@@ -241,6 +217,10 @@ class PostgresMessageRepository(MessageRepository):
             row = await cursor.fetchone()
         if row is None:
             return None
+        return self._build_recent_message_record(row)
+
+    @staticmethod
+    def _build_recent_message_record(row: RecentMessageRow) -> RecentMessageRecord:
         return RecentMessageRecord(
             message_id=str(row[0]),
             twitch_channel_id=str(row[1]),
@@ -250,12 +230,12 @@ class PostgresMessageRepository(MessageRepository):
         )
 
     @staticmethod
-    def _build_fallback_message_id(event: TwitchChatMessageEvent) -> str:
-        raise ValueError("Twitch IRC message is missing message_id.")
+    def _build_fallback_message_id() -> str:
+        raise MissingTwitchMessageIdError
 
     @classmethod
     def _resolve_message_id(cls, event: TwitchChatMessageEvent) -> str:
-        return event.message_id or cls._build_fallback_message_id(event)
+        return event.message_id or cls._build_fallback_message_id()
 
     @classmethod
     def _build_message_params(
@@ -263,7 +243,7 @@ class PostgresMessageRepository(MessageRepository):
         event: TwitchChatMessageEvent,
         *,
         is_bot: bool,
-    ) -> tuple[object, ...]:
+    ) -> MessageInsertParams:
         return (
             cls._resolve_message_id(event),
             event.broadcaster_id or event.channel_login,

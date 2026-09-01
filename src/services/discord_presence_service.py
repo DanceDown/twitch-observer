@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import random
+import secrets
 from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -18,6 +18,7 @@ class DiscordPresenceStatusSender:
     """Interface for pushing one custom status text to the Discord client."""
 
     async def set_status_text(self, text: str) -> None:  # pragma: no cover - interface
+        """Publish a custom status text through the Discord client."""
         raise NotImplementedError
 
 
@@ -83,10 +84,9 @@ class DiscordPresenceService:
                 text = available_texts[0]
             else:
                 options = tuple(text for text in available_texts if text != self._last_status_text)
-                text = random.choice(options or available_texts)
-            if text:
-                if await self._publish_status_text(text):
-                    self._last_status_text = text
+                text = secrets.choice(options or available_texts)
+            if text and await self._publish_status_text(text):
+                self._last_status_text = text
         finally:
             self._last_poll_finished_at = datetime.now(UTC)
 

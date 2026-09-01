@@ -21,6 +21,7 @@ class TwitchIRCEntrypoint:
         *,
         message_processor: ChatMessageProcessingService | None = None,
     ) -> None:
+        """Create the entrypoint and bind its raw-line callback to the gateway."""
         self._gateway = gateway
         self._message_processor = message_processor
         self._gateway.set_line_handler(self.handle_line)

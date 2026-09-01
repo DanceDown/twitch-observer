@@ -13,12 +13,15 @@ from .text import render_rows, render_section
 
 @dataclass(slots=True)
 class ShowAccountRenderer:
+    """Render linked Twitch-account status for `/show account`."""
+
     account_repository: TwitchAccountRepository | None
     device_flow_repository: TwitchDeviceFlowRepository | None
     resolver: ShowTwitchSubjectResolver
     localizer: Localizer
 
     async def render(self, thread: ThreadRecord) -> tuple[str, str | None]:
+        """Return the localized account section and optional account thumbnail."""
         language = self.localizer.language_for_thread(thread)
         rows: list[str] = []
         thumbnail_url = None

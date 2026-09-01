@@ -7,6 +7,10 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Protocol, TypeVar
 
+from src.database.connection import ThreadRecord, ThreadRepository, TwitchAccountRecord, TwitchAccountRepository, UserPermissionRepository
+from src.discord_results import build_result, build_thread_result
+from src.errors import DatabasePoolExhaustedError
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.gateways.twitch_api import (
     TwitchAPIConfigurationError,
     TwitchAPIError,
@@ -14,10 +18,6 @@ from src.gateways.twitch_api import (
     TwitchChannelNotFoundError,
     TwitchDeviceFlowError,
 )
-from src.database.connection import ThreadRecord, ThreadRepository, TwitchAccountRecord, TwitchAccountRepository, UserPermissionRepository
-from src.discord_results import build_result, build_thread_result
-from src.errors import DatabasePoolExhaustedError
-from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.services.authz import thread_has_permission
 from src.utils.permissions import ObserverPermission
@@ -45,6 +45,7 @@ class ThreadCommandGuards:
     not_joined_key: str
 
     async def require_thread(self, command: ThreadScopedCommand) -> ThreadRecord | DiscordCommandResult:
+        """Return the command's thread or an ephemeral not-joined result."""
         thread = await self.thread_repository.get_by_discord_channel_id(command.discord_channel_id)
         if thread is None:
             return build_result(
@@ -62,6 +63,7 @@ class ThreadCommandGuards:
         permission: ObserverPermission,
         denial_key: str,
     ) -> ThreadRecord | DiscordCommandResult:
+        """Return the thread when the requester has the required permission."""
         thread = await self.require_thread(command)
         if isinstance(thread, DiscordCommandResult):
             return thread
@@ -86,6 +88,7 @@ class ThreadCommandGuards:
         *,
         denial_key: str,
     ) -> ThreadRecord | DiscordCommandResult:
+        """Return the thread when the requester owns the Discord context."""
         thread = await self.require_thread(command)
         if isinstance(thread, DiscordCommandResult):
             return thread
@@ -105,6 +108,7 @@ class ThreadCommandGuards:
         *,
         denial_key: str,
     ) -> TwitchAccountRecord | DiscordCommandResult:
+        """Return the linked Twitch account or an error result for the thread."""
         if self.account_repository is None or thread.account_id is None:
             return build_thread_result(
                 self.localizer,
@@ -131,6 +135,7 @@ class ThreadCommandGuards:
         channel_count_lookup: Callable[[int], Awaitable[int]],
         denial_key: str,
     ) -> DiscordCommandResult | None:
+        """Return an error result when the thread has no tracked channels."""
         if await channel_count_lookup(thread.thread_id) > 0:
             return None
         return build_thread_result(
@@ -154,6 +159,7 @@ class CommandExecutionRunner:
         twitch_api_error_key: str,
         unexpected_error_key: str,
     ) -> None:
+        """Configure result templates and thread lookup for guarded execution."""
         self._localizer = localizer
         self._resolve_thread = resolve_thread
         self._validation_error_key = validation_error_key
@@ -174,6 +180,7 @@ class CommandExecutionRunner:
             TwitchChannelNotFoundError,
         ),
     ) -> DiscordCommandResult:
+        """Run a command operation and normalize expected failures for Discord."""
         try:
             result = await operation()
         except validation_exceptions as error:
@@ -193,7 +200,7 @@ class CommandExecutionRunner:
                 sources={"view": {"detail": str(error)}},
             )
         except DatabasePoolExhaustedError as error:
-            logger_.error("Database pool exhausted while handling %s.", command.__class__.__name__)
+            logger_.exception("Database pool exhausted while handling %s.", command.__class__.__name__)
             result = await self._thread_result(
                 command,
                 self._unexpected_error_key,

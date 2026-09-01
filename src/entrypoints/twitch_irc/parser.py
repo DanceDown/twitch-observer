@@ -9,6 +9,14 @@ from src.events.twitch_events import TwitchChatMessageEvent
 from .models import IRCMessage
 
 
+class InvalidIRCLineError(ValueError):
+    """Raised when a raw line cannot be parsed as an IRC message."""
+
+    def __init__(self, raw_line: str) -> None:
+        """Create a parse error that includes the raw IRC line."""
+        super().__init__(f"Invalid IRC line: {raw_line!r}")
+
+
 def parse_irc_message(raw_line: str) -> IRCMessage:
     """Parse a raw IRC line into its structured components."""
     line = raw_line.strip("\r\n")
@@ -30,7 +38,7 @@ def parse_irc_message(raw_line: str) -> IRCMessage:
 
     parts = [part for part in before_trailing.split(" ") if part]
     if not parts:
-        raise ValueError(f"Invalid IRC line: {raw_line!r}")
+        raise InvalidIRCLineError(raw_line)
 
     command = parts[0]
     params = parts[1:]

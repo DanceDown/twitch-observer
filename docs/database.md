@@ -69,6 +69,7 @@ Important fields:
 - `twitch_login`
 - `display_name`
 - `profile_image_url`
+- `chat_color`
 
 This cache is warmed from IRC metadata when possible and refreshed from Helix
 only when needed.

@@ -6,11 +6,19 @@ from datetime import UTC, datetime
 
 import pytest
 
+from src.database.connection import TwitchUserCacheRecord, TwitchUserCacheRepository, TwitchUserCacheUpsert
+from src.events.twitch_events import TwitchChatMessageEvent, TwitchChatSendRequest
 from src.gateways.twitch_api import TwitchUser
-from src.database.connection import TwitchUserCacheRecord, TwitchUserCacheRepository
-from src.events.twitch_events import TwitchChatMessageEvent
 from src.services.twitch_live_query_service import TwitchLiveQueryService
 from src.services.twitch_user_directory_service import TwitchUserDirectoryIngestService, TwitchUserDirectoryService
+
+
+async def _wait_until(predicate, *, timeout_seconds: float = 1) -> None:
+    deadline = asyncio.get_running_loop().time() + timeout_seconds
+    while not predicate():
+        if asyncio.get_running_loop().time() >= deadline:
+            raise TimeoutError
+        await asyncio.sleep(0.01)
 
 
 @dataclass
@@ -35,6 +43,7 @@ class InMemoryTwitchUserCacheRepository(TwitchUserCacheRepository):
         twitch_login: str,
         display_name: str,
         profile_image_url: str | None,
+        chat_color: str | None = None,
     ) -> TwitchUserCacheRecord:
         timestamp = datetime.now(UTC).isoformat()
         record = TwitchUserCacheRecord(
@@ -42,6 +51,7 @@ class InMemoryTwitchUserCacheRepository(TwitchUserCacheRepository):
             twitch_login=twitch_login.strip().lower(),
             display_name=display_name,
             profile_image_url=profile_image_url,
+            chat_color=chat_color,
             updated_at=timestamp,
         )
         self.by_id[twitch_user_id] = record
@@ -53,6 +63,7 @@ class InMemoryTwitchUserCacheRepository(TwitchUserCacheRepository):
         twitch_user_id: str,
         twitch_login: str,
         display_name: str | None,
+        chat_color: str | None = None,
     ) -> TwitchUserCacheRecord:
         self.observe_calls += 1
         existing = self.by_id.get(twitch_user_id)
@@ -61,6 +72,7 @@ class InMemoryTwitchUserCacheRepository(TwitchUserCacheRepository):
             twitch_login=twitch_login.strip().lower(),
             display_name=(display_name or (existing.display_name if existing is not None else twitch_login)).strip(),
             profile_image_url=None if existing is None else existing.profile_image_url,
+            chat_color=chat_color if chat_color is not None else (None if existing is None else existing.chat_color),
             updated_at="chat",
         )
         self.by_id[twitch_user_id] = record
@@ -69,13 +81,14 @@ class InMemoryTwitchUserCacheRepository(TwitchUserCacheRepository):
     async def list_all(self) -> list[TwitchUserCacheRecord]:
         return list(self.by_id.values())
 
-    async def upsert_many_from_api(self, records: tuple[tuple[str, str, str, str | None], ...]) -> None:
-        for twitch_user_id, twitch_login, display_name, profile_image_url in records:
+    async def upsert_many_from_api(self, records: tuple[TwitchUserCacheUpsert, ...]) -> None:
+        for twitch_user_id, twitch_login, display_name, profile_image_url, chat_color in records:
             await self.upsert_from_api(
                 twitch_user_id=twitch_user_id,
                 twitch_login=twitch_login,
                 display_name=display_name,
                 profile_image_url=profile_image_url,
+                chat_color=chat_color,
             )
 
 
@@ -86,6 +99,8 @@ class FakeTwitchAPI:
     live_user_ids: set[str] = field(default_factory=set)
     login_requests: list[str] = field(default_factory=list)
     id_requests: list[str] = field(default_factory=list)
+    login_color_requests: list[str] = field(default_factory=list)
+    id_color_requests: list[str] = field(default_factory=list)
     live_requests: list[list[str]] = field(default_factory=list)
     delay_seconds: float = 0
 
@@ -102,9 +117,23 @@ class FakeTwitchAPI:
             await asyncio.sleep(self.delay_seconds)
         return self.users_by_login[normalized]
 
+    async def get_user_by_login_with_chat_color(self, login: str) -> TwitchUser:
+        normalized = login.strip().lower()
+        self.login_color_requests.append(normalized)
+        if self.delay_seconds:
+            await asyncio.sleep(self.delay_seconds)
+        return self.users_by_login[normalized]
+
     async def get_user_by_id(self, user_id: str) -> TwitchUser:
         normalized = user_id.strip()
         self.id_requests.append(normalized)
+        if self.delay_seconds:
+            await asyncio.sleep(self.delay_seconds)
+        return self.users_by_id[normalized]
+
+    async def get_user_by_id_with_chat_color(self, user_id: str) -> TwitchUser:
+        normalized = user_id.strip()
+        self.id_color_requests.append(normalized)
         if self.delay_seconds:
             await asyncio.sleep(self.delay_seconds)
         return self.users_by_id[normalized]
@@ -125,7 +154,8 @@ class FakeTwitchAPI:
     async def refresh_user_access_token(self, refresh_token: str):
         raise NotImplementedError
 
-    async def send_chat_message(self, **kwargs):
+    async def send_chat_message(self, request: TwitchChatSendRequest):
+        _ = request
         raise NotImplementedError
 
 
@@ -165,6 +195,73 @@ async def test_directory_uses_persistent_cache_before_hitting_helix() -> None:
     assert by_id.login == "example"
     assert twitch_api.login_requests == ["example"]
     assert twitch_api.id_requests == []
+    assert twitch_api.login_color_requests == []
+    assert twitch_api.id_color_requests == []
+
+
+@pytest.mark.asyncio
+async def test_directory_chat_color_lookup_refreshes_unknown_cached_color() -> None:
+    repository = InMemoryTwitchUserCacheRepository(
+        by_id={
+            "42": TwitchUserCacheRecord(
+                twitch_user_id="42",
+                twitch_login="example",
+                display_name="Example",
+                profile_image_url="https://cdn.example/old.png",
+                chat_color=None,
+                updated_at="old",
+            )
+        }
+    )
+    twitch_api = FakeTwitchAPI(
+        users_by_id={
+            "42": TwitchUser(
+                user_id="42",
+                login="example",
+                display_name="Example",
+                profile_image_url="https://cdn.example/new.png",
+                chat_color="#AA00BB",
+            )
+        }
+    )
+    directory = TwitchUserDirectoryService(
+        twitch_api=twitch_api,
+        repository=repository,
+        memory_cache_size=2048,
+    )
+
+    user = await directory.get_user_by_id_with_chat_color("42")
+
+    assert user.chat_color == "#AA00BB"
+    assert twitch_api.id_requests == []
+    assert twitch_api.id_color_requests == ["42"]
+    assert repository.by_id["42"].chat_color == "#AA00BB"
+
+
+@pytest.mark.asyncio
+async def test_directory_normal_lookup_keeps_chat_color_api_out_of_the_path() -> None:
+    repository = InMemoryTwitchUserCacheRepository()
+    twitch_api = FakeTwitchAPI(
+        users_by_id={
+            "42": TwitchUser(
+                user_id="42",
+                login="example",
+                display_name="Example",
+                profile_image_url="https://cdn.example/avatar.png",
+            )
+        }
+    )
+    directory = TwitchUserDirectoryService(
+        twitch_api=twitch_api,
+        repository=repository,
+        memory_cache_size=2048,
+    )
+
+    user = await directory.get_user_by_id("42")
+
+    assert user.login == "example"
+    assert twitch_api.id_requests == ["42"]
+    assert twitch_api.id_color_requests == []
 
 
 @pytest.mark.asyncio
@@ -207,6 +304,33 @@ async def test_directory_ingests_chat_metadata_without_any_helix_lookup() -> Non
     assert broadcaster.login == "broadcaster"
     assert twitch_api.login_requests == []
     assert twitch_api.id_requests == []
+
+
+@pytest.mark.asyncio
+async def test_directory_ingests_chat_color_from_irc_metadata() -> None:
+    repository = InMemoryTwitchUserCacheRepository()
+    directory = TwitchUserDirectoryService(
+        twitch_api=FakeTwitchAPI(),
+        repository=repository,
+        memory_cache_size=2048,
+    )
+
+    await directory.observe_chat_message(
+        TwitchChatMessageEvent(
+            channel_login="alice",
+            author_login="alice",
+            author_display_name="Alice",
+            author_id="7",
+            broadcaster_id="7",
+            color="#AA00BB",
+            content="hello",
+        )
+    )
+
+    cached = directory.get_cached_user_by_id("7")
+
+    assert cached is not None
+    assert cached.chat_color == "#AA00BB"
 
 
 @pytest.mark.asyncio
@@ -380,6 +504,38 @@ async def test_directory_singleflight_refresh_survives_waiter_timeout() -> None:
     cached_record = await repository.get_by_user_id("42")
     assert cached_record is not None
     assert cached_record.profile_image_url == "https://cdn.example/avatar.png"
+
+
+@pytest.mark.asyncio
+async def test_directory_close_cancels_inflight_singleflight_tasks() -> None:
+    repository = InMemoryTwitchUserCacheRepository()
+    twitch_api = FakeTwitchAPI(
+        users_by_login={
+            "example": TwitchUser(
+                user_id="42",
+                login="example",
+                display_name="Example",
+                profile_image_url="https://cdn.example/avatar.png",
+            )
+        },
+        delay_seconds=1,
+    )
+    directory = TwitchUserDirectoryService(
+        twitch_api=twitch_api,
+        repository=repository,
+        memory_cache_size=2048,
+    )
+
+    task = asyncio.create_task(directory.refresh_user_by_login("example"))
+    await _wait_until(lambda: twitch_api.login_requests == ["example"])
+    assert twitch_api.login_requests == ["example"]
+
+    await directory.close()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert directory._inflight_by_login == {}
+    assert directory._inflight_by_user_id == {}
 
 
 @pytest.mark.asyncio

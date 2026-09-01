@@ -20,7 +20,7 @@ from src.localization import Localizer
 from src.services.chat import ChatPatternMatcher
 from src.services.twitch_gateways import TwitchUserLookup
 from src.services.twitch_runtime import safe_get_twitch_user_by_id, safe_get_twitch_user_by_login
-from src.utils.discord_embeds import build_tracking_embed
+from src.utils.discord_embeds import TrackingEmbedRequest, build_tracking_embed
 
 if TYPE_CHECKING:
     from src.services.chat import ChatPatternMatch
@@ -32,7 +32,8 @@ class TrackingNotificationSender:
     """Interface used by the tracking service to emit Discord embeds."""
 
     async def reserve_tracking_delivery(self, *, thread_id: int) -> None:
-        return None
+        """Reserve a future tracking delivery slot for one thread."""
+        _ = thread_id
 
     async def send_tracking_embed(
         self,
@@ -42,6 +43,7 @@ class TrackingNotificationSender:
         channel_login: str | None = None,
         thread_id: int | None = None,
     ) -> None:  # pragma: no cover
+        """Send one already-rendered tracking embed to Discord."""
         raise NotImplementedError
 
 
@@ -60,6 +62,7 @@ class PatternTrackingService:
     matcher: ChatPatternMatcher | None = None
 
     def __post_init__(self) -> None:
+        """Create the shared matcher when the caller did not inject one."""
         if self.matcher is None:
             self.matcher = ChatPatternMatcher(pattern_repository=self.pattern_repository)
 
@@ -125,17 +128,20 @@ class PatternTrackingService:
         await self.notifier.send_tracking_embed(
             match.thread.discord_channel_id,
             build_tracking_embed(
-                event=event,
-                pattern=match.pattern,
-                thread=match.thread,
-                localizer=self.localizer,
-                channel=match.source_channel,
-                author_icon_url=(None if author_user is None else author_user.profile_image_url),
-                channel_display_name=(None if channel_user is None else channel_user.display_name),
+                TrackingEmbedRequest(
+                    event=event,
+                    pattern=match.pattern,
+                    thread=match.thread,
+                    localizer=self.localizer,
+                    channel=match.source_channel,
+                    author_icon_url=(None if author_user is None else author_user.profile_image_url),
+                    channel_display_name=(None if channel_user is None else channel_user.display_name),
+                )
             ),
             channel_login=None if channel_user is None else channel_user.login,
             thread_id=match.thread.thread_id,
         )
 
     async def reserve_match_delivery(self, match: ChatPatternMatch) -> None:
+        """Reserve ordered Discord delivery for a prepared tracking match."""
         await self.notifier.reserve_tracking_delivery(thread_id=match.thread.thread_id)

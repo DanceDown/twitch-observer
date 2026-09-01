@@ -14,6 +14,7 @@ class FakeDirectory:
     cached_records: tuple[TwitchUserCacheRecord, ...] = ()
     users_by_id: dict[str, TwitchUser] = field(default_factory=dict)
     requested_batches: list[tuple[str, ...]] = field(default_factory=list)
+    color_requested_batches: list[tuple[str, ...]] = field(default_factory=list)
     upserted_batches: list[tuple[TwitchUser, ...]] = field(default_factory=list)
     failing_batches: set[tuple[str, ...]] = field(default_factory=set)
 
@@ -26,6 +27,11 @@ class FakeDirectory:
         if normalized in self.failing_batches:
             raise TwitchAPIError("batch failed")
         return tuple(self.users_by_id[user_id] for user_id in normalized if user_id in self.users_by_id)
+
+    async def get_users_by_ids_with_chat_colors(self, user_ids: tuple[str, ...]) -> tuple[TwitchUser, ...]:
+        normalized = tuple(user_ids)
+        self.color_requested_batches.append(normalized)
+        return await self.get_users_by_ids(normalized)
 
     async def upsert_users_from_api(self, users: tuple[TwitchUser, ...]) -> None:
         self.upserted_batches.append(users)
@@ -58,7 +64,7 @@ async def test_run_once_refreshes_full_cache_in_100_id_batches() -> None:
         users_by_id={str(index): _user(str(index)) for index in range(205)},
     )
     service = TwitchMetadataRefreshService(
-        directory=directory,  # type: ignore[arg-type]
+        directory=directory,
         refresh_interval_seconds=0,
         request_spacing_seconds=0,
         batch_size=100,
@@ -67,13 +73,14 @@ async def test_run_once_refreshes_full_cache_in_100_id_batches() -> None:
     await service.run_once()
 
     assert [len(batch) for batch in directory.requested_batches] == [100, 100, 5]
+    assert [len(batch) for batch in directory.color_requested_batches] == [100, 100, 5]
     assert [len(batch) for batch in directory.upserted_batches] == [100, 100, 5]
     assert tuple(user_id for batch in directory.requested_batches for user_id in batch) == tuple(str(index) for index in range(205))
 
 
 def test_spacing_uses_explicit_request_spacing_when_configured() -> None:
     service = TwitchMetadataRefreshService(
-        directory=FakeDirectory(),  # type: ignore[arg-type]
+        directory=FakeDirectory(),
         refresh_interval_seconds=3600,
         request_spacing_seconds=15,
     )
@@ -83,7 +90,7 @@ def test_spacing_uses_explicit_request_spacing_when_configured() -> None:
 
 def test_spacing_distributes_batches_over_refresh_interval_when_not_configured() -> None:
     service = TwitchMetadataRefreshService(
-        directory=FakeDirectory(),  # type: ignore[arg-type]
+        directory=FakeDirectory(),
         refresh_interval_seconds=1200,
         request_spacing_seconds=0,
     )
@@ -95,7 +102,7 @@ def test_spacing_distributes_batches_over_refresh_interval_when_not_configured()
 async def test_run_once_skips_empty_cache_without_requests() -> None:
     directory = FakeDirectory()
     service = TwitchMetadataRefreshService(
-        directory=directory,  # type: ignore[arg-type]
+        directory=directory,
         refresh_interval_seconds=3600,
         request_spacing_seconds=0,
     )
@@ -115,7 +122,7 @@ async def test_run_once_continues_after_batch_error() -> None:
         failing_batches={("0", "1")},
     )
     service = TwitchMetadataRefreshService(
-        directory=directory,  # type: ignore[arg-type]
+        directory=directory,
         refresh_interval_seconds=0,
         request_spacing_seconds=0,
         batch_size=2,

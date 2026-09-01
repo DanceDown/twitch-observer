@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import discord
 
-from src.entrypoints.discord.service_bundle import DiscordServiceBundle
-from src.localization import Localizer
-
 from ..dispatch import dispatch_add_tracked_user, dispatch_remove_tracked_user
 from ..helpers import complete_bound_result, defer_interaction_response
 from ..ui_data import TrackedUserPresentation
 from .selects import window_with_included_items
+from .shared import DiscordModalContext
 
 
 class UserNameModal(discord.ui.Modal):
@@ -19,35 +17,31 @@ class UserNameModal(discord.ui.Modal):
     def __init__(
         self,
         *,
-        services: DiscordServiceBundle,
-        discord_channel_id: int,
-        requester_id: int,
-        action: str,
-        localizer: Localizer,
-        language: str,
-        bound_message: discord.InteractionMessage | None = None,
+        context: DiscordModalContext,
     ) -> None:
-        super().__init__(title=localizer.text("discord.user_ui.modal.add.title", language=language), timeout=300)
-        self._services = services
-        self._discord_channel_id = discord_channel_id
-        self._requester_id = requester_id
-        self._bound_message = bound_message
+        """Create the modal for entering a Twitch user login."""
+        super().__init__(
+            title=context.localizer.text("discord.user_ui.modal.add.title", language=context.language),
+            timeout=300,
+        )
+        self._context = context
         self.twitch_name = discord.ui.TextInput(
-            label=localizer.text("discord.user_ui.modal.add.name_label", language=language),
-            placeholder=localizer.text("discord.user_ui.modal.add.name_placeholder", language=language),
+            label=context.localizer.text("discord.user_ui.modal.add.name_label", language=context.language),
+            placeholder=context.localizer.text("discord.user_ui.modal.add.name_placeholder", language=context.language),
             required=True,
         )
         self.add_item(self.twitch_name)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        """Dispatch the entered Twitch user as a tracked-user add command."""
         await defer_interaction_response(interaction, ephemeral=True)
         result = await dispatch_add_tracked_user(
-            self._services,
-            discord_channel_id=self._discord_channel_id,
-            requester_id=self._requester_id,
+            self._context.services,
+            discord_channel_id=self._context.discord_channel_id,
+            requester_id=self._context.requester_id,
             twitch_user_login=self.twitch_name.value.strip(),
         )
-        await complete_bound_result(interaction, bound_message=self._bound_message, result=result)
+        await complete_bound_result(interaction, bound_message=self._context.bound_message, result=result)
 
 
 class UserSelectionModal(discord.ui.Modal):
@@ -56,27 +50,23 @@ class UserSelectionModal(discord.ui.Modal):
     def __init__(
         self,
         *,
-        services: DiscordServiceBundle,
-        discord_channel_id: int,
-        requester_id: int,
+        context: DiscordModalContext,
         tracked_users: list[TrackedUserPresentation],
-        localizer: Localizer,
-        language: str,
         default_login: str | None = None,
-        bound_message: discord.InteractionMessage | None = None,
     ) -> None:
-        super().__init__(title=localizer.text("discord.user_ui.modal.remove.title", language=language), timeout=300)
-        self._services = services
-        self._discord_channel_id = discord_channel_id
-        self._requester_id = requester_id
-        self._bound_message = bound_message
+        """Create the modal for selecting a tracked user to remove."""
+        super().__init__(
+            title=context.localizer.text("discord.user_ui.modal.remove.title", language=context.language),
+            timeout=300,
+        )
+        self._context = context
         visible_users = window_with_included_items(
             tracked_users,
             key=lambda user: user.login,
             included_keys=[default_login] if default_login else [],
         )
         self.user = discord.ui.Label(
-            text=localizer.text("discord.user_ui.modal.remove.user_label", language=language),
+            text=context.localizer.text("discord.user_ui.modal.remove.user_label", language=context.language),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
@@ -94,11 +84,12 @@ class UserSelectionModal(discord.ui.Modal):
         self.add_item(self.user)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        """Dispatch the selected Twitch user as a tracked-user remove command."""
         await defer_interaction_response(interaction, ephemeral=True)
         result = await dispatch_remove_tracked_user(
-            self._services,
-            discord_channel_id=self._discord_channel_id,
-            requester_id=self._requester_id,
+            self._context.services,
+            discord_channel_id=self._context.discord_channel_id,
+            requester_id=self._context.requester_id,
             twitch_user_login=self.user.component.values[0],
         )
-        await complete_bound_result(interaction, bound_message=self._bound_message, result=result)
+        await complete_bound_result(interaction, bound_message=self._context.bound_message, result=result)

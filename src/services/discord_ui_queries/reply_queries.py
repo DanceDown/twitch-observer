@@ -13,14 +13,18 @@ from .shared import get_thread_for_channel
 
 @dataclass(slots=True)
 class ReplyQueryService:
+    """Load pattern auto-reply data for Discord UI selections."""
+
     thread_repository: ThreadRepository
     reply_repository: ReplyRepository
     pattern_queries: PatternQueryService
 
     async def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
+        """Return the thread configured for one Discord channel."""
         return await get_thread_for_channel(self.thread_repository, discord_channel_id)
 
     async def list_replies(self, discord_channel_id: int) -> list[ReplyPresentation]:
+        """List auto-replies joined with their owning pattern presentation."""
         thread = await self.get_thread(discord_channel_id)
         if thread is None:
             return []

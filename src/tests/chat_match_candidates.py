@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from src.database.connection import (
-    ChatPatternCandidateRecord,
-    ChatPatternSeedRecord,
     ChannelRecord,
     ChannelRepository,
+    ChatPatternCandidateRecord,
+    ChatPatternSeedRecord,
     PatternRecord,
     ReplyRecord,
     ReplyRepository,

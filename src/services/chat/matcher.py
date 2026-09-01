@@ -3,17 +3,41 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Protocol
 
 from src.database.connection import (
     ChannelRecord,
-    PatternRecord,
+    ChatPatternCandidateRecord,
     ChatPatternSeedRecord,
-    PatternRepository,
+    PatternRecord,
     ReplyRecord,
     ThreadRecord,
 )
 from src.events.twitch_events import TwitchChatMessageEvent
 from src.utils.pattern_matching import PatternCompileCache, is_sender_sub, matches_pattern_content
+
+
+class ChatPatternRepository(Protocol):
+    """Repository slice needed by the hot chat-pattern matching path."""
+
+    async def list_chat_match_seeds(
+        self,
+        *,
+        broadcaster_id: str,
+        author_id: str,
+        sender_is_sub: bool,
+    ) -> list[ChatPatternSeedRecord]:
+        """Return cheap match candidates for the given message context."""
+        ...
+
+    async def hydrate_chat_match_candidates(
+        self,
+        *,
+        broadcaster_id: str,
+        seeds: tuple[ChatPatternSeedRecord, ...],
+    ) -> list[ChatPatternCandidateRecord]:
+        """Load full records for seeds that passed local pattern checks."""
+        ...
 
 
 @dataclass(slots=True, frozen=True)
@@ -31,15 +55,17 @@ class ChatPatternMatch:
 class ChatPatternMatcher:
     """Resolve the first matching pattern per interested thread for one chat message."""
 
-    pattern_repository: PatternRepository
+    pattern_repository: ChatPatternRepository
     compile_cache_size: int = 512
     compile_cache: PatternCompileCache | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
+        """Create the regex compile cache when the caller did not inject one."""
         if self.compile_cache is None:
             self.compile_cache = PatternCompileCache(max_entries=self.compile_cache_size)
 
     async def find_matches(self, event: TwitchChatMessageEvent) -> tuple[ChatPatternMatch, ...]:
+        """Find at most one matching pattern per thread for one Twitch message."""
         if not event.broadcaster_id or not event.author_id:
             return ()
 

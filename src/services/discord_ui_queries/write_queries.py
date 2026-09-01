@@ -13,10 +13,13 @@ from .shared import get_thread_for_channel
 
 @dataclass(slots=True)
 class WriteQueryService:
+    """Load Twitch message candidates for Discord write/reply UI flows."""
+
     thread_repository: ThreadRepository
     message_repository: MessageRepository
 
     async def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
+        """Return the thread configured for one Discord channel."""
         return await get_thread_for_channel(self.thread_repository, discord_channel_id)
 
     async def list_recent_reply_candidates(
@@ -26,6 +29,7 @@ class WriteQueryService:
         max_age_minutes: int,
         limit: int,
     ) -> list[WriteReplyCandidatePresentation]:
+        """List recent Twitch messages that can be targeted by manual replies."""
         thread = await self.get_thread(discord_channel_id)
         if thread is None:
             return []
@@ -55,6 +59,7 @@ class WriteQueryService:
         discord_channel_id: int,
         message_id: str,
     ) -> WriteReplyCandidatePresentation | None:
+        """Return one recent Twitch message candidate by message ID."""
         thread = await self.get_thread(discord_channel_id)
         if thread is None:
             return None

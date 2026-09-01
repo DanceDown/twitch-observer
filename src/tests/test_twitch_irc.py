@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
@@ -21,6 +23,32 @@ class FakeMessageProcessor:
 
     async def enqueue(self, message: TwitchChatMessageEvent) -> None:
         self.messages.append(message)
+
+
+def _reader(fake: object) -> asyncio.StreamReader:
+    return cast(asyncio.StreamReader, fake)
+
+
+def _writer(fake: object) -> asyncio.StreamWriter:
+    return cast(asyncio.StreamWriter, fake)
+
+
+def _read_task(fake: asyncio.Future[None]) -> asyncio.Task[None]:
+    return cast(asyncio.Task[None], fake)
+
+
+def _bind_send_line(
+    gateway: AnonymousTwitchIRCGateway,
+    send_line: Callable[[str], Awaitable[None]],
+) -> None:
+    gateway._send_line = send_line
+
+
+def _bind_send_line_with_reconnect(
+    gateway: AnonymousTwitchIRCGateway,
+    send_line: Callable[[str], Awaitable[None]],
+) -> None:
+    gateway._send_line_with_reconnect = send_line
 
 
 def test_parse_irc_message_parses_twitch_tags_and_payload() -> None:
@@ -171,9 +199,9 @@ async def test_twitch_irc_gateway_can_join_channels_later() -> None:
     async def fake_send_line(line: str) -> None:
         sent_lines.append(line)
 
-    gateway._reader = SimpleNamespace(at_eof=lambda: False)  # type: ignore[assignment]
-    gateway._writer = SimpleNamespace(is_closing=lambda: False)  # type: ignore[assignment]
-    gateway._send_line = fake_send_line  # type: ignore[method-assign]
+    gateway._reader = _reader(SimpleNamespace(at_eof=lambda: False))
+    gateway._writer = _writer(SimpleNamespace(is_closing=lambda: False))
+    _bind_send_line(gateway, fake_send_line)
 
     await gateway.join_channel("Example")
     await gateway.join_channel("#example")
@@ -193,7 +221,7 @@ async def test_twitch_irc_gateway_rejoins_pending_channels_after_connect() -> No
 
     gateway._pending_channels.add("example")
     gateway._pending_channels.add("second")
-    gateway._send_line = fake_send_line  # type: ignore[method-assign]
+    _bind_send_line(gateway, fake_send_line)
 
     await gateway._join_initial_channels()
 
@@ -211,7 +239,7 @@ async def test_twitch_irc_gateway_keeps_pending_channel_when_join_fails() -> Non
         raise BrokenPipeError("pipe closed")
 
     gateway._pending_channels.add("example")
-    gateway._send_line = failing_send_line  # type: ignore[method-assign]
+    _bind_send_line(gateway, failing_send_line)
 
     with pytest.raises(BrokenPipeError):
         await gateway._join_initial_channels()
@@ -243,7 +271,7 @@ async def test_twitch_irc_gateway_read_loop_stops_on_connection_reset() -> None:
         async def readline(self) -> bytes:
             raise ConnectionResetError("reset by peer")
 
-    gateway._reader = ResetReader()  # type: ignore[assignment]
+    gateway._reader = _reader(ResetReader())
 
     await gateway._read_loop()
 
@@ -277,9 +305,9 @@ async def test_twitch_irc_gateway_answers_ping_before_line_handler() -> None:
     async def fake_send_line(line: str) -> None:
         sent_lines.append(line)
 
-    gateway._reader = Reader()  # type: ignore[assignment]
+    gateway._reader = _reader(Reader())
     gateway._line_handler = fake_line_handler
-    gateway._send_line = fake_send_line  # type: ignore[method-assign]
+    _bind_send_line(gateway, fake_send_line)
 
     await gateway._read_loop()
 
@@ -292,7 +320,7 @@ async def test_twitch_irc_gateway_stop_read_task_ignores_connection_reset() -> N
     config = AppConfig()
     gateway = AnonymousTwitchIRCGateway(config=config)
     loop = asyncio.get_running_loop()
-    gateway._read_task = loop.create_future()  # type: ignore[assignment]
+    gateway._read_task = _read_task(loop.create_future())
     gateway._read_task.set_exception(ConnectionResetError("reset by peer"))
 
     await gateway._stop_read_task()
@@ -312,7 +340,7 @@ async def test_twitch_irc_gateway_close_connection_ignores_wait_closed_reset() -
         async def wait_closed(self) -> None:
             raise ConnectionResetError("reset by peer")
 
-    gateway._writer = ResetWriter()  # type: ignore[assignment]
+    gateway._writer = _writer(ResetWriter())
     gateway._joined_channels.add("example")
 
     await gateway._close_connection(preserve_channels=True)
@@ -330,6 +358,7 @@ async def test_twitch_irc_gateway_start_retries_connection_errors(monkeypatch: p
     )
     gateway = AnonymousTwitchIRCGateway(config=config)
     connected = asyncio.Event()
+    never_returns = asyncio.Event()
     attempts = 0
 
     class FakeReader:
@@ -337,12 +366,13 @@ async def test_twitch_irc_gateway_start_retries_connection_errors(monkeypatch: p
             return False
 
         async def readline(self) -> bytes:
-            await asyncio.sleep(1)
+            await never_returns.wait()
             return b""
 
     class FakeWriter:
         def write(self, data: bytes) -> None:
-            return None
+            _ = data
+            return
 
         async def drain(self) -> None:
             return None
@@ -388,12 +418,12 @@ async def test_twitch_irc_gateway_reconnects_before_join_when_read_loop_stopped(
         gateway._read_task = None
 
     loop = asyncio.get_running_loop()
-    gateway._reader = SimpleNamespace(at_eof=lambda: False)  # type: ignore[assignment]
-    gateway._writer = SimpleNamespace(is_closing=lambda: False)  # type: ignore[assignment]
-    gateway._read_task = loop.create_future()  # type: ignore[assignment]
+    gateway._reader = _reader(SimpleNamespace(at_eof=lambda: False))
+    gateway._writer = _writer(SimpleNamespace(is_closing=lambda: False))
+    gateway._read_task = _read_task(loop.create_future())
     gateway._read_task.set_result(None)
-    gateway._send_line_with_reconnect = fake_send_line  # type: ignore[method-assign]
-    gateway.ensure_connected = fake_ensure_connected  # type: ignore[method-assign]
+    _bind_send_line_with_reconnect(gateway, fake_send_line)
+    gateway.ensure_connected = fake_ensure_connected
 
     await gateway.join_channel("Example")
 
@@ -427,7 +457,7 @@ async def test_twitch_irc_gateway_sends_pass_during_handshake(monkeypatch: pytes
         async def wait_closed(self) -> None:
             return None
 
-    async def fake_open_connection(*args, **kwargs):
+    async def fake_open_connection(*_args, **_kwargs):
         return FakeReader(), FakeWriter()
 
     monkeypatch.setattr("src.gateways.twitch_irc.asyncio.open_connection", fake_open_connection)

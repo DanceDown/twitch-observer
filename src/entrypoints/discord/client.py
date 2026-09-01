@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import logging
+
 import discord
 
 from src.config import AppConfig
-from src.entrypoints.discord.delivery import send_embed_with_retries
+from src.entrypoints.discord.delivery import DiscordEmbedSendRequest, send_embed_with_retries
 from src.localization import Localizer
 from src.utils.discord_embeds import build_result_embed
 
-from .service_bundle import DiscordServiceBundle
 from .commands import (
+    WriteCommandOptions,
     register_account_commands,
     register_channel_commands,
     register_help_commands,
@@ -25,8 +26,10 @@ from .commands import (
     register_user_commands,
     register_write_commands,
 )
-from .ui_data import DiscordUIDataProvider
+from .commands.localized import CommandCatalogTranslator
+from .service_bundle import DiscordServiceBundle
 from .ui.support_ui import register_persistent_support_views
+from .ui_data import DiscordUIDataProvider
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +44,7 @@ class ObserverDiscordClient(discord.Client):
         ui_data_provider: DiscordUIDataProvider,
         localizer: Localizer,
     ) -> None:
+        """Create the Discord client and register its command tree holder."""
         intents = discord.Intents.default()
         if config.discord_application_id:
             super().__init__(intents=intents, application_id=config.discord_application_id)
@@ -55,6 +59,7 @@ class ObserverDiscordClient(discord.Client):
 
     async def setup_hook(self) -> None:
         """Register slash commands and sync them globally."""
+        await self.tree.set_translator(CommandCatalogTranslator(self._localizer))
         register_thread_commands(self.tree, self._services, self._ui_data_provider, self._localizer)
         register_channel_commands(self.tree, self._services, self._ui_data_provider, self._localizer)
         register_live_state_commands(self.tree, self._services, self._ui_data_provider, self._localizer)
@@ -69,8 +74,10 @@ class ObserverDiscordClient(discord.Client):
             self._services,
             self._ui_data_provider,
             self._localizer,
-            reply_candidate_max_age_minutes=self._config.discord_write_reply_candidate_max_age_minutes,
-            reply_candidate_limit=self._config.discord_write_reply_candidate_limit,
+            WriteCommandOptions(
+                reply_candidate_max_age_minutes=self._config.discord_write_reply_candidate_max_age_minutes,
+                reply_candidate_limit=self._config.discord_write_reply_candidate_limit,
+            ),
         )
         register_show_commands(self.tree, self._services, self._ui_data_provider, self._localizer)
         register_support_commands(self.tree, self._services, self._ui_data_provider, self._localizer)
@@ -97,7 +104,7 @@ class ObserverDiscordClient(discord.Client):
         thread_id: int | None = None,
     ) -> None:
         """Send a tracking embed to a Discord channel or DM."""
-        _ = thread_id
+        _ = channel_login, thread_id
         channel = self.get_channel(discord_channel_id)
         messageable = (
             channel
@@ -106,9 +113,11 @@ class ObserverDiscordClient(discord.Client):
         )
         await send_embed_with_retries(
             messageable,
-            embed=embed,
-            purpose="tracking embed",
-            max_attempts=self._config.discord_delivery_max_attempts,
+            request=DiscordEmbedSendRequest(
+                embed=embed,
+                purpose="tracking embed",
+                max_attempts=self._config.discord_delivery_max_attempts,
+            ),
         )
 
     async def set_status_text(self, text: str) -> None:
@@ -126,9 +135,11 @@ class ObserverDiscordClient(discord.Client):
         channel = user.dm_channel or await user.create_dm()
         await send_embed_with_retries(
             channel,
-            embed=build_result_embed(result),
-            purpose="direct user result",
-            max_attempts=self._config.discord_delivery_max_attempts,
+            request=DiscordEmbedSendRequest(
+                embed=build_result_embed(result),
+                purpose="direct user result",
+                max_attempts=self._config.discord_delivery_max_attempts,
+            ),
         )
 
     async def send_channel_result(self, discord_channel_id: int, result) -> None:
@@ -139,7 +150,9 @@ class ObserverDiscordClient(discord.Client):
         if isinstance(channel, discord.TextChannel | discord.Thread | discord.DMChannel):
             await send_embed_with_retries(
                 channel,
-                embed=build_result_embed(result),
-                purpose="runtime channel result",
-                max_attempts=self._config.discord_delivery_max_attempts,
+                request=DiscordEmbedSendRequest(
+                    embed=build_result_embed(result),
+                    purpose="runtime channel result",
+                    max_attempts=self._config.discord_delivery_max_attempts,
+                ),
             )

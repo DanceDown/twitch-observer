@@ -13,11 +13,14 @@ from .text import render_details, render_empty_section, render_line, render_row,
 
 @dataclass(slots=True)
 class ShowPatternSectionRenderer:
+    """Render ping and regex pattern configuration for `/show pings`."""
+
     pattern_repository: PatternRepository
     resolver: ShowTwitchSubjectResolver
     localizer: Localizer
 
     async def render(self, thread: ThreadRecord) -> str:
+        """Return the localized pattern section for one thread."""
         language = self.localizer.language_for_thread(thread)
         patterns = await self.pattern_repository.list_patterns_for_thread(thread.thread_id, is_regex=None)
         if not patterns:

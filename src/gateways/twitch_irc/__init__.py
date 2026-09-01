@@ -5,13 +5,29 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-import random
+import secrets
 import ssl
 from collections.abc import Awaitable, Callable
 
 from src.config import AppConfig
 
 logger = logging.getLogger(__name__)
+
+
+class TwitchIRCReadLoopStateError(RuntimeError):
+    """Raised when the read loop starts before a stream reader is available."""
+
+    def __init__(self) -> None:
+        """Create the missing-reader error with a stable operator message."""
+        super().__init__("Twitch IRC read loop started without an active reader.")
+
+
+class TwitchIRCConnectionUnavailableError(ConnectionError):
+    """Raised when a command is sent while no Twitch IRC writer exists."""
+
+    def __init__(self) -> None:
+        """Create the unavailable-connection error with a stable message."""
+        super().__init__("Twitch IRC connection is not available.")
 
 
 class AnonymousTwitchIRCGateway:
@@ -23,6 +39,7 @@ class AnonymousTwitchIRCGateway:
         *,
         line_handler: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
+        """Initialize IRC connection state without opening the network socket."""
         self._config = config
         self._line_handler = line_handler
         self._reader: asyncio.StreamReader | None = None
@@ -37,6 +54,7 @@ class AnonymousTwitchIRCGateway:
 
     @property
     def nick(self) -> str:
+        """Return the generated anonymous Twitch IRC nick."""
         return self._nick
 
     def set_line_handler(self, line_handler: Callable[[str], Awaitable[None]]) -> None:
@@ -63,7 +81,8 @@ class AnonymousTwitchIRCGateway:
                         await self._recover_connection("connection health check failed")
                 except asyncio.CancelledError:
                     raise
-                except Exception as error:
+                except Exception as error:  # noqa: BLE001
+                    # This outer supervisor keeps DNS/socket surprises from killing the bot.
                     logger.warning(
                         "Twitch IRC connection loop recovered from error; retrying in %.1fs: %s",
                         reconnect_delay,
@@ -148,7 +167,7 @@ class AnonymousTwitchIRCGateway:
     async def _read_loop(self) -> None:
         reader = self._reader
         if reader is None:
-            raise RuntimeError("Twitch IRC read loop started without an active reader.")
+            raise TwitchIRCReadLoopStateError
         while not reader.at_eof():
             try:
                 raw_bytes = await reader.readline()
@@ -184,7 +203,7 @@ class AnonymousTwitchIRCGateway:
 
     async def _send_line(self, line: str) -> None:
         if self._writer is None:
-            raise ConnectionError("Twitch IRC connection is not available.")
+            raise TwitchIRCConnectionUnavailableError
         logger.debug("Sending IRC line: %s", line)
         self._writer.write(f"{line}\r\n".encode())
         await self._writer.drain()
@@ -296,11 +315,9 @@ class AnonymousTwitchIRCGateway:
         if self._reader.at_eof():
             return False
         is_closing = getattr(self._writer, "is_closing", None)
-        if callable(is_closing) and is_closing():
-            return False
-        return True
+        return not (callable(is_closing) and is_closing())
 
     @staticmethod
     def _build_anonymous_nick(prefix: str) -> str:
         """Build a Twitch-compatible anonymous nick such as justinfan12345."""
-        return f"{prefix}{random.randint(10000, 999999)}"
+        return f"{prefix}{secrets.randbelow(990000) + 10000}"

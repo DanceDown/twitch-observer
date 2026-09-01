@@ -13,14 +13,18 @@ from .shared import get_thread_for_channel, resolve_users_by_ids
 
 @dataclass(slots=True)
 class PatternQueryService:
+    """Load ping pattern data for Discord UI selections."""
+
     thread_repository: ThreadRepository
     pattern_repository: PatternRepository
     twitch_api: TwitchDirectoryGateway
 
     async def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
+        """Return the thread configured for one Discord channel."""
         return await get_thread_for_channel(self.thread_repository, discord_channel_id)
 
     async def list_patterns(self, discord_channel_id: int) -> list[PatternPresentation]:
+        """List patterns with display indexes and resolved Twitch names."""
         thread = await self.get_thread(discord_channel_id)
         if thread is None:
             return []
@@ -55,6 +59,7 @@ class PatternQueryService:
         return presentations
 
     async def get_pattern(self, discord_channel_id: int, pattern_id: int) -> PatternPresentation | None:
+        """Return one pattern presentation by database pattern ID."""
         patterns = await self.list_patterns(discord_channel_id)
         for pattern in patterns:
             if pattern.pattern.pattern_id == pattern_id:

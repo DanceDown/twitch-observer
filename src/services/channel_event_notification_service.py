@@ -18,16 +18,19 @@ from src.discord_results import build_thread_result
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.events.twitch_events import TwitchChannelLiveStateChangedEvent
 from src.localization import Localizer
-from src.services.twitch_runtime import safe_get_twitch_user_by_id
+from src.services.twitch_gateways import TwitchUserLookup
 from src.services.twitch_runtime import (
     CHANNEL_SUBJECT_TYPE,
     DISCORD_NOTIFY_ACTION,
     STREAM_OFFLINE_EVENT_KEY,
     STREAM_ONLINE_EVENT_KEY,
     TWITCH_ADAPTER_KEY,
+    safe_get_twitch_user_by_id,
 )
 
 logger = logging.getLogger(__name__)
+
+FALLBACK_EVENT_COLOR = "#808080"
 
 
 class ChannelEventNotificationSender:
@@ -38,6 +41,7 @@ class ChannelEventNotificationSender:
         discord_channel_id: int,
         result: DiscordCommandResult,
     ) -> None:  # pragma: no cover
+        """Send one prepared channel-event result to Discord."""
         raise NotImplementedError
 
 
@@ -48,6 +52,7 @@ class ChannelLiveStatePersistenceService:
     channel_repository: ChannelRepository
 
     async def handle_change(self, event: TwitchChannelLiveStateChangedEvent) -> None:
+        """Store the newest known live/offline state for a Twitch channel."""
         updated_rows = await self.channel_repository.set_live_state_for_twitch_channel(
             twitch_channel_id=event.twitch_channel_id,
             is_live=event.is_live,
@@ -70,7 +75,7 @@ class ChannelEventNotificationService:
     adapter_event_repository: AdapterEventRepository
     adapter_event_action_repository: AdapterEventActionRepository
     channel_repository: ChannelRepository
-    twitch_api: object
+    twitch_api: TwitchUserLookup
     notifier: ChannelEventNotificationSender
     localizer: Localizer = field(default_factory=Localizer.from_directory)
 
@@ -80,6 +85,7 @@ class ChannelEventNotificationService:
         *,
         suppressed_events: set[tuple[int, int]] | None = None,
     ) -> None:
+        """Send configured Discord notifications for one live/offline transition."""
         event_key = STREAM_ONLINE_EVENT_KEY if event.is_live else STREAM_OFFLINE_EVENT_KEY
         configured_events = await self.adapter_event_repository.list_matching_events(
             adapter_key=TWITCH_ADAPTER_KEY,
@@ -92,7 +98,11 @@ class ChannelEventNotificationService:
         if not configured_events:
             return
 
-        channel_user = await safe_get_twitch_user_by_id(self.twitch_api, event.twitch_channel_id)
+        channel_user = await safe_get_twitch_user_by_id(
+            self.twitch_api,
+            event.twitch_channel_id,
+            require_chat_color=True,
+        )
         channel_display_name = (
             (None if channel_user is None else channel_user.display_name) or event.twitch_channel_login or event.twitch_channel_id
         )
@@ -127,6 +137,7 @@ class ChannelEventNotificationService:
                         action=notify_action,
                         channel=source_channel,
                         thread=thread,
+                        twitch_chat_color=channel_user.chat_color if channel_user is not None else None,
                     ),
                     style=DiscordResultStyle.INFO,
                     ephemeral=False,
@@ -160,9 +171,10 @@ class ChannelEventNotificationService:
         action: AdapterEventActionRecord,
         channel: ChannelRecord | None,
         thread: ThreadRecord,
+        twitch_chat_color: str | None,
     ) -> str | None:
         if action.color:
             return action.color
         if channel is not None and channel.color:
             return channel.color
-        return thread.color
+        return thread.color or twitch_chat_color or FALLBACK_EVENT_COLOR

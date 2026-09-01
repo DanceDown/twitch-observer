@@ -14,11 +14,14 @@ from .text import render_empty_section, render_rows, render_section
 
 @dataclass(slots=True)
 class ShowUsersRenderer:
+    """Render tracked Twitch users for `/show users`."""
+
     tracked_user_repository: TrackedUserRepository | None
     resolver: ShowTwitchSubjectResolver
     localizer: Localizer
 
     async def render(self, thread: ThreadRecord) -> str:
+        """Return the localized tracked-user section for one thread."""
         language = self.localizer.language_for_thread(thread)
         if self.tracked_user_repository is None:
             return render_empty_section(self.localizer, "show.tracked_users", language=language)
@@ -40,10 +43,13 @@ class ShowUsersRenderer:
 
 @dataclass(slots=True)
 class ShowPermissionsRenderer:
+    """Render explicit Discord permission grants for `/show permissions`."""
+
     permission_repository: UserPermissionRepository | None
     localizer: Localizer
 
     async def render(self, thread: ThreadRecord) -> str:
+        """Return the localized permissions section for one thread."""
         language = self.localizer.language_for_thread(thread)
         user_entries = [
             {

@@ -4,18 +4,67 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 
 import psycopg
+from psycopg import sql
 
-from ..records import ChatPatternCandidateRecord, ChatPatternSeedRecord, ChannelRecord, PatternRecord, ReplyRecord, ThreadRecord
+from src.errors import ApplicationInvariantError
+
+from ..records import (
+    ChannelRecord,
+    ChatPatternCandidateRecord,
+    ChatPatternSeedRecord,
+    PatternCreate,
+    PatternExactQuery,
+    PatternRecord,
+    PatternUpdate,
+    ReplyRecord,
+    ThreadRecord,
+)
 from ..repositories import PatternRepository
 from ._utils import require_row
 from .database import PostgresDatabase
 
+PatternRow = tuple[int, int, str, str, str, str, str, bool, bool, str | None, bool, int]
+PatternSeedRow = tuple[int, int, str, bool, bool, int, bool]
+HydratedCandidateRow = tuple[
+    bool,
+    int,
+    int,
+    int,
+    str,
+    bool,
+    str | None,
+    int | None,
+    int,
+    str,
+    str | None,
+    bool | None,
+    datetime | None,
+    int,
+    int,
+    str,
+    str,
+    str,
+    str,
+    str,
+    bool,
+    bool,
+    str | None,
+    bool,
+    int,
+    int | None,
+    int | None,
+    str | None,
+    bool | None,
+    bool | None,
+]
+ScopeRow = tuple[int, str]
 
-PatternRow = tuple
-PatternSeedRow = tuple
-HydratedCandidateRow = tuple
+
+def _pattern_insert_retry_exhausted() -> ApplicationInvariantError:
+    return ApplicationInvariantError("Pattern insert retry exhausted unexpectedly.")
 
 
 @dataclass(slots=True)
@@ -25,20 +74,9 @@ class PostgresPatternRepository(PatternRepository):
     database: PostgresDatabase
     _PATTERN_SEQUENCE_CONSTRAINT_NAMES = frozenset({"pattern_pkey", "uniq_pattern_thread_internal_id"})
 
-    async def find_exact_pattern(
-        self,
-        *,
-        thread_id: int,
-        regex: str,
-        channel_scope_mode: str,
-        channel_scope_ids: tuple[str, ...],
-        user_scope_mode: str,
-        user_scope_ids: tuple[str, ...],
-        sub_state: str,
-        offline_state: str,
-        is_regex: bool,
-        case_sensitive: bool,
-    ) -> PatternRecord | None:
+    async def find_exact_pattern(self, query: PatternExactQuery) -> PatternRecord | None:
+        """Return a matching existing pattern for a normalized definition."""
+        definition = query.definition
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
@@ -57,166 +95,92 @@ class PostgresPatternRepository(PatternRepository):
                 ORDER BY pattern_id
                 """,
                 (
-                    thread_id,
-                    regex,
-                    channel_scope_mode,
-                    user_scope_mode,
-                    sub_state,
-                    offline_state,
-                    is_regex,
-                    case_sensitive,
+                    query.thread_id,
+                    definition.regex,
+                    definition.channel_scope_mode,
+                    definition.user_scope_mode,
+                    definition.sub_state,
+                    definition.offline_state,
+                    definition.is_regex,
+                    definition.case_sensitive,
                 ),
             )
             rows = await cursor.fetchall()
         patterns = await self._build_patterns_from_rows(rows)
-        normalized_scope_ids = tuple(sorted(channel_scope_ids))
-        normalized_user_ids = tuple(sorted(user_scope_ids))
+        normalized_scope_ids = tuple(sorted(definition.channel_scope_ids))
+        normalized_user_ids = tuple(sorted(definition.user_scope_ids))
         for pattern in patterns:
             if pattern.channel_scope_ids == normalized_scope_ids and pattern.user_scope_ids == normalized_user_ids:
                 return pattern
         return None
 
-    async def add_pattern(
-        self,
-        *,
-        thread_id: int,
-        regex: str,
-        channel_scope_mode: str,
-        channel_scope_ids: tuple[str, ...],
-        user_scope_mode: str,
-        user_scope_ids: tuple[str, ...],
-        sub_state: str,
-        offline_state: str,
-        is_regex: bool,
-        case_sensitive: bool,
-        color: str | None,
-        disabled: bool,
-        priority: int,
-    ) -> PatternRecord:
-        row = await self._insert_pattern_with_retry(
-            thread_id=thread_id,
-            regex=regex,
-            channel_scope_mode=channel_scope_mode,
-            channel_scope_ids=channel_scope_ids,
-            user_scope_mode=user_scope_mode,
-            user_scope_ids=user_scope_ids,
-            sub_state=sub_state,
-            offline_state=offline_state,
-            is_regex=is_regex,
-            case_sensitive=case_sensitive,
-            color=color,
-            disabled=disabled,
-            priority=priority,
-        )
+    async def add_pattern(self, pattern: PatternCreate) -> PatternRecord:
+        """Insert a pattern and its channel/user scopes."""
+        row = await self._insert_pattern_with_retry(pattern)
+        definition = pattern.definition
         return self._build_pattern_record(
             row,
-            channel_scope_ids=tuple(sorted(channel_scope_ids)),
-            user_scope_ids=tuple(sorted(user_scope_ids)),
+            channel_scope_ids=tuple(sorted(definition.channel_scope_ids)),
+            user_scope_ids=tuple(sorted(definition.user_scope_ids)),
         )
 
-    async def _insert_pattern_with_retry(
-        self,
-        *,
-        thread_id: int,
-        regex: str,
-        channel_scope_mode: str,
-        channel_scope_ids: tuple[str, ...],
-        user_scope_mode: str,
-        user_scope_ids: tuple[str, ...],
-        sub_state: str,
-        offline_state: str,
-        is_regex: bool,
-        case_sensitive: bool,
-        color: str | None,
-        disabled: bool,
-        priority: int,
-    ) -> PatternRow:
+    async def _insert_pattern_with_retry(self, pattern: PatternCreate) -> PatternRow:
         for attempt in range(2):
             try:
-                return await self._insert_pattern_once(
-                    thread_id=thread_id,
-                    regex=regex,
-                    channel_scope_mode=channel_scope_mode,
-                    channel_scope_ids=channel_scope_ids,
-                    user_scope_mode=user_scope_mode,
-                    user_scope_ids=user_scope_ids,
-                    sub_state=sub_state,
-                    offline_state=offline_state,
-                    is_regex=is_regex,
-                    case_sensitive=case_sensitive,
-                    color=color,
-                    disabled=disabled,
-                    priority=priority,
-                )
+                return await self._insert_pattern_once(pattern)
             except psycopg.errors.UniqueViolation as error:
                 if attempt > 0 or not self._is_pattern_sequence_conflict(error):
                     raise
                 await self._reset_pattern_id_sequence()
-        raise RuntimeError("Pattern insert retry exhausted unexpectedly.")
+        raise _pattern_insert_retry_exhausted()
 
-    async def _insert_pattern_once(
-        self,
-        *,
-        thread_id: int,
-        regex: str,
-        channel_scope_mode: str,
-        channel_scope_ids: tuple[str, ...],
-        user_scope_mode: str,
-        user_scope_ids: tuple[str, ...],
-        sub_state: str,
-        offline_state: str,
-        is_regex: bool,
-        case_sensitive: bool,
-        color: str | None,
-        disabled: bool,
-        priority: int,
-    ) -> PatternRow:
-        async with self.database.async_transaction() as connection:
-            async with connection.cursor() as cursor:
-                await cursor.execute(
-                    """
-                    INSERT INTO pattern (
-                        thread_id, regex, channel_scope_mode, user_scope_mode,
-                        sub_state, offline_state, is_regex, case_sensitive, color, disabled,
-                        priority
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING thread_id, pattern_id, regex, channel_scope_mode, user_scope_mode,
-                              sub_state, offline_state, is_regex, case_sensitive, color, disabled,
-                              priority
-                    """,
-                    (
-                        thread_id,
-                        regex,
-                        channel_scope_mode,
-                        user_scope_mode,
-                        sub_state,
-                        offline_state,
-                        is_regex,
-                        case_sensitive,
-                        color,
-                        disabled,
-                        priority,
-                    ),
+    async def _insert_pattern_once(self, pattern: PatternCreate) -> PatternRow:
+        definition = pattern.definition
+        async with self.database.async_transaction() as connection, connection.cursor() as cursor:
+            await cursor.execute(
+                """
+                INSERT INTO pattern (
+                    thread_id, regex, channel_scope_mode, user_scope_mode,
+                    sub_state, offline_state, is_regex, case_sensitive, color, disabled,
+                    priority
                 )
-                row = require_row(await cursor.fetchone(), operation="pattern.add_pattern")
-                persisted_pattern_id = int(row[1])
-                if channel_scope_ids:
-                    await cursor.executemany(
-                        """
-                        INSERT INTO pattern_channel_scope (thread_id, pattern_id, twitch_channel_id)
-                        VALUES (%s, %s, %s)
-                        """,
-                        [(thread_id, persisted_pattern_id, twitch_channel_id) for twitch_channel_id in channel_scope_ids],
-                    )
-                if user_scope_ids:
-                    await cursor.executemany(
-                        """
-                        INSERT INTO pattern_user_scope (thread_id, pattern_id, twitch_user_id)
-                        VALUES (%s, %s, %s)
-                        """,
-                        [(thread_id, persisted_pattern_id, twitch_user_id) for twitch_user_id in user_scope_ids],
-                    )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING thread_id, pattern_id, regex, channel_scope_mode, user_scope_mode,
+                          sub_state, offline_state, is_regex, case_sensitive, color, disabled,
+                          priority
+                """,
+                (
+                    pattern.thread_id,
+                    definition.regex,
+                    definition.channel_scope_mode,
+                    definition.user_scope_mode,
+                    definition.sub_state,
+                    definition.offline_state,
+                    definition.is_regex,
+                    definition.case_sensitive,
+                    pattern.color,
+                    pattern.disabled,
+                    pattern.priority,
+                ),
+            )
+            row = require_row(await cursor.fetchone(), operation="pattern.add_pattern")
+            persisted_pattern_id = int(row[1])
+            if definition.channel_scope_ids:
+                await cursor.executemany(
+                    """
+                    INSERT INTO pattern_channel_scope (thread_id, pattern_id, twitch_channel_id)
+                    VALUES (%s, %s, %s)
+                    """,
+                    [(pattern.thread_id, persisted_pattern_id, twitch_channel_id) for twitch_channel_id in definition.channel_scope_ids],
+                )
+            if definition.user_scope_ids:
+                await cursor.executemany(
+                    """
+                    INSERT INTO pattern_user_scope (thread_id, pattern_id, twitch_user_id)
+                    VALUES (%s, %s, %s)
+                    """,
+                    [(pattern.thread_id, persisted_pattern_id, twitch_user_id) for twitch_user_id in definition.user_scope_ids],
+                )
         return row
 
     async def _reset_pattern_id_sequence(self) -> None:
@@ -238,6 +202,7 @@ class PostgresPatternRepository(PatternRepository):
         return constraint_name in cls._PATTERN_SEQUENCE_CONSTRAINT_NAMES
 
     async def remove_pattern(self, *, thread_id: int, pattern_id: int) -> None:
+        """Delete one pattern from a thread by display ID."""
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -248,6 +213,7 @@ class PostgresPatternRepository(PatternRepository):
             )
 
     async def set_pattern_disabled(self, *, thread_id: int, pattern_id: int, disabled: bool) -> PatternRecord | None:
+        """Enable or disable one pattern by display ID."""
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -271,6 +237,7 @@ class PostgresPatternRepository(PatternRepository):
         )
 
     async def set_pattern_priority(self, *, thread_id: int, pattern_id: int, priority: int) -> PatternRecord | None:
+        """Update one pattern's priority by display ID."""
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -293,23 +260,9 @@ class PostgresPatternRepository(PatternRepository):
             user_scope_ids=user_scope_map.get(pattern_id, ()),
         )
 
-    async def update_pattern(
-        self,
-        *,
-        thread_id: int,
-        pattern_id: int,
-        regex: str,
-        channel_scope_mode: str,
-        channel_scope_ids: tuple[str, ...],
-        user_scope_mode: str,
-        user_scope_ids: tuple[str, ...],
-        sub_state: str,
-        offline_state: str,
-        is_regex: bool,
-        case_sensitive: bool,
-        color: str | None,
-        priority: int,
-    ) -> PatternRecord | None:
+    async def update_pattern(self, pattern: PatternUpdate) -> PatternRecord | None:
+        """Replace a pattern definition and rebuild its scopes."""
+        definition = pattern.definition
         async with self.database.async_cursor() as cursor:
             await cursor.execute(
                 """
@@ -329,17 +282,17 @@ class PostgresPatternRepository(PatternRepository):
                           priority
                 """,
                 (
-                    regex,
-                    channel_scope_mode,
-                    user_scope_mode,
-                    sub_state,
-                    offline_state,
-                    is_regex,
-                    case_sensitive,
-                    color,
-                    priority,
-                    thread_id,
-                    pattern_id,
+                    definition.regex,
+                    definition.channel_scope_mode,
+                    definition.user_scope_mode,
+                    definition.sub_state,
+                    definition.offline_state,
+                    definition.is_regex,
+                    definition.case_sensitive,
+                    pattern.color,
+                    pattern.priority,
+                    pattern.thread_id,
+                    pattern.pattern_id,
                 ),
             )
             row = await cursor.fetchone()
@@ -350,38 +303,39 @@ class PostgresPatternRepository(PatternRepository):
                 DELETE FROM pattern_channel_scope
                 WHERE thread_id = %s AND pattern_id = %s
                 """,
-                (thread_id, pattern_id),
+                (pattern.thread_id, pattern.pattern_id),
             )
-            if channel_scope_ids:
+            if definition.channel_scope_ids:
                 await cursor.executemany(
                     """
                     INSERT INTO pattern_channel_scope (thread_id, pattern_id, twitch_channel_id)
                     VALUES (%s, %s, %s)
                     """,
-                    [(thread_id, pattern_id, twitch_channel_id) for twitch_channel_id in channel_scope_ids],
+                    [(pattern.thread_id, pattern.pattern_id, twitch_channel_id) for twitch_channel_id in definition.channel_scope_ids],
                 )
             await cursor.execute(
                 """
                 DELETE FROM pattern_user_scope
                 WHERE thread_id = %s AND pattern_id = %s
                 """,
-                (thread_id, pattern_id),
+                (pattern.thread_id, pattern.pattern_id),
             )
-            if user_scope_ids:
+            if definition.user_scope_ids:
                 await cursor.executemany(
                     """
                     INSERT INTO pattern_user_scope (thread_id, pattern_id, twitch_user_id)
                     VALUES (%s, %s, %s)
                     """,
-                    [(thread_id, pattern_id, twitch_user_id) for twitch_user_id in user_scope_ids],
+                    [(pattern.thread_id, pattern.pattern_id, twitch_user_id) for twitch_user_id in definition.user_scope_ids],
                 )
         return self._build_pattern_record(
             row,
-            channel_scope_ids=tuple(sorted(channel_scope_ids)),
-            user_scope_ids=tuple(sorted(user_scope_ids)),
+            channel_scope_ids=tuple(sorted(definition.channel_scope_ids)),
+            user_scope_ids=tuple(sorted(definition.user_scope_ids)),
         )
 
     async def list_active_patterns_for_thread(self, thread_id: int) -> list[PatternRecord]:
+        """Return enabled patterns for one thread ordered for matching."""
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
@@ -404,6 +358,7 @@ class PostgresPatternRepository(PatternRepository):
         author_id: str,
         sender_is_sub: bool,
     ) -> list[ChatPatternSeedRecord]:
+        """Return cheap match seeds for a chat message before full hydration."""
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
@@ -501,16 +456,17 @@ class PostgresPatternRepository(PatternRepository):
         broadcaster_id: str,
         seeds: tuple[ChatPatternSeedRecord, ...],
     ) -> list[ChatPatternCandidateRecord]:
+        """Hydrate selected match seeds into full chat-match candidates."""
         if not seeds:
             return []
-        value_placeholders = ", ".join(["(%s, %s, %s, %s)"] * len(seeds))
+        value_placeholders = sql.SQL(", ").join([sql.SQL("(%s, %s, %s, %s)")] * len(seeds))
         params: list[object] = []
         for index, seed in enumerate(seeds):
             params.extend((index, seed.thread_id, seed.pattern_id, seed.explicit_user_scope_match))
         params.append(broadcaster_id)
-        query = f"""
+        query = sql.SQL("""
                 WITH matched(seed_order, thread_id, pattern_id, explicit_user_scope_match) AS (
-                    VALUES {value_placeholders}
+                    VALUES {}
                 )
                 SELECT
                     m.explicit_user_scope_match,
@@ -535,7 +491,7 @@ class PostgresPatternRepository(PatternRepository):
                  AND r.pattern_id = p.pattern_id
                  AND r.disabled = FALSE
                 ORDER BY m.seed_order
-                """
+                """).format(value_placeholders)
         async with self.database.read_cursor() as cursor:
             await cursor.execute(query, tuple(params))
             rows = await cursor.fetchall()
@@ -547,6 +503,7 @@ class PostgresPatternRepository(PatternRepository):
         thread_id: int,
         pattern_id: int,
     ) -> PatternRecord | None:
+        """Return one pattern by thread and display ID."""
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
@@ -570,6 +527,7 @@ class PostgresPatternRepository(PatternRepository):
         *,
         is_regex: bool | None = None,
     ) -> list[PatternRecord]:
+        """Return thread patterns, optionally limited to regex or text patterns."""
         async with self.database.read_cursor() as cursor:
             if is_regex is None:
                 await cursor.execute(
@@ -599,6 +557,7 @@ class PostgresPatternRepository(PatternRepository):
         return await self._build_patterns_from_rows(rows)
 
     async def count_channel_scope_references(self, *, thread_id: int, twitch_channel_id: str) -> int:
+        """Count pattern scopes that still reference a Twitch channel."""
         async with self.database.read_cursor() as cursor:
             await cursor.execute(
                 """
@@ -661,7 +620,7 @@ class PostgresPatternRepository(PatternRepository):
         return channel_scope_map, user_scope_map
 
     @staticmethod
-    def _scope_rows_to_map(rows: list[tuple]) -> dict[int, tuple[str, ...]]:
+    def _scope_rows_to_map(rows: list[ScopeRow]) -> dict[int, tuple[str, ...]]:
         scope_map: dict[int, list[str]] = defaultdict(list)
         for row in rows:
             scope_map[int(row[0])].append(str(row[1]))

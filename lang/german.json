@@ -458,6 +458,11 @@
         "body": "Hier ist gerade kein Twitch-Konto verbunden <:oopsie:1497720439810687006>",
         "footer": ""
       },
+      "pending_unlinked": {
+        "title": "Twitch-Login abgebrochen",
+        "body": "<@{RAW:view.requester_id}> hat den wartenden Twitch-Login abgebrochen. Du kannst mit `/account` einen neuen Versuch starten <:ApuApproved:1497724288256446465>",
+        "footer": ""
+      },
       "unlinked": {
         "title": "Twitch-Konto getrennt",
         "body": "<@{RAW:view.requester_id}> hat [`{CODE:view.account.display_name}`](https://www.twitch.tv/{RAW:view.account.login}) getrennt. Auto-Antworten bleiben gespeichert und funktionieren wieder, sobald ein Konto verbunden ist <:ApuApproved:1497724288256446465>",
@@ -1587,6 +1592,327 @@
     }
   },
   "discord": {
+    "commands": {
+      "thread": {
+        "join": {
+          "description": "Twitch Observer diesem Discord-Kanal beitreten lassen."
+        },
+        "leave": {
+          "description": "Twitch Observer aus diesem Discord-Kanal entfernen und Daten löschen."
+        },
+        "on": {
+          "description": "Twitch Observer aktivieren."
+        },
+        "off": {
+          "description": "Twitch Observer deaktivieren."
+        },
+        "color": {
+          "description": "Standardfarbe für Discord-Nachrichten setzen."
+        },
+        "language": {
+          "description": "Sprache für diesen Discord-Kanal setzen.",
+          "options": {
+            "language": "Sprache für diesen Discord-Kanal."
+          },
+          "choices": {
+            "english": "Englisch",
+            "german": "Deutsch"
+          }
+        }
+      },
+      "channel": {
+        "description": "Getrackte Twitch-Kanäle hinzufügen, entfernen oder einfärben.",
+        "add": {
+          "description": "Einen getrackten Twitch-Kanal hinzufügen.",
+          "options": {
+            "twitch_channel_login": "Twitch-Kanal-Login."
+          }
+        },
+        "remove": {
+          "description": "Einen getrackten Twitch-Kanal entfernen.",
+          "options": {
+            "twitch_channel_login": "Getrackter Twitch-Kanal-Login."
+          }
+        },
+        "color": {
+          "description": "Farbe für einen getrackten Kanal setzen oder entfernen.",
+          "options": {
+            "twitch_channel_login": "Getrackter Twitch-Kanal-Login.",
+            "color": "Hex-Farbe. Leer lassen, um sie zu entfernen."
+          }
+        }
+      },
+      "user": {
+        "description": "Getrackte Twitch-Nutzer hinzufügen oder entfernen.",
+        "add": {
+          "description": "Einen getrackten Twitch-Nutzer hinzufügen.",
+          "options": {
+            "twitch_user_login": "Twitch-Nutzer-Login."
+          }
+        },
+        "remove": {
+          "description": "Einen getrackten Twitch-Nutzer entfernen.",
+          "options": {
+            "twitch_user_login": "Getrackter Twitch-Nutzer-Login."
+          }
+        }
+      },
+      "liveping": {
+        "description": "Live- und Offline-Pings für diesen Discord-Kanal verwalten.",
+        "choices": {
+          "live": "Live",
+          "offline": "Offline"
+        },
+        "add": {
+          "description": "Einen Live- oder Offline-Ping hinzufügen.",
+          "options": {
+            "twitch_channel_login": "Getrackter Twitch-Kanal-Login.",
+            "state": "Live- oder Offline-Status."
+          }
+        },
+        "remove": {
+          "description": "Einen Live- oder Offline-Ping entfernen.",
+          "options": {
+            "ping_id": "Ping-ID oder Anzeigenummer."
+          }
+        },
+        "color": {
+          "description": "Farbe für einen Live- oder Offline-Ping setzen oder entfernen.",
+          "options": {
+            "ping_id": "Ping-ID oder Anzeigenummer.",
+            "color": "Hex-Farbe. Leer lassen, um sie zu entfernen."
+          }
+        }
+      },
+      "ping": {
+        "description": "Pings erstellen, bearbeiten, entfernen, deaktivieren oder aktivieren.",
+        "choices": {
+          "channel_scope": {
+            "all_tracked": "Alle getrackten",
+            "only_selected": "Nur ausgewählte",
+            "all_except_selected": "Alle außer ausgewählte"
+          },
+          "user_scope": {
+            "all_users": "Alle Nutzer",
+            "all_tracked": "Alle getrackten",
+            "all_tracked_except_selected": "Alle getrackten außer ausgewählte",
+            "only_selected": "Nur ausgewählte",
+            "all_except_selected": "Alle außer ausgewählte"
+          },
+          "sub_state": {
+            "all": "Alle",
+            "subs": "Abonnenten",
+            "non_subs": "Nicht-Abonnenten"
+          },
+          "offline_state": {
+            "both": "Live und offline",
+            "online": "Nur live",
+            "offline": "Nur offline"
+          }
+        },
+        "add": {
+          "description": "Einen Ping hinzufügen.",
+          "options": {
+            "pattern_text": "Pattern-Text.",
+            "is_regex": "Regex-Modus verwenden.",
+            "channel_scope_mode": "Kanalbereich.",
+            "channel_logins": "Kommaseparierte Twitch-Kanal-Logins.",
+            "user_scope_mode": "Nutzerbereich.",
+            "user_logins": "Kommaseparierte Twitch-Nutzer-Logins.",
+            "sub_state": "Abonnentenfilter.",
+            "offline_state": "Live-/Offline-Filter.",
+            "case_sensitive": "Groß-/Kleinschreibung beachten.",
+            "color": "Hex-Farbe.",
+            "priority": "Priorität von 0 bis 9.",
+            "disabled": "Deaktiviert erstellen."
+          }
+        },
+        "edit": {
+          "description": "Einen bestehenden Ping bearbeiten.",
+          "options": {
+            "pattern_id": "Pattern-ID oder Anzeigenummer.",
+            "pattern_text": "Neuer Pattern-Text.",
+            "is_regex": "Neuer Regex-Modus.",
+            "channel_scope_mode": "Neuer Kanalbereich.",
+            "channel_logins": "Neue kommaseparierte Kanal-Logins.",
+            "user_scope_mode": "Neuer Nutzerbereich.",
+            "user_logins": "Neue kommaseparierte Twitch-Nutzer-Logins.",
+            "sub_state": "Neuer Abonnentenfilter.",
+            "offline_state": "Neuer Live-/Offline-Filter.",
+            "case_sensitive": "Neue Groß-/Kleinschreibung-Einstellung.",
+            "color": "Neue Hex-Farbe.",
+            "clear_color": "Bestehende Farbe entfernen.",
+            "priority": "Neue Priorität von 0 bis 9."
+          }
+        },
+        "remove": {
+          "description": "Einen Ping entfernen.",
+          "options": {
+            "pattern_id": "Pattern-ID oder Anzeigenummer."
+          }
+        },
+        "disable": {
+          "description": "Einen Ping deaktivieren.",
+          "options": {
+            "pattern_id": "Pattern-ID oder Anzeigenummer."
+          }
+        },
+        "enable": {
+          "description": "Einen Ping aktivieren.",
+          "options": {
+            "pattern_id": "Pattern-ID oder Anzeigenummer."
+          }
+        }
+      },
+      "reply": {
+        "description": "Automatische Antworten hinzufügen, entfernen, deaktivieren oder aktivieren.",
+        "pattern": {
+          "description": "Automatische Antworten verwalten, die an Pings hängen.",
+          "add": {
+            "description": "Eine Auto-Antwort für einen Ping hinzufügen.",
+            "options": {
+              "pattern_id": "Pattern-ID oder Anzeigenummer.",
+              "message": "Antworttext.",
+              "reply_as_reply": "Als Twitch-Thread-Antwort senden."
+            }
+          },
+          "remove": {
+            "description": "Eine Ping-Auto-Antwort entfernen.",
+            "options": {
+              "pattern_id": "Pattern-ID oder Anzeigenummer."
+            }
+          },
+          "disable": {
+            "description": "Eine Ping-Auto-Antwort deaktivieren.",
+            "options": {
+              "pattern_id": "Pattern-ID oder Anzeigenummer."
+            }
+          },
+          "enable": {
+            "description": "Eine Ping-Auto-Antwort aktivieren.",
+            "options": {
+              "pattern_id": "Pattern-ID oder Anzeigenummer."
+            }
+          }
+        },
+        "event": {
+          "description": "Automatische Antworten für Live- oder Offline-Events verwalten.",
+          "add": {
+            "description": "Eine Auto-Antwort für ein Live- oder Offline-Event hinzufügen.",
+            "options": {
+              "event_id": "Adapter-Event-ID.",
+              "message": "Antworttext."
+            }
+          },
+          "remove": {
+            "description": "Eine Event-Auto-Antwort entfernen.",
+            "options": {
+              "event_id": "Adapter-Event-ID."
+            }
+          },
+          "disable": {
+            "description": "Eine Event-Auto-Antwort deaktivieren.",
+            "options": {
+              "event_id": "Adapter-Event-ID."
+            }
+          },
+          "enable": {
+            "description": "Eine Event-Auto-Antwort aktivieren.",
+            "options": {
+              "event_id": "Adapter-Event-ID."
+            }
+          }
+        }
+      },
+      "permission": {
+        "description": "Discord-Nutzerberechtigungen vergeben, entziehen oder löschen.",
+        "grant": {
+          "description": "Einem Discord-Nutzer Berechtigungen geben.",
+          "options": {
+            "target_user": "Discord-Nutzer, der geändert wird.",
+            "permissions": "Kommaseparierte Berechtigungswerte."
+          }
+        },
+        "revoke": {
+          "description": "Einem Discord-Nutzer Berechtigungen entziehen.",
+          "options": {
+            "target_user": "Discord-Nutzer, der geändert wird.",
+            "permissions": "Kommaseparierte Berechtigungswerte."
+          }
+        },
+        "clear": {
+          "description": "Alle expliziten Berechtigungen eines Discord-Nutzers löschen.",
+          "options": {
+            "target_user": "Discord-Nutzer, der geändert wird."
+          }
+        }
+      },
+      "account": {
+        "description": "Dein Twitch-Konto verbinden oder trennen.",
+        "connect": {
+          "description": "Dein Twitch-Konto verbinden."
+        },
+        "disconnect": {
+          "description": "Dein Twitch-Konto trennen."
+        }
+      },
+      "help": {
+        "description": "Erklärt, wie du den Bot verwendest.",
+        "options": {
+          "section": "Optionales Thema. Leer lassen für die allgemeine Einführung."
+        },
+        "choices": {
+          "overview": "Überblick",
+          "first_steps": "Erste Schritte",
+          "channels": "Kanäle",
+          "users": "Nutzer",
+          "pings": "Pings",
+          "auto_replies": "Auto-Antworten",
+          "live_pings": "Live-Pings",
+          "write": "Schreiben",
+          "account": "Konto",
+          "permissions": "Berechtigungen",
+          "tips": "Tipps"
+        }
+      },
+      "show": {
+        "description": "Zeigt die Einstellungen des aktuellen Kanals.",
+        "options": {
+          "section": "Optionaler Bereich. Leer lassen, um im Modal zu wählen."
+        },
+        "choices": {
+          "pings": "Pings",
+          "auto_replies": "Auto-Antworten",
+          "stream_pings": "Live-/Offline-Pings",
+          "channels": "Kanäle",
+          "users": "Nutzer",
+          "permissions": "Berechtigungen",
+          "account": "Konto"
+        }
+      },
+      "support": {
+        "description": "Ein Support-Ticket erstellen.",
+        "options": {
+          "category": "Support-Kategorie.",
+          "title": "Kurzer Titel für die Support-Anfrage.",
+          "description": "Was ist passiert oder wobei brauchst du Hilfe?"
+        },
+        "choices": {
+          "bug": "Bug",
+          "question": "Frage",
+          "idea": "Vorschlag",
+          "other": "Sonstiges"
+        }
+      },
+      "write": {
+        "description": "Eine Twitch-Nachricht über das verknüpfte Konto senden.",
+        "options": {
+          "twitch_channel_login": "Optionaler direkter Zielkanal-Login.",
+          "message": "Optionaler direkter Nachrichtentext.",
+          "reply_parent_message_id": "Optionale Twitch-Nachrichten-ID für eine Antwort."
+        }
+      }
+    },
     "tracking_embed": {
       "footer_channel": "Kanal: {RAW:view.channel_name}",
       "reply_field": "Antwort"

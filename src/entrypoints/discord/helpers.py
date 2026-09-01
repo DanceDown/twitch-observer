@@ -2,22 +2,24 @@
 
 from __future__ import annotations
 
-from contextlib import suppress
 import logging
+from contextlib import suppress
 
 import discord
 
 from src.discord_results import build_result
-from src.entrypoints.discord.delivery import send_embed_with_retries
+from src.entrypoints.discord.delivery import DiscordEmbedSendRequest, send_embed_with_retries
+from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.events.ui_flow import UIFlowKind, UIFlowStep
 from src.localization import Localizer
 from src.utils.discord_embeds import build_result_embed
-from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
 from .dispatch import dispatch_ui_flow_decision
 
 logger = logging.getLogger(__name__)
+
+DISCORD_UNKNOWN_INTERACTION_CODE = 10062
 
 
 def build_public_result_embed(result: DiscordCommandResult) -> discord.Embed:
@@ -101,8 +103,10 @@ async def send_initial_result(interaction: discord.Interaction, result: DiscordC
         try:
             public_sent = await send_embed_with_retries(
                 interaction.channel,
-                embed=public_embed,
-                purpose="public interaction result",
+                request=DiscordEmbedSendRequest(
+                    embed=public_embed,
+                    purpose="public interaction result",
+                ),
             )
         except discord.Forbidden:
             if response_ready:
@@ -150,8 +154,10 @@ async def complete_bound_result(
         try:
             public_sent = await send_embed_with_retries(
                 interaction.channel,
-                embed=build_public_result_embed(result),
-                purpose="bound public interaction result",
+                request=DiscordEmbedSendRequest(
+                    embed=build_public_result_embed(result),
+                    purpose="bound public interaction result",
+                ),
             )
         except discord.Forbidden:
             fallback_embed = build_result_embed(_missing_channel_access_result(interaction))
@@ -177,7 +183,7 @@ async def complete_bound_result(
 
 def _is_unknown_interaction_error(error: discord.HTTPException) -> bool:
     """Return whether Discord rejected the interaction because its token already expired."""
-    return getattr(error, "code", None) == 10062
+    return getattr(error, "code", None) == DISCORD_UNKNOWN_INTERACTION_CODE
 
 
 async def ensure_ui_flow_allowed(

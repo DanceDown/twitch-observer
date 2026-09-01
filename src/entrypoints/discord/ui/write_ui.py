@@ -7,23 +7,36 @@ from datetime import UTC
 
 import discord
 
-from src.entrypoints.discord.service_bundle import DiscordServiceBundle
+from src.events.commands import SendTwitchMessageCommand
 from src.localization import Localizer
 from src.services.discord_ui_queries import TrackedChannelPresentation, WriteReplyCandidatePresentation
 
 from ..dispatch import dispatch_send_twitch_message
 from ..helpers import defer_interaction_response, send_initial_result
 from .selects import window_with_included_items
+from .shared import DiscordModalContext
 
 _NO_REPLY_VALUE = "__none__"
+DISCORD_SELECT_MAX_OPTIONS = 25
 
 
 @dataclass(slots=True, frozen=True)
 class WriteReplyOption:
+    """Select-option data for one recent Twitch message reply target."""
+
     message_id: str
     twitch_channel_id: str
     label: str
     description: str
+
+
+@dataclass(slots=True, frozen=True)
+class WriteModalDefaults:
+    """Optional field defaults used when `/write` opens as a modal."""
+
+    channel_login: str | None = None
+    message: str | None = None
+    reply_parent_message_id: str | None = None
 
 
 class WriteModal(discord.ui.Modal):
@@ -32,46 +45,40 @@ class WriteModal(discord.ui.Modal):
     def __init__(
         self,
         *,
-        services: DiscordServiceBundle,
-        discord_channel_id: int,
-        requester_id: int,
+        context: DiscordModalContext,
         tracked_channels: list[TrackedChannelPresentation],
         reply_candidates: list[WriteReplyCandidatePresentation],
-        localizer: Localizer,
-        language: str,
-        default_channel_login: str | None = None,
-        default_message: str | None = None,
-        default_reply_parent_message_id: str | None = None,
+        defaults: WriteModalDefaults | None = None,
     ) -> None:
-        super().__init__(title=localizer.text("discord.write_ui.modal.title", language=language), timeout=300)
-        self._services = services
-        self._discord_channel_id = discord_channel_id
-        self._requester_id = requester_id
+        """Create the modal for composing a manual Twitch chat message."""
+        defaults = defaults or WriteModalDefaults()
+        super().__init__(title=context.localizer.text("discord.write_ui.modal.title", language=context.language), timeout=300)
+        self._context = context
         self._reply_map: dict[str, WriteReplyOption] = {}
 
         self.message = discord.ui.TextInput(
-            label=localizer.text("discord.write_ui.modal.message_label", language=language),
+            label=context.localizer.text("discord.write_ui.modal.message_label", language=context.language),
             style=discord.TextStyle.paragraph,
-            default=default_message,
-            placeholder=localizer.text("discord.write_ui.modal.message_placeholder", language=language),
+            default=defaults.message,
+            placeholder=context.localizer.text("discord.write_ui.modal.message_placeholder", language=context.language),
             required=True,
             max_length=500,
         )
         visible_channels = window_with_included_items(
             tracked_channels,
             key=lambda channel: channel.login,
-            included_keys=[default_channel_login] if default_channel_login else [],
+            included_keys=[defaults.channel_login] if defaults.channel_login else [],
         )
         self.channel = discord.ui.Label(
-            text=localizer.text("discord.write_ui.modal.channel_label", language=language),
-            description=localizer.text("discord.write_ui.modal.channel_description", language=language),
+            text=context.localizer.text("discord.write_ui.modal.channel_label", language=context.language),
+            description=context.localizer.text("discord.write_ui.modal.channel_description", language=context.language),
             component=discord.ui.Select(
                 options=[
                     discord.SelectOption(
                         label=channel.display_name[:100],
                         value=channel.login,
                         description=channel.login[:100],
-                        default=channel.login == default_channel_login,
+                        default=channel.login == defaults.channel_login,
                     )
                     for channel in visible_channels
                 ],
@@ -80,14 +87,14 @@ class WriteModal(discord.ui.Modal):
             ),
         )
         self.reply_target = discord.ui.Label(
-            text=localizer.text("discord.write_ui.modal.reply_to_label", language=language),
-            description=localizer.text("discord.write_ui.modal.reply_to_description", language=language),
+            text=context.localizer.text("discord.write_ui.modal.reply_to_label", language=context.language),
+            description=context.localizer.text("discord.write_ui.modal.reply_to_description", language=context.language),
             component=discord.ui.Select(
                 options=self._build_reply_options(
                     reply_candidates,
-                    localizer=localizer,
-                    language=language,
-                    default_reply_parent_message_id=default_reply_parent_message_id,
+                    localizer=context.localizer,
+                    language=context.language,
+                    default_reply_parent_message_id=defaults.reply_parent_message_id,
                 ),
                 min_values=1,
                 max_values=1,
@@ -117,7 +124,7 @@ class WriteModal(discord.ui.Modal):
             candidates,
             key=lambda candidate: candidate.message_id,
             included_keys=[default_reply_parent_message_id] if default_reply_parent_message_id else [],
-            limit=24,
+            limit=DISCORD_SELECT_MAX_OPTIONS - 1,
         )
         for candidate in visible_candidates:
             key = candidate.message_id
@@ -143,7 +150,7 @@ class WriteModal(discord.ui.Modal):
                     default=key == default_reply_parent_message_id,
                 )
             )
-            if len(options) >= 25:
+            if len(options) >= DISCORD_SELECT_MAX_OPTIONS:
                 break
         return options
 
@@ -153,11 +160,13 @@ class WriteModal(discord.ui.Modal):
         selected_reply = self.reply_target.component.values[0]
         reply_parent_message_id = None if selected_reply == _NO_REPLY_VALUE else selected_reply
         result = await dispatch_send_twitch_message(
-            self._services,
-            discord_channel_id=self._discord_channel_id,
-            requester_id=self._requester_id,
-            twitch_channel_login=self.channel.component.values[0],
-            message=self.message.value.strip(),
-            reply_parent_message_id=reply_parent_message_id,
+            self._context.services,
+            SendTwitchMessageCommand(
+                discord_channel_id=self._context.discord_channel_id,
+                requester_id=self._context.requester_id,
+                twitch_channel_login=self.channel.component.values[0],
+                message=self.message.value.strip(),
+                reply_parent_message_id=reply_parent_message_id,
+            ),
         )
         await send_initial_result(interaction, result)

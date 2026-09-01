@@ -36,13 +36,12 @@ async def _ensure_tracked_channel_state_table(config: AppConfig) -> None:
 
 
 async def _count_state_rows(config: AppConfig, twitch_channel_id: str) -> int:
-    async with await psycopg.AsyncConnection.connect(config.postgres_dsn) as connection:
-        async with connection.cursor() as cursor:
-            await cursor.execute(
-                "SELECT COUNT(*) FROM tracked_channel_state WHERE twitch_channel_id = %s",
-                (twitch_channel_id,),
-            )
-            row = await cursor.fetchone()
+    async with await psycopg.AsyncConnection.connect(config.postgres_dsn) as connection, connection.cursor() as cursor:
+        await cursor.execute(
+            "SELECT COUNT(*) FROM tracked_channel_state WHERE twitch_channel_id = %s",
+            (twitch_channel_id,),
+        )
+        row = await cursor.fetchone()
     return 0 if row is None else int(row[0])
 
 
@@ -185,65 +184,64 @@ async def test_tracked_channel_state_migration_backfills_newest_live_state_per_c
     discord_channel_id_1 = _unique_discord_channel_id()
     discord_channel_id_2 = _unique_discord_channel_id()
 
-    async with await psycopg.AsyncConnection.connect(config.postgres_dsn) as connection:
-        async with connection.cursor() as cursor:
-            try:
-                await cursor.execute(
-                    "ALTER TABLE channel ADD COLUMN IF NOT EXISTS is_live BOOLEAN",
-                    (),
-                )
-                await cursor.execute(
-                    "ALTER TABLE channel ADD COLUMN IF NOT EXISTS last_live_status_at TIMESTAMPTZ",
-                    (),
-                )
-                await cursor.execute(
-                    """
-                    INSERT INTO thread (owner_id, discord_channel_id)
-                    VALUES (%s, %s), (%s, %s)
-                    RETURNING thread_id
-                    """,
-                    (1, discord_channel_id_1, 2, discord_channel_id_2),
-                )
-                rows = await cursor.fetchall()
-                thread_id_1 = int(rows[0][0])
-                thread_id_2 = int(rows[1][0])
+    async with await psycopg.AsyncConnection.connect(config.postgres_dsn) as connection, connection.cursor() as cursor:
+        try:
+            await cursor.execute(
+                "ALTER TABLE channel ADD COLUMN IF NOT EXISTS is_live BOOLEAN",
+                (),
+            )
+            await cursor.execute(
+                "ALTER TABLE channel ADD COLUMN IF NOT EXISTS last_live_status_at TIMESTAMPTZ",
+                (),
+            )
+            await cursor.execute(
+                """
+                INSERT INTO thread (owner_id, discord_channel_id)
+                VALUES (%s, %s), (%s, %s)
+                RETURNING thread_id
+                """,
+                (1, discord_channel_id_1, 2, discord_channel_id_2),
+            )
+            rows = await cursor.fetchall()
+            thread_id_1 = int(rows[0][0])
+            thread_id_2 = int(rows[1][0])
 
-                await cursor.execute(
-                    "DELETE FROM tracked_channel_state WHERE twitch_channel_id = %s",
-                    (twitch_channel_id,),
-                )
-                await cursor.execute(
-                    """
-                    INSERT INTO channel (thread_id, twitch_channel_id, is_live, last_live_status_at)
-                    VALUES
-                        (%s, %s, %s, %s),
-                        (%s, %s, %s, %s)
-                    """,
-                    (
-                        thread_id_1,
-                        twitch_channel_id,
-                        False,
-                        "2026-07-01T12:00:00+00:00",
-                        thread_id_2,
-                        twitch_channel_id,
-                        True,
-                        "2026-07-01T13:00:00+00:00",
-                    ),
-                )
+            await cursor.execute(
+                "DELETE FROM tracked_channel_state WHERE twitch_channel_id = %s",
+                (twitch_channel_id,),
+            )
+            await cursor.execute(
+                """
+                INSERT INTO channel (thread_id, twitch_channel_id, is_live, last_live_status_at)
+                VALUES
+                    (%s, %s, %s, %s),
+                    (%s, %s, %s, %s)
+                """,
+                (
+                    thread_id_1,
+                    twitch_channel_id,
+                    False,
+                    "2026-07-01T12:00:00+00:00",
+                    thread_id_2,
+                    twitch_channel_id,
+                    True,
+                    "2026-07-01T13:00:00+00:00",
+                ),
+            )
 
-                await cursor.execute(migration_sql)
-                await cursor.execute(
-                    """
-                    SELECT is_live, last_live_status_at
-                    FROM tracked_channel_state
-                    WHERE twitch_channel_id = %s
-                    """,
-                    (twitch_channel_id,),
-                )
-                winner = await cursor.fetchone()
+            await cursor.execute(migration_sql)
+            await cursor.execute(
+                """
+                SELECT is_live, last_live_status_at
+                FROM tracked_channel_state
+                WHERE twitch_channel_id = %s
+                """,
+                (twitch_channel_id,),
+            )
+            winner = await cursor.fetchone()
 
-                assert winner is not None
-                assert winner[0] is True
-                assert winner[1].astimezone(UTC) == EXPECTED_SECOND_CHANGE_AT
-            finally:
-                await connection.rollback()
+            assert winner is not None
+            assert winner[0] is True
+            assert winner[1].astimezone(UTC) == EXPECTED_SECOND_CHANGE_AT
+        finally:
+            await connection.rollback()

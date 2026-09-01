@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import discord
 
-from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.entrypoints.discord.helpers import defer_interaction_response
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
@@ -12,6 +11,7 @@ from src.localization import Localizer
 from ...dispatch import dispatch_disable_pattern, dispatch_enable_pattern, dispatch_remove_pattern
 from ...ui_data import DiscordUIDataProvider, PatternPresentation
 from ..shared import BaseFormView
+from .context import PatternViewContext
 from .state import PatternActionKind
 
 
@@ -21,27 +21,22 @@ class PatternIdActionView(BaseFormView):
     def __init__(
         self,
         *,
-        owner_id: int,
-        language: str,
-        services: DiscordServiceBundle,
-        data_provider: DiscordUIDataProvider,
-        discord_channel_id: int,
+        context: PatternViewContext[DiscordUIDataProvider],
         action: PatternActionKind,
-        localizer: Localizer,
     ) -> None:
+        """Create a picker for one ID-based pattern action."""
         super().__init__(
-            owner_id=owner_id,
-            localizer=localizer,
-            language=language,
+            owner_id=context.owner_id,
+            localizer=context.localizer,
+            language=context.language,
         )
-        self._services = services
-        self._data_provider = data_provider
-        self._discord_channel_id = discord_channel_id
+        self._context = context
         self._action = action
         self._patterns: list[PatternPresentation] = []
 
     async def prepare(self) -> DiscordCommandResult | None:
-        patterns = await self._data_provider.list_patterns(self._discord_channel_id)
+        """Load patterns valid for the configured action."""
+        patterns = await self._context.data_provider.list_patterns(self._context.discord_channel_id)
         if self._action is PatternActionKind.DISABLE:
             patterns = [pattern for pattern in patterns if not pattern.pattern.disabled]
         elif self._action is PatternActionKind.ENABLE:
@@ -56,6 +51,7 @@ class PatternIdActionView(BaseFormView):
         return self.result(key, style=DiscordResultStyle.ERROR, ephemeral=True)
 
     def render_embed(self) -> discord.Embed:
+        """Render the localized prompt for the configured action."""
         action_label = {
             PatternActionKind.REMOVE: self.text("discord.pattern_ui.action.remove_title"),
             PatternActionKind.DISABLE: self.text("discord.pattern_ui.action.disable_title"),
@@ -64,25 +60,26 @@ class PatternIdActionView(BaseFormView):
         return self.form_embed("discord.pattern_ui.action.embed", sources={"view": {"action": action_label}})
 
     async def run_action(self, interaction: discord.Interaction, pattern_id: int) -> None:
+        """Dispatch the configured action for the selected pattern ID."""
         await defer_interaction_response(interaction, ephemeral=True)
         if self._action is PatternActionKind.REMOVE:
             result = await dispatch_remove_pattern(
-                self._services,
-                discord_channel_id=self._discord_channel_id,
+                self._context.services,
+                discord_channel_id=self._context.discord_channel_id,
                 requester_id=interaction.user.id,
                 pattern_id=pattern_id,
             )
         elif self._action is PatternActionKind.DISABLE:
             result = await dispatch_disable_pattern(
-                self._services,
-                discord_channel_id=self._discord_channel_id,
+                self._context.services,
+                discord_channel_id=self._context.discord_channel_id,
                 requester_id=interaction.user.id,
                 pattern_id=pattern_id,
             )
         else:
             result = await dispatch_enable_pattern(
-                self._services,
-                discord_channel_id=self._discord_channel_id,
+                self._context.services,
+                discord_channel_id=self._context.discord_channel_id,
                 requester_id=interaction.user.id,
                 pattern_id=pattern_id,
             )
@@ -101,6 +98,7 @@ class PatternActionSelectionModal(discord.ui.Modal):
         localizer: Localizer,
         language: str,
     ) -> None:
+        """Create the modal-backed selector for ID-based pattern actions."""
         super().__init__(title=title, timeout=300)
         self._parent_view = parent
         self.pattern = discord.ui.Label(
@@ -139,4 +137,5 @@ class PatternActionSelectionModal(discord.ui.Modal):
         self.add_item(self.pattern)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        """Forward the selected pattern ID to the parent action view."""
         await self._parent_view.run_action(interaction, int(self.pattern.component.values[0]))

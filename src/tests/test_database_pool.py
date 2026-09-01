@@ -76,7 +76,7 @@ class TimeoutPool(FakePool):
 @pytest.mark.asyncio
 async def test_database_healthcheck_uses_async_pool(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_pool = FakePool()
-    monkeypatch.setattr("src.database.postgres.database.AsyncConnectionPool", lambda *args, **kwargs: fake_pool)
+    monkeypatch.setattr("src.database.postgres.database.AsyncConnectionPool", lambda *_args, **_kwargs: fake_pool)
     database = PostgresDatabase(AppConfig(), max_pool_size=1, acquire_timeout_seconds=0.01)
 
     await database.open()
@@ -92,7 +92,7 @@ async def test_database_healthcheck_uses_async_pool(monkeypatch: pytest.MonkeyPa
 @pytest.mark.asyncio
 async def test_database_async_connection_commits_changes(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_pool = FakePool()
-    monkeypatch.setattr("src.database.postgres.database.AsyncConnectionPool", lambda *args, **kwargs: fake_pool)
+    monkeypatch.setattr("src.database.postgres.database.AsyncConnectionPool", lambda *_args, **_kwargs: fake_pool)
     database = PostgresDatabase(AppConfig(), max_pool_size=1, acquire_timeout_seconds=0.01)
 
     await database.open()
@@ -105,7 +105,7 @@ async def test_database_async_connection_commits_changes(monkeypatch: pytest.Mon
 
 @pytest.mark.asyncio
 async def test_database_pool_converts_pool_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("src.database.postgres.database.AsyncConnectionPool", lambda *args, **kwargs: TimeoutPool())
+    monkeypatch.setattr("src.database.postgres.database.AsyncConnectionPool", lambda *_args, **_kwargs: TimeoutPool())
     database = PostgresDatabase(AppConfig(), max_pool_size=1, acquire_timeout_seconds=0.01)
 
     await database.open()

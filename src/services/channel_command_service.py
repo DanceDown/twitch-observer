@@ -5,11 +5,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from src.database.connection import ChannelRepository, PatternRepository, ThreadRepository, UserPermissionRepository
+from src.database.connection import ChannelRepository, PatternRepository, ThreadRecord, ThreadRepository, UserPermissionRepository
 from src.discord_results import build_thread_result
 from src.errors import ApplicationInvariantError
 from src.events.commands import AddTrackedChannelCommand, RemoveTrackedChannelCommand, SetTrackedChannelColorCommand
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
+from src.gateways.twitch_api import TwitchUser
 from src.localization import Localizer
 from src.normalization import normalize_optional_color
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
@@ -18,6 +19,14 @@ from src.services.twitch_gateways import TwitchChannelLookup, TwitchIRCChannelGa
 from src.utils.permissions import ObserverPermission
 
 logger = logging.getLogger(__name__)
+
+
+def _tracked_channel_color_clear_missing() -> ApplicationInvariantError:
+    return ApplicationInvariantError.operation_returned_no_row("Tracked channel color clear")
+
+
+def _tracked_channel_color_update_missing() -> ApplicationInvariantError:
+    return ApplicationInvariantError.operation_returned_no_row("Tracked channel color update")
 
 
 @dataclass(slots=True)
@@ -36,6 +45,7 @@ class ChannelCommandService:
     _runner: CommandExecutionRunner = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Build shared command guards and error handling after injection."""
         self._guards = ThreadCommandGuards(
             thread_repository=self.thread_repository,
             permission_repository=self.permission_repository,
@@ -52,15 +62,18 @@ class ChannelCommandService:
         )
 
     async def handle_add(self, command: AddTrackedChannelCommand) -> DiscordCommandResult:
+        """Add a Twitch channel to the current Discord context."""
         return await self._runner.run(command, lambda: self._add_channel(command), logger_=logger)
 
     async def handle_remove(self, command: RemoveTrackedChannelCommand) -> DiscordCommandResult:
+        """Remove a Twitch channel from the current Discord context."""
         return await self._runner.run(command, lambda: self._remove_channel(command), logger_=logger)
 
     async def handle_color(self, command: SetTrackedChannelColorCommand) -> DiscordCommandResult:
+        """Set or clear the tracked-channel color override."""
         return await self._runner.run(command, lambda: self._set_color(command), logger_=logger)
 
-    async def _require_manage_channels(self, command: object) -> tuple[object, DiscordCommandResult | None]:
+    async def _require_manage_channels(self, command: object) -> tuple[ThreadRecord | None, DiscordCommandResult | None]:
         thread = await self._guards.require_permission(
             command,
             permission=ObserverPermission.MANAGE_CHANNELS,
@@ -70,7 +83,7 @@ class ChannelCommandService:
             return None, thread
         return thread, None
 
-    async def _resolve_channel(self, login: str):
+    async def _resolve_channel(self, login: str) -> TwitchUser:
         return await self.twitch_api.refresh_channel_by_login(login)
 
     async def _add_channel(self, command: AddTrackedChannelCommand) -> DiscordCommandResult:
@@ -141,7 +154,7 @@ class ChannelCommandService:
             )
 
             if updated is None:
-                raise ApplicationInvariantError("Tracked channel color clear returned no row.")
+                raise _tracked_channel_color_clear_missing()
             return build_thread_result(
                 self.localizer,
                 "results.channel.color_cleared",
@@ -162,7 +175,7 @@ class ChannelCommandService:
         )
 
         if updated is None:
-            raise ApplicationInvariantError("Tracked channel color update returned no row.")
+            raise _tracked_channel_color_update_missing()
         return build_thread_result(
             self.localizer,
             "results.channel.color_updated",

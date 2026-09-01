@@ -9,10 +9,10 @@ import discord
 from discord import ChannelType
 
 from src.discord_results import build_result
+from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.events.ui_flow import UIFlowKind, UIFlowStep
 from src.localization import Localizer
-from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 
 from ..dispatch import (
     dispatch_disable_thread,
@@ -23,6 +23,7 @@ from ..dispatch import (
 from ..helpers import command_unavailable_result, ensure_ui_flow_allowed, send_initial_result
 from ..ui.thread_ui import LeaveConfirmationModal, ThreadColorModal
 from ..ui_data import DiscordUIDataProvider
+from .localized import command_descriptions, command_text
 
 logger = logging.getLogger(__name__)
 
@@ -35,102 +36,140 @@ def register_thread_commands(
 ) -> None:
     """Register Discord context lifecycle commands on the shared command tree."""
 
-    @tree.command(name="join", description="Let the Twitch Observer join this Discord channel.")
+    @tree.command(name="join", description=command_text(localizer, "thread.join.description"))
     async def join(interaction: discord.Interaction) -> None:
-        if interaction.channel_id is None:
-            await send_initial_result(interaction, command_unavailable_result())
-            return
-        if not await _ensure_thread_membership_for_join(interaction, localizer):
-            return
-        if not _can_send_public_result(interaction):
-            await send_initial_result(interaction, _missing_channel_access_result(localizer, interaction))
-            return
+        await _handle_join_command(interaction, services=services, localizer=localizer)
 
-        logger.debug(
-            "Discord join command discord_channel_id=%s requester_id=%s",
-            interaction.channel_id,
-            interaction.user.id,
-        )
-        result = await dispatch_join_thread(
-            services,
-            discord_channel_id=interaction.channel_id,
-            requester_id=interaction.user.id,
-        )
-        await send_initial_result(interaction, result)
-        if result.style == DiscordResultStyle.SUCCESS and isinstance(interaction.channel, discord.Thread):
-            with suppress(discord.HTTPException, discord.Forbidden):
-                await interaction.channel.join()
-
-    @tree.command(name="leave", description="Remove the Twitch Observer from this Discord channel and delete all data.")
+    @tree.command(name="leave", description=command_text(localizer, "thread.leave.description"))
     async def leave(interaction: discord.Interaction) -> None:
-        if interaction.channel_id is None:
-            await send_initial_result(interaction, command_unavailable_result())
-            return
-        if not await ensure_ui_flow_allowed(interaction, services, flow=UIFlowKind.THREAD, step=UIFlowStep.LEAVE):
-            return
+        await _handle_leave_command(interaction, services=services, ui_data_provider=ui_data_provider, localizer=localizer)
 
-        logger.debug(
-            "Discord leave command discord_channel_id=%s requester_id=%s",
-            interaction.channel_id,
-            interaction.user.id,
-        )
-        await interaction.response.send_modal(
-            LeaveConfirmationModal(
-                language=await ui_data_provider.get_thread_language(interaction.channel_id) or localizer.default_language,
-                services=services,
-                discord_channel_id=interaction.channel_id,
-                requester_id=interaction.user.id,
-                localizer=localizer,
-            )
-        )
-
-    @tree.command(name="on", description="Enable the Twitch Observer.")
+    @tree.command(name="on", description=command_text(localizer, "thread.on.description"))
     async def on(interaction: discord.Interaction) -> None:
         await _handle_state_command(interaction, services=services, action="enable")
 
-    @tree.command(name="off", description="Disable the Twitch Observer.")
+    @tree.command(name="off", description=command_text(localizer, "thread.off.description"))
     async def off(interaction: discord.Interaction) -> None:
         await _handle_state_command(interaction, services=services, action="disable")
 
-    @tree.command(name="color", description="Set the default Discord color for messages.")
+    @tree.command(name="color", description=command_text(localizer, "thread.color.description"))
     async def color(interaction: discord.Interaction) -> None:
-        if interaction.channel_id is None:
-            await send_initial_result(interaction, command_unavailable_result())
-            return
-        if not await ensure_ui_flow_allowed(interaction, services, flow=UIFlowKind.THREAD, step=UIFlowStep.COLOR):
-            return
-        await interaction.response.send_modal(
-            ThreadColorModal(
-                language=await ui_data_provider.get_thread_language(interaction.channel_id) or localizer.default_language,
-                services=services,
-                discord_channel_id=interaction.channel_id,
-                requester_id=interaction.user.id,
-                localizer=localizer,
-            ),
-        )
+        await _handle_color_command(interaction, services=services, ui_data_provider=ui_data_provider, localizer=localizer)
 
-    @tree.command(name="language", description="Set the language for this Discord channel.")
-    @discord.app_commands.describe(language="Language used for this Discord channel.")
+    @tree.command(name="language", description=command_text(localizer, "thread.language.description"))
+    @discord.app_commands.describe(**command_descriptions(localizer, language="thread.language.options.language"))
     @discord.app_commands.choices(
         language=[
-            discord.app_commands.Choice(name="english", value="english"),
-            discord.app_commands.Choice(name="german", value="german"),
+            discord.app_commands.Choice(name=command_text(localizer, "thread.language.choices.english"), value="english"),
+            discord.app_commands.Choice(name=command_text(localizer, "thread.language.choices.german"), value="german"),
         ]
     )
     async def language(
         interaction: discord.Interaction,
         language: discord.app_commands.Choice[str],
     ) -> None:
-        if interaction.channel_id is None:
-            await send_initial_result(interaction, command_unavailable_result())
-            return
-        result = await dispatch_set_thread_language(
-            services,
+        await _handle_language_command(interaction, services=services, language=language.value)
+
+
+async def _handle_join_command(
+    interaction: discord.Interaction,
+    *,
+    services: DiscordServiceBundle,
+    localizer: Localizer,
+) -> None:
+    if interaction.channel_id is None:
+        await send_initial_result(interaction, command_unavailable_result())
+        return
+    if not await _ensure_thread_membership_for_join(interaction, localizer):
+        return
+    if not _can_send_public_result(interaction):
+        await send_initial_result(interaction, _missing_channel_access_result(localizer, interaction))
+        return
+
+    logger.debug(
+        "Discord join command discord_channel_id=%s requester_id=%s",
+        interaction.channel_id,
+        interaction.user.id,
+    )
+    result = await dispatch_join_thread(
+        services,
+        discord_channel_id=interaction.channel_id,
+        requester_id=interaction.user.id,
+    )
+    await send_initial_result(interaction, result)
+    if result.style == DiscordResultStyle.SUCCESS and isinstance(interaction.channel, discord.Thread):
+        with suppress(discord.HTTPException, discord.Forbidden):
+            await interaction.channel.join()
+
+
+async def _handle_leave_command(
+    interaction: discord.Interaction,
+    *,
+    services: DiscordServiceBundle,
+    ui_data_provider: DiscordUIDataProvider,
+    localizer: Localizer,
+) -> None:
+    if interaction.channel_id is None:
+        await send_initial_result(interaction, command_unavailable_result())
+        return
+    if not await ensure_ui_flow_allowed(interaction, services, flow=UIFlowKind.THREAD, step=UIFlowStep.LEAVE):
+        return
+
+    logger.debug(
+        "Discord leave command discord_channel_id=%s requester_id=%s",
+        interaction.channel_id,
+        interaction.user.id,
+    )
+    await interaction.response.send_modal(
+        LeaveConfirmationModal(
+            language=await ui_data_provider.get_thread_language(interaction.channel_id) or localizer.default_language,
+            services=services,
             discord_channel_id=interaction.channel_id,
             requester_id=interaction.user.id,
-            language=language.value,
+            localizer=localizer,
         )
-        await send_initial_result(interaction, result)
+    )
+
+
+async def _handle_color_command(
+    interaction: discord.Interaction,
+    *,
+    services: DiscordServiceBundle,
+    ui_data_provider: DiscordUIDataProvider,
+    localizer: Localizer,
+) -> None:
+    if interaction.channel_id is None:
+        await send_initial_result(interaction, command_unavailable_result())
+        return
+    if not await ensure_ui_flow_allowed(interaction, services, flow=UIFlowKind.THREAD, step=UIFlowStep.COLOR):
+        return
+    await interaction.response.send_modal(
+        ThreadColorModal(
+            language=await ui_data_provider.get_thread_language(interaction.channel_id) or localizer.default_language,
+            services=services,
+            discord_channel_id=interaction.channel_id,
+            requester_id=interaction.user.id,
+            localizer=localizer,
+        ),
+    )
+
+
+async def _handle_language_command(
+    interaction: discord.Interaction,
+    *,
+    services: DiscordServiceBundle,
+    language: str,
+) -> None:
+    if interaction.channel_id is None:
+        await send_initial_result(interaction, command_unavailable_result())
+        return
+    result = await dispatch_set_thread_language(
+        services,
+        discord_channel_id=interaction.channel_id,
+        requester_id=interaction.user.id,
+        language=language,
+    )
+    await send_initial_result(interaction, result)
 
 
 async def _handle_state_command(

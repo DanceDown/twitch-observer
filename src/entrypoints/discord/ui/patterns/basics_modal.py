@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import discord
+
 from src.entrypoints.discord.helpers import defer_interaction_response
 
 if TYPE_CHECKING:
@@ -15,6 +16,7 @@ class PatternBasicsModal(discord.ui.Modal):
     """Collect text, mode, casing, and color in one modal."""
 
     def __init__(self, *, parent: PatternHomeView) -> None:
+        """Create the modal seeded from the current pattern form state."""
         super().__init__(title=parent.text("discord.pattern_ui.basics.title"), timeout=300)
         self._parent_view = parent
         self.pattern_text = discord.ui.TextInput(
@@ -67,6 +69,7 @@ class PatternBasicsModal(discord.ui.Modal):
         self.add_item(self.color)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        """Store submitted basics in the parent form and rerender it."""
         await defer_interaction_response(interaction)
         self._parent_view.state.pattern_text = self.pattern_text.value.strip()
         self._parent_view.state.is_regex = self.mode.component.value == "regex"

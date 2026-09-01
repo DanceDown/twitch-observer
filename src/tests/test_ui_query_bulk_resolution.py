@@ -10,10 +10,11 @@ from src.gateways.twitch_api import TwitchUser
 from src.localization import Localizer
 from src.services.discord_ui_queries import PatternQueryService, TrackedChannelQueryService, TrackedUserQueryService
 from src.services.patterns.show_renderer import ShowSectionRenderer
+from src.services.twitch_gateways import TwitchDirectoryGateway
 
 
 @dataclass
-class FakeTwitchDirectory:
+class FakeTwitchDirectory(TwitchDirectoryGateway):
     users_by_id: dict[str, TwitchUser] = field(default_factory=dict)
     cached_users_by_id: dict[str, TwitchUser] = field(default_factory=dict)
     batch_requests: list[tuple[str, ...]] = field(default_factory=list)
@@ -30,13 +31,39 @@ class FakeTwitchDirectory:
         self.user_id_requests.append(normalized)
         return self.users_by_id[normalized]
 
+    async def refresh_user_by_id(self, user_id: str) -> TwitchUser:
+        return await self.get_user_by_id(user_id)
+
+    async def get_user_by_login(self, login: str) -> TwitchUser:
+        normalized = login.strip().lower()
+        for user in self.users_by_id.values():
+            if user.login == normalized:
+                return user
+        raise KeyError(normalized)
+
+    async def refresh_user_by_login(self, login: str) -> TwitchUser:
+        return await self.get_user_by_login(login)
+
     async def get_channel_by_id(self, user_id: str) -> TwitchUser:
         normalized = user_id.strip()
         self.channel_id_requests.append(normalized)
         return self.users_by_id[normalized]
 
+    async def refresh_channel_by_login(self, login: str) -> TwitchUser:
+        return await self.get_user_by_login(login)
+
+    def get_cached_user_by_login(self, login: str) -> TwitchUser | None:
+        normalized = login.strip().lower()
+        for user in self.cached_users_by_id.values():
+            if user.login == normalized:
+                return user
+        return None
+
     def get_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
         return self.cached_users_by_id.get(user_id.strip())
+
+    async def load_cached_user_by_login(self, login: str) -> TwitchUser | None:
+        return self.get_cached_user_by_login(login)
 
     async def load_cached_user_by_id(self, user_id: str) -> TwitchUser | None:
         return self.get_cached_user_by_id(user_id)
@@ -140,7 +167,7 @@ async def test_pattern_query_service_bulk_resolves_scope_users_once() -> None:
                 ),
             ]
         ),
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
 
     patterns = await service.list_patterns(42)
@@ -167,7 +194,7 @@ async def test_tracked_channel_query_service_bulk_resolves_channels_once() -> No
                 ChannelRecord(thread_id=7, twitch_channel_id="12", color="#123456"),
             ]
         ),
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
 
     channels = await service.list_tracked_channels(42)
@@ -193,7 +220,7 @@ async def test_tracked_user_query_service_bulk_resolves_users_once() -> None:
                 TrackedUserRecord(thread_id=7, twitch_user_id="22"),
             ]
         ),
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        twitch_api=twitch_api,
     )
 
     users = await service.list_tracked_users(42)
@@ -214,8 +241,8 @@ async def test_show_renderer_bulk_preloads_tracked_users_section() -> None:
     renderer = ShowSectionRenderer(
         channel_repository=StaticChannelRepository(),
         pattern_repository=StaticPatternRepository(),
-        reply_repository=None,  # type: ignore[arg-type]
-        twitch_api=twitch_api,  # type: ignore[arg-type]
+        reply_repository=None,
+        twitch_api=twitch_api,
         tracked_user_repository=StaticTrackedUserRepository(
             tracked_users=[
                 TrackedUserRecord(thread_id=7, twitch_user_id="21"),

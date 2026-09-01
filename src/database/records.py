@@ -36,6 +36,36 @@ class TwitchAccountRecord:
 
 
 @dataclass(slots=True, frozen=True)
+class TwitchAccountTokenData:
+    """Fresh Twitch token data validated against Helix before persistence."""
+
+    twitch_user_id: str
+    twitch_login: str
+    client_id: str
+    access_token: str
+    refresh_token: str | None
+    expires_at: str | None
+    scope: tuple[str, ...]
+    token_type: str | None
+
+
+@dataclass(slots=True, frozen=True)
+class TwitchAccountCreate:
+    """Request object for creating or replacing a Discord user's Twitch link."""
+
+    discord_user_id: int
+    token: TwitchAccountTokenData
+
+
+@dataclass(slots=True, frozen=True)
+class TwitchAccountUpdate:
+    """Request object for refreshing a stored Twitch account token."""
+
+    account_id: int
+    token: TwitchAccountTokenData
+
+
+@dataclass(slots=True, frozen=True)
 class TwitchDeviceFlowRecord:
     """Persisted pending Twitch Device Code login for one Discord user."""
 
@@ -53,6 +83,20 @@ class TwitchDeviceFlowRecord:
 
 
 @dataclass(slots=True, frozen=True)
+class TwitchDeviceFlowUpsert:
+    """Request object for storing a pending Twitch Device Code login."""
+
+    discord_user_id: int
+    discord_channel_id: int
+    device_code: str
+    user_code: str
+    verification_uri: str
+    interval_seconds: int
+    expires_at: str
+    scope: tuple[str, ...]
+
+
+@dataclass(slots=True, frozen=True)
 class TwitchUserCacheRecord:
     """Persisted Twitch user metadata used to avoid repeated Helix lookups."""
 
@@ -61,6 +105,11 @@ class TwitchUserCacheRecord:
     display_name: str
     profile_image_url: str | None
     updated_at: str
+    chat_color: str | None = None
+
+
+# Batch item shape for API-fresh Twitch user cache writes.
+type TwitchUserCacheUpsert = tuple[str, str, str, str | None, str | None]
 
 
 @dataclass(slots=True, frozen=True)
@@ -111,6 +160,51 @@ class PatternRecord:
     priority: int
     reply_message: str | None = None
     reply_as_reply: bool = False
+
+
+@dataclass(slots=True, frozen=True)
+class PatternDefinition:
+    """Match expression plus filters that define one ping uniquely inside a thread."""
+
+    regex: str
+    channel_scope_mode: str
+    channel_scope_ids: tuple[str, ...]
+    user_scope_mode: str
+    user_scope_ids: tuple[str, ...]
+    sub_state: str
+    offline_state: str
+    is_regex: bool
+    case_sensitive: bool
+
+
+@dataclass(slots=True, frozen=True)
+class PatternExactQuery:
+    """Lookup for an existing pattern with the same match definition."""
+
+    thread_id: int
+    definition: PatternDefinition
+
+
+@dataclass(slots=True, frozen=True)
+class PatternCreate:
+    """Request object for creating a new ping/regex pattern."""
+
+    thread_id: int
+    definition: PatternDefinition
+    color: str | None
+    disabled: bool
+    priority: int
+
+
+@dataclass(slots=True, frozen=True)
+class PatternUpdate:
+    """Request object for replacing a stored pattern definition."""
+
+    thread_id: int
+    pattern_id: int
+    definition: PatternDefinition
+    color: str | None
+    priority: int
 
 
 @dataclass(slots=True, frozen=True)
@@ -203,6 +297,18 @@ class SupportTicketRecord:
     closed_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(slots=True, frozen=True)
+class SupportTicketCreate:
+    """Data required to create one support ticket."""
+
+    source_discord_channel_id: int
+    requester_discord_user_id: int
+    category: str
+    title: str
+    description: str
+    language: str
 
 
 @dataclass(slots=True, frozen=True)

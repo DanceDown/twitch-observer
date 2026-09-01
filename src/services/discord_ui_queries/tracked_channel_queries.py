@@ -13,14 +13,18 @@ from .shared import get_thread_for_channel, resolve_users_by_ids
 
 @dataclass(slots=True)
 class TrackedChannelQueryService:
+    """Load tracked Twitch channel data for Discord UI selections."""
+
     thread_repository: ThreadRepository
     channel_repository: ChannelRepository
     twitch_api: TwitchDirectoryGateway
 
     async def get_thread(self, discord_channel_id: int) -> ThreadRecord | None:
+        """Return the thread configured for one Discord channel."""
         return await get_thread_for_channel(self.thread_repository, discord_channel_id)
 
     async def get_thread_language(self, discord_channel_id: int) -> str | None:
+        """Return the configured language for one Discord channel."""
         thread = await self.get_thread(discord_channel_id)
         return None if thread is None else thread.language
 
@@ -30,6 +34,7 @@ class TrackedChannelQueryService:
         *,
         filter_user_ids: tuple[str, ...] | None = None,
     ) -> list[TrackedChannelPresentation]:
+        """List tracked channels with Twitch names and configured colors."""
         thread = await self.get_thread(discord_channel_id)
         if thread is None:
             return []

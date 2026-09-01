@@ -10,13 +10,13 @@ from dataclasses import dataclass
 from src.entrypoints.discord import DiscordEntrypoint
 from src.entrypoints.discord.ui_data import DiscordUIDataProvider
 from src.entrypoints.twitch_irc import TwitchIRCEntrypoint
-from src.services.batched_message_repository import BatchedMessageRepository
 from src.services.account_polling_service import DeviceFlowPollingService
+from src.services.batched_message_repository import BatchedMessageRepository
 from src.services.discord_presence_service import DiscordPresenceService
 from src.services.irc_bootstrap_service import IRCBootstrapService
 from src.services.tracking_delivery_queue import OrderedTrackingDeliveryService
-from src.services.twitch_metadata_refresh_service import TwitchMetadataRefreshService
 from src.services.twitch_live_monitor_service import TwitchLiveMonitorService
+from src.services.twitch_metadata_refresh_service import TwitchMetadataRefreshService
 
 from .models import ApplicationCore, ApplicationEntrypoints, ApplicationGateways, ApplicationRuntime, ApplicationServices
 
@@ -26,6 +26,7 @@ def build_entrypoints(
     services: ApplicationServices,
     gateways: ApplicationGateways,
 ) -> ApplicationEntrypoints:
+    """Create Discord and IRC entrypoints and bind Discord delivery relays."""
     discord_entrypoint = DiscordEntrypoint(
         config=core.config,
         services=services.discord,
@@ -42,6 +43,7 @@ def build_runtime(
     services: ApplicationServices,
     gateways: ApplicationGateways,
 ) -> ApplicationRuntime:
+    """Create background workers and connect ordered delivery to chat processing."""
     message_write_batcher = core.message_repository if isinstance(core.message_repository, BatchedMessageRepository) else None
     tracking_delivery_queue = OrderedTrackingDeliveryService(
         sender=services.runtime_coordinator.tracking.sender,
@@ -109,9 +111,12 @@ def build_runtime(
 
 @dataclass(slots=True)
 class _LiveMonitorTrackedChannelsNotifier:
+    """Tiny adapter used by channel commands to wake the live monitor."""
+
     monitor: TwitchLiveMonitorService
 
     async def notify_tracked_channels_changed(self) -> None:
+        """Signal that the set of tracked Twitch channels changed."""
         self.monitor.notify_tracked_channels_changed()
 
 
@@ -121,6 +126,7 @@ async def start_runtime(
     *,
     task_failure_callback: Callable[[asyncio.Task[object]], None] | None = None,
 ) -> None:
+    """Start queues before entrypoints so incoming events always have consumers."""
     await runtime.tracking_delivery_queue.start()
     if runtime.message_write_batcher is not None:
         await runtime.message_write_batcher.start()
@@ -139,6 +145,7 @@ async def start_runtime(
 
 
 async def stop_runtime(core: ApplicationCore, entrypoints: ApplicationEntrypoints, runtime: ApplicationRuntime) -> None:
+    """Stop intake first, then drain queues and close external resources."""
     if runtime.twitch_irc_task is not None:
         runtime.twitch_irc_task.cancel()
         with suppress(asyncio.CancelledError):

@@ -3,15 +3,20 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
+
+import psycopg
 
 from src.database.connection import (
     AdapterEventActionRepository,
     ChannelRepository,
     PatternRepository,
     ReplyRepository,
+    SupportTicketCreate,
     SupportTicketRecord,
     SupportTicketRepository,
+    ThreadRecord,
     ThreadRepository,
     TrackedUserRepository,
     TwitchAccountRepository,
@@ -41,6 +46,8 @@ SUPPORT_RESPONSE_SUBJECT_MAX_LENGTH = 120
 SUPPORT_RESPONSE_BODY_MAX_LENGTH = 1500
 _SHOW_SECTIONS = ("channels", "stream_pings", "pings", "auto_replies", "users", "permissions", "account")
 
+ShowSectionRendererFn = Callable[[ThreadRecord], Awaitable[str]]
+
 
 @dataclass(slots=True, frozen=True)
 class SupportTicketCreateResult:
@@ -67,6 +74,19 @@ class SupportTicketUpdateResult:
     ticket: SupportTicketRecord | None
 
 
+@dataclass(slots=True, frozen=True)
+class _TicketResultOptions:
+    """Display switches for support-ticket command results."""
+
+    style: DiscordResultStyle = DiscordResultStyle.ERROR
+    ephemeral: bool = True
+    color: str | None = None
+    extra_view: dict[str, object] | None = None
+
+
+_DEFAULT_TICKET_RESULT_OPTIONS = _TicketResultOptions()
+
+
 @dataclass(slots=True)
 class SupportCommandService:
     """Create, answer, close and inspect support tickets."""
@@ -87,6 +107,7 @@ class SupportCommandService:
     _renderer: ShowSectionRenderer = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Build the shared renderer used by `/support show` actions."""
         self._renderer = ShowSectionRenderer(
             channel_repository=self.channel_repository,
             pattern_repository=self.pattern_repository,
@@ -107,7 +128,7 @@ class SupportCommandService:
             language = await self._language_for_source(command.discord_channel_id, command.language_hint)
             return await self._create(command, language=language)
         except DatabasePoolExhaustedError as error:
-            logger.error("Database pool exhausted while creating support ticket.")
+            logger.exception("Database pool exhausted while creating support ticket.")
             return self._create_error_result(
                 "results.support.unexpected_error",
                 language=language,
@@ -150,19 +171,20 @@ class SupportCommandService:
             return description_error
 
         ticket = await self.support_ticket_repository.create_ticket(
-            source_discord_channel_id=command.discord_channel_id,
-            requester_discord_user_id=command.requester_id,
-            category=category,
-            title=title,
-            description=description,
-            language=language,
+            SupportTicketCreate(
+                source_discord_channel_id=command.discord_channel_id,
+                requester_discord_user_id=command.requester_id,
+                category=category,
+                title=title,
+                description=description,
+                language=language,
+            )
         )
         return SupportTicketCreateResult(
             result=self._ticket_result(
                 "results.support.created",
-                ticket=ticket,
-                style=DiscordResultStyle.SUCCESS,
-                ephemeral=True,
+                ticket,
+                options=_TicketResultOptions(style=DiscordResultStyle.SUCCESS),
             ),
             ticket=ticket,
             support_discord_channel_id=self.support_discord_channel_id,
@@ -170,14 +192,22 @@ class SupportCommandService:
 
     async def record_support_message(self, *, ticket_id: int, support_message_id: int) -> SupportTicketRecord | None:
         """Attach the Discord support-channel message ID to one ticket."""
-        return await self.support_ticket_repository.set_support_message_id(
-            ticket_id=ticket_id,
-            support_message_id=support_message_id,
-        )
+        try:
+            return await self.support_ticket_repository.set_support_message_id(
+                ticket_id=ticket_id,
+                support_message_id=support_message_id,
+            )
+        except (DatabasePoolExhaustedError, psycopg.Error):
+            logger.warning("Could not record support message ID for ticket_id=%s.", ticket_id, exc_info=True)
+            return None
 
     async def list_open_tickets_with_messages(self) -> list[SupportTicketRecord]:
         """Return open tickets whose persistent views can be restored after a restart."""
-        return await self.support_ticket_repository.list_open_tickets_with_messages()
+        try:
+            return await self.support_ticket_repository.list_open_tickets_with_messages()
+        except (DatabasePoolExhaustedError, psycopg.Error):
+            logger.warning("Could not restore persistent support ticket views.", exc_info=True)
+            return []
 
     async def get_open_ticket_result(
         self,
@@ -195,15 +225,15 @@ class SupportCommandService:
                 )
             if ticket.status != SUPPORT_TICKET_OPEN:
                 return SupportTicketUpdateResult(
-                    result=self._ticket_result("results.support.ticket_not_open", ticket=ticket),
+                    result=self._ticket_result("results.support.ticket_not_open", ticket),
                     ticket=None,
                 )
             return SupportTicketUpdateResult(
-                result=self._ticket_result("results.support.action_ready", ticket=ticket),
+                result=self._ticket_result("results.support.action_ready", ticket),
                 ticket=ticket,
             )
         except DatabasePoolExhaustedError as error:
-            logger.error("Database pool exhausted while loading support ticket.")
+            logger.exception("Database pool exhausted while loading support ticket.")
             return SupportTicketUpdateResult(
                 result=self._plain_result(
                     "results.support.unexpected_error",
@@ -254,16 +284,18 @@ class SupportCommandService:
             return SupportTicketMessageResult(
                 result=self._ticket_result(
                     "results.support.user_answer",
-                    ticket=ticket_result.ticket,
-                    style=DiscordResultStyle.SUCCESS,
-                    ephemeral=False,
-                    color=thread.color if thread is not None else None,
-                    extra_view={"response_subject": subject, "response_body": body},
+                    ticket_result.ticket,
+                    options=_TicketResultOptions(
+                        style=DiscordResultStyle.SUCCESS,
+                        ephemeral=False,
+                        color=thread.color if thread is not None else None,
+                        extra_view={"response_subject": subject, "response_body": body},
+                    ),
                 ),
                 ticket=ticket_result.ticket,
             )
         except DatabasePoolExhaustedError as error:
-            logger.error("Database pool exhausted while preparing support ticket answer.")
+            logger.exception("Database pool exhausted while preparing support ticket answer.")
             return SupportTicketMessageResult(
                 result=self._plain_result(
                     "results.support.unexpected_error",
@@ -300,11 +332,15 @@ class SupportCommandService:
                     ticket=None,
                 )
             return SupportTicketUpdateResult(
-                result=self._ticket_result("results.support.answer_recorded", ticket=updated, style=DiscordResultStyle.SUCCESS),
+                result=self._ticket_result(
+                    "results.support.answer_recorded",
+                    updated,
+                    options=_TicketResultOptions(style=DiscordResultStyle.SUCCESS),
+                ),
                 ticket=updated,
             )
         except DatabasePoolExhaustedError as error:
-            logger.error("Database pool exhausted while marking support ticket answered.")
+            logger.exception("Database pool exhausted while marking support ticket answered.")
             return SupportTicketUpdateResult(
                 result=self._plain_result("results.support.unexpected_error", sources={"view": {"detail": str(error)}}),
                 ticket=None,
@@ -325,14 +361,13 @@ class SupportCommandService:
             return SupportTicketMessageResult(
                 result=self._ticket_result(
                     "results.support.user_closed",
-                    ticket=ticket_result.ticket,
-                    style=DiscordResultStyle.ERROR,
-                    ephemeral=False,
+                    ticket_result.ticket,
+                    options=_TicketResultOptions(ephemeral=False),
                 ),
                 ticket=ticket_result.ticket,
             )
         except DatabasePoolExhaustedError as error:
-            logger.error("Database pool exhausted while preparing support ticket close.")
+            logger.exception("Database pool exhausted while preparing support ticket close.")
             return SupportTicketMessageResult(
                 result=self._plain_result("results.support.unexpected_error", sources={"view": {"detail": str(error)}}),
                 ticket=None,
@@ -359,11 +394,15 @@ class SupportCommandService:
                     ticket=None,
                 )
             return SupportTicketUpdateResult(
-                result=self._ticket_result("results.support.close_recorded", ticket=updated, style=DiscordResultStyle.SUCCESS),
+                result=self._ticket_result(
+                    "results.support.close_recorded",
+                    updated,
+                    options=_TicketResultOptions(style=DiscordResultStyle.SUCCESS),
+                ),
                 ticket=updated,
             )
         except DatabasePoolExhaustedError as error:
-            logger.error("Database pool exhausted while marking support ticket closed.")
+            logger.exception("Database pool exhausted while marking support ticket closed.")
             return SupportTicketUpdateResult(
                 result=self._plain_result("results.support.unexpected_error", sources={"view": {"detail": str(error)}}),
                 ticket=None,
@@ -383,27 +422,11 @@ class SupportCommandService:
                 return self._plain_result("results.support.ticket_not_found")
             thread = await self.thread_repository.get_by_discord_channel_id(ticket.source_discord_channel_id)
             if thread is None:
-                return self._ticket_result("results.support.show_not_joined", ticket=ticket, style=DiscordResultStyle.ERROR)
+                return self._ticket_result("results.support.show_not_joined", ticket)
 
             self._renderer.reset_resolution_cache()
-            lines: list[str] = []
             sections = self._normalize_show_sections(command.sections)
-            if "channels" in sections:
-                lines.append(await self._renderer.render_channels_section(thread))
-            if "stream_pings" in sections:
-                lines.append(await self._renderer.render_channel_events_section(thread))
-            if "pings" in sections:
-                lines.append(await self._renderer.render_patterns_section(thread))
-            if "auto_replies" in sections:
-                lines.append(await self._renderer.render_auto_replies_section(thread))
-            if "users" in sections:
-                lines.append(await self._renderer.render_users_section(thread))
-            if "permissions" in sections:
-                lines.append(await self._renderer.render_permissions_section(thread))
-            thumbnail_url = None
-            if "account" in sections:
-                account_section, thumbnail_url = await self._renderer.render_account_section(thread)
-                lines.append(account_section)
+            lines, thumbnail_url = await self._render_show_sections(thread, sections)
             return build_thread_result(
                 self.localizer,
                 "results.support.show_overview",
@@ -414,7 +437,7 @@ class SupportCommandService:
                 thumbnail_url=thumbnail_url,
             )
         except DatabasePoolExhaustedError as error:
-            logger.error("Database pool exhausted while rendering support show.")
+            logger.exception("Database pool exhausted while rendering support show.")
             return self._plain_result("results.support.unexpected_error", sources={"view": {"detail": str(error)}})
         except Exception as error:
             logger.exception("Unexpected error while rendering support show.")
@@ -430,11 +453,11 @@ class SupportCommandService:
 
     def delivery_failed_result(self, ticket: SupportTicketRecord) -> DiscordCommandResult:
         """Build the shared error for failed origin-channel delivery."""
-        return self._ticket_result("results.support.delivery_failed", ticket=ticket, style=DiscordResultStyle.ERROR)
+        return self._ticket_result("results.support.delivery_failed", ticket)
 
     def support_channel_delivery_failed_result(self, ticket: SupportTicketRecord) -> DiscordCommandResult:
         """Build the shared error for failed support-channel delivery."""
-        return self._ticket_result("results.support.support_channel_delivery_failed", ticket=ticket, style=DiscordResultStyle.ERROR)
+        return self._ticket_result("results.support.support_channel_delivery_failed", ticket)
 
     async def _language_for_source(self, discord_channel_id: int, language_hint: str | None) -> str:
         thread = await self.thread_repository.get_by_discord_channel_id(discord_channel_id)
@@ -495,23 +518,20 @@ class SupportCommandService:
     def _ticket_result(
         self,
         key: str,
-        *,
         ticket: SupportTicketRecord,
-        style: DiscordResultStyle = DiscordResultStyle.ERROR,
-        ephemeral: bool = True,
-        color: str | None = None,
-        extra_view: dict[str, object] | None = None,
+        *,
+        options: _TicketResultOptions = _DEFAULT_TICKET_RESULT_OPTIONS,
     ) -> DiscordCommandResult:
         view = self._ticket_view(ticket)
-        if extra_view is not None:
-            view.update(extra_view)
+        if options.extra_view is not None:
+            view.update(options.extra_view)
         return build_result(
             self.localizer,
             key,
             language=ticket.language,
-            style=style,
-            ephemeral=ephemeral,
-            color=color,
+            style=options.style,
+            ephemeral=options.ephemeral,
+            color=options.color,
             sources={"view": view},
         )
 
@@ -560,3 +580,27 @@ class SupportCommandService:
     def _normalize_show_sections(raw_sections: tuple[str, ...]) -> tuple[str, ...]:
         normalized = tuple(section for section in raw_sections if section in _SHOW_SECTIONS)
         return normalized or ("channels",)
+
+    def _show_section_renderers(self) -> Mapping[str, ShowSectionRendererFn]:
+        return {
+            "channels": self._renderer.render_channels_section,
+            "stream_pings": self._renderer.render_channel_events_section,
+            "pings": self._renderer.render_patterns_section,
+            "auto_replies": self._renderer.render_auto_replies_section,
+            "users": self._renderer.render_users_section,
+            "permissions": self._renderer.render_permissions_section,
+        }
+
+    async def _render_show_sections(self, thread: ThreadRecord, sections: tuple[str, ...]) -> tuple[list[str], str | None]:
+        lines: list[str] = []
+        thumbnail_url = None
+        section_renderers = self._show_section_renderers()
+        for section in sections:
+            if section == "account":
+                account_section, thumbnail_url = await self._renderer.render_account_section(thread)
+                lines.append(account_section)
+                continue
+            renderer = section_renderers.get(section)
+            if renderer is not None:
+                lines.append(await renderer(thread))
+        return [line for line in lines if line], thumbnail_url

@@ -8,8 +8,8 @@ from src.database.postgres import (
     PostgresAdapterEventRepository,
     PostgresChannelRepository,
     PostgresDatabase,
-    PostgresMigrationRunner,
     PostgresMessageRepository,
+    PostgresMigrationRunner,
     PostgresPatternRepository,
     PostgresReplyRepository,
     PostgresSupportTicketRepository,
@@ -23,8 +23,8 @@ from src.database.postgres import (
 from src.gateways.twitch_api import TwitchAPIClient
 from src.gateways.twitch_irc import AnonymousTwitchIRCGateway
 from src.localization import Localizer
-from src.services.twitch_auth_service import TwitchAuthService
 from src.services.batched_message_repository import BatchedMessageRepository
+from src.services.twitch_auth_service import TwitchAuthService
 from src.services.twitch_chat_write_service import TwitchChatWriteService
 from src.services.twitch_live_query_service import TwitchLiveQueryService
 from src.services.twitch_service_bundle import TwitchServiceBundle
@@ -34,6 +34,7 @@ from .models import ApplicationCore, ApplicationGateways
 
 
 async def build_core(config: AppConfig) -> ApplicationCore:
+    """Create the shared infrastructure graph before entrypoints or workers start."""
     localizer = Localizer.from_directory()
     database = PostgresDatabase(config)
     await database.open()
@@ -95,4 +96,5 @@ async def build_core(config: AppConfig) -> ApplicationCore:
 
 
 def build_gateways(core: ApplicationCore) -> ApplicationGateways:
+    """Create external connection gateways that depend only on core configuration."""
     return ApplicationGateways(twitch_irc=AnonymousTwitchIRCGateway(core.config))

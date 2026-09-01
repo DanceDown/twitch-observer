@@ -458,6 +458,11 @@
         "body": "There is no Twitch account connected here right now <:oopsie:1497720439810687006>",
         "footer": ""
       },
+      "pending_unlinked": {
+        "title": "Twitch Login Cancelled",
+        "body": "<@{RAW:view.requester_id}> cancelled the pending Twitch login. You can start a new try with `/account` <:ApuApproved:1497724288256446465>",
+        "footer": ""
+      },
       "unlinked": {
         "title": "Twitch Account Unlinked",
         "body": "<@{RAW:view.requester_id}> disconnected [`{CODE:view.account.display_name}`](https://www.twitch.tv/{RAW:view.account.login}). Auto-replies stay saved and will work again once an account is linked <:ApuApproved:1497724288256446465>",
@@ -1591,6 +1596,327 @@
     }
   },
   "discord": {
+    "commands": {
+      "thread": {
+        "join": {
+          "description": "Let Twitch Observer join this Discord channel."
+        },
+        "leave": {
+          "description": "Remove Twitch Observer from this Discord channel and delete its data."
+        },
+        "on": {
+          "description": "Enable Twitch Observer."
+        },
+        "off": {
+          "description": "Disable Twitch Observer."
+        },
+        "color": {
+          "description": "Set the default Discord color for messages."
+        },
+        "language": {
+          "description": "Set the language for this Discord channel.",
+          "options": {
+            "language": "Language used for this Discord channel."
+          },
+          "choices": {
+            "english": "English",
+            "german": "German"
+          }
+        }
+      },
+      "channel": {
+        "description": "Add, remove, or recolor tracked Twitch channels.",
+        "add": {
+          "description": "Add one tracked Twitch channel.",
+          "options": {
+            "twitch_channel_login": "Twitch channel login."
+          }
+        },
+        "remove": {
+          "description": "Remove one tracked Twitch channel.",
+          "options": {
+            "twitch_channel_login": "Tracked Twitch channel login."
+          }
+        },
+        "color": {
+          "description": "Set or clear the color for one tracked channel.",
+          "options": {
+            "twitch_channel_login": "Tracked Twitch channel login.",
+            "color": "Hex color. Leave empty to clear it."
+          }
+        }
+      },
+      "user": {
+        "description": "Add or remove tracked Twitch users.",
+        "add": {
+          "description": "Add one tracked Twitch user.",
+          "options": {
+            "twitch_user_login": "Twitch user login."
+          }
+        },
+        "remove": {
+          "description": "Remove one tracked Twitch user.",
+          "options": {
+            "twitch_user_login": "Tracked Twitch user login."
+          }
+        }
+      },
+      "liveping": {
+        "description": "Manage live and offline pings for this Discord channel.",
+        "choices": {
+          "live": "Live",
+          "offline": "Offline"
+        },
+        "add": {
+          "description": "Add one live or offline ping.",
+          "options": {
+            "twitch_channel_login": "Tracked Twitch channel login.",
+            "state": "Live or offline state."
+          }
+        },
+        "remove": {
+          "description": "Remove one live or offline ping.",
+          "options": {
+            "ping_id": "Ping ID or display number."
+          }
+        },
+        "color": {
+          "description": "Set or clear the color for one live or offline ping.",
+          "options": {
+            "ping_id": "Ping ID or display number.",
+            "color": "Hex color. Leave empty to clear it."
+          }
+        }
+      },
+      "ping": {
+        "description": "Create, edit, remove, disable, or enable pings.",
+        "choices": {
+          "channel_scope": {
+            "all_tracked": "All tracked",
+            "only_selected": "Only selected",
+            "all_except_selected": "All except selected"
+          },
+          "user_scope": {
+            "all_users": "All users",
+            "all_tracked": "All tracked",
+            "all_tracked_except_selected": "All tracked except selected",
+            "only_selected": "Only selected",
+            "all_except_selected": "All except selected"
+          },
+          "sub_state": {
+            "all": "All",
+            "subs": "Subscribers",
+            "non_subs": "Non-subscribers"
+          },
+          "offline_state": {
+            "both": "Live and offline",
+            "online": "Live only",
+            "offline": "Offline only"
+          }
+        },
+        "add": {
+          "description": "Add one ping.",
+          "options": {
+            "pattern_text": "Pattern text.",
+            "is_regex": "Use regex mode.",
+            "channel_scope_mode": "Channel scope.",
+            "channel_logins": "Comma-separated Twitch channel logins.",
+            "user_scope_mode": "User scope.",
+            "user_logins": "Comma-separated Twitch user logins.",
+            "sub_state": "Subscriber filter.",
+            "offline_state": "Live/offline filter.",
+            "case_sensitive": "Case-sensitive matching.",
+            "color": "Hex color.",
+            "priority": "Priority from 0 to 9.",
+            "disabled": "Create as disabled."
+          }
+        },
+        "edit": {
+          "description": "Edit one existing ping.",
+          "options": {
+            "pattern_id": "Pattern ID or display number.",
+            "pattern_text": "New pattern text.",
+            "is_regex": "New regex mode.",
+            "channel_scope_mode": "New channel scope.",
+            "channel_logins": "New comma-separated channel logins.",
+            "user_scope_mode": "New user scope.",
+            "user_logins": "New comma-separated Twitch user logins.",
+            "sub_state": "New subscriber filter.",
+            "offline_state": "New live/offline filter.",
+            "case_sensitive": "New case-sensitive setting.",
+            "color": "New hex color.",
+            "clear_color": "Clear existing color.",
+            "priority": "New priority from 0 to 9."
+          }
+        },
+        "remove": {
+          "description": "Remove one ping.",
+          "options": {
+            "pattern_id": "Pattern ID or display number."
+          }
+        },
+        "disable": {
+          "description": "Disable one ping.",
+          "options": {
+            "pattern_id": "Pattern ID or display number."
+          }
+        },
+        "enable": {
+          "description": "Enable one ping.",
+          "options": {
+            "pattern_id": "Pattern ID or display number."
+          }
+        }
+      },
+      "reply": {
+        "description": "Add, remove, disable, or enable automatic replies.",
+        "pattern": {
+          "description": "Manage automatic replies attached to pings.",
+          "add": {
+            "description": "Add an auto-reply for one ping.",
+            "options": {
+              "pattern_id": "Pattern ID or display number.",
+              "message": "Reply text.",
+              "reply_as_reply": "Send as Twitch threaded reply."
+            }
+          },
+          "remove": {
+            "description": "Remove one ping auto-reply.",
+            "options": {
+              "pattern_id": "Pattern ID or display number."
+            }
+          },
+          "disable": {
+            "description": "Disable one ping auto-reply.",
+            "options": {
+              "pattern_id": "Pattern ID or display number."
+            }
+          },
+          "enable": {
+            "description": "Enable one ping auto-reply.",
+            "options": {
+              "pattern_id": "Pattern ID or display number."
+            }
+          }
+        },
+        "event": {
+          "description": "Manage automatic replies attached to live or offline events.",
+          "add": {
+            "description": "Add an auto-reply for one live or offline event.",
+            "options": {
+              "event_id": "Adapter event ID.",
+              "message": "Reply text."
+            }
+          },
+          "remove": {
+            "description": "Remove one event auto-reply.",
+            "options": {
+              "event_id": "Adapter event ID."
+            }
+          },
+          "disable": {
+            "description": "Disable one event auto-reply.",
+            "options": {
+              "event_id": "Adapter event ID."
+            }
+          },
+          "enable": {
+            "description": "Enable one event auto-reply.",
+            "options": {
+              "event_id": "Adapter event ID."
+            }
+          }
+        }
+      },
+      "permission": {
+        "description": "Grant, revoke, or clear Discord user permissions.",
+        "grant": {
+          "description": "Grant permissions to one Discord user.",
+          "options": {
+            "target_user": "Discord user to update.",
+            "permissions": "Comma-separated permission values."
+          }
+        },
+        "revoke": {
+          "description": "Revoke permissions from one Discord user.",
+          "options": {
+            "target_user": "Discord user to update.",
+            "permissions": "Comma-separated permission values."
+          }
+        },
+        "clear": {
+          "description": "Clear all explicit permissions for one Discord user.",
+          "options": {
+            "target_user": "Discord user to update."
+          }
+        }
+      },
+      "account": {
+        "description": "Connect or disconnect your Twitch account.",
+        "connect": {
+          "description": "Connect your Twitch account."
+        },
+        "disconnect": {
+          "description": "Disconnect your Twitch account."
+        }
+      },
+      "help": {
+        "description": "Explain how to use the bot.",
+        "options": {
+          "section": "Optional topic. Leave empty for the general introduction."
+        },
+        "choices": {
+          "overview": "Overview",
+          "first_steps": "First steps",
+          "channels": "Channels",
+          "users": "Users",
+          "pings": "Pings",
+          "auto_replies": "Auto-replies",
+          "live_pings": "Live pings",
+          "write": "Write",
+          "account": "Account",
+          "permissions": "Permissions",
+          "tips": "Tips"
+        }
+      },
+      "show": {
+        "description": "Show the settings of the current channel.",
+        "options": {
+          "section": "Optional section. Leave empty to pick from the modal."
+        },
+        "choices": {
+          "pings": "Pings",
+          "auto_replies": "Auto-replies",
+          "stream_pings": "Live/offline pings",
+          "channels": "Channels",
+          "users": "Users",
+          "permissions": "Permissions",
+          "account": "Account"
+        }
+      },
+      "support": {
+        "description": "Create a support ticket.",
+        "options": {
+          "category": "Support category.",
+          "title": "Short title for the support request.",
+          "description": "What happened or what do you need help with?"
+        },
+        "choices": {
+          "bug": "Bug",
+          "question": "Question",
+          "idea": "Idea",
+          "other": "Other"
+        }
+      },
+      "write": {
+        "description": "Send a Twitch message from the linked account.",
+        "options": {
+          "twitch_channel_login": "Optional direct target channel login.",
+          "message": "Optional direct message text.",
+          "reply_parent_message_id": "Optional Twitch message ID to send as reply."
+        }
+      }
+    },
     "tracking_embed": {
       "footer_channel": "Channel: {RAW:view.channel_name}",
       "reply_field": "Reply"

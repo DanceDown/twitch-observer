@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from src.database.connection import ThreadRepository, UserPermissionRepository
+from src.database.connection import ThreadRecord, ThreadRepository, UserPermissionRepository
 from src.discord_results import build_thread_result
 from src.events.commands import ClearPermissionsCommand, GrantPermissionsCommand, RevokePermissionsCommand
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
@@ -27,6 +27,7 @@ class PermissionCommandService:
     _runner: CommandExecutionRunner = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Build shared command guards and error handling after injection."""
         self._guards = ThreadCommandGuards(
             thread_repository=self.thread_repository,
             permission_repository=self.permission_repository,
@@ -43,15 +44,21 @@ class PermissionCommandService:
         )
 
     async def handle_grant(self, command: GrantPermissionsCommand) -> DiscordCommandResult:
+        """Grant one or more permissions in the current Discord context."""
         return await self._runner.run(command, lambda: self._grant(command), logger_=logger)
 
     async def handle_revoke(self, command: RevokePermissionsCommand) -> DiscordCommandResult:
+        """Revoke one or more permissions in the current Discord context."""
         return await self._runner.run(command, lambda: self._revoke(command), logger_=logger)
 
     async def handle_clear(self, command: ClearPermissionsCommand) -> DiscordCommandResult:
+        """Clear all explicit permissions for one user in the context."""
         return await self._runner.run(command, lambda: self._clear(command), logger_=logger)
 
-    async def _require_manage_permissions(self, command) -> tuple[object, DiscordCommandResult | None]:
+    async def _require_manage_permissions(
+        self,
+        command: GrantPermissionsCommand | RevokePermissionsCommand | ClearPermissionsCommand,
+    ) -> tuple[ThreadRecord | None, DiscordCommandResult | None]:
         thread = await self._guards.require_permission(
             command,
             permission=ObserverPermission.MANAGE_PERMISSIONS,

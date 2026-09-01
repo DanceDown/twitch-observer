@@ -6,8 +6,8 @@ from contextlib import suppress
 
 import discord
 
-from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.discord_results import build_result
+from src.entrypoints.discord.service_bundle import DiscordServiceBundle
 from src.events.discord_results import DiscordResultStyle
 from src.localization import Localizer
 
@@ -27,6 +27,7 @@ class LeaveConfirmationModal(discord.ui.Modal):
         requester_id: int,
         localizer: Localizer,
     ) -> None:
+        """Create the confirmation modal for leaving a context."""
         super().__init__(
             title=localizer.text("discord.thread_modal.confirm_leave_title", language=language),
             timeout=300,
@@ -87,6 +88,7 @@ class ThreadColorModal(discord.ui.Modal):
         requester_id: int,
         localizer: Localizer,
     ) -> None:
+        """Create the modal for editing the thread color override."""
         super().__init__(
             title=localizer.text("discord.thread_modal.observer_color_title", language=language),
             timeout=300,

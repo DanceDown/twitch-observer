@@ -7,18 +7,22 @@ import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from src.gateways.twitch_api import TwitchAPIError, TwitchAuthenticationError
 from src.database.connection import (
+    AdapterEventActionRecord,
     AdapterEventActionRepository,
+    AdapterEventRecord,
     AdapterEventRepository,
     ChannelRecord,
     ChannelRepository,
     MessageRepository,
+    ThreadRecord,
     ThreadRepository,
+    TwitchAccountRecord,
     TwitchAccountRepository,
 )
+from src.events.twitch_events import TwitchChannelLiveStateChangedEvent, TwitchChatMessageEvent, TwitchChatSendRequest
+from src.gateways.twitch_api import TwitchAPIError, TwitchAuthenticationError
 from src.localization import Localizer
-from src.events.twitch_events import TwitchChannelLiveStateChangedEvent, TwitchChatMessageEvent
 from src.services.patterns import TrackingNotificationSender
 from src.services.twitch_gateways import TwitchReplyGateway
 from src.services.twitch_runtime import (
@@ -29,13 +33,33 @@ from src.services.twitch_runtime import (
     STREAM_ONLINE_EVENT_KEY,
     TWITCH_ADAPTER_KEY,
     TWITCH_SEND_MESSAGE_ACTION,
+    LinkedTwitchAccountRefreshContext,
     ensure_fresh_linked_account,
     refresh_linked_account,
     safe_get_twitch_user_by_id,
 )
-from src.utils.discord_embeds import build_channel_event_auto_reply_embed
+from src.utils.discord_embeds import ChannelEventAutoReplyEmbedRequest, build_channel_event_auto_reply_embed
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(slots=True, frozen=True)
+class _EventAutoReplyContext:
+    reply: AdapterEventActionRecord
+    thread: ThreadRecord
+    account: TwitchAccountRecord
+    source_channel: ChannelRecord | None
+    notify_action: AdapterEventActionRecord | None
+
+
+@dataclass(slots=True, frozen=True)
+class _ChannelEventMetadata:
+    event: TwitchChannelLiveStateChangedEvent
+    state: str
+    channel_name: str
+    channel_login: str | None
+    channel_icon_url: str | None
+    twitch_chat_color: str | None
 
 
 @dataclass(slots=True)
@@ -57,6 +81,7 @@ class ChannelEventAutoReplyService:
         self,
         event: TwitchChannelLiveStateChangedEvent,
     ) -> set[tuple[int, int]]:
+        """Send configured Twitch auto-replies for one live/offline transition."""
         event_key = STREAM_ONLINE_EVENT_KEY if event.is_live else STREAM_OFFLINE_EVENT_KEY
         configured_events = await self.adapter_event_repository.list_matching_events(
             adapter_key=TWITCH_ADAPTER_KEY,
@@ -72,19 +97,22 @@ class ChannelEventAutoReplyService:
         channel_user = await safe_get_twitch_user_by_id(
             self.twitch_api,
             event.twitch_channel_id,
+            require_chat_color=True,
         )
         channel_login = event.twitch_channel_login or (None if channel_user is None else channel_user.login)
-        channel_name = (event.twitch_channel_login if channel_user is None else channel_user.display_name) or event.twitch_channel_id
-        event_state = STREAM_EVENT_KEY_TO_STATE[event_key]
+        metadata = _ChannelEventMetadata(
+            event=event,
+            state=STREAM_EVENT_KEY_TO_STATE[event_key],
+            channel_name=(event.twitch_channel_login if channel_user is None else channel_user.display_name) or event.twitch_channel_id,
+            channel_login=channel_login,
+            channel_icon_url=None if channel_user is None else channel_user.profile_image_url,
+            twitch_chat_color=None if channel_user is None else channel_user.chat_color,
+        )
         task_results = await asyncio.gather(
             *[
                 self._handle_configured_event_auto_reply(
                     configured_event=configured_event,
-                    event=event,
-                    event_state=event_state,
-                    channel_name=channel_name,
-                    channel_login=channel_login,
-                    channel_icon_url=None if channel_user is None else channel_user.profile_image_url,
+                    metadata=metadata,
                 )
                 for configured_event in configured_events
             ],
@@ -98,7 +126,7 @@ class ChannelEventAutoReplyService:
                     configured_event.thread_id,
                     configured_event.event_id,
                     event.twitch_channel_id,
-                    event_state,
+                    metadata.state,
                     exc_info=(type(result), result, result.__traceback__),
                 )
                 continue
@@ -109,13 +137,73 @@ class ChannelEventAutoReplyService:
     async def _handle_configured_event_auto_reply(
         self,
         *,
-        configured_event,
-        event: TwitchChannelLiveStateChangedEvent,
-        event_state: str,
-        channel_name: str,
-        channel_login: str | None,
-        channel_icon_url: str | None,
+        configured_event: AdapterEventRecord,
+        metadata: _ChannelEventMetadata,
     ) -> tuple[int, int] | None:
+        context = await self._load_event_auto_reply_context(
+            configured_event=configured_event,
+            twitch_channel_id=metadata.event.twitch_channel_id,
+        )
+        if context is None:
+            return None
+        refresh_context = LinkedTwitchAccountRefreshContext(
+            account_repository=self.account_repository,
+            twitch_auth=self.twitch_api,
+            thread_repository=self.thread_repository,
+            thread=context.thread,
+        )
+        account = (
+            await ensure_fresh_linked_account(
+                account=context.account,
+                context=refresh_context,
+                token_refresh_skew_seconds=self.token_refresh_skew_seconds,
+            )
+            or context.account
+        )
+        rendered_message = self._render_channel_event_reply(
+            context.reply.message_template or "",
+            channel_name=metadata.channel_name,
+            state=metadata.state,
+        )
+        try:
+            return await self._send_channel_event_auto_reply(
+                configured_event=configured_event,
+                context=context,
+                account=account,
+                metadata=metadata,
+                rendered_message=rendered_message,
+            )
+        except TwitchAuthenticationError:
+            refreshed = await refresh_linked_account(
+                account=account,
+                context=refresh_context,
+            )
+            if refreshed is None:
+                return None
+            return await self._send_channel_event_auto_reply(
+                configured_event=configured_event,
+                context=context,
+                account=refreshed,
+                metadata=metadata,
+                rendered_message=rendered_message,
+            )
+        except TwitchAPIError as error:
+            logger.warning(
+                "Failed to send channel-event auto-reply thread_id=%s twitch_channel_id=%s state=%s channel_login=%s: %s",
+                configured_event.thread_id,
+                metadata.event.twitch_channel_id,
+                metadata.state,
+                metadata.channel_login,
+                error,
+            )
+            return None
+
+    async def _load_event_auto_reply_context(
+        self,
+        *,
+        configured_event: AdapterEventRecord,
+        twitch_channel_id: str,
+    ) -> _EventAutoReplyContext | None:
         reply = await self.adapter_event_action_repository.get_action(
             event_id=configured_event.event_id,
             action_type=TWITCH_SEND_MESSAGE_ACTION,
@@ -133,119 +221,54 @@ class ChannelEventAutoReplyService:
 
         source_channel = await self.channel_repository.get_by_thread_and_twitch_channel(
             thread.thread_id,
-            event.twitch_channel_id,
+            twitch_channel_id,
         )
         notify_action = await self.adapter_event_action_repository.get_action(
             event_id=configured_event.event_id,
             action_type=DISCORD_NOTIFY_ACTION,
         )
-        account = (
-            await ensure_fresh_linked_account(
-                account=account,
-                account_repository=self.account_repository,
-                twitch_auth=self.twitch_api,
-                token_refresh_skew_seconds=self.token_refresh_skew_seconds,
-                thread_repository=self.thread_repository,
-                thread=thread,
-            )
-            or account
+        return _EventAutoReplyContext(
+            reply=reply,
+            thread=thread,
+            account=account,
+            source_channel=source_channel,
+            notify_action=notify_action,
         )
-        rendered_message = self._render_channel_event_reply(
-            reply.message_template,
-            channel_name=channel_name,
-            state=event_state,
-        )
-        try:
-            return await self._send_channel_event_auto_reply(
-                configured_event=configured_event,
-                thread=thread,
-                source_channel=source_channel,
-                account=account,
-                event=event,
-                event_state=event_state,
-                channel_name=channel_name,
-                channel_login=channel_login,
-                channel_icon_url=channel_icon_url,
-                event_color=None if notify_action is None else notify_action.color,
-                rendered_message=rendered_message,
-            )
-        except TwitchAuthenticationError:
-            refreshed = await refresh_linked_account(
-                account=account,
-                account_repository=self.account_repository,
-                twitch_auth=self.twitch_api,
-                thread_repository=self.thread_repository,
-                thread=thread,
-            )
-            if refreshed is None:
-                return None
-            return await self._send_channel_event_auto_reply(
-                configured_event=configured_event,
-                thread=thread,
-                source_channel=source_channel,
-                account=refreshed,
-                event=event,
-                event_state=event_state,
-                channel_name=channel_name,
-                channel_login=channel_login,
-                channel_icon_url=channel_icon_url,
-                event_color=None if notify_action is None else notify_action.color,
-                rendered_message=rendered_message,
-            )
-        except TwitchAPIError as error:
-            logger.warning(
-                "Failed to send channel-event auto-reply thread_id=%s twitch_channel_id=%s state=%s channel_login=%s: %s",
-                configured_event.thread_id,
-                event.twitch_channel_id,
-                event_state,
-                channel_login,
-                error,
-            )
-            return None
 
     async def _send_channel_event_auto_reply(
         self,
         *,
-        configured_event,
-        thread,
-        source_channel: ChannelRecord | None,
-        account,
-        event: TwitchChannelLiveStateChangedEvent,
-        event_state: str,
-        channel_name: str,
-        channel_login: str | None,
-        channel_icon_url: str | None,
-        event_color: str | None,
+        configured_event: AdapterEventRecord,
+        context: _EventAutoReplyContext,
+        account: TwitchAccountRecord,
+        metadata: _ChannelEventMetadata,
         rendered_message: str,
     ) -> tuple[int, int]:
         sent_message_id = await self.twitch_api.send_chat_message(
-            access_token=account.access_token,
-            client_id=account.client_id,
-            sender_id=account.twitch_user_id,
-            broadcaster_id=event.twitch_channel_id,
-            message=rendered_message,
+            TwitchChatSendRequest(
+                access_token=account.access_token,
+                client_id=account.client_id,
+                sender_id=account.twitch_user_id,
+                broadcaster_id=metadata.event.twitch_channel_id,
+                message=rendered_message,
+            )
         )
         await self.message_repository.save_bot_twitch_message(
             self._build_sent_message_event(
-                channel_login=channel_login or event.twitch_channel_id,
-                author_login=account.twitch_login,
-                author_id=account.twitch_user_id,
-                broadcaster_id=event.twitch_channel_id,
+                metadata=metadata,
+                account=account,
                 message_id=sent_message_id,
                 content=rendered_message,
             )
         )
         await self._notify_auto_reply(
-            thread=thread,
-            source_channel=source_channel,
-            channel_display_name=channel_name,
-            channel_login=channel_login,
-            channel_icon_url=channel_icon_url,
-            state=event_state,
+            thread=context.thread,
+            source_channel=context.source_channel,
+            metadata=metadata,
             reply_message=rendered_message,
-            event_color=event_color,
+            event_color=None if context.notify_action is None else context.notify_action.color,
         )
-        return (thread.thread_id, configured_event.event_id)
+        return (context.thread.thread_id, configured_event.event_id)
 
     @staticmethod
     def _render_channel_event_reply(
@@ -260,47 +283,45 @@ class ChannelEventAutoReplyService:
     async def _notify_auto_reply(
         self,
         *,
-        thread,
+        thread: ThreadRecord,
         source_channel: ChannelRecord | None,
-        channel_display_name: str,
-        channel_login: str | None,
-        channel_icon_url: str | None,
-        state: str,
+        metadata: _ChannelEventMetadata,
         reply_message: str,
         event_color: str | None,
     ) -> None:
         await self.tracking_notifier.send_tracking_embed(
             thread.discord_channel_id,
             build_channel_event_auto_reply_embed(
-                thread=thread,
-                localizer=self.localizer,
-                channel_display_name=channel_display_name,
-                channel_login=channel_login or channel_display_name,
-                state=state,
-                reply_message=reply_message,
-                channel=source_channel,
-                event_color=event_color,
-                channel_icon_url=channel_icon_url,
+                ChannelEventAutoReplyEmbedRequest(
+                    thread=thread,
+                    localizer=self.localizer,
+                    channel_display_name=metadata.channel_name,
+                    channel_login=metadata.channel_login or metadata.channel_name,
+                    state=metadata.state,
+                    reply_message=reply_message,
+                    channel=source_channel,
+                    event_color=event_color,
+                    twitch_chat_color=metadata.twitch_chat_color,
+                    channel_icon_url=metadata.channel_icon_url,
+                )
             ),
-            channel_login=channel_login,
+            channel_login=metadata.channel_login,
         )
 
     @staticmethod
     def _build_sent_message_event(
         *,
-        channel_login: str,
-        author_login: str,
-        author_id: str,
-        broadcaster_id: str,
+        metadata: _ChannelEventMetadata,
+        account: TwitchAccountRecord,
         message_id: str,
         content: str,
     ) -> TwitchChatMessageEvent:
         return TwitchChatMessageEvent(
-            channel_login=channel_login,
-            author_login=author_login,
-            author_display_name=author_login,
-            author_id=author_id,
-            broadcaster_id=broadcaster_id,
+            channel_login=metadata.channel_login or metadata.event.twitch_channel_id,
+            author_login=account.twitch_login,
+            author_display_name=account.twitch_login,
+            author_id=account.twitch_user_id,
+            broadcaster_id=metadata.event.twitch_channel_id,
             message_id=message_id,
             content=content,
             sent_at=datetime.now(UTC),

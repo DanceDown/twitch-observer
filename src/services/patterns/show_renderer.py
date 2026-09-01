@@ -53,6 +53,7 @@ class ShowSectionRenderer:
     _account: ShowAccountRenderer = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Create focused section renderers that share one Twitch resolver cache."""
         self._resolver = ShowTwitchSubjectResolver(self.twitch_api)
         self._channels = ShowChannelsRenderer(
             channel_repository=self.channel_repository,
@@ -94,25 +95,33 @@ class ShowSectionRenderer:
         )
 
     def reset_resolution_cache(self) -> None:
+        """Clear cached Twitch name resolutions before a fresh `/show` render."""
         self._resolver.reset()
 
     async def render_channels_section(self, thread: ThreadRecord) -> str:
+        """Render tracked Twitch channels for a `/show` response."""
         return await self._channels.render(thread)
 
     async def render_channel_events_section(self, thread: ThreadRecord) -> str:
+        """Render live/offline channel-event configuration for `/show`."""
         return await self._channel_events.render(thread)
 
     async def render_patterns_section(self, thread: ThreadRecord) -> str:
+        """Render ping and regex patterns for `/show`."""
         return await self._patterns.render(thread)
 
     async def render_auto_replies_section(self, thread: ThreadRecord) -> str:
+        """Render pattern and live/offline auto-replies for `/show`."""
         return await self._auto_replies.render(thread)
 
     async def render_users_section(self, thread: ThreadRecord) -> str:
+        """Render tracked Twitch users for `/show`."""
         return await self._users.render(thread)
 
     async def render_permissions_section(self, thread: ThreadRecord) -> str:
+        """Render explicit Discord permission grants for `/show`."""
         return await self._permissions.render(thread)
 
     async def render_account_section(self, thread: ThreadRecord) -> tuple[str, str | None]:
+        """Render linked Twitch account state plus an optional thumbnail."""
         return await self._account.render(thread)

@@ -9,9 +9,9 @@ from dataclasses import dataclass, field
 
 import psycopg
 
-from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import ChannelRepository
 from src.errors import DatabasePoolExhaustedError
+from src.gateways.twitch_api import TwitchAPIError
 from src.services.twitch_gateways import TwitchChannelLookup, TwitchIRCConnectionGateway
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class IRCBootstrapService:
         try:
             channel_ids = await self.channel_repository.list_all_twitch_channel_ids()
         except DatabasePoolExhaustedError:
-            logger.error("Persisted IRC channel sync skipped because the database pool is exhausted.")
+            logger.exception("Persisted IRC channel sync skipped because the database pool is exhausted.")
             return
         except psycopg.Error:
             logger.exception("Persisted IRC channel sync failed because PostgreSQL returned an error.")
@@ -98,7 +98,7 @@ class IRCBootstrapService:
                 try:
                     await self.sync_persisted_channels()
                 except DatabasePoolExhaustedError:
-                    logger.error("Periodic IRC channel sync skipped because the database pool is exhausted.")
+                    logger.exception("Periodic IRC channel sync skipped because the database pool is exhausted.")
                 except psycopg.Error:
                     logger.exception("Periodic IRC channel sync failed because PostgreSQL returned an error.")
                 except Exception:

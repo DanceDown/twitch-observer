@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import ChannelRepository, ThreadRepository, UserPermissionRepository
 from src.discord_results import build_result, build_thread_result
 from src.errors import ApplicationInvariantError
@@ -17,6 +16,7 @@ from src.events.commands import (
     SetThreadLanguageCommand,
 )
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
+from src.gateways.twitch_api import TwitchAPIError
 from src.localization import Localizer
 from src.normalization import normalize_language, normalize_optional_color
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
@@ -25,6 +25,22 @@ from src.services.twitch_gateways import TwitchDirectoryGateway, TwitchIRCChanne
 from src.utils.permissions import ObserverPermission
 
 logger = logging.getLogger(__name__)
+
+
+def _thread_enable_state_update_missing() -> ApplicationInvariantError:
+    return ApplicationInvariantError.operation_returned_no_row("Thread enable state update")
+
+
+def _thread_color_clear_missing() -> ApplicationInvariantError:
+    return ApplicationInvariantError.operation_returned_no_row("Thread color clear")
+
+
+def _thread_color_update_missing() -> ApplicationInvariantError:
+    return ApplicationInvariantError.operation_returned_no_row("Thread color update")
+
+
+def _thread_language_update_missing() -> ApplicationInvariantError:
+    return ApplicationInvariantError.operation_returned_no_row("Thread language update")
 
 
 @dataclass(slots=True)
@@ -42,6 +58,7 @@ class ThreadLifecycleService:
     _runner: CommandExecutionRunner = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Build shared command guards and error-normalizing runner."""
         self._guards = ThreadCommandGuards(
             thread_repository=self.thread_repository,
             permission_repository=self.permission_repository,
@@ -58,18 +75,23 @@ class ThreadLifecycleService:
         )
 
     async def handle_join(self, command: JoinThreadCommand) -> DiscordCommandResult:
+        """Join the current Discord context for Twitch observation."""
         return await self._runner.run(command, lambda: self._join_context(command), logger_=logger)
 
     async def handle_leave(self, command: LeaveThreadCommand) -> DiscordCommandResult:
+        """Leave the current Discord context and prune unused IRC joins."""
         return await self._runner.run(command, lambda: self._leave_context(command), logger_=logger)
 
     async def handle_set_enabled(self, command: SetThreadEnabledCommand) -> DiscordCommandResult:
+        """Enable or disable observer output for the Discord context."""
         return await self._runner.run(command, lambda: self._set_context_enabled(command), logger_=logger)
 
     async def handle_set_color(self, command: SetThreadColorCommand) -> DiscordCommandResult:
+        """Set or clear the default embed color for the Discord context."""
         return await self._runner.run(command, lambda: self._set_context_color(command), logger_=logger)
 
     async def handle_set_language(self, command: SetThreadLanguageCommand) -> DiscordCommandResult:
+        """Set the language used by bot responses in the Discord context."""
         return await self._runner.run(command, lambda: self._set_context_language(command), logger_=logger)
 
     async def _join_context(self, command: JoinThreadCommand) -> DiscordCommandResult:
@@ -194,7 +216,7 @@ class ThreadLifecycleService:
         )
 
         if updated is None:
-            raise ApplicationInvariantError("Thread enable state update returned no row.")
+            raise _thread_enable_state_update_missing()
         return build_thread_result(
             self.localizer,
             "results.thread.enabled" if command.enabled else "results.thread.disabled",
@@ -217,7 +239,7 @@ class ThreadLifecycleService:
         if normalized_color is None:
             updated = await self.thread_repository.set_color(discord_channel_id=command.discord_channel_id, color=None)
             if updated is None:
-                raise ApplicationInvariantError("Thread color clear returned no row.")
+                raise _thread_color_clear_missing()
             return build_thread_result(
                 self.localizer,
                 "results.thread.color_cleared",
@@ -241,7 +263,7 @@ class ThreadLifecycleService:
         )
 
         if updated is None:
-            raise ApplicationInvariantError("Thread color update returned no row.")
+            raise _thread_color_update_missing()
         return build_thread_result(
             self.localizer,
             "results.thread.color_updated",
@@ -299,7 +321,7 @@ class ThreadLifecycleService:
         )
 
         if updated is None:
-            raise ApplicationInvariantError("Thread language update returned no row.")
+            raise _thread_language_update_missing()
         language_name = self._thread_language_name("results.thread.language_updated", requested_language)
         return build_thread_result(
             self.localizer,

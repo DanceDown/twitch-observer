@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import time
 from dataclasses import dataclass, field
@@ -13,6 +14,8 @@ from src.services.chat_pipeline import ChatMessageProcessingService
 from src.services.patterns import TrackingNotificationSender
 from src.services.tracking_delivery_queue import OrderedTrackingDeliveryService
 
+logger = logging.getLogger(__name__)
+
 pytestmark = pytest.mark.skipif(
     os.getenv("RUN_LOAD_TESTS") != "1",
     reason="set RUN_LOAD_TESTS=1 to run developer load tests",
@@ -24,6 +27,7 @@ class _LoadMessageIngest:
     handled: int = 0
 
     async def handle_chat_message(self, message: TwitchChatMessageEvent) -> None:
+        _ = message
         self.handled += 1
 
 
@@ -32,6 +36,7 @@ class _LoadUserObserver:
     handled: int = 0
 
     async def handle_chat_message(self, message: TwitchChatMessageEvent) -> None:
+        _ = message
         self.handled += 1
 
 
@@ -127,7 +132,7 @@ async def test_chat_pipeline_load_preserves_delivery_order_after_parallel_proces
     pipeline = ChatMessageProcessingService(
         message_ingest=_LoadMessageIngest(),
         user_observer=_LoadUserObserver(),
-        reactions=reactions,  # type: ignore[arg-type]
+        reactions=reactions,
         queue_size=message_count + worker_count,
         worker_count=worker_count,
         completion_notifier=delivery_queue,
@@ -156,7 +161,7 @@ async def test_chat_pipeline_load_preserves_delivery_order_after_parallel_proces
 
     elapsed_seconds = time.perf_counter() - started_at
     expected_sent = [message_index for message_index in range(1, message_count + 1) if message_index % match_every == 0]
-    print(
+    logger.info(
         "load-test "
         f"messages={message_count} workers={worker_count} targets={target_count} sent={len(sender.sent)} "
         f"max_active={reactions.max_active} rate={per_target_rate_per_second} elapsed_seconds={elapsed_seconds:.3f}"

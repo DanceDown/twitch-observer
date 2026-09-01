@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from src.events.commands import AddChannelEventCommand, RemoveChannelEventCommand, SetChannelEventColorCommand
-from src.events.twitch_events import StreamEventKind
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
+from src.events.commands import AddChannelEventCommand, RemoveChannelEventCommand, SetChannelEventColorCommand
+from src.events.discord_results import DiscordCommandResult
+from src.events.twitch_events import StreamEventKind
 
 
 async def dispatch_add_channel_event(
@@ -14,7 +15,8 @@ async def dispatch_add_channel_event(
     requester_id: int,
     twitch_channel_id: str,
     event_kind: StreamEventKind,
-) -> object:
+) -> DiscordCommandResult:
+    """Dispatch a request to add a live/offline Discord notification."""
     return await services.channel_event.handle_add_command(
         AddChannelEventCommand(
             discord_channel_id=discord_channel_id,
@@ -32,7 +34,8 @@ async def dispatch_remove_channel_event(
     requester_id: int,
     twitch_channel_id: str,
     event_kind: StreamEventKind,
-) -> object:
+) -> DiscordCommandResult:
+    """Dispatch a request to remove a live/offline Discord notification."""
     return await services.channel_event.handle_remove_command(
         RemoveChannelEventCommand(
             discord_channel_id=discord_channel_id,
@@ -45,19 +48,7 @@ async def dispatch_remove_channel_event(
 
 async def dispatch_set_channel_event_color(
     services: DiscordServiceBundle,
-    *,
-    discord_channel_id: int,
-    requester_id: int,
-    twitch_channel_id: str,
-    event_kind: StreamEventKind,
-    color: str | None,
-) -> object:
-    return await services.channel_event.handle_set_color_command(
-        SetChannelEventColorCommand(
-            discord_channel_id=discord_channel_id,
-            requester_id=requester_id,
-            twitch_channel_id=twitch_channel_id,
-            event_kind=event_kind,
-            color=color,
-        ),
-    )
+    command: SetChannelEventColorCommand,
+) -> DiscordCommandResult:
+    """Dispatch a request to set or clear a live/offline notification color."""
+    return await services.channel_event.handle_set_color_command(command)

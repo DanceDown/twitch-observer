@@ -6,18 +6,19 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from src.gateways.twitch_api import TwitchAPIError
 from src.database.connection import (
     ThreadRecord,
     ThreadRepository,
     TwitchAccountRecord,
     TwitchAccountRepository,
     TwitchDeviceFlowRepository,
+    TwitchDeviceFlowUpsert,
     UserPermissionRepository,
 )
 from src.discord_results import build_result, build_thread_result
 from src.events.commands import StartAccountLinkCommand, UnlinkAccountCommand
 from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
+from src.gateways.twitch_api import TwitchAPIError
 from src.localization import Localizer
 from src.services.account_support import AccountNotificationSender
 from src.services.command_execution import CommandExecutionRunner, ThreadCommandGuards
@@ -44,6 +45,7 @@ class AccountCommandService:
     _guards: ThreadCommandGuards = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Build shared command guards and error handling after injection."""
         self._runner = CommandExecutionRunner(
             localizer=self.localizer,
             resolve_thread=self._resolve_thread,
@@ -60,9 +62,11 @@ class AccountCommandService:
         )
 
     async def handle_link_command(self, command: StartAccountLinkCommand) -> DiscordCommandResult:
+        """Start the Twitch account linking flow for a Discord context."""
         return await self._runner.run(command, lambda: self._start_link(command), logger_=logger)
 
     async def handle_unlink_command(self, command: UnlinkAccountCommand) -> DiscordCommandResult:
+        """Unlink a Twitch account or cancel a pending account link."""
         return await self._runner.run(command, lambda: self._unlink_account(command), logger_=logger)
 
     async def _start_link(self, command: StartAccountLinkCommand) -> DiscordCommandResult:
@@ -116,14 +120,16 @@ class AccountCommandService:
         start = await self.twitch_api.start_device_code_flow(scopes=("user:write:chat",))
         expires_at = (datetime.now().astimezone() + timedelta(seconds=start.expires_in)).isoformat()
         pending = await self.device_flow_repository.upsert_pending_flow(
-            discord_user_id=command.requester_id,
-            discord_channel_id=thread.discord_channel_id,
-            device_code=start.device_code,
-            user_code=start.user_code,
-            verification_uri=start.verification_uri,
-            interval_seconds=start.interval,
-            expires_at=expires_at,
-            scope=("user:write:chat",),
+            TwitchDeviceFlowUpsert(
+                discord_user_id=command.requester_id,
+                discord_channel_id=thread.discord_channel_id,
+                device_code=start.device_code,
+                user_code=start.user_code,
+                verification_uri=start.verification_uri,
+                interval_seconds=start.interval,
+                expires_at=expires_at,
+                scope=("user:write:chat",),
+            )
         )
 
         return build_thread_result(
@@ -172,6 +178,15 @@ class AccountCommandService:
                 thread=thread,
                 style=DiscordResultStyle.INFO,
                 ephemeral=True,
+            )
+        if account is None:
+            return build_thread_result(
+                self.localizer,
+                "results.account.pending_unlinked",
+                thread=thread,
+                style=DiscordResultStyle.SUCCESS,
+                ephemeral=False,
+                sources={"view": {"requester_id": command.requester_id}},
             )
         return build_thread_result(
             self.localizer,

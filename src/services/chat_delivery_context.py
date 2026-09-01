@@ -11,11 +11,17 @@ _current_chat_message_sequence: ContextVar[int | None] = ContextVar("current_cha
 class ChatMessageCompletionNotifier(Protocol):
     """Tracks chat processing milestones for ordered delivery."""
 
-    async def reserve_message(self, sequence: int) -> None: ...
+    async def reserve_message(self, sequence: int) -> None:
+        """Reserve an ordered delivery slot for a chat message."""
+        ...
 
-    async def complete_message_routing(self, sequence: int) -> None: ...
+    async def complete_message_routing(self, sequence: int) -> None:
+        """Mark routing complete once all target slots are known."""
+        ...
 
-    async def complete_message(self, sequence: int) -> None: ...
+    async def complete_message(self, sequence: int) -> None:
+        """Mark all delivery work complete for one chat message."""
+        ...
 
 
 def get_current_chat_message_sequence() -> int | None:

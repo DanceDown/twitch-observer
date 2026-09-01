@@ -8,6 +8,7 @@ from src.services.twitch_gateways import TwitchDirectoryGateway
 
 
 async def get_thread_for_channel(thread_repository: ThreadRepository, discord_channel_id: int) -> ThreadRecord | None:
+    """Return the stored thread for one Discord channel ID."""
     return await thread_repository.get_by_discord_channel_id(discord_channel_id)
 
 
@@ -24,6 +25,7 @@ async def resolve_users_by_ids(
     *,
     channel_lookup: bool,
 ) -> dict[str, TwitchUser]:
+    """Resolve Twitch users by ID using cache first and Helix fallback."""
     resolved: dict[str, TwitchUser] = {}
     normalized_ids = tuple(dict.fromkeys(user_id.strip() for user_id in user_ids if user_id.strip()))
     missing_ids: list[str] = []
