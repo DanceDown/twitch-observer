@@ -56,6 +56,17 @@ class ChannelEventAutoReplyEmbedRequest:
     channel_icon_url: str | None = None
 
 
+@dataclass(slots=True, frozen=True)
+class SupportUserAnswerEmbedRequest:
+    """Inputs for the answer sent back to the ticket requester."""
+
+    ticket: SupportTicketRecord
+    localizer: Localizer
+    response_subject: str
+    response_body: str
+    color: str | None = None
+
+
 def build_result_embed(result: DiscordCommandResult) -> discord.Embed:
     """Render a command result into a consistently styled Discord embed."""
     embed = discord.Embed(
@@ -203,6 +214,55 @@ def build_support_closed_ticket_embed(
         localizer=localizer,
         key="discord.support.embed.closed",
     )
+
+
+def build_support_user_answer_embed(request: SupportUserAnswerEmbedRequest) -> discord.Embed:
+    """Render the support answer that is sent into the requester's origin channel."""
+    language = request.localizer.resolve_language(request.ticket.language)
+    entry = request.localizer.value("discord.support.user_answer_embed", language=language)
+    if not isinstance(entry, dict):
+        raise LocalizationError.translation_key_not_object("discord.support.user_answer_embed")
+    title = entry.get("title")
+    body = entry.get("body")
+    footer = entry.get("footer")
+    placeholder_specs = entry.get("placeholders")
+    if not isinstance(title, str) or not isinstance(body, str) or not isinstance(footer, str):
+        raise LocalizationError.translation_result_missing_strings("discord.support.user_answer_embed")
+    if placeholder_specs is not None and not isinstance(placeholder_specs, dict):
+        raise LocalizationError.translation_result_invalid_placeholders("discord.support.user_answer_embed")
+
+    sources = {
+        "view": {
+            **_support_ticket_view(request.ticket, localizer=request.localizer, language=language),
+            "response_subject": request.response_subject,
+            "response_body": request.response_body,
+        }
+    }
+    embed = discord.Embed(
+        title=request.localizer.render_with_placeholders(
+            title,
+            language=language,
+            sources=sources,
+            placeholder_specs=placeholder_specs,
+        ),
+        description=request.localizer.render_with_placeholders(
+            body,
+            language=language,
+            sources=sources,
+            placeholder_specs=placeholder_specs,
+        ),
+        color=_parse_hex_color(request.color) if request.color else EMBED_COLORS[DiscordResultStyle.SUCCESS],
+    )
+    if footer:
+        embed.set_footer(
+            text=request.localizer.render_with_placeholders(
+                footer,
+                language=language,
+                sources=sources,
+                placeholder_specs=placeholder_specs,
+            )
+        )
+    return embed
 
 
 def resolve_tracking_color(

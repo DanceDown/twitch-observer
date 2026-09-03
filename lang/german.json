@@ -2186,6 +2186,14 @@
         "close": "Schließen",
         "show": "Anzeigen"
       },
+      "create_modal": {
+        "title": "Support-Anfrage",
+        "category_label": "Kategorie",
+        "title_label": "Titel",
+        "title_placeholder": "Kurz beschreiben, worum es geht",
+        "description_label": "Beschreibung",
+        "description_placeholder": "Beschreibe, wobei du Hilfe brauchst."
+      },
       "reply_modal": {
         "title": "Support-Ticket beantworten",
         "subject_label": "Betreff",
@@ -2222,6 +2230,11 @@
           "body": "**Status**\n{view.status_label}\n\n**User**\n<@{RAW:view.requester_id}> (`{CODE:view.requester_id}`)\n\n**Ursprung**\n<#{RAW:view.source_channel_id}> (`{CODE:view.source_channel_id}`)\n\n**Beschreibung**\n{view.description}\n\n## Geschlossen\n**Geschlossen von**\n<@{RAW:view.closed_by}> (`{CODE:view.closed_by}`)\n\n**Zeit**\n{TIMESTAMP:view.closed_at}",
           "footer": "Ticket #{RAW:view.ticket_id} | Erstellt: {TIMESTAMP:view.created_at}"
         }
+      },
+      "user_answer_embed": {
+        "title": "Deine Support-Anfrage wurde beantwortet",
+        "body": "**{view.title}**\n{view.description}\n\n## Antwort\n**{view.response_subject}**\n{RAW:view.response_body}",
+        "footer": "Ticket #{RAW:view.ticket_id}"
       }
     },
     "pattern_ui": {

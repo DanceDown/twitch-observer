@@ -64,6 +64,8 @@ class SupportTicketMessageResult:
 
     result: DiscordCommandResult
     ticket: SupportTicketRecord | None
+    response_subject: str | None = None
+    response_body: str | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -293,6 +295,8 @@ class SupportCommandService:
                     ),
                 ),
                 ticket=ticket_result.ticket,
+                response_subject=subject,
+                response_body=body,
             )
         except DatabasePoolExhaustedError as error:
             logger.exception("Database pool exhausted while preparing support ticket answer.")
@@ -446,6 +450,10 @@ class SupportCommandService:
     def is_support_channel(self, discord_channel_id: int | None) -> bool:
         """Return whether one interaction came from the configured support channel."""
         return self.support_discord_channel_id is not None and discord_channel_id == self.support_discord_channel_id
+
+    def support_unavailable_result(self, *, language_hint: str | None = None) -> DiscordCommandResult:
+        """Build the shared unavailable result for `/support` before opening a modal."""
+        return self._plain_result("results.support.unavailable", language=language_hint)
 
     def wrong_channel_result(self, *, language_hint: str | None = None) -> DiscordCommandResult:
         """Build the shared error for support actions outside the configured support channel."""

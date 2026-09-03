@@ -9,13 +9,23 @@ from typing import cast
 import discord
 
 from src.entrypoints.discord.delivery import DiscordEmbedSendRequest, send_embed_message_with_retries, send_embed_with_retries
-from src.entrypoints.discord.helpers import defer_interaction_response, send_initial_result, send_modal_response
+from src.entrypoints.discord.helpers import (
+    command_unavailable_result,
+    defer_interaction_response,
+    normalize_optional_text,
+    send_initial_result,
+    send_modal_response,
+)
 from src.entrypoints.discord.service_bundle import DiscordServiceBundle
-from src.events.discord_results import DiscordResultStyle
+from src.events.commands import CreateSupportTicketCommand
+from src.events.discord_results import DiscordCommandResult, DiscordResultStyle
 from src.localization import Localizer
 from src.services.support_command_service import (
+    SUPPORT_DESCRIPTION_MAX_LENGTH,
     SUPPORT_RESPONSE_BODY_MAX_LENGTH,
     SUPPORT_RESPONSE_SUBJECT_MAX_LENGTH,
+    SUPPORT_TICKET_CATEGORIES,
+    SUPPORT_TITLE_MAX_LENGTH,
     SupportTicketCreateResult,
 )
 from src.utils.discord_embeds import (
@@ -23,9 +33,12 @@ from src.utils.discord_embeds import (
     build_support_answered_ticket_embed,
     build_support_closed_ticket_embed,
     build_support_ticket_embed,
+    build_support_user_answer_embed,
+    SupportUserAnswerEmbedRequest,
 )
 
 from ..dispatch import (
+    dispatch_create_support_ticket,
     dispatch_mark_support_answered,
     dispatch_mark_support_closed,
     dispatch_prepare_support_answer,
@@ -56,10 +69,10 @@ class SupportTicketView(discord.ui.View):
         self._language = localizer.resolve_language(language)
         self.reply.label = localizer.text("discord.support.actions.reply", language=self._language)
         self.reply.custom_id = _support_action_custom_id("reply", ticket_id)
-        self.close.label = localizer.text("discord.support.actions.close", language=self._language)
-        self.close.custom_id = _support_action_custom_id("close", ticket_id)
         self.show.label = localizer.text("discord.support.actions.show", language=self._language)
         self.show.custom_id = _support_action_custom_id("show", ticket_id)
+        self.close.label = localizer.text("discord.support.actions.close", language=self._language)
+        self.close.custom_id = _support_action_custom_id("close", ticket_id)
 
     @discord.ui.button(label="_", style=discord.ButtonStyle.primary)
     async def reply(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
@@ -84,43 +97,6 @@ class SupportTicketView(discord.ui.View):
             ),
         )
 
-    @discord.ui.button(label="_", style=discord.ButtonStyle.danger)
-    async def close(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
-        """Close one open ticket and notify the requesting channel."""
-        if not await self._ensure_support_channel(interaction):
-            return
-        await defer_interaction_response(interaction, ephemeral=True)
-        prepared = await dispatch_prepare_support_close(
-            self._services,
-            ticket_id=self._ticket_id,
-            closer_id=interaction.user.id,
-        )
-        if prepared.ticket is None:
-            await send_initial_result(interaction, prepared.result)
-            return
-        if not await _send_to_origin_channel(
-            interaction.client,
-            channel_id=prepared.ticket.source_discord_channel_id,
-            embed=build_result_embed(prepared.result),
-            purpose="support close user notice",
-        ):
-            await send_initial_result(interaction, self._services.support.delivery_failed_result(prepared.ticket))
-            return
-
-        updated = await dispatch_mark_support_closed(
-            self._services,
-            ticket_id=self._ticket_id,
-            closer_id=interaction.user.id,
-        )
-        if updated.ticket is None:
-            await send_initial_result(interaction, updated.result)
-            return
-        await _edit_support_message(
-            _interaction_message(interaction),
-            embed=build_support_closed_ticket_embed(ticket=updated.ticket, localizer=self._localizer),
-        )
-        await send_initial_result(interaction, updated.result)
-
     @discord.ui.button(label="_", style=discord.ButtonStyle.secondary)
     async def show(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         """Open the support-owned show section picker for the ticket origin."""
@@ -137,6 +113,43 @@ class SupportTicketView(discord.ui.View):
             ),
         )
 
+    @discord.ui.button(label="_", style=discord.ButtonStyle.danger)
+    async def close(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        """Close one open ticket and notify the requesting channel."""
+        if not await self._ensure_support_channel(interaction):
+            return
+        await defer_interaction_response(interaction, ephemeral=True)
+        prepared = await dispatch_prepare_support_close(
+            self._services,
+            ticket_id=self._ticket_id,
+            closer_id=interaction.user.id,
+        )
+        if prepared.ticket is None:
+            await _send_support_action_result(interaction, prepared.result)
+            return
+        if not await _send_to_origin_channel(
+            interaction.client,
+            channel_id=prepared.ticket.source_discord_channel_id,
+            embed=build_result_embed(prepared.result),
+            purpose="support close user notice",
+        ):
+            await _send_support_action_result(interaction, self._services.support.delivery_failed_result(prepared.ticket))
+            return
+
+        updated = await dispatch_mark_support_closed(
+            self._services,
+            ticket_id=self._ticket_id,
+            closer_id=interaction.user.id,
+        )
+        if updated.ticket is None:
+            await _send_support_action_result(interaction, updated.result)
+            return
+        await _edit_support_message(
+            _interaction_message(interaction),
+            embed=build_support_closed_ticket_embed(ticket=updated.ticket, localizer=self._localizer),
+        )
+        await _send_support_action_result(interaction, updated.result)
+
     async def _ensure_support_channel(self, interaction: discord.Interaction) -> bool:
         if self._services.support.is_support_channel(interaction.channel_id):
             return True
@@ -145,6 +158,72 @@ class SupportTicketView(discord.ui.View):
             self._services.support.wrong_channel_result(language_hint=self._language),
         )
         return False
+
+
+class SupportCreateModal(discord.ui.Modal):
+    """Collect the support ticket fields that do not fit nicely into a slash command."""
+
+    def __init__(
+        self,
+        *,
+        services: DiscordServiceBundle,
+        localizer: Localizer,
+        language: str,
+        default_category: str | None = None,
+        default_title: str | None = None,
+        default_description: str | None = None,
+    ) -> None:
+        """Create the modal for a new support ticket with optional command defaults."""
+        resolved_language = localizer.resolve_language(language)
+        category = _normalize_support_category(default_category)
+        super().__init__(title=localizer.text("discord.support.create_modal.title", language=resolved_language), timeout=300)
+        self._services = services
+        self._localizer = localizer
+        self._language = resolved_language
+        self.category = discord.ui.Label(
+            text=localizer.text("discord.support.create_modal.category_label", language=resolved_language),
+            component=discord.ui.RadioGroup(
+                options=[
+                    discord.RadioGroupOption(
+                        label=localizer.lookup("discord.support.category", value, language=resolved_language),
+                        value=value,
+                        default=value == category,
+                    )
+                    for value in SUPPORT_TICKET_CATEGORIES
+                ]
+            ),
+        )
+        self.title_input = discord.ui.TextInput(
+            label=localizer.text("discord.support.create_modal.title_label", language=resolved_language),
+            placeholder=localizer.text("discord.support.create_modal.title_placeholder", language=resolved_language),
+            default=default_title,
+            required=True,
+            max_length=SUPPORT_TITLE_MAX_LENGTH,
+        )
+        self.description_input = discord.ui.TextInput(
+            label=localizer.text("discord.support.create_modal.description_label", language=resolved_language),
+            placeholder=localizer.text("discord.support.create_modal.description_placeholder", language=resolved_language),
+            default=default_description,
+            required=True,
+            style=discord.TextStyle.paragraph,
+            max_length=SUPPORT_DESCRIPTION_MAX_LENGTH,
+        )
+        self.add_item(self.category)
+        self.add_item(self.title_input)
+        self.add_item(self.description_input)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        """Create the support ticket from submitted modal values."""
+        await defer_interaction_response(interaction, ephemeral=True)
+        await submit_support_ticket(
+            interaction,
+            services=self._services,
+            localizer=self._localizer,
+            category=self.category.component.value or "other",
+            title=normalize_optional_text(self.title_input.value),
+            description=normalize_optional_text(self.description_input.value),
+            language_hint=self._language,
+        )
 
 
 class SupportReplyModal(discord.ui.Modal):
@@ -194,15 +273,23 @@ class SupportReplyModal(discord.ui.Modal):
             body=str(self.body.value),
         )
         if prepared.ticket is None:
-            await send_initial_result(interaction, prepared.result)
+            await _send_support_action_result(interaction, prepared.result)
             return
         if not await _send_to_origin_channel(
             interaction.client,
             channel_id=prepared.ticket.source_discord_channel_id,
-            embed=build_result_embed(prepared.result),
+            embed=build_support_user_answer_embed(
+                SupportUserAnswerEmbedRequest(
+                    ticket=prepared.ticket,
+                    localizer=self._localizer,
+                    response_subject=prepared.response_subject or str(self.subject.value).strip(),
+                    response_body=prepared.response_body or str(self.body.value).strip(),
+                    color=prepared.result.color,
+                )
+            ),
             purpose="support answer user notice",
         ):
-            await send_initial_result(interaction, self._services.support.delivery_failed_result(prepared.ticket))
+            await _send_support_action_result(interaction, self._services.support.delivery_failed_result(prepared.ticket))
             return
 
         updated = await dispatch_mark_support_answered(
@@ -213,13 +300,13 @@ class SupportReplyModal(discord.ui.Modal):
             body=str(self.body.value),
         )
         if updated.ticket is None:
-            await send_initial_result(interaction, updated.result)
+            await _send_support_action_result(interaction, updated.result)
             return
         await _edit_support_message(
             self._support_message,
             embed=build_support_answered_ticket_embed(ticket=updated.ticket, localizer=self._localizer),
         )
-        await send_initial_result(interaction, updated.result)
+        await _send_support_action_result(interaction, updated.result)
 
 
 class SupportShowSectionModal(discord.ui.Modal):
@@ -353,6 +440,47 @@ async def send_new_support_ticket(
     return True
 
 
+async def submit_support_ticket(
+    interaction: discord.Interaction,
+    *,
+    services: DiscordServiceBundle,
+    localizer: Localizer,
+    category: str | None,
+    title: str | None,
+    description: str | None,
+    language_hint: str,
+) -> None:
+    """Create a support ticket and deliver it to the configured support channel."""
+    if interaction.channel_id is None:
+        await send_initial_result(interaction, command_unavailable_result())
+        return
+    creation = await dispatch_create_support_ticket(
+        services,
+        CreateSupportTicketCommand(
+            discord_channel_id=interaction.channel_id,
+            requester_id=interaction.user.id,
+            category=category or "other",
+            title=title or "",
+            description=description or "",
+            language_hint=language_hint,
+        ),
+    )
+    if creation.ticket is None:
+        await send_initial_result(interaction, creation.result)
+        return
+
+    if not await send_new_support_ticket(
+        client=interaction.client,
+        creation=creation,
+        services=services,
+        localizer=localizer,
+    ):
+        await send_initial_result(interaction, services.support.support_channel_delivery_failed_result(creation.ticket))
+        return
+
+    await send_initial_result(interaction, creation.result)
+
+
 async def register_persistent_support_views(
     *,
     client: discord.Client,
@@ -439,3 +567,16 @@ def _support_action_custom_id(action: str, ticket_id: int) -> str:
 
 def _support_allowed_mentions() -> discord.AllowedMentions:
     return discord.AllowedMentions(everyone=False, users=False, roles=False, replied_user=False)
+
+
+async def _send_support_action_result(interaction: discord.Interaction, result: DiscordCommandResult) -> None:
+    followup = getattr(interaction, "followup", None)
+    if followup is None:
+        return
+    with suppress(discord.HTTPException):
+        await followup.send(embed=build_result_embed(result), ephemeral=True)
+
+
+def _normalize_support_category(value: str | None) -> str:
+    normalized = (value or "other").strip().lower()
+    return normalized if normalized in SUPPORT_TICKET_CATEGORIES else "other"

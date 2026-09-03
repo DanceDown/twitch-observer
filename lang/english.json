@@ -2190,6 +2190,14 @@
         "close": "Close",
         "show": "Show"
       },
+      "create_modal": {
+        "title": "Support Request",
+        "category_label": "Category",
+        "title_label": "Title",
+        "title_placeholder": "Briefly describe what this is about",
+        "description_label": "Description",
+        "description_placeholder": "Describe what you need help with."
+      },
       "reply_modal": {
         "title": "Answer Support Ticket",
         "subject_label": "Subject",
@@ -2226,6 +2234,11 @@
           "body": "**Status**\n{view.status_label}\n\n**User**\n<@{RAW:view.requester_id}> (`{CODE:view.requester_id}`)\n\n**Origin**\n<#{RAW:view.source_channel_id}> (`{CODE:view.source_channel_id}`)\n\n**Description**\n{view.description}\n\n## Closed\n**Closed by**\n<@{RAW:view.closed_by}> (`{CODE:view.closed_by}`)\n\n**Time**\n{TIMESTAMP:view.closed_at}",
           "footer": "Ticket #{RAW:view.ticket_id} | Created: {TIMESTAMP:view.created_at}"
         }
+      },
+      "user_answer_embed": {
+        "title": "Your Support Request Was Answered",
+        "body": "**{view.title}**\n{view.description}\n\n## Answer\n**{view.response_subject}**\n{RAW:view.response_body}",
+        "footer": "Ticket #{RAW:view.ticket_id}"
       }
     },
     "pattern_ui": {

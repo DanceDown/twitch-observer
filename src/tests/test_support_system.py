@@ -9,13 +9,19 @@ import pytest
 
 from src.database.records import SupportTicketCreate, SupportTicketRecord, ThreadRecord
 from src.entrypoints.discord.commands.support_commands import register_support_commands
-from src.entrypoints.discord.ui.support_ui import SupportTicketView
+from src.entrypoints.discord.ui.support_ui import SupportCreateModal, SupportTicketView
 from src.discord_results import build_result
 from src.events.commands import AnswerSupportTicketCommand, CloseSupportTicketCommand, CreateSupportTicketCommand, ShowSupportTicketCommand
 from src.events.discord_results import DiscordResultStyle
 from src.localization import Localizer
-from src.services.support_command_service import SupportCommandService
-from src.utils.discord_embeds import EMBED_COLORS, build_result_embed, resolve_support_ticket_color
+from src.services.support_command_service import SUPPORT_TICKET_CATEGORIES, SupportCommandService
+from src.utils.discord_embeds import (
+    EMBED_COLORS,
+    SupportUserAnswerEmbedRequest,
+    build_result_embed,
+    build_support_user_answer_embed,
+    resolve_support_ticket_color,
+)
 
 
 @dataclass
@@ -135,6 +141,7 @@ class EmptyReplyRepository:
 @dataclass
 class FakeDiscordResponse:
     done: bool = False
+    sent_modal: discord.ui.Modal | None = None
 
     def is_done(self) -> bool:
         return self.done
@@ -146,6 +153,18 @@ class FakeDiscordResponse:
     async def send_message(self, *, embed: discord.Embed, ephemeral: bool, view: object | None = None) -> None:
         _ = (embed, ephemeral, view)
         self.done = True
+
+    async def send_modal(self, modal: discord.ui.Modal) -> None:
+        self.sent_modal = modal
+        self.done = True
+
+
+@dataclass
+class FakeDiscordFollowup:
+    sent: list[dict[str, object]] = field(default_factory=list)
+
+    async def send(self, **kwargs) -> None:
+        self.sent.append(kwargs)
 
 
 @dataclass
@@ -174,12 +193,22 @@ class FakeDiscordClient:
 
 
 @dataclass
+class FakeUIDataProvider:
+    language: str | None = None
+
+    async def get_thread_language(self, discord_channel_id: int) -> str | None:
+        _ = discord_channel_id
+        return self.language
+
+
+@dataclass
 class FakeInteraction:
     client: FakeDiscordClient
     channel_id: int
     user_id: int
     locale: str = "de-DE"
     response: FakeDiscordResponse = field(default_factory=FakeDiscordResponse)
+    followup: FakeDiscordFollowup = field(default_factory=FakeDiscordFollowup)
     edited_original_embed: discord.Embed | None = None
     message: object | None = None
 
@@ -237,6 +266,24 @@ async def test_support_without_config_returns_ephemeral_unavailable() -> None:
 
 
 @pytest.mark.asyncio
+async def test_support_command_without_config_sends_unavailable_instead_of_modal() -> None:
+    localizer = Localizer.from_directory()
+    service = _service(support_channel_id=None, localizer=localizer)
+    services = SimpleNamespace(support=service)
+    tree_client = discord.Client(intents=discord.Intents.default())
+    tree = discord.app_commands.CommandTree(tree_client)
+
+    register_support_commands(tree, services, FakeUIDataProvider(language="german"), localizer)
+    support_command = next(command for command in tree.get_commands() if command.name == "support")
+    interaction = FakeInteraction(client=FakeDiscordClient(channels={}), channel_id=100, user_id=200)
+
+    await support_command.callback(interaction, category=None, title=None, description=None)
+
+    assert interaction.response.done is True
+    assert interaction.response.sent_modal is None
+
+
+@pytest.mark.asyncio
 async def test_support_command_creates_ticket_and_sends_colored_support_embed() -> None:
     localizer = Localizer.from_directory()
     support_channel = FakeDiscordChannel(channel_id=500)
@@ -246,7 +293,7 @@ async def test_support_command_creates_ticket_and_sends_colored_support_embed() 
     tree_client = discord.Client(intents=discord.Intents.default())
     tree = discord.app_commands.CommandTree(tree_client)
 
-    register_support_commands(tree, services, object(), localizer)
+    register_support_commands(tree, services, FakeUIDataProvider(language="german"), localizer)
     support_command = next(command for command in tree.get_commands() if command.name == "support")
     interaction = FakeInteraction(client=client, channel_id=100, user_id=200)
 
@@ -276,35 +323,103 @@ async def test_support_command_creates_ticket_and_sends_colored_support_embed() 
 
 
 @pytest.mark.asyncio
+async def test_support_command_opens_prefilled_modal_when_values_are_missing() -> None:
+    localizer = Localizer.from_directory()
+    support_channel = FakeDiscordChannel(channel_id=500)
+    client = FakeDiscordClient(channels={500: support_channel})
+    service = _service(support_channel_id=500, localizer=localizer)
+    services = SimpleNamespace(support=service)
+    tree_client = discord.Client(intents=discord.Intents.default())
+    tree = discord.app_commands.CommandTree(tree_client)
+
+    register_support_commands(tree, services, FakeUIDataProvider(language="german"), localizer)
+    support_command = next(command for command in tree.get_commands() if command.name == "support")
+    interaction = FakeInteraction(client=client, channel_id=100, user_id=200)
+
+    await support_command.callback(
+        interaction,
+        category=discord.app_commands.Choice(name="Bug", value="bug"),
+        title="Ping 14",
+        description=None,
+    )
+
+    assert isinstance(interaction.response.sent_modal, SupportCreateModal)
+    modal = interaction.response.sent_modal
+    language = "german"
+    assert modal.title == localizer.text("discord.support.create_modal.title", language=language)
+    assert modal.category.text == localizer.text("discord.support.create_modal.category_label", language=language)
+    assert [option.label for option in modal.category.component.options] == [
+        localizer.lookup("discord.support.category", category, language=language) for category in SUPPORT_TICKET_CATEGORIES
+    ]
+    selected_options = [option.value for option in modal.category.component.options if option.default]
+    assert selected_options == ["bug"]
+    assert modal.title_input.default == "Ping 14"
+    assert modal.description_input.default is None
+    assert support_channel.sent == []
+
+
+def test_support_ticket_buttons_are_ordered_reply_show_close() -> None:
+    localizer = Localizer.from_directory()
+    service = _service(localizer=localizer)
+
+    view = SupportTicketView(
+        ticket_id=1,
+        services=SimpleNamespace(support=service),
+        localizer=localizer,
+        language="english",
+    )
+
+    assert [child.custom_id for child in view.children if isinstance(child, discord.ui.Button)] == [
+        "support:reply:1",
+        "support:show:1",
+        "support:close:1",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_support_answer_uses_thread_color_markdown_and_original_request() -> None:
     repository = InMemorySupportTicketRepository()
     service = _service(repository=repository, thread_color="#123456")
     created = await _create_ticket(service)
+    answer_body = "# Überschrift\nNutze `/ping add ...` @everyone"
 
     prepared = await service.prepare_answer(
         AnswerSupportTicketCommand(
             ticket_id=created.ticket.ticket_id,
             responder_id=300,
             subject="How to Ping",
-            body="# Überschrift\nNutze `/ping add ...` @everyone",
+            body=answer_body,
         )
     )
 
     assert prepared.ticket is not None
-    embed = build_result_embed(prepared.result)
+    embed = build_support_user_answer_embed(
+        SupportUserAnswerEmbedRequest(
+            ticket=prepared.ticket,
+            localizer=service.localizer,
+            response_subject=prepared.response_subject or "How to Ping",
+            response_body=prepared.response_body or answer_body,
+            color=prepared.result.color,
+        )
+    )
     assert embed.color.value == 0x123456
+    assert embed.title == service.localizer.text("discord.support.user_answer_embed.title", language=created.ticket.language)
     assert embed.description is not None
-    assert embed.description.startswith("# Überschrift")
+    title_index = embed.description.index(created.ticket.title)
+    description_index = embed.description.index(created.ticket.description)
+    subject_index = embed.description.index("How to Ping")
+    answer_index = embed.description.index(answer_body)
+    assert title_index < description_index < subject_index < answer_index
     assert "@everyone" in embed.description
-    assert "Ping 14" in embed.description
-    assert "Kommt nicht durch" in embed.description
+    category_label = service.localizer.lookup("discord.support.category", created.ticket.category, language=created.ticket.language)
+    assert category_label not in embed.description
 
     updated = await service.mark_answered(
         AnswerSupportTicketCommand(
             ticket_id=created.ticket.ticket_id,
             responder_id=300,
             subject="How to Ping",
-            body="# Überschrift\nNutze `/ping add ...` @everyone",
+            body=answer_body,
         )
     )
 
@@ -409,6 +524,8 @@ async def test_support_close_button_sends_user_notice_and_removes_buttons() -> N
     await close_button.callback(interaction)
 
     assert len(origin_channel.sent) == 1
+    assert interaction.edited_original_embed is None
+    assert len(interaction.followup.sent) == 1
     assert support_message.edited_view is None
     assert support_message.edited_embed is not None
     assert localizer.lookup("discord.support.status", "closed", language="english") in (support_message.edited_embed.description or "")
