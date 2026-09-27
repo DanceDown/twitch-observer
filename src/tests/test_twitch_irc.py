@@ -208,6 +208,45 @@ async def test_twitch_irc_gateway_can_join_channels_later() -> None:
     await gateway.join_channel("second")
 
     assert sent_lines == ["JOIN #example", "JOIN #second"]
+    assert gateway._joined_channels == set()
+    assert gateway._pending_channels == {"example", "second"}
+
+
+@pytest.mark.asyncio
+async def test_twitch_irc_gateway_confirms_join_from_roomstate() -> None:
+    config = AppConfig()
+    gateway = AnonymousTwitchIRCGateway(config=config)
+    handled_lines: list[str] = []
+
+    class Reader:
+        def __init__(self) -> None:
+            self.lines = [
+                b"@emote-only=0;followers-only=-1;r9k=0;room-id=42;slow=0;subs-only=0 :tmi.twitch.tv ROOMSTATE #Example\r\n",
+            ]
+            self.index = 0
+
+        def at_eof(self) -> bool:
+            return self.index >= len(self.lines)
+
+        async def readline(self) -> bytes:
+            line = self.lines[self.index]
+            self.index += 1
+            return line
+
+    async def fake_line_handler(raw_line: str) -> None:
+        handled_lines.append(raw_line.strip())
+
+    gateway._reader = _reader(Reader())
+    gateway._line_handler = fake_line_handler
+    gateway._pending_channels.add("example")
+    gateway._pending_join_sent_at["example"] = 1
+
+    await gateway._read_loop()
+
+    assert gateway._joined_channels == {"example"}
+    assert gateway._pending_channels == set()
+    assert gateway._pending_join_sent_at == {}
+    assert handled_lines == ["@emote-only=0;followers-only=-1;r9k=0;room-id=42;slow=0;subs-only=0 :tmi.twitch.tv ROOMSTATE #Example"]
 
 
 @pytest.mark.asyncio

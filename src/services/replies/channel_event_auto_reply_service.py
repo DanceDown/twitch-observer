@@ -253,12 +253,14 @@ class ChannelEventAutoReplyService:
                 message=rendered_message,
             )
         )
+        sender_display_name = await self._resolve_account_display_name(account)
         await self.message_repository.save_bot_twitch_message(
             self._build_sent_message_event(
                 metadata=metadata,
                 account=account,
                 message_id=sent_message_id,
                 content=rendered_message,
+                sender_display_name=sender_display_name,
             )
         )
         await self._notify_auto_reply(
@@ -315,14 +317,28 @@ class ChannelEventAutoReplyService:
         account: TwitchAccountRecord,
         message_id: str,
         content: str,
+        sender_display_name: str,
     ) -> TwitchChatMessageEvent:
         return TwitchChatMessageEvent(
             channel_login=metadata.channel_login or metadata.event.twitch_channel_id,
             author_login=account.twitch_login,
-            author_display_name=account.twitch_login,
+            author_display_name=sender_display_name,
             author_id=account.twitch_user_id,
             broadcaster_id=metadata.event.twitch_channel_id,
             message_id=message_id,
             content=content,
             sent_at=datetime.now(UTC),
         )
+
+    async def _resolve_account_display_name(self, account: TwitchAccountRecord) -> str:
+        cached = self.twitch_api.get_cached_user_by_id(account.twitch_user_id)
+        if cached is None:
+            try:
+                cached = await self.twitch_api.load_cached_user_by_id(account.twitch_user_id)
+            except Exception:
+                logger.debug(
+                    "Could not load cached Twitch account display name for account_id=%s.",
+                    account.account_id,
+                    exc_info=True,
+                )
+        return account.twitch_login if cached is None else cached.display_name

@@ -225,10 +225,12 @@ class AutoReplyService:
                 reply_parent_message_id=(delivery.event.message_id if delivery.matching_reply.reply_as_reply else None),
             )
         )
+        sender_display_name = await self._resolve_account_display_name(delivery.account)
         await self.message_repository.save_bot_twitch_message(
             self._build_sent_message_event(
                 delivery=delivery,
                 message_id=sent_message_id,
+                sender_display_name=sender_display_name,
             )
         )
         self.sent_replies += 1
@@ -326,11 +328,12 @@ class AutoReplyService:
         *,
         delivery: _PatternAutoReplyDelivery,
         message_id: str,
+        sender_display_name: str,
     ) -> TwitchChatMessageEvent:
         return TwitchChatMessageEvent(
             channel_login=delivery.event.channel_login if delivery.channel_user is None else delivery.channel_user.login,
             author_login=delivery.account.twitch_login,
-            author_display_name=delivery.account.twitch_login,
+            author_display_name=sender_display_name,
             author_id=delivery.account.twitch_user_id,
             broadcaster_id=delivery.event.broadcaster_id,
             message_id=message_id,
@@ -338,6 +341,19 @@ class AutoReplyService:
             reply_parent_message_id=(delivery.event.message_id if delivery.matching_reply.reply_as_reply else None),
             sent_at=datetime.now(UTC),
         )
+
+    async def _resolve_account_display_name(self, account: TwitchAccountRecord) -> str:
+        cached = self.twitch_api.get_cached_user_by_id(account.twitch_user_id)
+        if cached is None:
+            try:
+                cached = await self.twitch_api.load_cached_user_by_id(account.twitch_user_id)
+            except Exception:
+                logger.debug(
+                    "Could not load cached Twitch account display name for account_id=%s.",
+                    account.account_id,
+                    exc_info=True,
+                )
+        return account.twitch_login if cached is None else cached.display_name
 
     async def _notify_account_expired(self, discord_channel_id: int) -> None:
         await self.account_notifier.send_account_result(

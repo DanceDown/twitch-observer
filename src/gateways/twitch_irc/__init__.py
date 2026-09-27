@@ -47,6 +47,7 @@ class AnonymousTwitchIRCGateway:
         self._nick = self._build_anonymous_nick(config.twitch_irc_nick_prefix)
         self._joined_channels: set[str] = set()
         self._pending_channels: set[str] = set()
+        self._pending_join_sent_at: dict[str, float] = {}
         self._connected_event = asyncio.Event()
         self._connection_lock = asyncio.Lock()
         self._read_task: asyncio.Task[None] | None = None
@@ -111,17 +112,19 @@ class AnonymousTwitchIRCGateway:
         normalized = channel_login.strip().lstrip("#").lower()
         if not normalized or normalized in self._joined_channels:
             return
+        if normalized in self._pending_channels and not self._should_retry_pending_join(normalized):
+            return
         if not self._is_connection_ready():
             logger.warning("Twitch IRC was disconnected before joining #%s; reconnecting.", normalized)
         self._pending_channels.add(normalized)
         await self.ensure_connected()
         if normalized in self._joined_channels:
             self._pending_channels.discard(normalized)
+            self._pending_join_sent_at.pop(normalized, None)
             return
         await self._send_line_with_reconnect(f"JOIN #{normalized}")
-        self._pending_channels.discard(normalized)
-        self._joined_channels.add(normalized)
-        logger.debug("Joined Twitch IRC channel #%s", normalized)
+        self._pending_join_sent_at[normalized] = asyncio.get_running_loop().time()
+        logger.debug("Requested Twitch IRC join for #%s", normalized)
 
     async def join_channels(self, channel_logins: list[str]) -> None:
         """Join multiple Twitch channels."""
@@ -140,6 +143,7 @@ class AnonymousTwitchIRCGateway:
         await self.ensure_connected()
         await self._send_line_with_reconnect(f"PART #{normalized}")
         self._pending_channels.discard(normalized)
+        self._pending_join_sent_at.pop(normalized, None)
         self._joined_channels.discard(normalized)
         logger.debug("Left Twitch IRC channel #%s", normalized)
 
@@ -185,6 +189,7 @@ class AnonymousTwitchIRCGateway:
                     logger.warning("Twitch IRC read loop stopped after PING/PONG connection error: %s", error)
                     break
                 continue
+            self._observe_server_line(raw_line)
             try:
                 if self._line_handler is not None:
                     await self._line_handler(raw_line)
@@ -200,6 +205,36 @@ class AnonymousTwitchIRCGateway:
         if not line.startswith("PING "):
             return None
         return line.removeprefix("PING ").removeprefix(":").strip()
+
+    def _observe_server_line(self, raw_line: str) -> None:
+        roomstate_channel = self._extract_roomstate_channel(raw_line)
+        if roomstate_channel is None:
+            return
+        self._pending_channels.discard(roomstate_channel)
+        self._pending_join_sent_at.pop(roomstate_channel, None)
+        if roomstate_channel not in self._joined_channels:
+            logger.debug("Confirmed Twitch IRC join for #%s", roomstate_channel)
+        self._joined_channels.add(roomstate_channel)
+
+    @staticmethod
+    def _extract_roomstate_channel(raw_line: str) -> str | None:
+        line = raw_line.strip()
+        if not line:
+            return None
+        if line.startswith("@"):
+            parts = line.split(" ", 1)
+            if len(parts) != 2:
+                return None
+            line = parts[1]
+        if line.startswith(":"):
+            parts = line.split(" ", 1)
+            if len(parts) != 2:
+                return None
+            line = parts[1]
+        parts = [part for part in line.split(" ") if part]
+        if len(parts) < 2 or parts[0] != "ROOMSTATE":
+            return None
+        return parts[1].lstrip("#").lower() or None
 
     async def _send_line(self, line: str) -> None:
         if self._writer is None:
@@ -254,11 +289,11 @@ class AnonymousTwitchIRCGateway:
                 continue
             if normalized in self._joined_channels:
                 self._pending_channels.discard(normalized)
+                self._pending_join_sent_at.pop(normalized, None)
                 continue
             await self._send_line(f"JOIN #{normalized}")
-            self._joined_channels.add(normalized)
-            self._pending_channels.discard(normalized)
-            logger.debug("Joined Twitch IRC channel #%s", normalized)
+            self._pending_join_sent_at[normalized] = asyncio.get_running_loop().time()
+            logger.debug("Requested Twitch IRC join for #%s", normalized)
 
     async def _send_line_with_reconnect(self, line: str) -> None:
         try:
@@ -285,6 +320,7 @@ class AnonymousTwitchIRCGateway:
         if preserve_channels:
             self._pending_channels.update(self._joined_channels)
         self._joined_channels.clear()
+        self._pending_join_sent_at.clear()
         if writer is not None:
             with contextlib.suppress(OSError):
                 writer.close()
@@ -316,6 +352,15 @@ class AnonymousTwitchIRCGateway:
             return False
         is_closing = getattr(self._writer, "is_closing", None)
         return not (callable(is_closing) and is_closing())
+
+    def _should_retry_pending_join(self, channel_login: str) -> bool:
+        sent_at = self._pending_join_sent_at.get(channel_login)
+        if sent_at is None:
+            return True
+        return asyncio.get_running_loop().time() - sent_at >= self._pending_join_retry_seconds()
+
+    def _pending_join_retry_seconds(self) -> float:
+        return max(60.0, self._config.twitch_irc_connection_check_interval_seconds * 3)
 
     @staticmethod
     def _build_anonymous_nick(prefix: str) -> str:

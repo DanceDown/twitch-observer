@@ -1791,6 +1791,11 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
                 login="example",
                 display_name="ExampleChannel",
             ),
+            "77": TwitchUser(
+                user_id="77",
+                login="dancedown",
+                display_name="DanceDown",
+            ),
         },
     )
     notifier = FakeNotifier()
@@ -1829,6 +1834,7 @@ async def test_auto_reply_service_sends_reply_for_matching_pattern() -> None:
     assert message_repository.saved_bot_messages[0].message_id == "sent-1"
     assert message_repository.saved_bot_messages[0].reply_parent_message_id == "msg-1"
     assert message_repository.saved_bot_messages[0].author_id == "77"
+    assert message_repository.saved_bot_messages[0].author_display_name == "DanceDown"
     assert len(notifier.tracking_embeds) == 1
 
 
@@ -2393,7 +2399,10 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
     twitch_api = FakeTwitchAPI(
         users_by_id={
             "42": TwitchUser(user_id="42", login="example", display_name="ExampleChannel"),
-        }
+        },
+        cached_users_by_id={
+            "77": TwitchUser(user_id="77", login="dancedown", display_name="DanceDown"),
+        },
     )
     notifier = FakeNotifier()
     message_repository = InMemoryMessageRepository()
@@ -2424,6 +2433,7 @@ async def test_channel_event_auto_reply_service_sends_message_when_channel_goes_
     assert len(message_repository.saved_bot_messages) == 1
     assert message_repository.saved_bot_messages[0].message_id == "sent-1"
     assert message_repository.saved_bot_messages[0].author_id == "77"
+    assert message_repository.saved_bot_messages[0].author_display_name == "DanceDown"
     assert message_repository.saved_bot_messages[0].channel_login == "example"
     assert len(notifier.tracking_embeds) == 1
     tracking_embed = notifier.tracking_embeds[0][1]
