@@ -181,6 +181,9 @@ class AnonymousTwitchIRCGateway:
             if not raw_bytes:
                 break
             raw_line = raw_bytes.decode("utf-8", errors="replace")
+            if self._is_reconnect_command(raw_line):
+                logger.warning("Twitch IRC server requested reconnect.")
+                break
             ping_payload = self._extract_ping_payload(raw_line)
             if ping_payload is not None:
                 try:
@@ -205,6 +208,24 @@ class AnonymousTwitchIRCGateway:
         if not line.startswith("PING "):
             return None
         return line.removeprefix("PING ").removeprefix(":").strip()
+
+    @staticmethod
+    def _is_reconnect_command(raw_line: str) -> bool:
+        line = raw_line.strip()
+        if not line:
+            return False
+        if line.startswith("@"):
+            parts = line.split(" ", 1)
+            if len(parts) != 2:
+                return False
+            line = parts[1]
+        if line.startswith(":"):
+            parts = line.split(" ", 1)
+            if len(parts) != 2:
+                return False
+            line = parts[1]
+        parts = [part for part in line.split(" ") if part]
+        return bool(parts and parts[0] == "RECONNECT")
 
     def _observe_server_line(self, raw_line: str) -> None:
         roomstate_channel = self._extract_roomstate_channel(raw_line)

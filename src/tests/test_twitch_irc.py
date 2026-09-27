@@ -355,6 +355,39 @@ async def test_twitch_irc_gateway_answers_ping_before_line_handler() -> None:
 
 
 @pytest.mark.asyncio
+async def test_twitch_irc_gateway_stops_read_loop_on_reconnect_command() -> None:
+    config = AppConfig()
+    gateway = AnonymousTwitchIRCGateway(config=config)
+    handled_lines: list[str] = []
+
+    class Reader:
+        def __init__(self) -> None:
+            self.lines = [
+                b":tmi.twitch.tv RECONNECT\r\n",
+                b":tmi.twitch.tv NOTICE * :should not be handled\r\n",
+            ]
+            self.index = 0
+
+        def at_eof(self) -> bool:
+            return self.index >= len(self.lines)
+
+        async def readline(self) -> bytes:
+            line = self.lines[self.index]
+            self.index += 1
+            return line
+
+    async def fake_line_handler(raw_line: str) -> None:
+        handled_lines.append(raw_line.strip())
+
+    gateway._reader = _reader(Reader())
+    gateway._line_handler = fake_line_handler
+
+    await gateway._read_loop()
+
+    assert handled_lines == []
+
+
+@pytest.mark.asyncio
 async def test_twitch_irc_gateway_stop_read_task_ignores_connection_reset() -> None:
     config = AppConfig()
     gateway = AnonymousTwitchIRCGateway(config=config)
