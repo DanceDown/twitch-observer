@@ -161,6 +161,7 @@ class ThreadLifecycleService:
                 ephemeral=True,
             )
 
+        part_candidate_logins: list[str] = []
         for twitch_channel_id in part_candidate_channel_ids:
             try:
                 cached = self.twitch_api.get_cached_user_by_id(twitch_channel_id.strip())
@@ -175,7 +176,9 @@ class ThreadLifecycleService:
                     command.discord_channel_id,
                 )
             else:
-                await self.irc_gateway.leave_channel(twitch_user.login)
+                part_candidate_logins.append(twitch_user.login)
+        if part_candidate_logins:
+            await self.irc_gateway.leave_channels(part_candidate_logins)
 
         logger.debug(
             "Left Discord context discord_channel_id=%s owner_id=%s removed_twitch_channels=%s",

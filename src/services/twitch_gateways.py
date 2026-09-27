@@ -152,8 +152,16 @@ class TwitchIRCChannelGateway(Protocol):
         """Join one Twitch IRC channel by login."""
         ...
 
+    async def join_channels(self, channel_logins: list[str]) -> None:
+        """Join multiple Twitch IRC channels by login."""
+        ...
+
     async def leave_channel(self, channel_login: str) -> None:
         """Leave one Twitch IRC channel by login."""
+        ...
+
+    async def leave_channels(self, channel_logins: list[str]) -> None:
+        """Leave multiple Twitch IRC channels by login."""
         ...
 
 

@@ -151,6 +151,7 @@ class FakeTwitchAPI(TwitchDirectoryGateway):
 class FakeIRCGateway(TwitchIRCChannelGateway):
     joined: list[str] = field(default_factory=list)
     left: list[str] = field(default_factory=list)
+    left_batches: list[list[str]] = field(default_factory=list)
     ensure_connected_calls: int = 0
 
     async def ensure_connected(self) -> None:
@@ -159,8 +160,16 @@ class FakeIRCGateway(TwitchIRCChannelGateway):
     async def join_channel(self, channel_login: str) -> None:
         self.joined.append(channel_login)
 
+    async def join_channels(self, channel_logins: list[str]) -> None:
+        self.joined.extend(channel_logins)
+
     async def leave_channel(self, channel_login: str) -> None:
         self.left.append(channel_login)
+        self.left_batches.append([channel_login])
+
+    async def leave_channels(self, channel_logins: list[str]) -> None:
+        self.left.extend(channel_logins)
+        self.left_batches.append(list(channel_logins))
 
 
 @dataclass
@@ -177,6 +186,11 @@ class FailingIRCGateway(FakeIRCGateway):
         if self.fail_on_leave:
             raise ConnectionError("Connection Lost")
         await super().leave_channel(channel_login)
+
+    async def leave_channels(self, channel_logins: list[str]) -> None:
+        if self.fail_on_leave:
+            raise ConnectionError("Connection Lost")
+        await super().leave_channels(channel_logins)
 
 
 @dataclass
@@ -573,6 +587,41 @@ async def test_leave_command_deletes_thread_and_parts_last_irc_channels() -> Non
     assert result.style == DiscordResultStyle.SUCCESS
     assert await thread_repository.get_by_discord_channel_id(100) is None
     assert irc_gateway.left == ["example"]
+
+
+@pytest.mark.asyncio
+async def test_leave_command_parts_last_irc_channels_as_batch() -> None:
+    event_bus = SimpleNamespace()
+    thread_repository = InMemoryThreadRepository()
+    thread = await thread_repository.create(owner_id=200, discord_channel_id=100)
+    channel_repository = InMemoryChannelRepository()
+    await channel_repository.add_channel(thread.thread_id, "42")
+    await channel_repository.add_channel(thread.thread_id, "84")
+    twitch_api = FakeTwitchAPI(
+        users_by_login={
+            "example": TwitchUser(user_id="42", login="example", display_name="Example"),
+            "second": TwitchUser(user_id="84", login="second", display_name="Second"),
+        }
+    )
+    irc_gateway = FakeIRCGateway()
+    event_bus.thread = ThreadLifecycleService(
+        thread_repository=thread_repository,
+        channel_repository=channel_repository,
+        twitch_api=twitch_api,
+        irc_gateway=irc_gateway,
+        tracked_channels_notifier=FakeTrackedChannelsNotifier(),
+    )
+
+    result = await dispatch_thread_command(
+        event_bus,
+        discord_channel_id=100,
+        requester_id=200,
+        action="leave",
+    )
+
+    assert result.style == DiscordResultStyle.SUCCESS
+    assert irc_gateway.left == ["example", "second"]
+    assert irc_gateway.left_batches == [["example", "second"]]
 
 
 @pytest.mark.asyncio

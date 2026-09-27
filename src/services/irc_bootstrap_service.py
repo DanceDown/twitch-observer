@@ -70,10 +70,11 @@ class IRCBootstrapService:
             return
 
         logger.debug("Rehydrating %s persisted Twitch IRC channel subscriptions from the database.", len(channel_ids))
+        channel_logins: list[str] = []
         for twitch_channel_id in channel_ids:
             try:
                 user = await self.twitch_api.get_channel_by_id(twitch_channel_id)
-                await self.irc_gateway.join_channel(user.login)
+                channel_logins.append(user.login)
             except TwitchAPIError as error:
                 logger.warning(
                     "Could not resolve stored Twitch channel id=%s during IRC startup sync: %s",
@@ -81,12 +82,15 @@ class IRCBootstrapService:
                     error,
                 )
                 continue
-            except (ConnectionError, OSError) as error:
-                logger.warning(
-                    "Could not join stored Twitch channel id=%s during IRC startup sync; will retry later: %s",
-                    twitch_channel_id,
-                    error,
-                )
+        if not channel_logins:
+            return
+        try:
+            await self.irc_gateway.join_channels(channel_logins)
+        except (ConnectionError, OSError) as error:
+            logger.warning(
+                "Could not join stored Twitch channels during IRC startup sync; will retry later: %s",
+                error,
+            )
 
     async def _run_periodic_sync(self) -> None:
         if self.resync_interval_seconds is None:

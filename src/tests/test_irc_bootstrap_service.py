@@ -47,6 +47,9 @@ class FakeIRCGateway(TwitchIRCConnectionGateway):
     async def join_channel(self, channel_login: str) -> None:
         self.joined.append(channel_login)
 
+    async def join_channels(self, channel_logins: list[str]) -> None:
+        self.joined.extend(channel_logins)
+
 
 @pytest.mark.asyncio
 async def test_bootstrap_service_joins_all_distinct_persisted_channels() -> None:

@@ -13,6 +13,8 @@ from src.config import AppConfig
 
 logger = logging.getLogger(__name__)
 
+IRC_CHANNEL_COMMAND_MAX_LENGTH = 480
+
 
 class TwitchIRCReadLoopStateError(RuntimeError):
     """Raised when the read loop starts before a stream reader is available."""
@@ -114,43 +116,47 @@ class AnonymousTwitchIRCGateway:
 
     async def join_channel(self, channel_login: str) -> None:
         """Join one Twitch channel after normalizing and deduplicating the login."""
-        normalized = channel_login.strip().lstrip("#").lower()
-        if not normalized or normalized in self._joined_channels:
+        targets = self._collect_join_targets([channel_login], include_joined=False)
+        if not targets:
             return
-        if normalized in self._pending_channels and not self._should_retry_pending_join(normalized):
-            return
+        normalized = targets[0]
         if not self._is_connection_ready():
             logger.warning("Twitch IRC was disconnected before joining #%s; reconnecting.", normalized)
-        self._pending_channels.add(normalized)
+        self._pending_channels.update(targets)
         await self.ensure_connected()
-        if normalized in self._joined_channels:
-            self._pending_channels.discard(normalized)
-            self._pending_join_sent_at.pop(normalized, None)
-            return
-        await self._send_line_with_reconnect(f"JOIN #{normalized}")
-        self._pending_join_sent_at[normalized] = asyncio.get_running_loop().time()
-        logger.debug("Requested Twitch IRC join for #%s", normalized)
+        await self._send_join_batches(targets, reconnect=True)
 
     async def join_channels(self, channel_logins: list[str]) -> None:
         """Join multiple Twitch channels."""
-        for channel_login in channel_logins:
-            await self.join_channel(channel_login)
+        targets = self._collect_join_targets(channel_logins, include_joined=False)
+        if not targets:
+            return
+        if not self._is_connection_ready():
+            logger.warning("Twitch IRC was disconnected before joining %d channels; reconnecting.", len(targets))
+        self._pending_channels.update(targets)
+        await self.ensure_connected()
+        await self._send_join_batches(targets, reconnect=True)
 
     async def leave_channel(self, channel_login: str) -> None:
         """Leave one Twitch channel after normalizing the login."""
-        normalized = channel_login.strip().lstrip("#").lower()
-        if not normalized:
+        targets = self._collect_part_targets([channel_login])
+        if not targets:
             return
-        if normalized not in self._joined_channels and normalized not in self._pending_channels:
-            return
+        normalized = targets[0]
         if not self._is_connection_ready():
             logger.warning("Twitch IRC was disconnected before parting #%s; reconnecting.", normalized)
         await self.ensure_connected()
-        await self._send_line_with_reconnect(f"PART #{normalized}")
-        self._pending_channels.discard(normalized)
-        self._pending_join_sent_at.pop(normalized, None)
-        self._joined_channels.discard(normalized)
-        logger.debug("Left Twitch IRC channel #%s", normalized)
+        await self._send_part_batches(targets, reconnect=True)
+
+    async def leave_channels(self, channel_logins: list[str]) -> None:
+        """Leave multiple Twitch channels."""
+        targets = self._collect_part_targets(channel_logins)
+        if not targets:
+            return
+        if not self._is_connection_ready():
+            logger.warning("Twitch IRC was disconnected before parting %d channels; reconnecting.", len(targets))
+        await self.ensure_connected()
+        await self._send_part_batches(targets, reconnect=True)
 
     async def wait_until_connected(self) -> None:
         """Wait until the IRC connection is established and handshake lines were sent."""
@@ -322,11 +328,7 @@ class AnonymousTwitchIRCGateway:
         if not channels:
             return
         logger.warning("Refreshing Twitch IRC joins for %d channels (%s).", len(channels), reason)
-        sent_at = asyncio.get_running_loop().time()
-        self._pending_channels.update(channels)
-        for channel_login in channels:
-            await self._send_line_with_reconnect(f"JOIN #{channel_login}")
-            self._pending_join_sent_at[channel_login] = sent_at
+        await self._send_join_batches(channels, reconnect=True)
 
     async def _send_line(self, line: str) -> None:
         if self._writer is None:
@@ -367,28 +369,96 @@ class AnonymousTwitchIRCGateway:
             raise
 
     async def _join_initial_channels(self) -> None:
-        initial_channels = {
-            normalized
-            for channel_login in set(self._config.twitch_irc_channels) | self._pending_channels
-            if (normalized := channel_login.strip().lstrip("#").lower())
-        }
+        initial_channels = self._collect_join_targets(
+            list(set(self._config.twitch_irc_channels) | self._pending_channels),
+            include_joined=False,
+        )
         if not initial_channels:
             logger.debug(
                 "No initial Twitch IRC channels configured in runtime state; persisted channel subscriptions can still be rejoined by startup sync."
             )
             return
-        self._pending_channels.update(initial_channels)
-        for channel_login in sorted(initial_channels):
+        await self._send_join_batches(initial_channels, reconnect=False)
+
+    def _collect_join_targets(self, channel_logins: list[str], *, include_joined: bool) -> list[str]:
+        targets: set[str] = set()
+        for channel_login in channel_logins:
             normalized = channel_login.strip().lstrip("#").lower()
             if not normalized:
                 continue
-            if normalized in self._joined_channels:
-                self._pending_channels.discard(normalized)
-                self._pending_join_sent_at.pop(normalized, None)
+            if not include_joined and normalized in self._joined_channels:
                 continue
-            await self._send_line(f"JOIN #{normalized}")
-            self._pending_join_sent_at[normalized] = asyncio.get_running_loop().time()
-            logger.debug("Requested Twitch IRC join for #%s", normalized)
+            if normalized in self._pending_channels and not self._should_retry_pending_join(normalized):
+                continue
+            targets.add(normalized)
+        return sorted(targets)
+
+    async def _send_join_batches(self, channel_logins: list[str], *, reconnect: bool) -> None:
+        targets = sorted({channel_login for channel_login in channel_logins if channel_login})
+        if not targets:
+            return
+        self._pending_channels.update(targets)
+        sent_at = asyncio.get_running_loop().time()
+        for batch in self._build_join_batches(targets):
+            line = f"JOIN {','.join(f'#{channel_login}' for channel_login in batch)}"
+            if reconnect:
+                await self._send_line_with_reconnect(line)
+            else:
+                await self._send_line(line)
+            for channel_login in batch:
+                self._pending_join_sent_at[channel_login] = sent_at
+            logger.debug("Requested Twitch IRC join batch for %d channels: %s", len(batch), ", ".join(f"#{item}" for item in batch))
+
+    def _collect_part_targets(self, channel_logins: list[str]) -> list[str]:
+        targets: set[str] = set()
+        for channel_login in channel_logins:
+            normalized = channel_login.strip().lstrip("#").lower()
+            if not normalized:
+                continue
+            if normalized not in self._joined_channels and normalized not in self._pending_channels:
+                continue
+            targets.add(normalized)
+        return sorted(targets)
+
+    async def _send_part_batches(self, channel_logins: list[str], *, reconnect: bool) -> None:
+        targets = sorted({channel_login for channel_login in channel_logins if channel_login})
+        if not targets:
+            return
+        for batch in self._build_channel_batches("PART", targets):
+            line = f"PART {','.join(f'#{channel_login}' for channel_login in batch)}"
+            if reconnect:
+                await self._send_line_with_reconnect(line)
+            else:
+                await self._send_line(line)
+            for channel_login in batch:
+                self._pending_channels.discard(channel_login)
+                self._pending_join_sent_at.pop(channel_login, None)
+                self._joined_channels.discard(channel_login)
+            logger.debug("Requested Twitch IRC part batch for %d channels: %s", len(batch), ", ".join(f"#{item}" for item in batch))
+
+    def _build_join_batches(self, channel_logins: list[str]) -> list[list[str]]:
+        return self._build_channel_batches("JOIN", channel_logins)
+
+    @staticmethod
+    def _build_channel_batches(command: str, channel_logins: list[str]) -> list[list[str]]:
+        batches: list[list[str]] = []
+        current_batch: list[str] = []
+        current_length = len(f"{command} ")
+        for channel_login in channel_logins:
+            item = f"#{channel_login}"
+            separator_length = 1 if current_batch else 0
+            next_length = current_length + separator_length + len(item)
+            if current_batch and next_length > IRC_CHANNEL_COMMAND_MAX_LENGTH:
+                batches.append(current_batch)
+                current_batch = []
+                current_length = len(f"{command} ")
+                separator_length = 0
+                next_length = current_length + len(item)
+            current_batch.append(channel_login)
+            current_length = next_length
+        if current_batch:
+            batches.append(current_batch)
+        return batches
 
     async def _send_line_with_reconnect(self, line: str) -> None:
         try:

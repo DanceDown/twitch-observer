@@ -176,8 +176,7 @@ Channels can be joined immediately after startup or later at runtime.
 Example:
 
 ```text
-JOIN #example
-JOIN #second
+JOIN #example,#second
 ```
 
 The adapter normalizes user input before sending the command:
@@ -188,6 +187,17 @@ The adapter normalizes user input before sending the command:
 - avoids duplicate joins
 
 This is important because channels will later be managed dynamically through Discord commands, not only through the startup configuration.
+
+For multiple joins, the adapter batches channels into comma-separated `JOIN`
+commands. Twitch still confirms each successful channel join separately with its
+own `ROOMSTATE`, and the adapter only marks that channel as joined after seeing
+that response.
+
+Multiple leaves are batched the same way:
+
+```text
+PART #example,#second
+```
 
 ## Ping / Pong
 

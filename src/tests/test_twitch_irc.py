@@ -203,12 +203,26 @@ async def test_twitch_irc_gateway_can_join_channels_later() -> None:
     gateway._writer = _writer(SimpleNamespace(is_closing=lambda: False))
     _bind_send_line(gateway, fake_send_line)
 
-    await gateway.join_channel("Example")
-    await gateway.join_channel("#example")
-    await gateway.join_channel("second")
+    await gateway.join_channels(["Example", "#example", "second"])
 
-    assert sent_lines == ["JOIN #example", "JOIN #second"]
+    assert sent_lines == ["JOIN #example,#second"]
     assert gateway._joined_channels == set()
+    assert gateway._pending_channels == {"example", "second"}
+
+
+@pytest.mark.asyncio
+async def test_twitch_irc_gateway_keeps_batched_join_pending_when_connect_fails() -> None:
+    config = AppConfig()
+    gateway = AnonymousTwitchIRCGateway(config=config)
+
+    async def fake_ensure_connected() -> None:
+        raise ConnectionError("connect failed")
+
+    gateway.ensure_connected = fake_ensure_connected
+
+    with pytest.raises(ConnectionError):
+        await gateway.join_channels(["Example", "Second"])
+
     assert gateway._pending_channels == {"example", "second"}
 
 
@@ -250,6 +264,39 @@ async def test_twitch_irc_gateway_confirms_join_from_roomstate() -> None:
 
 
 @pytest.mark.asyncio
+async def test_twitch_irc_gateway_confirms_batched_joins_from_individual_roomstates() -> None:
+    config = AppConfig()
+    gateway = AnonymousTwitchIRCGateway(config=config)
+
+    class Reader:
+        def __init__(self) -> None:
+            self.lines = [
+                b"@room-id=42 :tmi.twitch.tv ROOMSTATE #example\r\n",
+                b"@room-id=84 :tmi.twitch.tv ROOMSTATE #second\r\n",
+            ]
+            self.index = 0
+
+        def at_eof(self) -> bool:
+            return self.index >= len(self.lines)
+
+        async def readline(self) -> bytes:
+            line = self.lines[self.index]
+            self.index += 1
+            return line
+
+    gateway._reader = _reader(Reader())
+    gateway._pending_channels.update({"example", "second"})
+    gateway._pending_join_sent_at["example"] = 1
+    gateway._pending_join_sent_at["second"] = 1
+
+    await gateway._read_loop()
+
+    assert gateway._joined_channels == {"example", "second"}
+    assert gateway._pending_channels == set()
+    assert gateway._pending_join_sent_at == {}
+
+
+@pytest.mark.asyncio
 async def test_twitch_irc_gateway_rejoins_pending_channels_after_connect() -> None:
     config = AppConfig()
     gateway = AnonymousTwitchIRCGateway(config=config)
@@ -264,7 +311,75 @@ async def test_twitch_irc_gateway_rejoins_pending_channels_after_connect() -> No
 
     await gateway._join_initial_channels()
 
-    assert sent_lines == ["JOIN #example", "JOIN #second"]
+    assert sent_lines == ["JOIN #example,#second"]
+
+
+@pytest.mark.asyncio
+async def test_twitch_irc_gateway_splits_large_join_batches() -> None:
+    config = AppConfig()
+    gateway = AnonymousTwitchIRCGateway(config=config)
+    sent_lines: list[str] = []
+
+    async def fake_send_line(line: str) -> None:
+        sent_lines.append(line)
+
+    channel_logins = [f"channel{i:02d}{'x' * 20}" for i in range(30)]
+    _bind_send_line(gateway, fake_send_line)
+
+    await gateway._send_join_batches(channel_logins, reconnect=False)
+
+    assert len(sent_lines) > 1
+    assert all(line.startswith("JOIN #") for line in sent_lines)
+    assert all(len(line) <= 480 for line in sent_lines)
+    joined_from_lines = {item.lstrip("#") for line in sent_lines for item in line.removeprefix("JOIN ").split(",")}
+    assert joined_from_lines == set(channel_logins)
+
+
+@pytest.mark.asyncio
+async def test_twitch_irc_gateway_can_part_channels_later() -> None:
+    config = AppConfig()
+    gateway = AnonymousTwitchIRCGateway(config=config)
+    sent_lines: list[str] = []
+
+    async def fake_send_line(line: str) -> None:
+        sent_lines.append(line)
+
+    gateway._reader = _reader(SimpleNamespace(at_eof=lambda: False))
+    gateway._writer = _writer(SimpleNamespace(is_closing=lambda: False))
+    gateway._joined_channels.update({"example", "second"})
+    gateway._pending_channels.add("pending")
+    gateway._pending_join_sent_at["pending"] = 1
+    _bind_send_line_with_reconnect(gateway, fake_send_line)
+
+    await gateway.leave_channels(["Example", "#second", "pending", "missing"])
+
+    assert sent_lines == ["PART #example,#pending,#second"]
+    assert gateway._joined_channels == set()
+    assert gateway._pending_channels == set()
+    assert gateway._pending_join_sent_at == {}
+
+
+@pytest.mark.asyncio
+async def test_twitch_irc_gateway_splits_large_part_batches() -> None:
+    config = AppConfig()
+    gateway = AnonymousTwitchIRCGateway(config=config)
+    sent_lines: list[str] = []
+
+    async def fake_send_line(line: str) -> None:
+        sent_lines.append(line)
+
+    channel_logins = [f"channel{i:02d}{'x' * 20}" for i in range(30)]
+    gateway._joined_channels.update(channel_logins)
+    _bind_send_line(gateway, fake_send_line)
+
+    await gateway._send_part_batches(channel_logins, reconnect=False)
+
+    assert len(sent_lines) > 1
+    assert all(line.startswith("PART #") for line in sent_lines)
+    assert all(len(line) <= 480 for line in sent_lines)
+    parted_from_lines = {item.lstrip("#") for line in sent_lines for item in line.removeprefix("PART ").split(",")}
+    assert parted_from_lines == set(channel_logins)
+    assert gateway._joined_channels == set()
 
 
 @pytest.mark.asyncio
@@ -427,7 +542,7 @@ async def test_twitch_irc_gateway_refreshes_joins_after_health_ping_timeout() ->
 
     await gateway._health_check_once()
 
-    assert sent_lines == ["JOIN #example", "JOIN #second"]
+    assert sent_lines == ["JOIN #example,#second"]
     assert gateway._pending_channels == {"example", "second"}
     assert gateway._pending_health_ping_payload is None
     assert gateway._pending_health_ping_sent_at is None
