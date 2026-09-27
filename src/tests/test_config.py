@@ -105,6 +105,18 @@ def test_app_config_reads_support_channel_id(monkeypatch) -> None:
     assert config.support_discord_channel_id == 123456
 
 
+def test_app_config_disables_traceback_logging_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("LOG_TRACEBACKS", raising=False)
+    config = AppConfig()
+    assert config.log_tracebacks is False
+
+
+def test_app_config_reads_traceback_logging_flag(monkeypatch) -> None:
+    monkeypatch.setenv("LOG_TRACEBACKS", "true")
+    config = AppConfig()
+    assert config.log_tracebacks is True
+
+
 def test_app_config_uses_default_irc_reconnect_delays(monkeypatch) -> None:
     monkeypatch.delenv("TWITCH_IRC_RECONNECT_INITIAL_DELAY_SECONDS", raising=False)
     monkeypatch.delenv("TWITCH_IRC_RECONNECT_MAX_DELAY_SECONDS", raising=False)

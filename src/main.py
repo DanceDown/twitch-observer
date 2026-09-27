@@ -9,15 +9,13 @@ from contextlib import suppress
 
 from src.bootstrap import build_core, build_entrypoints, build_gateways, build_runtime, build_services, start_runtime, stop_runtime
 from src.config import AppConfig
+from src.logging_config import configure_logging
 
 
 async def _run() -> None:
     """Boot the application and keep it running until shutdown is requested."""
     config = AppConfig()
-    logging.basicConfig(
-        level=getattr(logging, config.log_level.upper(), logging.INFO),
-        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-    )
+    configure_logging(config)
     core = await build_core(config)
     gateways = build_gateways(core)
     services = build_services(core, gateways)

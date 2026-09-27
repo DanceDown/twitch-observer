@@ -144,6 +144,7 @@ class AppConfig:
     irc_bootstrap_connect_timeout_seconds: float = field(default_factory=lambda: _get_float("IRC_BOOTSTRAP_CONNECT_TIMEOUT_SECONDS", "15"))
     irc_channel_resync_interval_seconds: float = field(default_factory=lambda: _get_float("IRC_CHANNEL_RESYNC_INTERVAL_SECONDS", "300"))
     log_level: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
+    log_tracebacks: bool = field(default_factory=lambda: _get_bool("LOG_TRACEBACKS", "false"))
 
     @property
     def postgres_dsn(self) -> str:
