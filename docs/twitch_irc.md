@@ -206,3 +206,11 @@ PONG :tmi.twitch.tv
 ```
 
 If the client stops answering `PING`, Twitch will eventually close the connection.
+
+The adapter also uses a client-side health `PING` after IRC has been silent for
+`TWITCH_IRC_HEALTH_PING_INTERVAL_SECONDS` seconds. The default is 300 seconds.
+
+If Twitch answers with the matching `PONG`, no channel action is taken. If no
+matching `PONG` arrives within `TWITCH_IRC_HEALTH_PING_TIMEOUT_SECONDS` seconds,
+the adapter sends `JOIN` again for all channels it currently believes should be
+joined. This refreshes channel membership without forcing a full disconnect.

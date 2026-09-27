@@ -52,6 +52,9 @@ class AnonymousTwitchIRCGateway:
         self._connection_lock = asyncio.Lock()
         self._read_task: asyncio.Task[None] | None = None
         self._stop_requested = False
+        self._last_line_received_at: float | None = None
+        self._pending_health_ping_payload: str | None = None
+        self._pending_health_ping_sent_at: float | None = None
 
     @property
     def nick(self) -> str:
@@ -80,6 +83,8 @@ class AnonymousTwitchIRCGateway:
                         continue
                     if not self._is_transport_connected():
                         await self._recover_connection("connection health check failed")
+                        continue
+                    await self._health_check_once()
                 except asyncio.CancelledError:
                     raise
                 except Exception as error:  # noqa: BLE001
@@ -181,9 +186,14 @@ class AnonymousTwitchIRCGateway:
             if not raw_bytes:
                 break
             raw_line = raw_bytes.decode("utf-8", errors="replace")
+            self._mark_line_received()
             if self._is_reconnect_command(raw_line):
                 logger.warning("Twitch IRC server requested reconnect.")
                 break
+            pong_payload = self._extract_pong_payload(raw_line)
+            if pong_payload is not None:
+                self._observe_pong(pong_payload)
+                continue
             ping_payload = self._extract_ping_payload(raw_line)
             if ping_payload is not None:
                 try:
@@ -210,22 +220,20 @@ class AnonymousTwitchIRCGateway:
         return line.removeprefix("PING ").removeprefix(":").strip()
 
     @staticmethod
+    def _extract_pong_payload(raw_line: str) -> str | None:
+        command, params, trailing = AnonymousTwitchIRCGateway._parse_irc_command_parts(raw_line)
+        if command != "PONG":
+            return None
+        if trailing is not None:
+            return trailing
+        if params:
+            return params[-1].lstrip(":")
+        return ""
+
+    @staticmethod
     def _is_reconnect_command(raw_line: str) -> bool:
-        line = raw_line.strip()
-        if not line:
-            return False
-        if line.startswith("@"):
-            parts = line.split(" ", 1)
-            if len(parts) != 2:
-                return False
-            line = parts[1]
-        if line.startswith(":"):
-            parts = line.split(" ", 1)
-            if len(parts) != 2:
-                return False
-            line = parts[1]
-        parts = [part for part in line.split(" ") if part]
-        return bool(parts and parts[0] == "RECONNECT")
+        command, _params, _trailing = AnonymousTwitchIRCGateway._parse_irc_command_parts(raw_line)
+        return command == "RECONNECT"
 
     def _observe_server_line(self, raw_line: str) -> None:
         roomstate_channel = self._extract_roomstate_channel(raw_line)
@@ -239,23 +247,86 @@ class AnonymousTwitchIRCGateway:
 
     @staticmethod
     def _extract_roomstate_channel(raw_line: str) -> str | None:
+        command, params, _trailing = AnonymousTwitchIRCGateway._parse_irc_command_parts(raw_line)
+        if command != "ROOMSTATE" or not params:
+            return None
+        return params[0].lstrip("#").lower() or None
+
+    @staticmethod
+    def _parse_irc_command_parts(raw_line: str) -> tuple[str | None, list[str], str | None]:
         line = raw_line.strip()
         if not line:
-            return None
+            return None, [], None
         if line.startswith("@"):
             parts = line.split(" ", 1)
             if len(parts) != 2:
-                return None
+                return None, [], None
             line = parts[1]
         if line.startswith(":"):
             parts = line.split(" ", 1)
             if len(parts) != 2:
-                return None
+                return None, [], None
             line = parts[1]
+        trailing: str | None = None
+        if " :" in line:
+            line, trailing = line.split(" :", 1)
         parts = [part for part in line.split(" ") if part]
-        if len(parts) < 2 or parts[0] != "ROOMSTATE":
-            return None
-        return parts[1].lstrip("#").lower() or None
+        if not parts:
+            return None, [], trailing
+        return parts[0], parts[1:], trailing
+
+    def _mark_line_received(self) -> None:
+        self._last_line_received_at = asyncio.get_running_loop().time()
+
+    def _observe_pong(self, payload: str) -> None:
+        pending_payload = self._pending_health_ping_payload
+        if pending_payload is None:
+            logger.debug("Received unsolicited Twitch IRC PONG payload=%r", payload)
+            return
+        if payload != pending_payload:
+            logger.debug("Received Twitch IRC PONG for another payload=%r; waiting for %r", payload, pending_payload)
+            return
+        logger.debug("Received Twitch IRC health PONG payload=%r", payload)
+        self._pending_health_ping_payload = None
+        self._pending_health_ping_sent_at = None
+
+    async def _health_check_once(self) -> None:
+        interval_seconds = self._config.twitch_irc_health_ping_interval_seconds
+        if interval_seconds <= 0:
+            return
+        now = asyncio.get_running_loop().time()
+        timeout_seconds = max(1.0, self._config.twitch_irc_health_ping_timeout_seconds)
+        if self._pending_health_ping_payload is not None and self._pending_health_ping_sent_at is not None:
+            if now - self._pending_health_ping_sent_at >= timeout_seconds:
+                logger.warning(
+                    "Twitch IRC health PING timed out after %.1fs; refreshing channel joins.",
+                    timeout_seconds,
+                )
+                self._pending_health_ping_payload = None
+                self._pending_health_ping_sent_at = None
+                await self._refresh_joined_channels("health PING timed out")
+            return
+        if self._last_line_received_at is None:
+            return
+        idle_seconds = now - self._last_line_received_at
+        if idle_seconds < interval_seconds:
+            return
+        payload = f"health-{secrets.token_hex(8)}"
+        await self._send_line_with_reconnect(f"PING :{payload}")
+        self._pending_health_ping_payload = payload
+        self._pending_health_ping_sent_at = now
+        logger.debug("Sent Twitch IRC health PING after %.1fs without server lines.", idle_seconds)
+
+    async def _refresh_joined_channels(self, reason: str) -> None:
+        channels = sorted(self._joined_channels | self._pending_channels)
+        if not channels:
+            return
+        logger.warning("Refreshing Twitch IRC joins for %d channels (%s).", len(channels), reason)
+        sent_at = asyncio.get_running_loop().time()
+        self._pending_channels.update(channels)
+        for channel_login in channels:
+            await self._send_line_with_reconnect(f"JOIN #{channel_login}")
+            self._pending_join_sent_at[channel_login] = sent_at
 
     async def _send_line(self, line: str) -> None:
         if self._writer is None:
@@ -275,6 +346,9 @@ class AnonymousTwitchIRCGateway:
             )
             self._reader = reader
             self._writer = writer
+            self._last_line_received_at = asyncio.get_running_loop().time()
+            self._pending_health_ping_payload = None
+            self._pending_health_ping_sent_at = None
             logger.debug("Connected to Twitch IRC at %s:%s", self._config.twitch_irc_host, self._config.twitch_irc_port)
             await self._send_line("PASS SCHMOOPIIE")
             await self._send_line("CAP REQ :twitch.tv/tags twitch.tv/commands")
@@ -338,6 +412,9 @@ class AnonymousTwitchIRCGateway:
         self._reader = None
         self._writer = None
         self._connected_event.clear()
+        self._last_line_received_at = None
+        self._pending_health_ping_payload = None
+        self._pending_health_ping_sent_at = None
         if preserve_channels:
             self._pending_channels.update(self._joined_channels)
         self._joined_channels.clear()

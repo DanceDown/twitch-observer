@@ -355,6 +355,85 @@ async def test_twitch_irc_gateway_answers_ping_before_line_handler() -> None:
 
 
 @pytest.mark.asyncio
+async def test_twitch_irc_gateway_observes_health_pong_before_line_handler() -> None:
+    config = AppConfig()
+    gateway = AnonymousTwitchIRCGateway(config=config)
+    handled_lines: list[str] = []
+
+    class Reader:
+        def __init__(self) -> None:
+            self.lines = [
+                b":tmi.twitch.tv PONG tmi.twitch.tv :health-123\r\n",
+                b":tmi.twitch.tv NOTICE * :hello\r\n",
+            ]
+            self.index = 0
+
+        def at_eof(self) -> bool:
+            return self.index >= len(self.lines)
+
+        async def readline(self) -> bytes:
+            line = self.lines[self.index]
+            self.index += 1
+            return line
+
+    async def fake_line_handler(raw_line: str) -> None:
+        handled_lines.append(raw_line.strip())
+
+    gateway._reader = _reader(Reader())
+    gateway._line_handler = fake_line_handler
+    gateway._pending_health_ping_payload = "health-123"
+    gateway._pending_health_ping_sent_at = asyncio.get_running_loop().time()
+
+    await gateway._read_loop()
+
+    assert gateway._pending_health_ping_payload is None
+    assert gateway._pending_health_ping_sent_at is None
+    assert handled_lines == [":tmi.twitch.tv NOTICE * :hello"]
+
+
+@pytest.mark.asyncio
+async def test_twitch_irc_gateway_sends_health_ping_after_idle() -> None:
+    config = AppConfig(twitch_irc_health_ping_interval_seconds=1)
+    gateway = AnonymousTwitchIRCGateway(config=config)
+    sent_lines: list[str] = []
+
+    async def fake_send_line(line: str) -> None:
+        sent_lines.append(line)
+
+    _bind_send_line_with_reconnect(gateway, fake_send_line)
+    gateway._last_line_received_at = asyncio.get_running_loop().time() - 2
+
+    await gateway._health_check_once()
+
+    assert len(sent_lines) == 1
+    assert sent_lines[0].startswith("PING :health-")
+    assert gateway._pending_health_ping_payload == sent_lines[0].removeprefix("PING :")
+    assert gateway._pending_health_ping_sent_at is not None
+
+
+@pytest.mark.asyncio
+async def test_twitch_irc_gateway_refreshes_joins_after_health_ping_timeout() -> None:
+    config = AppConfig(twitch_irc_health_ping_interval_seconds=1, twitch_irc_health_ping_timeout_seconds=1)
+    gateway = AnonymousTwitchIRCGateway(config=config)
+    sent_lines: list[str] = []
+
+    async def fake_send_line(line: str) -> None:
+        sent_lines.append(line)
+
+    _bind_send_line_with_reconnect(gateway, fake_send_line)
+    gateway._joined_channels.update({"example", "second"})
+    gateway._pending_health_ping_payload = "health-123"
+    gateway._pending_health_ping_sent_at = asyncio.get_running_loop().time() - 2
+
+    await gateway._health_check_once()
+
+    assert sent_lines == ["JOIN #example", "JOIN #second"]
+    assert gateway._pending_channels == {"example", "second"}
+    assert gateway._pending_health_ping_payload is None
+    assert gateway._pending_health_ping_sent_at is None
+
+
+@pytest.mark.asyncio
 async def test_twitch_irc_gateway_stops_read_loop_on_reconnect_command() -> None:
     config = AppConfig()
     gateway = AnonymousTwitchIRCGateway(config=config)

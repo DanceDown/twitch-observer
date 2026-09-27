@@ -113,6 +113,22 @@ def test_app_config_uses_default_irc_reconnect_delays(monkeypatch) -> None:
     assert config.twitch_irc_reconnect_max_delay_seconds == 60
 
 
+def test_app_config_uses_default_irc_health_ping_settings(monkeypatch) -> None:
+    monkeypatch.delenv("TWITCH_IRC_HEALTH_PING_INTERVAL_SECONDS", raising=False)
+    monkeypatch.delenv("TWITCH_IRC_HEALTH_PING_TIMEOUT_SECONDS", raising=False)
+    config = AppConfig()
+    assert config.twitch_irc_health_ping_interval_seconds == 300
+    assert config.twitch_irc_health_ping_timeout_seconds == 30
+
+
+def test_app_config_reads_irc_health_ping_settings(monkeypatch) -> None:
+    monkeypatch.setenv("TWITCH_IRC_HEALTH_PING_INTERVAL_SECONDS", "120")
+    monkeypatch.setenv("TWITCH_IRC_HEALTH_PING_TIMEOUT_SECONDS", "7.5")
+    config = AppConfig()
+    assert config.twitch_irc_health_ping_interval_seconds == 120
+    assert config.twitch_irc_health_ping_timeout_seconds == 7.5
+
+
 def test_app_config_uses_default_chat_processing_queue_settings(monkeypatch) -> None:
     monkeypatch.delenv("TWITCH_CHAT_PROCESSING_QUEUE_SIZE", raising=False)
     monkeypatch.delenv("TWITCH_CHAT_PROCESSING_WORKERS", raising=False)

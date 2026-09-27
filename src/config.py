@@ -58,6 +58,12 @@ class AppConfig:
     twitch_irc_connection_check_interval_seconds: float = field(
         default_factory=lambda: _get_float("TWITCH_IRC_CONNECTION_CHECK_INTERVAL_SECONDS", "10")
     )
+    twitch_irc_health_ping_interval_seconds: float = field(
+        default_factory=lambda: _get_float("TWITCH_IRC_HEALTH_PING_INTERVAL_SECONDS", "300")
+    )
+    twitch_irc_health_ping_timeout_seconds: float = field(
+        default_factory=lambda: _get_float("TWITCH_IRC_HEALTH_PING_TIMEOUT_SECONDS", "30")
+    )
     twitch_irc_reconnect_initial_delay_seconds: float = field(
         default_factory=lambda: _get_float("TWITCH_IRC_RECONNECT_INITIAL_DELAY_SECONDS", "1")
     )
