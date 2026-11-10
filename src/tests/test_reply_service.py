@@ -52,7 +52,7 @@ from src.services.account_service import AccountCommandService
 from src.services.account_support import AccountNotificationSender
 from src.services.channel_event_notification_service import ChannelEventNotificationService
 from src.services.channel_live_state_service import ChannelEventCommandService
-from src.services.patterns import ShowCommandService
+from src.services.patterns import ShowCommandService, TrackingNotificationSender
 from src.services.replies import AutoReplyService, ChannelEventAutoReplyService, ReplyCommandService
 from src.services.twitch_gateways import TwitchReplyGateway
 from src.tests.chat_match_candidates import build_chat_match_seeds, hydrate_chat_match_candidates
@@ -1107,7 +1107,7 @@ class BlockingLiveEventTwitchAPI(FakeTwitchAPI):
 
 
 @dataclass
-class FakeNotifier(AccountNotificationSender):
+class FakeNotifier(AccountNotificationSender, TrackingNotificationSender):
     sent: list[tuple[int, DiscordCommandResult]] = field(default_factory=list)
     tracking_embeds: list[tuple[int, object]] = field(default_factory=list)
     channel_results: list[tuple[int, DiscordCommandResult]] = field(default_factory=list)

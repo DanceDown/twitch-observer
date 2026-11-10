@@ -33,7 +33,7 @@ from src.services.twitch_runtime import (
     safe_get_twitch_user_by_id,
     safe_get_twitch_user_by_login,
 )
-from src.utils.discord_embeds import TrackingEmbedRequest, build_auto_reply_embed, build_tracking_embed
+from src.utils.discord_embeds import TrackingEmbedRequest
 
 if TYPE_CHECKING:
     from src.services.chat import ChatPatternMatch
@@ -256,19 +256,17 @@ class AutoReplyService:
             reply_as_reply=delivery.matching_reply.reply_as_reply,
             disabled=delivery.matching_reply.disabled,
         )
-        await self.tracking_notifier.send_tracking_embed(
+        await self.tracking_notifier.send_tracking_notification(
             delivery.match.thread.discord_channel_id,
-            build_auto_reply_embed(
-                TrackingEmbedRequest(
-                    event=delivery.event,
-                    pattern=delivery.match.pattern,
-                    thread=delivery.match.thread,
-                    localizer=self.localizer,
-                    channel=delivery.match.source_channel,
-                    reply=rendered_reply,
-                    author_icon_url=author_icon_url,
-                    channel_display_name=None if delivery.channel_user is None else delivery.channel_user.display_name,
-                )
+            TrackingEmbedRequest(
+                event=delivery.event,
+                pattern=delivery.match.pattern,
+                thread=delivery.match.thread,
+                localizer=self.localizer,
+                channel=delivery.match.source_channel,
+                reply=rendered_reply,
+                author_icon_url=author_icon_url,
+                channel_display_name=None if delivery.channel_user is None else delivery.channel_user.display_name,
             ),
             channel_login=None if delivery.channel_user is None else delivery.channel_user.login,
             thread_id=delivery.match.thread.thread_id,
@@ -295,18 +293,16 @@ class AutoReplyService:
                 timeout_seconds=self.metadata_lookup_timeout_seconds,
             ),
         )
-        await self.tracking_notifier.send_tracking_embed(
+        await self.tracking_notifier.send_tracking_notification(
             match.thread.discord_channel_id,
-            build_tracking_embed(
-                TrackingEmbedRequest(
-                    event=event,
-                    pattern=match.pattern,
-                    thread=match.thread,
-                    localizer=self.localizer,
-                    channel=match.source_channel,
-                    author_icon_url=(None if author_user is None else author_user.profile_image_url),
-                    channel_display_name=(None if channel_user is None else channel_user.display_name),
-                )
+            TrackingEmbedRequest(
+                event=event,
+                pattern=match.pattern,
+                thread=match.thread,
+                localizer=self.localizer,
+                channel=match.source_channel,
+                author_icon_url=(None if author_user is None else author_user.profile_image_url),
+                channel_display_name=(None if channel_user is None else channel_user.display_name),
             ),
             channel_login=None if channel_user is None else channel_user.login,
             thread_id=match.thread.thread_id,

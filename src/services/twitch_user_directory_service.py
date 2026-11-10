@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 from src.database.connection import TwitchUserCacheRecord, TwitchUserCacheRepository
 from src.events.twitch_events import TwitchChatMessageEvent
-from src.gateways.twitch_api import TwitchAPIClient, TwitchUser
+from src.gateways.twitch_api import TWITCH_GET_USERS_MAX_IDS, TwitchAPIClient, TwitchUser
 
 
 def _record_to_twitch_user(record: TwitchUserCacheRecord) -> TwitchUser:
@@ -34,6 +34,10 @@ class TwitchUserDirectoryService:
     _user_ids_by_login: dict[str, str] = field(default_factory=dict, init=False)
     _inflight_by_user_id: dict[str, asyncio.Task[TwitchUser]] = field(default_factory=dict, init=False)
     _inflight_by_login: dict[str, asyncio.Task[TwitchUser]] = field(default_factory=dict, init=False)
+    _color_futures: dict[str, asyncio.Future[str | None]] = field(default_factory=dict, init=False)
+    _pending_color_ids: dict[str, None] = field(default_factory=dict, init=False)
+    _color_tasks: set[asyncio.Task[None]] = field(default_factory=set, init=False)
+    _color_flush_task: asyncio.Task[None] | None = field(default=None, init=False)
 
     async def start(self) -> None:
         """Open the underlying Twitch API session."""
@@ -42,7 +46,78 @@ class TwitchUserDirectoryService:
     async def close(self) -> None:
         """Close the underlying Twitch API session."""
         await self._cancel_inflight_refreshes()
+        for task in tuple(self._color_tasks):
+            task.cancel()
+        await asyncio.gather(*self._color_tasks, return_exceptions=True)
+        for future in self._color_futures.values():
+            future.cancel()
+        self._color_futures.clear()
+        self._pending_color_ids.clear()
+        self._color_flush_task = None
         await self.twitch_api.close()
+
+    async def get_user_chat_color_by_id(self, user_id: str) -> str | None:
+        """Load persisted colors first and batch concurrent misses without fetching profiles."""
+        user_id = user_id.strip()
+        if not user_id:
+            return None
+        cached = self._get_record_from_memory_by_id(user_id)
+        if cached is None or cached.chat_color is None:
+            cached = await self.repository.get_by_user_id(user_id)
+            if cached is not None:
+                self._remember_record(cached)
+        if cached is not None and cached.chat_color is not None:
+            return cached.chat_color
+        future = self._color_futures.get(user_id)
+        if future is None:
+            future = asyncio.get_running_loop().create_future()
+            future.add_done_callback(self._consume_color_exception)
+            self._color_futures[user_id] = future
+            self._pending_color_ids[user_id] = None
+            if self._color_flush_task is None:
+                self._color_flush_task = self._start_color_task(self._flush_color_requests())
+        return await asyncio.shield(future)
+
+    @staticmethod
+    def _consume_color_exception(future: asyncio.Future[str | None]) -> None:
+        if not future.cancelled():
+            future.exception()
+
+    def _start_color_task(self, work: Awaitable[None]) -> asyncio.Task[None]:
+        task = asyncio.create_task(work)
+        self._color_tasks.add(task)
+        task.add_done_callback(self._color_tasks.discard)
+        return task
+
+    async def _flush_color_requests(self) -> None:
+        await asyncio.sleep(0.01)
+        user_ids = tuple(self._pending_color_ids)
+        self._pending_color_ids.clear()
+        self._color_flush_task = None
+        for offset in range(0, len(user_ids), TWITCH_GET_USERS_MAX_IDS):
+            self._start_color_task(self._fetch_chat_colors(user_ids[offset : offset + TWITCH_GET_USERS_MAX_IDS]))
+
+    async def _fetch_chat_colors(self, user_ids: tuple[str, ...]) -> None:
+        try:
+            colors = await self.twitch_api.get_user_chat_colors_by_ids(user_ids)
+            records = await self.repository.fill_missing_chat_colors(colors)
+            records_by_id = {record.twitch_user_id: record for record in records}
+            for record in records:
+                self._remember_record(record)
+            for user_id in user_ids:
+                cached = records_by_id.get(user_id) or self._get_record_from_memory_by_id(user_id)
+                color = colors.get(user_id) if cached is None or cached.chat_color is None else cached.chat_color
+                self._color_futures[user_id].set_result(color)
+        except asyncio.CancelledError:
+            for user_id in user_ids:
+                self._color_futures[user_id].cancel()
+            raise
+        except Exception as error:
+            for user_id in user_ids:
+                self._color_futures[user_id].set_exception(error)
+        finally:
+            for user_id in user_ids:
+                self._color_futures.pop(user_id, None)
 
     def get_cached_user_by_login(self, login: str) -> TwitchUser | None:
         """Return an in-memory cached user by login without any I/O."""
@@ -285,13 +360,14 @@ class TwitchUserDirectoryService:
 
     def _remember_api_users(self, users: tuple[TwitchUser, ...]) -> None:
         for user in users:
+            previous = self._users_by_id.get(user.user_id)
             self._remember_record(
                 TwitchUserCacheRecord(
                     twitch_user_id=user.user_id,
                     twitch_login=user.login,
                     display_name=user.display_name,
                     profile_image_url=user.profile_image_url,
-                    chat_color=user.chat_color,
+                    chat_color=user.chat_color if user.chat_color is not None else (None if previous is None else previous.chat_color),
                     updated_at="",
                 )
             )
@@ -317,7 +393,7 @@ class TwitchUserDirectoryService:
         )
 
         self._remember_record(record)
-        return user
+        return _record_to_twitch_user(record)
 
     async def _refresh_user_by_id_uncached(self, user_id: str, *, include_chat_color: bool) -> TwitchUser:
         if include_chat_color:
@@ -333,7 +409,7 @@ class TwitchUserDirectoryService:
         )
 
         self._remember_record(record)
-        return user
+        return _record_to_twitch_user(record)
 
     async def _run_singleflight_login(
         self,

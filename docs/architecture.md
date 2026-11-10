@@ -56,7 +56,9 @@ This is the main runtime reference for the Twitch Observer.
    Discord delivery in IRC message order per Discord target even though worker
    processing happens in parallel. Each Discord target has its own serial sender
    and small send-rate limiter, so one slow or rate-limited channel does not
-   block other channels.
+   block other channels. Tracking and pattern auto-reply notifications carry their
+   view data into this queue. Missing author colors are resolved there before
+   sending, outside the shared chat workers.
 
 ### Live-state flow
 
@@ -175,6 +177,29 @@ cache row for every chat message.
 Parallel cache misses for the same user are deduplicated in-process so only one
 Helix lookup runs per key at a time. Profile images and users without recent IRC
 chat color still require Helix metadata refreshes.
+
+Chat notification colors use the current IRC color first, after any configured
+pattern, channel, or thread override. When IRC has no color, the delivery queue
+asks the directory for the author's color, checking memory and PostgreSQL before
+Helix. The LRU size limits memory usage only; eviction and process restarts do not
+delete persisted colors. Profile-only API refreshes preserve known chat colors.
+
+Concurrent unknown colors are collected for 10 ms, deduplicated by Twitch user
+ID, and fetched through Helix `Get User Chat Color` in batches of at most 100.
+This path does not call `Get Users`. Colors are written back in one database
+query per batch without replacing newer known IRC colors or identity metadata.
+An empty string means Twitch returned no selected color; `NULL` means unknown.
+Users omitted from an API response remain unknown and can be retried later.
+
+Queued notifications prefetch colors concurrently, including multiple messages
+for one target. Each target's sender waits for its own notifications in order;
+slow color requests do not occupy chat workers or another target's sender.
+The short chat metadata timeout does not cut these color requests short. Failed
+lookups and omitted API color records are retried with exponential delays from
+1 to 30 seconds. Warnings identify the user and Discord target. The affected
+target waits until a color is known; only a confirmed empty color uses the gray
+fallback. Shutdown cancels outstanding preparation after the delivery drain
+timeout, so an upstream outage cannot prevent shutdown indefinitely.
 
 The persistent cache is also refreshed by `TwitchMetadataRefreshService` in
 full batched passes on one shared interval

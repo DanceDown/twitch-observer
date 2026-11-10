@@ -50,6 +50,7 @@ def build_runtime(
         stop_timeout_seconds=core.config.discord_tracking_delivery_stop_timeout_seconds,
         per_target_rate_per_second=core.config.discord_tracking_delivery_per_target_rate_per_second,
         per_target_burst=core.config.discord_tracking_delivery_per_target_burst,
+        twitch_colors=core.twitch_directory,
     )
     services.runtime_coordinator.tracking.bind(tracking_delivery_queue)
     services.chat_pipeline.completion_notifier = tracking_delivery_queue

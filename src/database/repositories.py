@@ -254,6 +254,10 @@ class TwitchDeviceFlowRepository:
 class TwitchUserCacheRepository:
     """Persistence interface for Twitch user metadata cached by ID and login."""
 
+    async def fill_missing_chat_colors(self, colors_by_id: dict[str, str]) -> tuple[TwitchUserCacheRecord, ...]:
+        """Fill unknown colors without overwriting newer IRC metadata or user identities."""
+        raise NotImplementedError
+
     async def get_by_user_id(self, twitch_user_id: str) -> TwitchUserCacheRecord | None:  # pragma: no cover
         """Return cached Twitch user metadata by Twitch user ID."""
         raise NotImplementedError

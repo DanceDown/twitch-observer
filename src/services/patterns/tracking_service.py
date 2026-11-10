@@ -31,6 +31,17 @@ logger = logging.getLogger(__name__)
 class TrackingNotificationSender:
     """Interface used by the tracking service to emit Discord embeds."""
 
+    async def send_tracking_notification(
+        self,
+        discord_channel_id: int,
+        request: TrackingEmbedRequest,
+        *,
+        channel_login: str | None = None,
+        thread_id: int | None = None,
+    ) -> None:
+        """Send a tracking request, allowing queued senders to resolve its color later."""
+        await self.send_tracking_embed(discord_channel_id, build_tracking_embed(request), channel_login=channel_login, thread_id=thread_id)
+
     async def reserve_tracking_delivery(self, *, thread_id: int) -> None:
         """Reserve a future tracking delivery slot for one thread."""
         _ = thread_id
@@ -125,18 +136,16 @@ class PatternTrackingService:
             match.thread.discord_channel_id,
         )
         await self.message_repository.mark_message_matched_in_thread(thread_id=match.thread.thread_id, event=event)
-        await self.notifier.send_tracking_embed(
+        await self.notifier.send_tracking_notification(
             match.thread.discord_channel_id,
-            build_tracking_embed(
-                TrackingEmbedRequest(
-                    event=event,
-                    pattern=match.pattern,
-                    thread=match.thread,
-                    localizer=self.localizer,
-                    channel=match.source_channel,
-                    author_icon_url=(None if author_user is None else author_user.profile_image_url),
-                    channel_display_name=(None if channel_user is None else channel_user.display_name),
-                )
+            TrackingEmbedRequest(
+                event=event,
+                pattern=match.pattern,
+                thread=match.thread,
+                localizer=self.localizer,
+                channel=match.source_channel,
+                author_icon_url=(None if author_user is None else author_user.profile_image_url),
+                channel_display_name=(None if channel_user is None else channel_user.display_name),
             ),
             channel_login=None if channel_user is None else channel_user.login,
             thread_id=match.thread.thread_id,

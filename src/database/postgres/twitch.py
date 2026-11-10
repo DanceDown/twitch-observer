@@ -388,6 +388,26 @@ class PostgresTwitchUserCacheRepository(TwitchUserCacheRepository):
 
     database: PostgresDatabase
 
+    async def fill_missing_chat_colors(self, colors_by_id: dict[str, str]) -> tuple[TwitchUserCacheRecord, ...]:
+        """Fill unknown chat colors in one query while preserving concurrent IRC updates."""
+        if not colors_by_id:
+            return ()
+        async with self.database.async_cursor() as cursor:
+            await cursor.execute(
+                """
+                UPDATE twitch_user_cache AS cache
+                SET chat_color = COALESCE(cache.chat_color, colors.color),
+                    updated_at = CASE WHEN cache.chat_color IS NULL THEN NOW() ELSE cache.updated_at END
+                FROM unnest(%s::text[], %s::text[]) AS colors(user_id, color)
+                WHERE cache.twitch_user_id = colors.user_id
+                RETURNING cache.twitch_user_id, cache.twitch_login, cache.display_name,
+                          cache.profile_image_url, cache.chat_color, cache.updated_at
+                """,
+                (list(colors_by_id), [color.strip() for color in colors_by_id.values()]),
+            )
+            rows = await cursor.fetchall()
+        return tuple(self._build_record(row) for row in rows)
+
     async def get_by_user_id(self, twitch_user_id: str) -> TwitchUserCacheRecord | None:
         """Return cached Twitch metadata by Twitch user ID."""
         async with self.database.read_cursor() as cursor:

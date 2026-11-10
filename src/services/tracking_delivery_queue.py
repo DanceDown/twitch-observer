@@ -5,12 +5,14 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import discord
 
 from src.services.chat_delivery_context import ChatMessageCompletionNotifier, get_current_chat_message_sequence
 from src.services.patterns import TrackingNotificationSender
+from src.services.twitch_gateways import TwitchChatColorLookup
+from src.utils.discord_embeds import TrackingEmbedRequest, build_tracking_embed
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +22,8 @@ class _TrackingDelivery:
     discord_channel_id: int
     embed: discord.Embed
     channel_login: str | None
+    request: TrackingEmbedRequest | None = None
+    preparation: asyncio.Task[None] | None = None
 
 
 @dataclass(slots=True)
@@ -77,6 +81,7 @@ class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageComp
     stop_timeout_seconds: float = 30
     per_target_rate_per_second: float = 2
     per_target_burst: int = 5
+    twitch_colors: TwitchChatColorLookup | None = None
     _condition: asyncio.Condition = field(default_factory=asyncio.Condition, init=False)
     _message_states: dict[int, _MessageState] = field(default_factory=dict, init=False)
     _slots_by_key: dict[int, dict[int, _MessageSlot]] = field(default_factory=dict, init=False)
@@ -84,6 +89,7 @@ class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageComp
     _target_states: dict[int, _TargetDeliveryState] = field(default_factory=dict, init=False)
     _stop_requested: bool = field(default=False, init=False)
     _task: asyncio.Task[None] | None = field(default=None, init=False)
+    _preparation_tasks: set[asyncio.Task[None]] = field(default_factory=set, init=False)
 
     async def start(self) -> None:
         """Start the coordinator that releases completed chat-message slots."""
@@ -112,6 +118,9 @@ class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageComp
                 await task
             await self._cancel_target_workers()
         finally:
+            for preparation in tuple(self._preparation_tasks):
+                preparation.cancel()
+            await asyncio.gather(*self._preparation_tasks, return_exceptions=True)
             async with self._condition:
                 self._message_states.clear()
                 self._slots_by_key.clear()
@@ -160,23 +169,73 @@ class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageComp
         thread_id: int | None = None,
     ) -> None:
         """Queue or directly send one prepared tracking embed."""
-        sequence = get_current_chat_message_sequence()
         delivery = _TrackingDelivery(
             discord_channel_id=discord_channel_id,
             embed=embed,
             channel_login=channel_login,
         )
+        await self._enqueue_delivery(delivery, thread_id=thread_id)
+
+    async def send_tracking_notification(
+        self,
+        discord_channel_id: int,
+        request: TrackingEmbedRequest,
+        *,
+        channel_login: str | None = None,
+        thread_id: int | None = None,
+    ) -> None:
+        """Queue view data so missing colors are resolved only by the target's sender."""
+        await self._enqueue_delivery(
+            _TrackingDelivery(discord_channel_id, build_tracking_embed(request), channel_login, request), thread_id=thread_id
+        )
+
+    async def _enqueue_delivery(self, delivery: _TrackingDelivery, *, thread_id: int | None) -> None:
+        sequence = get_current_chat_message_sequence()
         if self._task is None:
-            await self._send_direct(discord_channel_id, embed, channel_login=channel_login)
+            await self._prepare_delivery_color(delivery)
+            await self._send_direct(delivery.discord_channel_id, delivery.embed, channel_login=delivery.channel_login)
             return
         if sequence is None:
             self._queue_target_delivery(delivery)
             return
-        ordering_key = self._ordering_key(thread_id=thread_id, discord_channel_id=discord_channel_id)
+        ordering_key = self._ordering_key(thread_id=thread_id, discord_channel_id=delivery.discord_channel_id)
         async with self._condition:
             slot = self._reserve_slot_locked(ordering_key=ordering_key, sequence=sequence)
             slot.deliveries.append(delivery)
             self._condition.notify_all()
+
+    async def _prepare_delivery_color(self, delivery: _TrackingDelivery) -> None:
+        request = delivery.request
+        if request is None or self.twitch_colors is None:
+            return
+        if request.pattern.color or (request.channel is not None and request.channel.color) or request.thread.color or request.event.color:
+            return
+        if not request.event.author_id:
+            return
+        retry_seconds = 1.0
+        while True:
+            try:
+                color = await self.twitch_colors.get_user_chat_color_by_id(request.event.author_id)
+                if color is not None:
+                    break
+                logger.warning(
+                    "Twitch returned no color record for user_id=%s discord_channel_id=%s; retrying in %ss.",
+                    request.event.author_id,
+                    delivery.discord_channel_id,
+                    retry_seconds,
+                )
+            except Exception:
+                logger.warning(
+                    "Could not resolve tracking color for user_id=%s discord_channel_id=%s; retrying in %ss.",
+                    request.event.author_id,
+                    delivery.discord_channel_id,
+                    retry_seconds,
+                    exc_info=True,
+                )
+            await asyncio.sleep(retry_seconds)
+            retry_seconds = min(30.0, retry_seconds * 2)
+        if color:
+            delivery.embed = build_tracking_embed(replace(request, event=replace(request.event, color=color)))
 
     async def _run_loop(self) -> None:
         while True:
@@ -255,6 +314,10 @@ class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageComp
         await self.sender.send_tracking_embed(discord_channel_id, embed, channel_login=channel_login)
 
     def _queue_target_delivery(self, delivery: _TrackingDelivery) -> None:
+        if delivery.request is not None:
+            delivery.preparation = asyncio.create_task(self._prepare_delivery_color(delivery))
+            self._preparation_tasks.add(delivery.preparation)
+            delivery.preparation.add_done_callback(self._preparation_tasks.discard)
         state = self._get_or_create_target_state(delivery.discord_channel_id)
         state.queue.put_nowait(delivery)
 
@@ -282,8 +345,10 @@ class OrderedTrackingDeliveryService(TrackingNotificationSender, ChatMessageComp
             try:
                 if delivery is None:
                     return
-                await state.limiter.wait_for_slot()
                 try:
+                    if delivery.preparation is not None:
+                        await delivery.preparation
+                    await state.limiter.wait_for_slot()
                     await self._send_direct(
                         delivery.discord_channel_id,
                         delivery.embed,

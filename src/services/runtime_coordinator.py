@@ -12,6 +12,7 @@ from src.services.account_support import AccountNotificationSender
 from src.services.channel_event_notification_service import ChannelEventNotificationSender
 from src.services.discord_presence_service import DiscordPresenceStatusSender
 from src.services.patterns import TrackingNotificationSender
+from src.utils.discord_embeds import TrackingEmbedRequest
 
 
 class TrackedChannelsChangedNotifier:
@@ -37,6 +38,18 @@ class TrackingRuntimeRelay(TrackingNotificationSender):
         if self.sender is None:
             return
         await self.sender.reserve_tracking_delivery(thread_id=thread_id)
+
+    async def send_tracking_notification(
+        self,
+        discord_channel_id: int,
+        request: TrackingEmbedRequest,
+        *,
+        channel_login: str | None = None,
+        thread_id: int | None = None,
+    ) -> None:
+        """Forward a tracking request to the delivery queue before resolving its color."""
+        if self.sender is not None:
+            await self.sender.send_tracking_notification(discord_channel_id, request, channel_login=channel_login, thread_id=thread_id)
 
     async def send_tracking_embed(
         self,

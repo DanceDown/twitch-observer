@@ -49,6 +49,15 @@ class TwitchUserLookup(Protocol):
 
 
 @runtime_checkable
+class TwitchChatColorLookup(Protocol):
+    """Resolve a chat color independently of profile metadata."""
+
+    async def get_user_chat_color_by_id(self, user_id: str) -> str | None:
+        """Return a cached color or wait for a batched color-only lookup."""
+        ...
+
+
+@runtime_checkable
 class TwitchUserChatColorLookup(Protocol):
     """Optional Twitch lookup extension for caller paths that need chat-name colors."""
 

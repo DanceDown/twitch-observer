@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 
 import pytest
@@ -26,6 +26,16 @@ class InMemoryTwitchUserCacheRepository(TwitchUserCacheRepository):
     by_id: dict[str, TwitchUserCacheRecord] = field(default_factory=dict)
     observe_calls: int = 0
 
+    async def fill_missing_chat_colors(self, colors_by_id: dict[str, str]) -> tuple[TwitchUserCacheRecord, ...]:
+        records = []
+        for user_id, color in colors_by_id.items():
+            record = self.by_id.get(user_id)
+            if record is not None:
+                record = replace(record, chat_color=color if record.chat_color is None else record.chat_color)
+                self.by_id[user_id] = record
+                records.append(record)
+        return tuple(records)
+
     async def get_by_user_id(self, twitch_user_id: str) -> TwitchUserCacheRecord | None:
         return self.by_id.get(twitch_user_id)
 
@@ -46,12 +56,13 @@ class InMemoryTwitchUserCacheRepository(TwitchUserCacheRepository):
         chat_color: str | None = None,
     ) -> TwitchUserCacheRecord:
         timestamp = datetime.now(UTC).isoformat()
+        existing = self.by_id.get(twitch_user_id)
         record = TwitchUserCacheRecord(
             twitch_user_id=twitch_user_id,
             twitch_login=twitch_login.strip().lower(),
             display_name=display_name,
             profile_image_url=profile_image_url,
-            chat_color=chat_color,
+            chat_color=chat_color if chat_color is not None else (None if existing is None else existing.chat_color),
             updated_at=timestamp,
         )
         self.by_id[twitch_user_id] = record
@@ -103,6 +114,14 @@ class FakeTwitchAPI:
     id_color_requests: list[str] = field(default_factory=list)
     live_requests: list[list[str]] = field(default_factory=list)
     delay_seconds: float = 0
+    color_requests: list[tuple[str, ...]] = field(default_factory=list)
+    colors_by_id: dict[str, str] = field(default_factory=dict)
+
+    async def get_user_chat_colors_by_ids(self, user_ids: tuple[str, ...]) -> dict[str, str]:
+        self.color_requests.append(user_ids)
+        if self.delay_seconds:
+            await asyncio.sleep(self.delay_seconds)
+        return {user_id: self.colors_by_id[user_id] for user_id in user_ids if user_id in self.colors_by_id}
 
     async def start(self) -> None:
         return None

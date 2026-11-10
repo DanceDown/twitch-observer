@@ -78,6 +78,29 @@ The background refresh worker also revalidates the full persistent cache in
 batches on one shared interval. `updated_at` tracks when stored metadata last
 changed; the schema no longer stores a separate "last refresh" timestamp.
 
+`chat_color IS NULL` means the color is unknown. An empty string means Twitch
+confirmed that the user has no selected color. Known colors survive profile-only
+refreshes, memory-cache eviction, and restarts. Notification color lookups fill
+missing values in batches without replacing newer IRC metadata.
+
+To inspect one user's persisted color on a running installation, use this
+read-only query (replace the login as needed):
+
+```sql
+SELECT twitch_user_id, twitch_login, display_name, chat_color, updated_at,
+       CASE
+           WHEN chat_color IS NULL THEN 'unknown'
+           WHEN chat_color = '' THEN 'no selected color'
+           ELSE 'known color'
+       END AS color_state
+FROM twitch_user_cache
+WHERE twitch_login = 'bastighg';
+```
+
+The configured memory-cache size limits only the in-process LRU, not this table.
+See [Architecture](architecture.md#twitch-users) for notification lookup and
+retry behavior.
+
 ## Tracking scope
 
 ### `channel`
