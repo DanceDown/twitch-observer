@@ -275,7 +275,7 @@ class PatternHomeView(BaseFormView):
                     offline_state=OfflineScope(self.state.offline_state),
                     case_sensitive=self.state.case_sensitive,
                     color=self.state.color,
-                    clear_color=False,
+                    clear_color=self.state.color is None,
                     priority=self.state.priority,
                 ),
             )

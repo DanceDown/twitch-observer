@@ -136,6 +136,13 @@ Supported rule settings:
 - custom color
 - priority (`0`..`9`, optional)
 
+In the editor, empty the color field and save to remove the pattern's color
+override. The embed then inherits the channel/context color or Twitch user color.
+White (`#ffffff`) is an explicit color override.
+
+Direct edits preserve the saved color when `color` is omitted. Use
+`clear_color:true` to remove it.
+
 ### `/reply`
 
 Manage auto-replies.
